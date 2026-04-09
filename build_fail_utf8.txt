@@ -1,0 +1,898 @@
+﻿Reusing configuration cache.
+> Task :feature:auth:preBuild UP-TO-DATE
+> Task :core:room:preBuild UP-TO-DATE
+> Task :feature:profile:preBuild UP-TO-DATE
+> Task :data:preBuild UP-TO-DATE
+> Task :core:android:preBuild UP-TO-DATE
+> Task :sync:preBuild UP-TO-DATE
+> Task :core:network:preBuild UP-TO-DATE
+> Task :feature:home:preBuild UP-TO-DATE
+> Task :core:preferences:preBuild UP-TO-DATE
+> Task :feature:settings:preBuild UP-TO-DATE
+> Task :core:ui:preBuild UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :feature:auth:preDebugBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :core:preferences:preDebugBuild UP-TO-DATE
+> Task :app:injectCrashlyticsVersionControlInfoDebug UP-TO-DATE
+> Task :app:debugOssDependencyTask UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :app:injectCrashlyticsMappingFileIdDebug UP-TO-DATE
+> Task :core:android:preDebugBuild UP-TO-DATE
+> Task :sync:preDebugBuild UP-TO-DATE
+> Task :data:preDebugBuild UP-TO-DATE
+> Task :core:android:extractDebugSupportedLocales UP-TO-DATE
+> Task :feature:home:preDebugBuild UP-TO-DATE
+> Task :core:preferences:extractDebugSupportedLocales UP-TO-DATE
+> Task :sync:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:room:preDebugBuild UP-TO-DATE
+> Task :feature:auth:extractDebugSupportedLocales UP-TO-DATE
+> Task :feature:settings:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :firebase:auth:preBuild UP-TO-DATE
+> Task :feature:profile:preDebugBuild UP-TO-DATE
+> Task :firebase:analytics:preBuild UP-TO-DATE
+> Task :core:room:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:ui:preDebugBuild UP-TO-DATE
+> Task :firebase:firestore:preBuild UP-TO-DATE
+> Task :core:network:preDebugBuild UP-TO-DATE
+> Task :firebase:auth:preDebugBuild UP-TO-DATE
+> Task :data:extractDebugSupportedLocales UP-TO-DATE
+> Task :feature:profile:extractDebugSupportedLocales UP-TO-DATE
+> Task :firebase:analytics:preDebugBuild UP-TO-DATE
+> Task :firebase:firestore:preDebugBuild UP-TO-DATE
+> Task :feature:home:extractDebugSupportedLocales UP-TO-DATE
+> Task :sync:processDebugNavigationResources UP-TO-DATE
+> Task :feature:settings:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:ui:extractDebugSupportedLocales UP-TO-DATE
+> Task :firebase:firestore:extractDebugSupportedLocales UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :data:processDebugNavigationResources UP-TO-DATE
+> Task :core:network:extractDebugSupportedLocales UP-TO-DATE
+> Task :firebase:auth:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:network:processDebugNavigationResources UP-TO-DATE
+> Task :core:preferences:processDebugNavigationResources UP-TO-DATE
+> Task :core:android:processDebugNavigationResources UP-TO-DATE
+> Task :core:ui:processDebugNavigationResources UP-TO-DATE
+> Task :feature:home:processDebugNavigationResources UP-TO-DATE
+> Task :feature:auth:processDebugNavigationResources UP-TO-DATE
+> Task :core:room:processDebugNavigationResources UP-TO-DATE
+> Task :firebase:analytics:extractDebugSupportedLocales UP-TO-DATE
+> Task :firebase:firestore:processDebugNavigationResources UP-TO-DATE
+> Task :firebase:auth:processDebugNavigationResources UP-TO-DATE
+> Task :firebase:analytics:processDebugNavigationResources UP-TO-DATE
+> Task :feature:settings:processDebugNavigationResources UP-TO-DATE
+> Task :sync:generateDebugResources UP-TO-DATE
+> Task :feature:profile:processDebugNavigationResources UP-TO-DATE
+> Task :core:android:generateDebugResources UP-TO-DATE
+> Task :core:preferences:generateDebugResources UP-TO-DATE
+> Task :core:network:javaPreCompileDebug UP-TO-DATE
+> Task :core:room:generateDebugResources UP-TO-DATE
+> Task :core:room:javaPreCompileDebug UP-TO-DATE
+> Task :core:preferences:javaPreCompileDebug UP-TO-DATE
+> Task :core:network:generateDebugResources UP-TO-DATE
+> Task :core:android:packageDebugResources UP-TO-DATE
+> Task :firebase:firestore:generateDebugResources UP-TO-DATE
+> Task :core:android:javaPreCompileDebug UP-TO-DATE
+> Task :data:generateDebugResources UP-TO-DATE
+> Task :firebase:auth:generateDebugResources UP-TO-DATE
+> Task :firebase:auth:javaPreCompileDebug UP-TO-DATE
+> Task :core:network:packageDebugResources UP-TO-DATE
+> Task :core:room:packageDebugResources UP-TO-DATE
+> Task :data:javaPreCompileDebug UP-TO-DATE
+> Task :core:android:parseDebugLocalResources UP-TO-DATE
+> Task :firebase:auth:generateDebugBuildConfig UP-TO-DATE
+> Task :core:room:parseDebugLocalResources UP-TO-DATE
+> Task :core:network:generateDebugBuildConfig UP-TO-DATE
+> Task :sync:javaPreCompileDebug UP-TO-DATE
+> Task :core:network:parseDebugLocalResources UP-TO-DATE
+> Task :core:ui:generateDebugResources UP-TO-DATE
+> Task :core:ui:javaPreCompileDebug UP-TO-DATE
+> Task :feature:auth:generateDebugResources UP-TO-DATE
+> Task :feature:auth:javaPreCompileDebug UP-TO-DATE
+> Task :firebase:firestore:javaPreCompileDebug UP-TO-DATE
+> Task :core:room:generateDebugRFile UP-TO-DATE
+> Task :data:packageDebugResources UP-TO-DATE
+> Task :firebase:auth:packageDebugResources UP-TO-DATE
+> Task :core:android:generateDebugRFile UP-TO-DATE
+> Task :firebase:firestore:packageDebugResources UP-TO-DATE
+> Task :core:preferences:packageDebugResources UP-TO-DATE
+> Task :sync:packageDebugResources UP-TO-DATE
+> Task :core:ui:packageDebugResources UP-TO-DATE
+> Task :core:network:generateDebugRFile UP-TO-DATE
+> Task :feature:home:javaPreCompileDebug UP-TO-DATE
+> Task :core:ui:parseDebugLocalResources UP-TO-DATE
+> Task :core:preferences:parseDebugLocalResources UP-TO-DATE
+> Task :feature:profile:javaPreCompileDebug UP-TO-DATE
+> Task :feature:profile:generateDebugResources UP-TO-DATE
+> Task :feature:settings:javaPreCompileDebug UP-TO-DATE
+> Task :firebase:auth:parseDebugLocalResources UP-TO-DATE
+> Task :firebase:analytics:generateDebugResources UP-TO-DATE
+> Task :feature:home:generateDebugResources UP-TO-DATE
+> Task :data:parseDebugLocalResources UP-TO-DATE
+> Task :firebase:analytics:javaPreCompileDebug UP-TO-DATE
+> Task :core:android:kspDebugKotlin UP-TO-DATE
+> Task :firebase:firestore:parseDebugLocalResources UP-TO-DATE
+> Task :feature:settings:generateDebugResources UP-TO-DATE
+> Task :sync:parseDebugLocalResources UP-TO-DATE
+> Task :data:writeDebugAarMetadata UP-TO-DATE
+> Task :core:ui:generateDebugRFile UP-TO-DATE
+> Task :feature:auth:packageDebugResources UP-TO-DATE
+> Task :feature:profile:packageDebugResources UP-TO-DATE
+> Task :data:generateDebugRFile UP-TO-DATE
+> Task :firebase:auth:generateDebugRFile UP-TO-DATE
+> Task :core:preferences:generateDebugRFile UP-TO-DATE
+> Task :firebase:analytics:packageDebugResources UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :feature:home:packageDebugResources UP-TO-DATE
+> Task :core:android:writeDebugAarMetadata UP-TO-DATE
+> Task :core:network:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:home:parseDebugLocalResources UP-TO-DATE
+> Task :core:preferences:writeDebugAarMetadata UP-TO-DATE
+> Task :sync:writeDebugAarMetadata UP-TO-DATE
+> Task :firebase:firestore:generateDebugRFile UP-TO-DATE
+> Task :firebase:analytics:parseDebugLocalResources UP-TO-DATE
+> Task :feature:settings:packageDebugResources UP-TO-DATE
+> Task :core:room:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:auth:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:home:writeDebugAarMetadata UP-TO-DATE
+> Task :core:ui:writeDebugAarMetadata UP-TO-DATE
+> Task :firebase:analytics:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:auth:parseDebugLocalResources UP-TO-DATE
+> Task :feature:profile:parseDebugLocalResources UP-TO-DATE
+> Task :feature:profile:writeDebugAarMetadata UP-TO-DATE
+> Task :firebase:auth:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:settings:parseDebugLocalResources UP-TO-DATE
+> Task :sync:generateDebugRFile UP-TO-DATE
+> Task :firebase:analytics:generateDebugRFile UP-TO-DATE
+> Task :firebase:firestore:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:settings:writeDebugAarMetadata UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :data:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:home:generateDebugRFile UP-TO-DATE
+> Task :feature:auth:generateDebugRFile UP-TO-DATE
+> Task :core:android:extractDeepLinksDebug UP-TO-DATE
+> Task :sync:extractDeepLinksDebug UP-TO-DATE
+> Task :core:network:extractDeepLinksDebug UP-TO-DATE
+> Task :data:processDebugManifest UP-TO-DATE
+> Task :sync:processDebugManifest UP-TO-DATE
+> Task :core:room:extractDeepLinksDebug UP-TO-DATE
+> Task :core:preferences:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:settings:generateDebugRFile UP-TO-DATE
+> Task :core:ui:extractDeepLinksDebug UP-TO-DATE
+> Task :core:network:processDebugManifest UP-TO-DATE
+> Task :feature:profile:generateDebugRFile UP-TO-DATE
+> Task :feature:home:extractDeepLinksDebug UP-TO-DATE
+> Task :core:preferences:processDebugManifest UP-TO-DATE
+> Task :core:android:processDebugManifest UP-TO-DATE
+> Task :feature:auth:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:settings:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:profile:extractDeepLinksDebug UP-TO-DATE
+> Task :firebase:analytics:extractDeepLinksDebug UP-TO-DATE
+> Task :core:room:processDebugManifest UP-TO-DATE
+> Task :feature:auth:processDebugManifest UP-TO-DATE
+> Task :core:ui:processDebugManifest UP-TO-DATE
+> Task :feature:home:processDebugManifest UP-TO-DATE
+> Task :firebase:auth:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:profile:processDebugManifest UP-TO-DATE
+> Task :firebase:firestore:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:settings:processDebugManifest UP-TO-DATE
+> Task :firebase:auth:processDebugManifest UP-TO-DATE
+> Task :sync:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:network:mapDebugSourceSetPaths UP-TO-DATE
+> Task :data:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:preferences:mapDebugSourceSetPaths UP-TO-DATE
+> Task :firebase:firestore:processDebugManifest UP-TO-DATE
+> Task :firebase:analytics:processDebugManifest UP-TO-DATE
+> Task :core:room:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:ui:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:network:compileDebugLibraryResources UP-TO-DATE
+> Task :sync:compileDebugLibraryResources UP-TO-DATE
+> Task :feature:home:mapDebugSourceSetPaths UP-TO-DATE
+> Task :feature:auth:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:ui:compileDebugLibraryResources UP-TO-DATE
+> Task :feature:profile:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:room:compileDebugLibraryResources UP-TO-DATE
+> Task :core:android:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:preferences:compileDebugLibraryResources UP-TO-DATE
+> Task :feature:home:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase:analytics:mapDebugSourceSetPaths UP-TO-DATE
+> Task :feature:settings:mapDebugSourceSetPaths UP-TO-DATE
+> Task :feature:profile:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase:analytics:compileDebugLibraryResources UP-TO-DATE
+> Task :data:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase:firestore:mapDebugSourceSetPaths UP-TO-DATE
+> Task :firebase:auth:mapDebugSourceSetPaths UP-TO-DATE
+> Task :feature:auth:compileDebugLibraryResources UP-TO-DATE
+> Task :feature:settings:compileDebugLibraryResources UP-TO-DATE
+> Task :core:android:compileDebugLibraryResources UP-TO-DATE
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :firebase:firestore:compileDebugLibraryResources UP-TO-DATE
+> Task :sync:preDebugUnitTestBuild UP-TO-DATE
+> Task :firebase:auth:compileDebugLibraryResources UP-TO-DATE
+> Task :data:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:preferences:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:network:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :core:android:preDebugUnitTestBuild UP-TO-DATE
+> Task :data:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :core:ui:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:room:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:network:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :feature:auth:preDebugUnitTestBuild UP-TO-DATE
+> Task :core:preferences:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :core:android:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :core:ui:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :sync:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :core:room:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :core:android:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :feature:home:preDebugUnitTestBuild UP-TO-DATE
+> Task :feature:auth:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :feature:home:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :feature:profile:preDebugUnitTestBuild UP-TO-DATE
+> Task :data:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :core:preferences:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :core:room:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :feature:settings:preDebugUnitTestBuild UP-TO-DATE
+> Task :feature:profile:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :core:network:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :feature:settings:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :firebase:analytics:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :sync:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :core:ui:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :firebase:firestore:preDebugUnitTestBuild UP-TO-DATE
+> Task :firebase:auth:preDebugUnitTestBuild UP-TO-DATE
+> Task :feature:auth:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :firebase:analytics:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :firebase:firestore:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :firebase:auth:javaPreCompileDebugUnitTest UP-TO-DATE
+> Task :core:android:compileDebugKotlin UP-TO-DATE
+> Task :core:android:processDebugJavaRes UP-TO-DATE
+> Task :firebase:firestore:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :feature:home:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :core:android:compileDebugJavaWithJavac UP-TO-DATE
+> Task :firebase:analytics:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :firebase:auth:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :core:android:transformDebugClassesWithAsm UP-TO-DATE
+> Task :feature:profile:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :feature:settings:generateDebugUnitTestStubRFile UP-TO-DATE
+> Task :core:android:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:android:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:android:kspDebugUnitTestKotlin NO-SOURCE
+> Task :core:android:compileDebugUnitTestKotlin NO-SOURCE
+> Task :core:android:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :core:android:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :core:android:processDebugUnitTestJavaRes NO-SOURCE
+> Task :core:preferences:kspDebugKotlin UP-TO-DATE
+> Task :firebase:auth:kspDebugKotlin UP-TO-DATE
+> Task :core:room:kspDebugKotlin UP-TO-DATE
+> Task :firebase:firestore:kspDebugKotlin UP-TO-DATE
+> Task :firebase:analytics:kspDebugKotlin UP-TO-DATE
+> Task :core:network:kspDebugKotlin UP-TO-DATE
+> Task :core:android:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :core:android:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :core:android:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :core:android:testDebugUnitTest NO-SOURCE
+> Task :core:ui:compileDebugKotlin UP-TO-DATE
+> Task :core:room:compileDebugKotlin UP-TO-DATE
+> Task :firebase:analytics:compileDebugKotlin UP-TO-DATE
+> Task :core:ui:processDebugJavaRes UP-TO-DATE
+> Task :core:room:processDebugJavaRes UP-TO-DATE
+> Task :core:ui:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:ui:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :firebase:analytics:processDebugJavaRes UP-TO-DATE
+> Task :firebase:firestore:compileDebugKotlin UP-TO-DATE
+> Task :core:room:compileDebugJavaWithJavac UP-TO-DATE
+> Task :firebase:auth:compileDebugKotlin UP-TO-DATE
+> Task :core:ui:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:preferences:compileDebugKotlin UP-TO-DATE
+> Task :firebase:analytics:compileDebugJavaWithJavac UP-TO-DATE
+> Task :core:preferences:processDebugJavaRes UP-TO-DATE
+> Task :firebase:firestore:processDebugJavaRes UP-TO-DATE
+> Task :firebase:auth:compileDebugJavaWithJavac UP-TO-DATE
+> Task :core:preferences:compileDebugJavaWithJavac UP-TO-DATE
+> Task :firebase:firestore:compileDebugJavaWithJavac UP-TO-DATE
+> Task :core:room:transformDebugClassesWithAsm UP-TO-DATE
+> Task :core:ui:compileDebugUnitTestKotlin NO-SOURCE
+> Task :firebase:auth:processDebugJavaRes UP-TO-DATE
+> Task :core:room:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:room:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :firebase:analytics:transformDebugClassesWithAsm UP-TO-DATE
+> Task :core:ui:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :core:ui:processDebugUnitTestJavaRes NO-SOURCE
+> Task :firebase:analytics:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:room:kspDebugUnitTestKotlin NO-SOURCE
+> Task :core:ui:testDebugUnitTest NO-SOURCE
+> Task :firebase:analytics:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:preferences:transformDebugClassesWithAsm UP-TO-DATE
+> Task :firebase:analytics:kspDebugUnitTestKotlin NO-SOURCE
+> Task :core:preferences:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:room:compileDebugUnitTestKotlin NO-SOURCE
+> Task :core:preferences:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :firebase:auth:transformDebugClassesWithAsm UP-TO-DATE
+> Task :core:preferences:kspDebugUnitTestKotlin NO-SOURCE
+> Task :firebase:auth:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:room:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :core:room:processDebugUnitTestJavaRes NO-SOURCE
+> Task :firebase:auth:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :firebase:firestore:transformDebugClassesWithAsm UP-TO-DATE
+> Task :firebase:analytics:compileDebugUnitTestKotlin NO-SOURCE
+> Task :core:room:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :firebase:firestore:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :firebase:firestore:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :firebase:auth:kspDebugUnitTestKotlin NO-SOURCE
+> Task :firebase:analytics:processDebugUnitTestJavaRes NO-SOURCE
+> Task :firebase:analytics:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :core:preferences:compileDebugUnitTestKotlin NO-SOURCE
+> Task :core:network:compileDebugKotlin UP-TO-DATE
+> Task :firebase:analytics:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :firebase:firestore:kspDebugUnitTestKotlin NO-SOURCE
+> Task :core:preferences:processDebugUnitTestJavaRes NO-SOURCE
+> Task :core:preferences:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :core:preferences:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :core:network:processDebugJavaRes UP-TO-DATE
+> Task :core:network:compileDebugJavaWithJavac UP-TO-DATE
+> Task :firebase:auth:compileDebugUnitTestKotlin NO-SOURCE
+> Task :firebase:firestore:compileDebugUnitTestKotlin NO-SOURCE
+> Task :firebase:auth:processDebugUnitTestJavaRes NO-SOURCE
+> Task :firebase:auth:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :firebase:auth:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :core:room:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :firebase:firestore:processDebugUnitTestJavaRes NO-SOURCE
+> Task :firebase:firestore:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :firebase:firestore:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :core:room:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :core:preferences:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :firebase:analytics:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :core:preferences:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :core:network:transformDebugClassesWithAsm UP-TO-DATE
+> Task :firebase:analytics:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :core:network:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:network:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:room:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :core:preferences:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :core:network:kspDebugUnitTestKotlin NO-SOURCE
+> Task :core:preferences:testDebugUnitTest NO-SOURCE
+> Task :firebase:analytics:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :core:room:testDebugUnitTest NO-SOURCE
+> Task :firebase:auth:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :firebase:firestore:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :core:network:compileDebugUnitTestKotlin NO-SOURCE
+> Task :firebase:auth:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :firebase:analytics:testDebugUnitTest NO-SOURCE
+> Task :firebase:firestore:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :core:network:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :core:network:processDebugUnitTestJavaRes NO-SOURCE
+> Task :core:network:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :firebase:auth:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :firebase:firestore:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :data:kspDebugKotlin UP-TO-DATE
+> Task :firebase:firestore:testDebugUnitTest NO-SOURCE
+> Task :firebase:auth:testDebugUnitTest NO-SOURCE
+> Task :core:network:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :core:network:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :core:network:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :core:network:testDebugUnitTest NO-SOURCE
+> Task :app:debugOssLicensesTask UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:extractDebugSupportedLocales UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :app:generateDebugLocaleConfig UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :data:compileDebugKotlin UP-TO-DATE
+> Task :data:processDebugJavaRes UP-TO-DATE
+> Task :data:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :data:transformDebugClassesWithAsm UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :data:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :data:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :data:kspDebugUnitTestKotlin NO-SOURCE
+> Task :data:compileDebugUnitTestKotlin NO-SOURCE
+> Task :data:processDebugUnitTestJavaRes NO-SOURCE
+> Task :data:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :data:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :sync:kspDebugKotlin UP-TO-DATE
+> Task :data:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :feature:home:kspDebugKotlin UP-TO-DATE
+> Task :feature:profile:kspDebugKotlin UP-TO-DATE
+> Task :feature:auth:kspDebugKotlin UP-TO-DATE
+> Task :data:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :feature:settings:kspDebugKotlin UP-TO-DATE
+> Task :data:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :data:testDebugUnitTest NO-SOURCE
+> Task :sync:compileDebugKotlin UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :sync:processDebugJavaRes UP-TO-DATE
+> Task :sync:compileDebugJavaWithJavac UP-TO-DATE
+> Task :feature:profile:compileDebugKotlin UP-TO-DATE
+> Task :sync:transformDebugClassesWithAsm UP-TO-DATE
+> Task :feature:profile:processDebugJavaRes UP-TO-DATE
+> Task :sync:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :sync:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :feature:settings:compileDebugKotlin UP-TO-DATE
+> Task :feature:profile:compileDebugJavaWithJavac UP-TO-DATE
+> Task :sync:kspDebugUnitTestKotlin NO-SOURCE
+> Task :feature:home:compileDebugKotlin UP-TO-DATE
+> Task :feature:settings:processDebugJavaRes UP-TO-DATE
+> Task :feature:home:processDebugJavaRes UP-TO-DATE
+> Task :feature:auth:compileDebugKotlin UP-TO-DATE
+> Task :feature:home:compileDebugJavaWithJavac UP-TO-DATE
+> Task :sync:compileDebugUnitTestKotlin NO-SOURCE
+> Task :feature:settings:compileDebugJavaWithJavac UP-TO-DATE
+> Task :feature:auth:processDebugJavaRes UP-TO-DATE
+> Task :sync:processDebugUnitTestJavaRes NO-SOURCE
+> Task :sync:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :sync:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :feature:auth:compileDebugJavaWithJavac UP-TO-DATE
+> Task :feature:profile:transformDebugClassesWithAsm UP-TO-DATE
+> Task :feature:home:transformDebugClassesWithAsm UP-TO-DATE
+> Task :feature:profile:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:home:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:home:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :feature:profile:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :feature:settings:transformDebugClassesWithAsm UP-TO-DATE
+> Task :feature:settings:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:settings:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :sync:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :feature:home:kspDebugUnitTestKotlin NO-SOURCE
+> Task :feature:profile:kspDebugUnitTestKotlin NO-SOURCE
+> Task :sync:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :feature:settings:kspDebugUnitTestKotlin NO-SOURCE
+> Task :feature:auth:transformDebugClassesWithAsm UP-TO-DATE
+> Task :feature:home:compileDebugUnitTestKotlin NO-SOURCE
+> Task :feature:profile:compileDebugUnitTestKotlin NO-SOURCE
+> Task :feature:auth:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:auth:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :feature:settings:compileDebugUnitTestKotlin NO-SOURCE
+> Task :feature:home:processDebugUnitTestJavaRes NO-SOURCE
+> Task :feature:home:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :feature:home:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :feature:profile:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :feature:profile:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :feature:auth:kspDebugUnitTestKotlin NO-SOURCE
+> Task :feature:settings:processDebugUnitTestJavaRes NO-SOURCE
+> Task :feature:profile:processDebugUnitTestJavaRes NO-SOURCE
+> Task :feature:settings:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :feature:settings:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :sync:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :feature:auth:compileDebugUnitTestKotlin NO-SOURCE
+> Task :feature:auth:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :sync:testDebugUnitTest NO-SOURCE
+> Task :feature:auth:processDebugUnitTestJavaRes NO-SOURCE
+> Task :feature:auth:hiltSyncDebugUnitTest UP-TO-DATE
+> Task :feature:home:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :feature:profile:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :feature:settings:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :feature:profile:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :feature:home:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :feature:settings:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :feature:auth:hiltAggregateDepsDebugUnitTest UP-TO-DATE
+> Task :feature:auth:hiltJavaCompileDebugUnitTest NO-SOURCE
+> Task :feature:home:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :feature:profile:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :feature:settings:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :feature:auth:transformDebugUnitTestClassesWithAsm UP-TO-DATE
+> Task :feature:settings:testDebugUnitTest NO-SOURCE
+> Task :feature:home:testDebugUnitTest NO-SOURCE
+> Task :feature:profile:testDebugUnitTest NO-SOURCE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :feature:auth:testDebugUnitTest NO-SOURCE
+
+> Task :app:compileDebugKotlin FAILED
+./gradlew : e: file:///C:
+/Users/naoui/Desktop/Proj
+ets/PFE/app/src/main/kotl
+in/com/mobicloud/data/loc
+al/MobicloudDatabase.kt:3
+:17 Unresolved reference 
+'room'.
+At line:1 char:1
++ ./gradlew 
+testDebugUnitTest 
+--tests "com.mobicloud.da
+ta.local.dao.Cat ...
++ ~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo       
+       : NotSpecified:   
+  (e: file:///C:/U...f   
+ erence 'room'.:Strin    
+g) [], RemoteExcepti    
+on
+    + FullyQualifiedErro 
+   rId : NativeCommandE  
+  rror
+ 
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/Mobicloud
+Database.kt:4:17 
+Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/Mobicloud
+Database.kt:9:2 
+Unresolved reference 
+'Database'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/Mobicloud
+Database.kt:17:36 
+Unresolved reference 
+'RoomDatabase'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:3:17 Unresolved 
+reference 'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:4:17 Unresolved 
+reference 'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:5:17 Unresolved 
+reference 'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:6:17 Unresolved 
+reference 'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:7:17 Unresolved 
+reference 'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:13:2 Unresolved 
+reference 'Dao'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:15:6 Unresolved 
+reference 'Transaction'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:16:6 Unresolved 
+reference 'Query'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:19:6 Unresolved 
+reference 'Transaction'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:20:6 Unresolved 
+reference 'Query'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:23:6 Unresolved 
+reference 'Transaction'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:24:6 Unresolved 
+reference 'Query'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:27:6 Unresolved 
+reference 'Insert'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:27:26 
+Unresolved reference 
+'OnConflictStrategy'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:30:6 Unresolved 
+reference 'Insert'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:30:26 
+Unresolved reference 
+'OnConflictStrategy'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:33:6 Unresolved 
+reference 'Query'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/dao/Catal
+ogDao.kt:36:6 Unresolved 
+reference 'Transaction'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryEntity.kt:3:17 
+Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryEntity.kt:4:17 
+Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryEntity.kt:5:17 
+Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryEntity.kt:7:2 
+Unresolved reference 
+'Entity'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryEntity.kt:9:6 
+Unresolved reference 
+'PrimaryKey'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryEntity.kt:10:6 
+Unresolved reference 
+'ColumnInfo'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryEntity.kt:13:6 
+Unresolved reference 
+'ColumnInfo'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryEntity.kt:16:6 
+Unresolved reference 
+'ColumnInfo'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryWithFragments.k
+t:3:17 Unresolved 
+reference 'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryWithFragments.k
+t:4:17 Unresolved 
+reference 'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryWithFragments.k
+t:7:6 Unresolved 
+reference 'Embedded'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Ca
+talogEntryWithFragments.k
+t:9:6 Unresolved 
+reference 'Relation'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:3
+:17 Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:4
+:17 Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:5
+:17 Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:6
+:17 Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:7
+:17 Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:8
+:17 Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:1
+0:2 Unresolved reference 
+'Entity'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:1
+3:9 Unresolved reference 
+'ForeignKey'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:1
+7:24 Unresolved 
+reference 'ForeignKey'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:2
+0:16 Unresolved 
+reference 'Index'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:2
+2:2 Unresolved reference 
+'TypeConverters'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:2
+4:6 Unresolved reference 
+'PrimaryKey'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:2
+5:6 Unresolved reference 
+'ColumnInfo'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:2
+8:6 Unresolved reference 
+'ColumnInfo'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:3
+1:6 Unresolved reference 
+'ColumnInfo'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:3
+4:6 Unresolved reference 
+'ColumnInfo'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/Fr
+agmentLocationEntity.kt:3
+7:6 Unresolved reference 
+'ColumnInfo'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/St
+ringListConverter.kt:3:17
+ Unresolved reference 
+'room'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/St
+ringListConverter.kt:8:6 
+Unresolved reference 
+'TypeConverter'.
+e: file:///C:/Users/naoui
+/Desktop/Projets/PFE/app/
+src/main/kotlin/com/mobic
+loud/data/local/entity/St
+ringListConverter.kt:13:6
+ Unresolved reference 
+'TypeConverter'.
+
+FAILURE: Build failed 
+with an exception.
+
+* What went wrong:
+Execution failed for 
+task ':app:compileDebugKo
+tlin'.
+> A failure occurred 
+while executing org.jetbr
+ains.kotlin.compilerRunne
+r.btapi.BuildToolsApiComp
+ilationWork
+   > Compilation error. 
+See log for more details
+
+* Try:
+> Run with --stacktrace 
+option to get the stack 
+trace.
+> Run with --info or 
+--debug option to get 
+more log output.
+> Get more help at 
+https://help.gradle.org.
+
+BUILD FAILED in 2s
+346 actionable tasks: 1 executed, 345 up-to-date
+Configuration cache entry reused.

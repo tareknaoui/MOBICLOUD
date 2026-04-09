@@ -1,0 +1,89 @@
+# generated: 2026-03-27T01:15:29+01:00
+# last_updated: 2026-03-27T01:15:29+01:00
+# project: PFE
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: c:/Users/naoui/Desktop/Projets/PFE/_bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - SM typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+
+generated: 2026-03-27T01:15:29+01:00
+last_updated: 2026-04-09T14:53:00+02:00
+project: PFE
+project_key: NOKEY
+tracking_system: file-system
+story_location: c:/Users/naoui/Desktop/Projets/PFE/_bmad-output/implementation-artifacts
+
+development_status:
+  epic-0: in-progress
+  0-1-initialisation-du-starter-clean-architecture: done
+  0-2-configuration-protobuf-serialisation: done
+  0-4-hotfix-compilation-ui-boilerplate: done
+  0-3-configuration-du-build-ndk-cmake: done
+  epic-0-retrospective: optional
+  epic-1: in-progress
+  1-1-generation-de-la-node-identity-androidkeystore: done
+  1-2-preuve-de-travail-hashcash-anti-sybil-authentification-fr-09-1b: done
+  1-3-couche-reseau-foreground-service-multicastlock: done
+  1-4-udp-heartbeat-et-registre-des-pairs: done
+  1-5-backoff-progressif-dannonce-anti-saturation-fr-01-5: done
+  epic-1-retrospective: optional
+  epic-2: in-progress
+  2-1-modele-dht-partitionne-crdt-jetpack-room-fr-05-1: in-progress
+  2-2-election-basique-genesis-hashcash: backlog
+  2-3-filtres-de-bloom-parametres-et-gossip-epidemique: backlog
+  2-4-transmission-delta-tcp-desynchronisation: backlog
+  2-5-garbage-collector-et-time-to-live-purge-du-catalogue-fr-05-5: backlog
+  epic-2-retrospective: optional
+  epic-3: backlog
+  3-1-chunking-de-fichiers-chiffrement-aes-256: backlog
+  3-2-erasure-coding-avec-bridge-c-ndk-matrice-de-galois: backlog
+  epic-3-retrospective: optional
+  epic-4: backlog
+  4-1-resolution-des-sources-p2p-dht: backlog
+  4-2-telechargement-competitif-et-redondant-configurable: backlog
+  4-3-pipeline-de-streaming-et-dechiffrement-actif: backlog
+  4-4-enforcement-strict-du-routage-direct-single-hop-fr-01-4b: backlog
+  epic-4-retrospective: optional
+  epic-5: backlog
+  5-1-re-election-avec-formule-mathematique-bully-hysteresis-fr-10-2b: backlog
+  5-2-abdication-forcee-et-file-dattente-io: backlog
+  epic-5-retrospective: optional
+  epic-6: backlog
+  6-1-detection-de-churn-et-auto-reparation-isolee: backlog
+  6-2-evacuation-proactive-os-intents-churn-graceful-exit: backlog
+  6-3-circuit-breaker-sre-davalanche: backlog
+  6-4-test-dintegration-churn-sla-proof-of-nfr1: backlog
+  epic-6-retrospective: optional
+  epic-7: backlog
+  7-1-karma-temporel-et-signature-anti-replay: backlog
+  7-2-intelligence-artificielle-on-device-tensorflow-lite: backlog
+  7-3-preuve-de-stockage-proof-of-retrievability-por-fr-09-4: backlog
+  epic-7-retrospective: optional

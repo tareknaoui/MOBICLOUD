@@ -1,0 +1,1168 @@
+Reusing configuration cache.
+> Task :core:ui:preBuild UP-TO-DATE
+> Task :sync:preBuild UP-TO-DATE
+> Task :feature:auth:preBuild UP-TO-DATE
+> Task :feature:profile:preBuild UP-TO-DATE
+> Task :app:preBuild UP-TO-DATE
+> Task :core:preferences:preBuild UP-TO-DATE
+> Task :feature:home:preBuild UP-TO-DATE
+> Task :feature:settings:preBuild UP-TO-DATE
+> Task :core:preferences:preDebugBuild UP-TO-DATE
+> Task :core:ui:preDebugBuild UP-TO-DATE
+> Task :feature:home:preDebugBuild UP-TO-DATE
+> Task :data:preBuild UP-TO-DATE
+> Task :core:android:preBuild UP-TO-DATE
+> Task :core:room:preBuild UP-TO-DATE
+> Task :core:network:preBuild UP-TO-DATE
+> Task :feature:auth:preDebugBuild UP-TO-DATE
+> Task :app:injectCrashlyticsVersionControlInfoDebug UP-TO-DATE
+> Task :app:debugOssDependencyTask UP-TO-DATE
+> Task :core:android:preDebugBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :core:preferences:extractDebugSupportedLocales UP-TO-DATE
+> Task :feature:profile:preDebugBuild UP-TO-DATE
+> Task :core:ui:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:network:preDebugBuild UP-TO-DATE
+> Task :app:processDebugGoogleServices UP-TO-DATE
+> Task :feature:home:extractDebugSupportedLocales UP-TO-DATE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:injectCrashlyticsMappingFileIdDebug UP-TO-DATE
+> Task :core:room:preDebugBuild UP-TO-DATE
+> Task :core:network:extractDebugSupportedLocales UP-TO-DATE
+> Task :firebase:auth:preBuild UP-TO-DATE
+> Task :firebase:firestore:preBuild UP-TO-DATE
+> Task :sync:preDebugBuild UP-TO-DATE
+> Task :firebase:auth:preDebugBuild UP-TO-DATE
+> Task :core:room:extractDebugSupportedLocales UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :firebase:analytics:preBuild UP-TO-DATE
+> Task :data:preDebugBuild UP-TO-DATE
+> Task :firebase:analytics:preDebugBuild UP-TO-DATE
+> Task :firebase:auth:extractDebugSupportedLocales UP-TO-DATE
+> Task :firebase:firestore:preDebugBuild UP-TO-DATE
+> Task :firebase:analytics:extractDebugSupportedLocales UP-TO-DATE
+> Task :sync:extractDebugSupportedLocales UP-TO-DATE
+> Task :feature:settings:preDebugBuild UP-TO-DATE
+> Task :feature:auth:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:android:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:network:processDebugNavigationResources UP-TO-DATE
+> Task :core:preferences:processDebugNavigationResources UP-TO-DATE
+> Task :core:android:processDebugNavigationResources UP-TO-DATE
+> Task :core:ui:processDebugNavigationResources UP-TO-DATE
+> Task :sync:processDebugNavigationResources UP-TO-DATE
+> Task :firebase:firestore:extractDebugSupportedLocales UP-TO-DATE
+> Task :feature:home:processDebugNavigationResources UP-TO-DATE
+> Task :core:room:processDebugNavigationResources UP-TO-DATE
+> Task :feature:profile:processDebugNavigationResources UP-TO-DATE
+> Task :feature:settings:processDebugNavigationResources UP-TO-DATE
+> Task :firebase:analytics:processDebugNavigationResources UP-TO-DATE
+> Task :firebase:auth:processDebugNavigationResources UP-TO-DATE
+> Task :data:processDebugNavigationResources UP-TO-DATE
+> Task :data:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:network:generateDebugResources UP-TO-DATE
+> Task :feature:settings:extractDebugSupportedLocales UP-TO-DATE
+> Task :feature:auth:processDebugNavigationResources UP-TO-DATE
+> Task :core:android:javaPreCompileDebug UP-TO-DATE
+> Task :core:network:generateDebugBuildConfig UP-TO-DATE
+> Task :core:preferences:generateDebugResources UP-TO-DATE
+> Task :firebase:firestore:processDebugNavigationResources UP-TO-DATE
+> Task :core:android:generateDebugResources UP-TO-DATE
+> Task :core:preferences:javaPreCompileDebug UP-TO-DATE
+> Task :sync:generateDebugResources UP-TO-DATE
+> Task :feature:profile:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:network:javaPreCompileDebug UP-TO-DATE
+> Task :firebase:auth:generateDebugResources UP-TO-DATE
+> Task :core:network:packageDebugResources UP-TO-DATE
+> Task :core:preferences:packageDebugResources UP-TO-DATE
+> Task :firebase:firestore:generateDebugResources UP-TO-DATE
+> Task :data:generateDebugResources UP-TO-DATE
+> Task :firebase:auth:javaPreCompileDebug UP-TO-DATE
+> Task :core:room:generateDebugResources UP-TO-DATE
+> Task :core:room:javaPreCompileDebug UP-TO-DATE
+> Task :firebase:auth:packageDebugResources UP-TO-DATE
+> Task :firebase:auth:generateDebugBuildConfig UP-TO-DATE
+> Task :firebase:firestore:javaPreCompileDebug UP-TO-DATE
+> Task :data:javaPreCompileDebug UP-TO-DATE
+> Task :core:android:packageDebugResources UP-TO-DATE
+> Task :core:ui:generateDebugResources UP-TO-DATE
+> Task :core:ui:javaPreCompileDebug UP-TO-DATE
+> Task :core:preferences:parseDebugLocalResources UP-TO-DATE
+> Task :feature:home:generateDebugResources UP-TO-DATE
+> Task :firebase:firestore:packageDebugResources UP-TO-DATE
+> Task :sync:packageDebugResources UP-TO-DATE
+> Task :core:network:parseDebugLocalResources UP-TO-DATE
+> Task :sync:javaPreCompileDebug UP-TO-DATE
+> Task :firebase:firestore:parseDebugLocalResources UP-TO-DATE
+> Task :core:preferences:generateDebugRFile UP-TO-DATE
+> Task :feature:auth:generateDebugResources UP-TO-DATE
+> Task :feature:home:javaPreCompileDebug UP-TO-DATE
+> Task :feature:profile:generateDebugResources UP-TO-DATE
+> Task :core:room:packageDebugResources UP-TO-DATE
+> Task :feature:auth:javaPreCompileDebug UP-TO-DATE
+> Task :firebase:auth:parseDebugLocalResources UP-TO-DATE
+> Task :core:android:parseDebugLocalResources UP-TO-DATE
+> Task :feature:profile:javaPreCompileDebug UP-TO-DATE
+> Task :feature:settings:generateDebugResources UP-TO-DATE
+> Task :core:room:parseDebugLocalResources UP-TO-DATE
+> Task :feature:home:packageDebugResources UP-TO-DATE
+> Task :sync:parseDebugLocalResources UP-TO-DATE
+> Task :core:network:generateDebugRFile UP-TO-DATE
+> Task :feature:profile:packageDebugResources UP-TO-DATE
+> Task :firebase:auth:generateDebugRFile UP-TO-DATE
+> Task :feature:settings:javaPreCompileDebug UP-TO-DATE
+> Task :core:room:generateDebugRFile UP-TO-DATE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :data:generateDebugAssets UP-TO-DATE
+> Task :core:ui:packageDebugResources UP-TO-DATE
+> Task :feature:home:parseDebugLocalResources UP-TO-DATE
+> Task :firebase:analytics:javaPreCompileDebug UP-TO-DATE
+> Task :sync:generateDebugAssets UP-TO-DATE
+> Task :data:packageDebugResources UP-TO-DATE
+> Task :data:mergeDebugAssets UP-TO-DATE
+> Task :core:ui:parseDebugLocalResources UP-TO-DATE
+> Task :sync:mergeDebugAssets UP-TO-DATE
+> Task :core:android:generateDebugRFile UP-TO-DATE
+> Task :core:network:generateDebugAssets UP-TO-DATE
+> Task :core:preferences:generateDebugAssets UP-TO-DATE
+> Task :feature:settings:packageDebugResources UP-TO-DATE
+> Task :core:android:generateDebugAssets UP-TO-DATE
+> Task :feature:home:generateDebugRFile UP-TO-DATE
+> Task :core:room:generateDebugAssets UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :core:android:mergeDebugAssets UP-TO-DATE
+> Task :firebase:analytics:generateDebugResources UP-TO-DATE
+> Task :data:parseDebugLocalResources UP-TO-DATE
+> Task :core:ui:generateDebugAssets UP-TO-DATE
+> Task :core:preferences:mergeDebugAssets UP-TO-DATE
+> Task :core:room:mergeDebugAssets UP-TO-DATE
+> Task :feature:auth:generateDebugAssets UP-TO-DATE
+> Task :sync:generateDebugRFile UP-TO-DATE
+> Task :core:ui:mergeDebugAssets UP-TO-DATE
+> Task :feature:profile:parseDebugLocalResources UP-TO-DATE
+> Task :core:ui:generateDebugRFile UP-TO-DATE
+> Task :feature:profile:generateDebugAssets UP-TO-DATE
+> Task :feature:auth:mergeDebugAssets UP-TO-DATE
+> Task :feature:home:generateDebugAssets UP-TO-DATE
+> Task :firebase:analytics:generateDebugAssets UP-TO-DATE
+> Task :firebase:firestore:generateDebugRFile UP-TO-DATE
+> Task :firebase:firestore:generateDebugAssets UP-TO-DATE
+> Task :firebase:auth:generateDebugAssets UP-TO-DATE
+> Task :data:generateDebugRFile UP-TO-DATE
+> Task :feature:settings:parseDebugLocalResources UP-TO-DATE
+> Task :feature:settings:generateDebugAssets UP-TO-DATE
+> Task :feature:home:mergeDebugAssets UP-TO-DATE
+> Task :feature:profile:generateDebugRFile UP-TO-DATE
+> Task :feature:profile:mergeDebugAssets UP-TO-DATE
+> Task :firebase:analytics:mergeDebugAssets UP-TO-DATE
+> Task :core:network:mergeDebugAssets UP-TO-DATE
+> Task :feature:settings:mergeDebugAssets UP-TO-DATE
+> Task :feature:auth:packageDebugResources UP-TO-DATE
+> Task :firebase:firestore:mergeDebugAssets UP-TO-DATE
+> Task :firebase:auth:mergeDebugAssets UP-TO-DATE
+> Task :core:android:kspDebugKotlin UP-TO-DATE
+> Task :core:android:writeDebugAarMetadata UP-TO-DATE
+> Task :core:network:writeDebugAarMetadata UP-TO-DATE
+> Task :sync:writeDebugAarMetadata UP-TO-DATE
+> Task :data:writeDebugAarMetadata UP-TO-DATE
+> Task :core:preferences:writeDebugAarMetadata UP-TO-DATE
+> Task :core:room:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:auth:parseDebugLocalResources UP-TO-DATE
+> Task :firebase:analytics:packageDebugResources UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :feature:profile:writeDebugAarMetadata UP-TO-DATE
+> Task :core:ui:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:settings:generateDebugRFile UP-TO-DATE
+> Task :feature:auth:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:settings:writeDebugAarMetadata UP-TO-DATE
+> Task :firebase:firestore:writeDebugAarMetadata UP-TO-DATE
+> Task :firebase:analytics:writeDebugAarMetadata UP-TO-DATE
+> Task :feature:home:writeDebugAarMetadata UP-TO-DATE
+> Task :firebase:auth:writeDebugAarMetadata UP-TO-DATE
+> Task :sync:extractDeepLinksDebug UP-TO-DATE
+> Task :data:extractDeepLinksDebug UP-TO-DATE
+> Task :core:android:extractDeepLinksDebug UP-TO-DATE
+> Task :core:network:extractDeepLinksDebug UP-TO-DATE
+> Task :core:preferences:extractDeepLinksDebug UP-TO-DATE
+> Task :core:room:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:auth:generateDebugRFile UP-TO-DATE
+> Task :core:ui:extractDeepLinksDebug UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :feature:home:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:auth:extractDeepLinksDebug UP-TO-DATE
+> Task :core:preferences:processDebugManifest UP-TO-DATE
+> Task :core:android:processDebugManifest UP-TO-DATE
+> Task :feature:profile:extractDeepLinksDebug UP-TO-DATE
+> Task :core:room:processDebugManifest UP-TO-DATE
+> Task :core:ui:processDebugManifest UP-TO-DATE
+> Task :feature:auth:processDebugManifest UP-TO-DATE
+> Task :sync:processDebugManifest UP-TO-DATE
+> Task :core:network:processDebugManifest UP-TO-DATE
+> Task :feature:home:processDebugManifest UP-TO-DATE
+> Task :firebase:auth:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:settings:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:profile:processDebugManifest UP-TO-DATE
+> Task :firebase:analytics:parseDebugLocalResources UP-TO-DATE
+> Task :firebase:firestore:extractDeepLinksDebug UP-TO-DATE
+> Task :firebase:analytics:extractDeepLinksDebug UP-TO-DATE
+> Task :feature:settings:processDebugManifest UP-TO-DATE
+> Task :firebase:firestore:processDebugManifest UP-TO-DATE
+> Task :firebase:analytics:processDebugManifest UP-TO-DATE
+> Task :data:processDebugManifest UP-TO-DATE
+> Task :core:preferences:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:network:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:android:mapDebugSourceSetPaths UP-TO-DATE
+> Task :sync:mapDebugSourceSetPaths UP-TO-DATE
+> Task :data:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:preferences:compileDebugLibraryResources UP-TO-DATE
+> Task :core:android:compileDebugLibraryResources UP-TO-DATE
+> Task :core:ui:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:network:compileDebugLibraryResources UP-TO-DATE
+> Task :core:room:mapDebugSourceSetPaths UP-TO-DATE
+> Task :feature:auth:mapDebugSourceSetPaths UP-TO-DATE
+> Task :sync:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase:analytics:generateDebugRFile UP-TO-DATE
+> Task :feature:home:mapDebugSourceSetPaths UP-TO-DATE
+> Task :firebase:auth:processDebugManifest UP-TO-DATE
+> Task :data:compileDebugLibraryResources UP-TO-DATE
+> Task :feature:profile:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:ui:compileDebugLibraryResources UP-TO-DATE
+> Task :feature:settings:mapDebugSourceSetPaths UP-TO-DATE
+> Task :feature:auth:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase:analytics:mapDebugSourceSetPaths UP-TO-DATE
+> Task :firebase:auth:mapDebugSourceSetPaths UP-TO-DATE
+> Task :core:room:compileDebugLibraryResources UP-TO-DATE
+> Task :feature:profile:compileDebugLibraryResources UP-TO-DATE
+> Task :feature:home:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase:firestore:mapDebugSourceSetPaths UP-TO-DATE
+> Task :feature:settings:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase:analytics:compileDebugLibraryResources UP-TO-DATE
+> Task :firebase:firestore:compileDebugLibraryResources UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :data:mergeDebugJniLibFolders UP-TO-DATE
+> Task :firebase:auth:compileDebugLibraryResources UP-TO-DATE
+> Task :core:android:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:network:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:preferences:mergeDebugJniLibFolders UP-TO-DATE
+> Task :sync:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:room:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:network:mergeDebugNativeLibs NO-SOURCE
+> Task :core:preferences:mergeDebugNativeLibs NO-SOURCE
+> Task :core:network:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :core:preferences:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :core:ui:mergeDebugJniLibFolders UP-TO-DATE
+> Task :feature:auth:mergeDebugJniLibFolders UP-TO-DATE
+> Task :core:android:mergeDebugNativeLibs NO-SOURCE
+> Task :data:mergeDebugNativeLibs NO-SOURCE
+> Task :core:room:mergeDebugNativeLibs NO-SOURCE
+> Task :core:android:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :core:room:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :data:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :feature:settings:mergeDebugJniLibFolders UP-TO-DATE
+> Task :feature:profile:mergeDebugJniLibFolders UP-TO-DATE
+> Task :feature:home:mergeDebugJniLibFolders UP-TO-DATE
+> Task :feature:profile:mergeDebugNativeLibs NO-SOURCE
+> Task :sync:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:settings:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:profile:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :feature:home:mergeDebugNativeLibs NO-SOURCE
+> Task :sync:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :feature:auth:mergeDebugNativeLibs NO-SOURCE
+> Task :firebase:analytics:mergeDebugJniLibFolders UP-TO-DATE
+> Task :feature:auth:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :core:ui:mergeDebugNativeLibs NO-SOURCE
+> Task :feature:settings:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :firebase:auth:mergeDebugJniLibFolders UP-TO-DATE
+> Task :firebase:firestore:mergeDebugJniLibFolders UP-TO-DATE
+> Task :firebase:analytics:mergeDebugNativeLibs NO-SOURCE
+> Task :core:ui:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :firebase:analytics:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :firebase:auth:mergeDebugNativeLibs NO-SOURCE
+> Task :firebase:firestore:mergeDebugNativeLibs NO-SOURCE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :data:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :data:preDebugAndroidTestBuild UP-TO-DATE
+> Task :firebase:firestore:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:generateDebugAndroidTestResources UP-TO-DATE
+> Task :firebase:auth:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :feature:home:copyDebugJniLibsProjectOnly UP-TO-DATE
+> Task :app:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :app:packageDebugAndroidTestResources UP-TO-DATE
+> Task :app:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :app:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :app:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :app:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :app:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :app:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :app:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :app:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :app:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :app:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :data:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :app:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :data:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :data:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :data:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :data:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :core:android:compileDebugKotlin UP-TO-DATE
+> Task :data:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:android:processDebugJavaRes UP-TO-DATE
+> Task :data:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :data:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :sync:preDebugAndroidTestBuild UP-TO-DATE
+> Task :sync:generateDebugAndroidTestResources UP-TO-DATE
+> Task :data:generateDebugAndroidTestResources UP-TO-DATE
+> Task :data:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :data:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :core:android:compileDebugJavaWithJavac UP-TO-DATE
+> Task :data:packageDebugAndroidTestResources UP-TO-DATE
+> Task :data:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :sync:packageDebugAndroidTestResources UP-TO-DATE
+> Task :sync:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :sync:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :sync:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :sync:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :data:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :sync:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :data:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :sync:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :sync:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :data:processDebugAndroidTestManifest UP-TO-DATE
+> Task :sync:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:android:transformDebugClassesWithAsm UP-TO-DATE
+> Task :app:configureCMakeDebug[x86]
+> Task :core:android:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:android:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :data:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :sync:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :sync:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :app:configureCMakeDebug[x86_64]
+> Task :app:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :data:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :app:processDebugAndroidTestManifest UP-TO-DATE
+> Task :core:preferences:kspDebugKotlin UP-TO-DATE
+> Task :core:android:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :sync:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :app:generateDebugAndroidTestBuildConfig UP-TO-DATE
+> Task :firebase:auth:kspDebugKotlin UP-TO-DATE
+> Task :data:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :core:network:kspDebugKotlin UP-TO-DATE
+> Task :firebase:analytics:kspDebugKotlin UP-TO-DATE
+> Task :core:room:kspDebugKotlin UP-TO-DATE
+> Task :data:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :sync:processDebugAndroidTestManifest UP-TO-DATE
+> Task :sync:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :firebase:firestore:kspDebugKotlin UP-TO-DATE
+> Task :core:preferences:compileDebugKotlin UP-TO-DATE
+> Task :firebase:analytics:compileDebugKotlin UP-TO-DATE
+> Task :app:debugOssLicensesTask UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:extractDebugSupportedLocales UP-TO-DATE
+> Task :core:preferences:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:generateDebugLocaleConfig UP-TO-DATE
+> Task :firebase:analytics:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:compileDebugNavigationResources UP-TO-DATE
+> Task :firebase:analytics:transformDebugClassesWithAsm UP-TO-DATE
+> Task :data:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :core:preferences:transformDebugClassesWithAsm UP-TO-DATE
+> Task :app:configureCMakeDebug[armeabi-v7a]
+> Task :core:preferences:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :firebase:analytics:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :firebase:analytics:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:preferences:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :core:preferences:processDebugJavaRes UP-TO-DATE
+> Task :firebase:analytics:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :sync:processDebugAndroidTestResources UP-TO-DATE
+> Task :core:preferences:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :firebase:analytics:processDebugJavaRes UP-TO-DATE
+> Task :sync:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :sync:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :firebase:auth:compileDebugKotlin UP-TO-DATE
+> Task :firebase:auth:processDebugJavaRes UP-TO-DATE
+> Task :firebase:auth:compileDebugJavaWithJavac UP-TO-DATE
+> Task :sync:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :core:android:preDebugAndroidTestBuild UP-TO-DATE
+> Task :core:android:generateDebugAndroidTestResources UP-TO-DATE
+> Task :data:processDebugAndroidTestResources UP-TO-DATE
+> Task :core:android:packageDebugAndroidTestResources UP-TO-DATE
+> Task :firebase:firestore:compileDebugKotlin UP-TO-DATE
+> Task :app:processDebugAndroidTestResources UP-TO-DATE
+> Task :core:android:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :core:android:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:android:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :core:android:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :firebase:auth:transformDebugClassesWithAsm UP-TO-DATE
+> Task :core:android:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :firebase:firestore:processDebugJavaRes UP-TO-DATE
+> Task :firebase:auth:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :firebase:auth:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :firebase:firestore:compileDebugJavaWithJavac UP-TO-DATE
+> Task :firebase:auth:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:android:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :sync:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :core:ui:compileDebugKotlin UP-TO-DATE
+> Task :sync:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :core:android:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :core:android:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :core:android:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :core:ui:processDebugJavaRes UP-TO-DATE
+> Task :core:android:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :core:android:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:ui:compileDebugJavaWithJavac NO-SOURCE
+> Task :core:android:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :core:ui:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:android:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :sync:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :core:ui:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :core:android:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :core:ui:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:android:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :core:android:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :core:android:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :core:android:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :core:android:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :firebase:firestore:transformDebugClassesWithAsm UP-TO-DATE
+> Task :core:android:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :core:android:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :core:android:processDebugAndroidTestManifest UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :firebase:firestore:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:android:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :firebase:firestore:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :firebase:firestore:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:network:preDebugAndroidTestBuild UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :core:android:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :core:android:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :core:android:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :core:network:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :core:network:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :core:network:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:network:generateDebugAndroidTestResources UP-TO-DATE
+> Task :core:network:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :core:network:packageDebugAndroidTestResources UP-TO-DATE
+> Task :core:network:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :core:android:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :core:network:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :core:network:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:room:compileDebugKotlin UP-TO-DATE
+> Task :core:network:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :core:android:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :core:android:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :core:network:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :core:android:processDebugAndroidTestResources UP-TO-DATE
+> Task :core:room:processDebugJavaRes UP-TO-DATE
+> Task :core:network:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :core:network:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :core:network:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :core:preferences:preDebugAndroidTestBuild UP-TO-DATE
+> Task :core:network:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :core:network:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :core:preferences:generateDebugAndroidTestResources UP-TO-DATE
+> Task :core:preferences:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:network:processDebugAndroidTestManifest UP-TO-DATE
+> Task :core:android:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :core:preferences:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :core:preferences:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :core:network:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :core:network:generateDebugAndroidTestBuildConfig UP-TO-DATE
+> Task :core:network:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :core:network:compileDebugKotlin UP-TO-DATE
+> Task :core:preferences:packageDebugAndroidTestResources UP-TO-DATE
+> Task :core:room:compileDebugJavaWithJavac UP-TO-DATE
+> Task :core:preferences:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :core:preferences:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :core:network:processDebugJavaRes UP-TO-DATE
+> Task :core:preferences:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :core:network:compileDebugJavaWithJavac UP-TO-DATE
+> Task :core:preferences:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :core:preferences:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :core:preferences:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :core:room:transformDebugClassesWithAsm UP-TO-DATE
+> Task :core:preferences:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :core:network:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :core:room:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:room:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :core:room:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:network:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :core:android:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :core:network:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :core:android:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :core:network:transformDebugClassesWithAsm UP-TO-DATE
+> Task :core:network:processDebugAndroidTestResources UP-TO-DATE
+> Task :core:preferences:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:preferences:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :core:network:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :core:network:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:network:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :core:android:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :core:preferences:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :app:configureCMakeDebug[arm64-v8a]
+> Task :core:preferences:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :sync:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :core:preferences:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :core:room:preDebugAndroidTestBuild UP-TO-DATE
+> Task :core:preferences:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :core:preferences:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :core:preferences:processDebugAndroidTestManifest UP-TO-DATE
+> Task :core:room:generateDebugAndroidTestResources UP-TO-DATE
+> Task :core:preferences:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :core:preferences:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :core:network:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :core:android:packageDebugAndroidTest UP-TO-DATE
+> Task :core:room:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:room:packageDebugAndroidTestResources UP-TO-DATE
+> Task :core:preferences:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :core:android:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :core:room:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :core:room:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :core:room:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :core:room:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :core:room:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :core:room:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :core:room:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :core:preferences:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :core:room:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:preferences:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :core:room:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :core:room:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :core:preferences:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :core:preferences:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :core:network:kspDebugAndroidTestKotlin UP-TO-DATE
+> Task :core:room:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :core:preferences:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :core:room:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :core:room:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :core:room:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :core:room:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :data:kspDebugKotlin UP-TO-DATE
+> Task :core:room:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :core:ui:preDebugAndroidTestBuild UP-TO-DATE
+> Task :core:preferences:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :core:network:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :core:room:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :core:room:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :core:room:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :core:room:processDebugAndroidTestManifest UP-TO-DATE
+> Task :core:room:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :core:room:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :core:network:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :core:ui:generateDebugAndroidTestResources UP-TO-DATE
+> Task :core:network:compileDebugAndroidTestJavaWithJavac UP-TO-DATE
+> Task :core:network:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :core:preferences:processDebugAndroidTestResources UP-TO-DATE
+> Task :core:ui:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:room:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :core:ui:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :core:ui:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :core:room:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :core:room:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :core:ui:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :core:ui:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :core:network:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :core:network:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :core:ui:packageDebugAndroidTestResources UP-TO-DATE
+> Task :core:room:processDebugAndroidTestResources UP-TO-DATE
+> Task :core:ui:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:ui:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :core:room:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :core:network:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :core:room:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :core:room:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :core:ui:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :core:ui:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :core:network:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :core:room:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :core:preferences:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :core:network:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :core:ui:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :core:ui:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :core:preferences:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :core:ui:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :core:network:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :core:ui:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :core:room:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :core:ui:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :core:ui:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :core:ui:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :core:ui:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :core:room:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:preDebugAndroidTestBuild UP-TO-DATE
+> Task :core:ui:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :core:ui:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :core:ui:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:generateDebugAndroidTestResources UP-TO-DATE
+> Task :feature:auth:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :feature:auth:packageDebugAndroidTestResources UP-TO-DATE
+> Task :feature:auth:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :core:preferences:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :feature:auth:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :core:network:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :feature:auth:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :core:room:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :core:preferences:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :feature:auth:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :core:network:packageDebugAndroidTest UP-TO-DATE
+> Task :core:network:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :core:preferences:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :core:ui:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :feature:auth:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:ui:processDebugAndroidTestManifest UP-TO-DATE
+> Task :core:preferences:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :core:room:packageDebugAndroidTest UP-TO-DATE
+> Task :core:ui:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :core:room:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :feature:auth:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :feature:auth:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :core:ui:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :core:preferences:packageDebugAndroidTest UP-TO-DATE
+> Task :core:preferences:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :core:ui:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :feature:auth:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :feature:home:preDebugAndroidTestBuild UP-TO-DATE
+> Task :feature:home:generateDebugAndroidTestResources UP-TO-DATE
+> Task :feature:home:packageDebugAndroidTestResources UP-TO-DATE
+> Task :feature:home:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :feature:home:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :feature:auth:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :feature:home:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :feature:home:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :feature:auth:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :feature:home:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :feature:home:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :feature:auth:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :core:ui:processDebugAndroidTestResources UP-TO-DATE
+> Task :feature:auth:processDebugAndroidTestManifest UP-TO-DATE
+> Task :feature:home:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :core:ui:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :feature:home:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :feature:home:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :feature:home:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :core:ui:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :feature:auth:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :data:compileDebugKotlin UP-TO-DATE
+> Task :app:buildCMakeDebug[x86_64]
+> Task :data:processDebugJavaRes UP-TO-DATE
+> Task :data:compileDebugJavaWithJavac UP-TO-DATE
+> Task :feature:auth:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :feature:home:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :feature:home:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :feature:home:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :feature:home:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :feature:profile:preDebugAndroidTestBuild UP-TO-DATE
+> Task :feature:home:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :feature:profile:generateDebugAndroidTestResources UP-TO-DATE
+> Task :feature:profile:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :feature:profile:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :feature:profile:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :feature:home:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :data:transformDebugClassesWithAsm UP-TO-DATE
+> Task :data:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :core:ui:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :data:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :data:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:profile:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :app:buildCMakeDebug[x86]
+> Task :data:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :feature:home:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :app:buildCMakeDebug[armeabi-v7a]
+> Task :data:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :sync:kspDebugKotlin UP-TO-DATE
+> Task :data:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:processDebugAndroidTestResources UP-TO-DATE
+> Task :feature:home:processDebugAndroidTestManifest UP-TO-DATE
+> Task :core:ui:packageDebugAndroidTest UP-TO-DATE
+> Task :data:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :core:ui:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :feature:profile:kspDebugKotlin UP-TO-DATE
+> Task :feature:home:kspDebugKotlin UP-TO-DATE
+> Task :feature:home:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:kspDebugKotlin UP-TO-DATE
+> Task :feature:home:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :feature:profile:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :data:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :data:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :feature:profile:packageDebugAndroidTestResources UP-TO-DATE
+> Task :feature:profile:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :feature:profile:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :feature:profile:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :feature:profile:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :feature:profile:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :app:buildCMakeDebug[arm64-v8a]
+> Task :feature:settings:kspDebugKotlin UP-TO-DATE
+> Task :data:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :data:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :feature:profile:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :data:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :feature:profile:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :sync:compileDebugKotlin UP-TO-DATE
+> Task :sync:processDebugJavaRes UP-TO-DATE
+> Task :sync:compileDebugJavaWithJavac UP-TO-DATE
+> Task :feature:profile:compileDebugKotlin UP-TO-DATE
+> Task :feature:profile:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :feature:profile:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :feature:profile:processDebugJavaRes UP-TO-DATE
+> Task :feature:home:processDebugAndroidTestResources UP-TO-DATE
+> Task :feature:profile:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :data:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :feature:profile:compileDebugJavaWithJavac UP-TO-DATE
+> Task :feature:profile:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :feature:settings:preDebugAndroidTestBuild UP-TO-DATE
+> Task :feature:settings:generateDebugAndroidTestResources UP-TO-DATE
+> Task :feature:home:compileDebugKotlin UP-TO-DATE
+> Task :feature:settings:packageDebugAndroidTestResources UP-TO-DATE
+> Task :core:ui:connectedDebugAndroidTest
+> Task :sync:transformDebugClassesWithAsm UP-TO-DATE
+> Task :feature:home:processDebugJavaRes UP-TO-DATE
+> Task :sync:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :sync:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :sync:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :data:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :sync:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :feature:home:compileDebugJavaWithJavac UP-TO-DATE
+> Task :data:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :core:ui:connectedAndroidTest
+> Task :sync:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :feature:auth:compileDebugKotlin UP-TO-DATE
+> Task :feature:settings:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :feature:profile:transformDebugClassesWithAsm UP-TO-DATE
+> Task :feature:auth:processDebugJavaRes UP-TO-DATE
+> Task :feature:profile:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:profile:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :feature:settings:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :feature:profile:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :sync:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :feature:auth:compileDebugJavaWithJavac UP-TO-DATE
+> Task :sync:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :sync:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :sync:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :feature:profile:processDebugAndroidTestManifest UP-TO-DATE
+> Task :feature:profile:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :feature:profile:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :feature:settings:compileDebugKotlin UP-TO-DATE
+> Task :feature:profile:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :feature:home:transformDebugClassesWithAsm UP-TO-DATE
+> Task :feature:profile:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :feature:settings:processDebugJavaRes UP-TO-DATE
+> Task :feature:home:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:home:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :feature:home:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :feature:profile:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :feature:home:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :feature:settings:compileDebugJavaWithJavac UP-TO-DATE
+> Task :data:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :app:mergeDebugNativeLibs UP-TO-DATE
+> Task :feature:profile:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :feature:profile:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :feature:profile:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :feature:home:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:transformDebugClassesWithAsm UP-TO-DATE
+> Task :app:stripDebugDebugSymbols UP-TO-DATE
+> Task :feature:auth:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:auth:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :feature:home:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :app:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :feature:auth:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :app:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :sync:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :sync:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :feature:home:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :feature:auth:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :feature:home:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :feature:home:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :data:packageDebugAndroidTest UP-TO-DATE
+> Task :feature:profile:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :feature:auth:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :sync:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :data:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :feature:auth:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :feature:auth:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :feature:auth:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :feature:settings:transformDebugClassesWithAsm UP-TO-DATE
+> Task :sync:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :feature:settings:bundleLibCompileToJarDebug UP-TO-DATE
+> Task :feature:settings:bundleLibRuntimeToJarDebug UP-TO-DATE
+> Task :feature:settings:bundleLibRuntimeToDirDebug UP-TO-DATE
+> Task :feature:settings:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :sync:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :app:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :sync:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :feature:profile:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :feature:settings:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :feature:settings:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :feature:home:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :feature:profile:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :feature:profile:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :feature:home:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :feature:auth:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :feature:settings:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :feature:home:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :feature:auth:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :feature:settings:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :feature:settings:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :feature:profile:processDebugAndroidTestResources UP-TO-DATE
+> Task :feature:settings:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :feature:auth:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :feature:home:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :sync:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :feature:profile:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :feature:settings:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :sync:packageDebugAndroidTest UP-TO-DATE
+> Task :feature:profile:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :feature:home:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :sync:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :feature:auth:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :feature:home:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :feature:profile:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :app:kspDebugKotlin UP-TO-DATE
+> Task :feature:settings:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :feature:settings:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :feature:settings:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :firebase:analytics:preDebugAndroidTestBuild UP-TO-DATE
+> Task :firebase:analytics:generateDebugAndroidTestResources UP-TO-DATE
+> Task :firebase:analytics:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :firebase:analytics:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :firebase:analytics:packageDebugAndroidTestResources UP-TO-DATE
+> Task :feature:settings:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :firebase:analytics:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :firebase:analytics:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :firebase:analytics:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :firebase:analytics:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :firebase:analytics:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :firebase:analytics:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :firebase:analytics:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :firebase:analytics:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :firebase:analytics:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :firebase:analytics:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :firebase:analytics:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :firebase:analytics:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :feature:profile:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :feature:auth:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :feature:home:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :firebase:analytics:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :feature:settings:processDebugAndroidTestManifest UP-TO-DATE
+> Task :firebase:analytics:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :feature:settings:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :firebase:analytics:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :feature:auth:packageDebugAndroidTest UP-TO-DATE
+> Task :feature:profile:packageDebugAndroidTest UP-TO-DATE
+> Task :firebase:analytics:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :feature:home:packageDebugAndroidTest UP-TO-DATE
+> Task :feature:auth:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :feature:settings:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :firebase:analytics:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :feature:home:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :feature:profile:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :feature:settings:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :firebase:analytics:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :firebase:analytics:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :firebase:analytics:processDebugAndroidTestManifest UP-TO-DATE
+> Task :firebase:analytics:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :firebase:analytics:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :firebase:analytics:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :firebase:auth:preDebugAndroidTestBuild UP-TO-DATE
+> Task :firebase:analytics:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+> Task :firebase:auth:generateDebugAndroidTestResources UP-TO-DATE
+> Task :firebase:auth:packageDebugAndroidTestResources UP-TO-DATE
+> Task :firebase:auth:processDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :firebase:auth:parseDebugAndroidTestLocalResources UP-TO-DATE
+> Task :firebase:analytics:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :firebase:auth:generateDebugAndroidTestRFile UP-TO-DATE
+> Task :firebase:analytics:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :firebase:auth:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :firebase:auth:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :firebase:analytics:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :firebase:auth:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :firebase:auth:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :firebase:auth:compileDebugAndroidTestNavigationResources UP-TO-DATE
+> Task :firebase:analytics:processDebugAndroidTestResources UP-TO-DATE
+> Task :firebase:auth:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :firebase:auth:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :firebase:auth:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :firebase:auth:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :firebase:analytics:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :firebase:auth:processDebugAndroidTestManifest UP-TO-DATE
+> Task :firebase:auth:generateDebugAndroidTestBuildConfig UP-TO-DATE
+> Task :firebase:auth:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :firebase:auth:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :firebase:analytics:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :firebase:analytics:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :firebase:analytics:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :firebase:auth:mergeDebugAndroidTestNativeLibs UP-TO-DATE
+> Task :firebase:auth:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :firebase:auth:stripDebugAndroidTestDebugSymbols UP-TO-DATE
+> Task :firebase:auth:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :firebase:auth:kspDebugAndroidTestKotlin UP-TO-DATE
+> Task :feature:settings:processDebugAndroidTestResources UP-TO-DATE
+> Task :firebase:auth:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :feature:settings:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :firebase:auth:validateSigningDebugAndroidTest
+> Task :firebase:auth:writeDebugAndroidTestSigningConfigVersions
+> Task :firebase:firestore:preDebugAndroidTestBuild UP-TO-DATE
+> Task :firebase:auth:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :feature:settings:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :firebase:firestore:generateDebugAndroidTestResources FROM-CACHE
+> Task :feature:settings:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :feature:settings:packageDebugAndroidTest UP-TO-DATE
+> Task :feature:settings:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :app:compileDebugKotlin UP-TO-DATE
+> Task :firebase:firestore:packageDebugAndroidTestResources
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:hiltSyncDebug UP-TO-DATE
+> Task :app:hiltAggregateDepsDebug UP-TO-DATE
+> Task :app:mergeDebugJavaResource UP-TO-DATE
+> Task :firebase:firestore:processDebugAndroidTestNavigationResources FROM-CACHE
+> Task :app:hiltJavaCompileDebug UP-TO-DATE
+> Task :firebase:firestore:parseDebugAndroidTestLocalResources FROM-CACHE
+> Task :app:bundleDebugClassesToCompileJar UP-TO-DATE
+> Task :app:transformDebugClassesWithAsm UP-TO-DATE
+> Task :app:dexBuilderDebug UP-TO-DATE
+> Task :app:kspDebugAndroidTestKotlin UP-TO-DATE
+> Task :app:mergeProjectDexDebug UP-TO-DATE
+> Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :app:packageDebug UP-TO-DATE
+> Task :app:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :app:compileDebugAndroidTestKotlin UP-TO-DATE
+> Task :app:compileDebugAndroidTestJavaWithJavac UP-TO-DATE
+> Task :app:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :app:hiltAggregateDepsDebugAndroidTest UP-TO-DATE
+> Task :app:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :firebase:firestore:generateDebugAndroidTestRFile
+> Task :app:processDebugAndroidTestJavaRes UP-TO-DATE
+> Task :app:transformDebugAndroidTestClassesWithAsm UP-TO-DATE
+> Task :app:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :app:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :app:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :app:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :firebase:firestore:kspDebugAndroidTestKotlin NO-SOURCE
+> Task :firebase:firestore:compileDebugAndroidTestKotlin NO-SOURCE
+> Task :app:packageDebugAndroidTest UP-TO-DATE
+> Task :app:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :firebase:firestore:javaPreCompileDebugAndroidTest FROM-CACHE
+> Task :firebase:firestore:compileDebugAndroidTestJavaWithJavac NO-SOURCE
+> Task :firebase:firestore:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :firebase:analytics:packageDebugAndroidTest
+> Task :firebase:analytics:createDebugAndroidTestApkListingFileRedirect
+> Task :firebase:firestore:mergeDebugAndroidTestAssets
+> Task :firebase:firestore:compressDebugAndroidTestAssets FROM-CACHE
+> Task :firebase:firestore:desugarDebugAndroidTestFileDependencies FROM-CACHE
+> Task :firebase:firestore:hiltSyncDebugAndroidTest UP-TO-DATE
+> Task :firebase:firestore:hiltAggregateDepsDebugAndroidTest FROM-CACHE
+> Task :firebase:firestore:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :firebase:firestore:checkDebugAndroidTestAarMetadata
+> Task :firebase:firestore:mapDebugAndroidTestSourceSetPaths
+> Task :firebase:firestore:compileDebugAndroidTestNavigationResources FROM-CACHE
+> Task :firebase:auth:compileDebugAndroidTestJavaWithJavac
+> Task :firebase:auth:hiltSyncDebugAndroidTest
+> Task :firebase:auth:hiltAggregateDepsDebugAndroidTest FROM-CACHE
+> Task :firebase:auth:hiltJavaCompileDebugAndroidTest NO-SOURCE
+> Task :firebase:firestore:processDebugAndroidTestManifest
+> Task :firebase:firestore:processDebugAndroidTestJavaRes NO-SOURCE
+> Task :firebase:auth:mergeDebugAndroidTestJavaResource
+> Task :core:android:connectedDebugAndroidTest FAILED
+> Task :firebase:firestore:checkDebugAndroidTestDuplicateClasses
+> Task :firebase:firestore:mergeDebugAndroidTestResources
+> Task :firebase:firestore:mergeDebugAndroidTestJavaResource
+> Task :firebase:auth:processDebugAndroidTestResources
+> Task :core:room:connectedDebugAndroidTest FAILED
+> Task :core:network:connectedDebugAndroidTest FAILED
+> Task :core:preferences:connectedDebugAndroidTest FAILED
+> Task :data:connectedDebugAndroidTest FAILED
+> Task :sync:connectedDebugAndroidTest FAILED
+> Task :feature:auth:connectedDebugAndroidTest FAILED
+> Task :feature:home:connectedDebugAndroidTest FAILED
+> Task :feature:profile:connectedDebugAndroidTest FAILED
+> Task :feature:settings:connectedDebugAndroidTest FAILED
+> Task :app:connectedDebugAndroidTest FAILED
+> Task :firebase:analytics:connectedDebugAndroidTest FAILED
+
+FAILURE: Build completed with 12 failures.
+
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':core:android:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':core:room:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+3: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':core:network:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+4: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':core:preferences:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+5: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':data:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+6: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':sync:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+7: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':feature:auth:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+8: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':feature:home:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+9: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':feature:profile:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+10: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':feature:settings:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+11: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':app:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+12: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':firebase:analytics:connectedDebugAndroidTest'.
+> com.android.builder.testing.api.DeviceException: No connected devices!
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Get more help at https://help.gradle.org.
+==============================================================================
+
+BUILD FAILED in 14s
+838 actionable tasks: 37 executed, 9 from cache, 792 up-to-date
+Configuration cache entry reused.
