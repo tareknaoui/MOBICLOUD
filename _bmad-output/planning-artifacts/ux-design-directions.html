@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MobiCloud - Design Directions Showcase</title>
+<style>
+  :root {
+    --bg-pure: #000000;
+    --text-high: #E0E0E0;
+    --text-med: #9E9E9E;
+    --border: #333333;
+    --success: #00FF41;
+    --warning: #FFB300;
+    --error: #FF3333;
+  }
+  body { 
+    background: #111; 
+    color: var(--text-high); 
+    font-family: 'Inter', 'Roboto', sans-serif; 
+    display: flex; 
+    flex-wrap: wrap;
+    gap: 40px; 
+    padding: 40px; 
+    justify-content: center;
+  }
+  .info-panel {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .info-panel h1 { color: #fff; }
+  .info-panel p { color: var(--text-med); max-width: 600px; margin: 0 auto; }
+  
+  .direction {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  
+  .direction-title { font-weight: bold; font-size: 18px; }
+  .direction-desc { font-size: 13px; color: var(--text-med); max-width: 320px; text-align: center;}
+  
+  .mockup { 
+    background: var(--bg-pure); 
+    width: 320px; 
+    height: 640px; 
+    border: 12px solid #222; 
+    border-radius: 30px; /* Phone frame */
+    position: relative; 
+    overflow: hidden; 
+    display: flex; 
+    flex-direction: column;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  }
+  
+  /* Shared Top Status Bar Mock */
+  .status-bar { height: 24px; display: flex; justify-content: space-between; padding: 0 16px; align-items: center; font-size: 11px; font-family: monospace; color: var(--text-med); border-bottom: 1px solid var(--bg-pure);}
+  
+  /* Shared Bottom Nav */
+  .bottom-nav { margin-top: auto; height: 60px; display: flex; justify-content: space-around; align-items: center; border-top: 1px solid var(--border); background: var(--bg-pure); }
+  .nav-item { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 10px; color: var(--text-med); font-weight: 500;}
+  .nav-item.active { color: var(--text-high); }
+  
+  /* V1: Cyber-Terminal Strict */
+  .v1 { font-family: 'JetBrains Mono', 'Courier New', monospace; border-color: #1a1a1a; }
+  .v1 .status-bar { border-bottom-color: var(--border); }
+  .v1 .header { border-bottom: 1px solid var(--success); padding: 16px; color: var(--success); font-weight: bold; font-size: 14px; letter-spacing: 1px;}
+  .v1 .console { padding: 16px; display: flex; flex-direction: column; gap: 12px; font-size: 12px; }
+  .v1 .data-row { display: flex; justify-content: space-between; }
+  .v1 .file-block { border-left: 2px solid var(--text-med); padding-left: 8px; margin-top: 16px;}
+  .v1 .progress { color: var(--warning); margin-top: 4px;}
+  .v1 .bottom-nav { border-top: 1px dashed var(--success); }
+  .v1 .nav-item.active { color: var(--success); }
+
+  /* V2: Dashboard Tactique */
+  .v2 { font-family: 'Inter', sans-serif; }
+  .v2 .header { background: #0a0a0a; padding: 16px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;}
+  .v2 .title-dot { color: var(--success); font-size: 20px; line-height: 0;}
+  .v2 .dashboard { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+  .v2 .kpi-card { background: transparent; border: 1px solid var(--border); padding: 16px; border-radius: 8px; position: relative;}
+  .v2 .kpi-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--border); border-radius: 8px 0 0 8px; }
+  .v2 .kpi-card.healthy::before { background: var(--success); }
+  .v2 .kpi-card.alert::before { background: var(--warning); }
+  .v2 .kpi-label { font-size: 10px; color: var(--text-med); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 4px; font-weight: 600;}
+  .v2 .kpi-value { font-size: 28px; font-family: 'JetBrains Mono', monospace; font-weight: 300; color: var(--text-high); }
+
+  /* V3: Explorateur Utilitariste */
+  .v3 { font-family: 'Roboto', sans-serif; }
+  .v3 .header { padding: 20px 16px 12px 16px; font-size: 24px; font-weight: 300; letter-spacing: -0.5px;}
+  .v3 .list { display: flex; flex-direction: column; }
+  .v3 .list-item { display: flex; align-items: center; padding: 16px; border-bottom: 1px solid #1a1a1a; gap: 16px;}
+  .v3 .file-icon { width: 32px; height: 32px; border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 10px; border-radius: 4px;}
+  .v3 .file-details { flex-grow: 1; display: flex; flex-direction: column; gap: 4px;}
+  .v3 .file-name { font-size: 14px; color: var(--text-high); }
+  .v3 .file-meta { font-size: 12px; color: var(--text-med); display: flex; justify-content: space-between; font-family: 'JetBrains Mono', monospace;}
+</style>
+</head>
+<body>
+
+  <div class="info-panel">
+    <h1>Directions de Design - MobiCloud</h1>
+    <p>Explorez ces 3 interprétations visuelles respectant la contrainte <strong>OLED / Zéro-Overhead</strong> tout en proposant des architectures d'information différentes.</p>
+  </div>
+
+  <!-- Direction 1 -->
+  <div class="direction">
+    <div class="direction-title">Direction 1 : Cyber-Terminal Strict</div>
+    <div class="direction-desc">Accent maximal sur l'infrastructure. Zéro fioriture, tout en typo monospace. Sensation d'être un développeur connecté au cœur du P2P.</div>
+    <div class="mockup v1">
+      <div class="status-bar"><span>15:42</span><span>BLE/WFD</span></div>
+      <div class="header">SYS/MOBICLOUD_NODE</div>
+      <div class="console">
+        <div class="data-row"><span>> PEER_COUNT</span><span style="color: var(--success)">12 OKS</span></div>
+        <div class="data-row"><span>> UPTIME</span><span>04:12:08</span></div>
+        <div class="data-row"><span>> BATT_DRAIN</span><span style="color: var(--warning)">-2.1%/H</span></div>
+        
+        <div class="file-block">
+          <div>[RCV] archi_PFE.pdf</div>
+          <div class="progress">[====······] 40% (4/10)</div>
+        </div>
+        <div class="file-block">
+          <div>[SND] backup_db.zip</div>
+          <div class="progress" style="color: var(--success)">[==========] OK</div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active"><div>[1]</div><div>TERMINAL</div></div>
+        <div class="nav-item"><div>[2]</div><div>DHT_FS</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Direction 2 -->
+  <div class="direction">
+    <div class="direction-title">Direction 2 : Dashboard Tactique</div>
+    <div class="direction-desc">Épure géométrique. Utilise de fines bordures et la couleur comme marqueur d'état (Vert/Ambres). Approche par KPI très lisible.</div>
+    <div class="mockup v2">
+      <div class="status-bar"><span>15:42</span><span>MobiCloud Service</span></div>
+      <div class="header">
+        <span style="font-weight: 600; font-size: 18px;">MobiCloud</span>
+        <span class="title-dot">●</span>
+      </div>
+      <div class="dashboard">
+        <div class="kpi-card healthy">
+          <div class="kpi-label">Score de Fiabilité IA</div>
+          <div class="kpi-value">94.2<span style="font-size: 14px; color: var(--text-med)">%</span></div>
+        </div>
+        <div style="display: flex; gap: 16px;">
+          <div class="kpi-card" style="flex: 1">
+            <div class="kpi-label">Pairs BLE</div>
+            <div class="kpi-value">12</div>
+          </div>
+          <div class="kpi-card alert" style="flex: 1">
+            <div class="kpi-label">Batterie</div>
+            <div class="kpi-value">15<span style="font-size: 14px; color: var(--text-med)">%</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item">▣ Fichiers</div>
+        <div class="nav-item active">◩ Mon Nœud</div>
+        <div class="nav-item">⚄ Réseau</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Direction 3 -->
+  <div class="direction">
+    <div class="direction-title">Direction 3 : Explorateur Utilitariste</div>
+    <div class="direction-desc">Familiarité native (ressemble aux paramètres Android). Efficace, se concentre sur les fichiers et délègue la technique au second plan.</div>
+    <div class="mockup v3">
+      <div class="status-bar"><span>15:42</span><span>Actif - 12 pairs</span></div>
+      <div class="header">Fichiers Locaux</div>
+      <div class="list">
+        <div class="list-item">
+          <div class="file-icon">TXT</div>
+          <div class="file-details">
+            <div class="file-name">notes_reunion.txt</div>
+            <div class="file-meta"><span>12 Kb</span><span style="color: var(--success)">10/10 parts</span></div>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="file-icon" style="color: var(--warning); border-color: var(--warning)">PDF</div>
+          <div class="file-details">
+            <div class="file-name">présentation_finale.pdf</div>
+            <div class="file-meta"><span>5.4 Mb</span><span style="color: var(--warning)">Envoi: 42%</span></div>
+          </div>
+        </div>
+        <div class="list-item">
+          <div class="file-icon">ZIP</div>
+          <div class="file-details">
+            <div class="file-name">assets_design.zip</div>
+            <div class="file-meta"><span>28 Mb</span><span style="color: var(--success)">Hébergé</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="bottom-nav">
+        <div class="nav-item active">Fichiers</div>
+        <div class="nav-item">Diagnostic</div>
+        <div class="nav-item">Réseau</div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

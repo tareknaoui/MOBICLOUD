@@ -12,8 +12,6 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CatalogDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCatalogEntry(entry: CatalogEntryEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertFragmentLocations(fragments: List<FragmentLocationEntity>)
@@ -33,10 +31,26 @@ interface CatalogDao {
     @Query("DELETE FROM fragment_location WHERE catalog_file_hash = :hash")
     suspend fun deleteFragmentLocations(hash: String)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCatalogEntryInternal(entry: CatalogEntryEntity)
+
+    /**
+     * Insère une entrée catalogue et REMPLACE intégralement ses fragments (full replace atomique).
+     * ATTENTION : passer `fragments = emptyList()` supprime tous les fragments existants.
+     * Pour une mise à jour de l'entrée seule, utiliser [updateCatalogEntryOnly].
+     */
     @Transaction
     suspend fun insertWithFragments(entry: CatalogEntryEntity, fragments: List<FragmentLocationEntity>) {
-        insertCatalogEntry(entry)
+        // Ordre critique (BH-01) : delete AVANT insert pour éviter tout état incohérent
+        // observable par les Flow pendant la fenêtsre de transaction.
         deleteFragmentLocations(entry.fileHash)
+        insertCatalogEntryInternal(entry)
         insertFragmentLocations(fragments)
     }
+
+    /**
+     * Met à jour l'entrée catalogue sans modifier les fragments associés. (D2-B)
+     */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun updateCatalogEntryOnly(entry: CatalogEntryEntity)
 }

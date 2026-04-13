@@ -3,7 +3,7 @@
 **Story ID:** 2.1
 **Story Key:** 2-1-modele-dht-partitionne-crdt-jetpack-room-fr-05-1
 **Epic:** 2 (Catalogue Distribué P2P)
-**Status:** in-progress
+**Status:** done
 
 ## Story
 
@@ -102,3 +102,24 @@ Localisation probable pour les créations/éditions :
 ## Change Log
 - 
 
+## Review Findings
+
+### Decision Needed
+*(toutes résolues — converties en patches)*
+
+### Patches
+- [x] [Review][Patch] **D1-B — `MergeCatalogEntriesUseCase` : tie-breaking par hash lexicographique par `fragmentIndex`** — En cas d'égalité `versionClock`, remplacer `distinctBy { fragmentIndex to fragmentHash }` par une logique qui, pour chaque `fragmentIndex`, conserve le fragment avec le `fragmentHash` le plus grand lexicographiquement. Élimine les doublons et garantit une convergence déterministe sans timestamp physique. [MergeCatalogEntriesUseCase.kt:24-26]
+- [x] [Review][Patch] **D2-B — `CatalogDao` : ajouter `updateCatalogEntryOnly(entry)`** — Méthode dédiée `@Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun updateCatalogEntryOnly(entry: CatalogEntryEntity)` ajoutée avec KDoc spécifiant le contrat "full replace" de `insertWithFragments`. [CatalogDao.kt]
+- [x] [Review][Patch] **D3-A — Créer `CatalogRepositoryImpl` avec filtre DHT (AC #6)** — Interface `CatalogRepository` créée dans `domain/repository/`. `CatalogRepositoryImpl` créé dans `data/repository_impl/` avec filtre DHT, `withContext(Dispatchers.IO)` et `Result<T>`. [AC #6, AC #9]
+- [x] [Review][Patch] **BH-01 — Race condition dans `insertWithFragments` : état incohérent observable par le Flow** — Ordre corrigé : `delete` est maintenant appelé AVANT `insert entry` pour éviter toute fenêtre incohérente visible par les Flow observateurs. [CatalogDao.kt]
+- [x] [Review][Patch] **BH-02/ECH-06 — `Converters.kt` TypeConverter mort et confusion JSON/Protobuf** — Converter `List<FragmentLocation>` supprimé. Remplacé par un converter générique `List<String>` pour usage futur. La sérialisation de `nodeIds` est maintenant gérée explicitement dans `CatalogRepositoryImpl`. [Converters.kt]
+- [x] [Review][Patch] **BH-06 — Comparaison lexicographique des IDs DHT invalide si longueurs variables** — Précondition `require(key.length == nodeId.length && nodeId.length == successorId.length)` ajoutée avec message d'erreur explicatif. [CalculateDhtRangeUseCase.kt]
+- [x] [Review][Patch] **ECH-01 — `fileHash` vide accepté comme clé primaire valide** — Guards `require(local.fileHash.isNotBlank())` et `require(remote.fileHash.isNotBlank())` ajoutés dans `MergeCatalogEntriesUseCase.invoke()`. [MergeCatalogEntriesUseCase.kt]
+- [x] [Review][Patch] **ECH-03 — Test manquant : `key == successorId` en mode wrap-around** — `assertFalse(useCase(key = "2000", nodeId = nodeId, successorId = successorId))` ajouté dans `testIsInRange_wrapAroundRange`. [CalculateDhtRangeUseCaseTest.kt]
+- [x] [Review][Patch] **AA-02/AA-04 — `CatalogRepositoryImpl` absent : pas de `Result<T>` ni de `Dispatchers.IO`** — Adressé par le patch D3-A. Les interfaces et l'implémentation ont été créées avec tous les guardrails. [CatalogRepositoryImpl.kt]
+- [x] [Review][Patch] **BH-04 — `allowMainThreadQueries()` masque l'absence de `Dispatchers.IO`** — Supprimé. Tous les appels DAO dans les tests sont maintenant encapsulés dans `withContext(Dispatchers.IO)`. [CatalogDaoTest.kt]
+
+### Deferred
+- [x] [Review][Defer] **BH-03 — `exportSchema = false` bloque les migrations Room futures** [CatalogDatabase.kt:10] — deferred, décision technique consciente pour la phase de développement. À activer avant la première release publique.
+- [x] [Review][Defer] **AA-05 — Absence de validation de format des hashes cryptographiques** [CatalogEntryEntity.kt, CatalogEntry.kt] — deferred, validation à ajouter dans une story de hardening sécurité.
+- [x] [Review][Defer] **AA-06 — Aucune requête DAO de sélection par plage DHT** [CatalogDao.kt] — deferred, sera requis en Story 2.3 (filtres de Bloom + Gossip). À planifier lors du sprint de l'Epic 2.

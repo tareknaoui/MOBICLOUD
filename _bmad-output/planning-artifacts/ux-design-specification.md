@@ -1,5 +1,6 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7]
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+lastStep: 14
 inputDocuments: ["c:\\Users\\naoui\\Desktop\\Projets\\PFE\\_bmad-output\\planning-artifacts\\prd.md"]
 ---
 
@@ -209,5 +210,235 @@ Permet de diagnostiquer l'état du "Datalake" sans animations coûteuses.
 ### 3. États Globaux Transverses
 
 - **Alertes de Migration (Snackbar/Bannière) :** Si la batterie devient critique, une bannière ambre informe de façon persistante : "Évacuation d'urgence en cours..."
+
+## Visual Design Foundation
+
+### Color System
+
+Adoptant un "Dark Mode OLED Pur Forcé", le système de couleurs est pragmatique :
+- **Backgrounds :** `#000000` (Neutral Black) exclusif. Économie d'énergie pure.
+- **Primary Text :** `#E0E0E0`. Secondary Text: `#9E9E9E`. Bordures : `#333333`.
+- **Semantic Accents :** 
+  - `Success/Active` : `#00FF41` (Vert Terminal, pour l'état sain du Foreground Service).
+  - `Warning/Action` : `#FFB300` (Ambre Fluorescent, pour les alertes de survie / batterie).
+  - `Error/Critical` : `#FF3333` (Rouge, transferts échoués).
+
+### Typography System
+
+La typographie vise la stabilité de l'affichage interactif :
+- **Primary Typeface (UI & Layout) :** `Inter` / `Roboto`. Pour les titres, les instructions et l'interface de base.
+- **Data Typeface (Diagnostics & Hash) :** `JetBrains Mono` / `Roboto Mono`. Pour tout contenu mis à jour dynamiquement afin d'éviter le "UI Jitter" (ex: `0x4F...B2A`).
+
+### Spacing & Layout Foundation
+
+- **Baselines :** Grille stricte de 8px (sous-module de 4px pour les micro-espacements).
+- **Layouts "Flat & Densified" :** Les vues sont structurées sans élévation (ombres désactivées / `0dp`). La séparation se fait par de fines bordures (#333333).
+
+### Accessibility Considerations
+
+- Contrôle du contraste répondant aux contraintes WCAG AAA pour la visibilité des données critiques.
+- Maintenir une taille de cible tactile (Touch Targets) de minimum `48x48dp` sur les boutons, même dans des écrans denses de "Tableau de Bord".
+
+## Design Direction Decision
+
+### Design Directions Explored
+
+1. **Cyber-Terminal Strict :** Focus infrastructure, terminal-like, typographie monospace intégrale.
+2. **Dashboard Tactique :** Épure géométrique, approche par KPIs (cartes de diagnostique), utilisation de la couleur (Vert/Ambres) comme marqueur d'état.
+3. **Explorateur Utilitariste :** Familiarité native (type Android Settings), focus immédiat sur la liste de fichiers avec la P2P reléguée au second plan.
+
+### Chosen Direction
+
+**Direction 2 : Dashboard Tactique**
+
+Cette direction s'impose comme une évidence car elle permet de démontrer visuellement la puissance du moteur P2P sous-jacent (le "cerveau" de l'application) à un jury de soutenance de PFE, tout en gardant un aspect clair et professionnel, sans tomber dans l'excès très "geek" du terminal. 
+
+### Design Rationale
+
+- **Lisibilité du Statut Vital :** Le Dashboard met immédiatement en évidence le fameux "Score de Fiabilité" (qui motive l'élection du Super-Pair) de manière rassurante et esthétique.
+- **Preuve de l'Effort (Proof of Work) :** L'interface affiche des métriques temps réel (Batterie, Pairs, Rôle) permettant de prouver visuellement à un jury non-technique que le Foreground Service P2P travaille réellement sans ruiner le téléphone (NFR-03).
+- **Séparation Cognitive :** La machine (Mon Nœud) est fièrement exposée sur le Dashboard d'accueil, tandis que le besoin utilitaire pur (L'Explorateur de Fichiers chiffrés) dispose de son propre onglet, évitant de mélanger les concepts.
+
+### Implementation Approach
+
+Le design system appliquera ces composants majeurs en Jetpack Compose (en forçant la faible consommation d'énergie) :
+- **Indicateur de Santé Global :** Affichage central très visible du Score de Fiabilité algorithmique global de l'appareil (sans IA/Tensorflow).
+- **Les Cartes de Diagnostique :** Une grille modulaire affichant des données brutes avec de simples badges de couleur (Batterie : 42%, Ping DDNS, etc).
+- **Statut & Rôle :** Un badge en haut de l'écran affichant explicitement le statut du nœud dans sa topologie (Ex: `★ Super-Pair` ou `● Nœud Connecté`).
+- **Explorateur & Radar :** Un compteur de "Pairs à portée" sur le Dashboard, avec la gestion des fichiers transférée dans le premier onglet exclusif de la barre de navigation basse (Bottom Nav).
+
+## User Journey Flows
+
+### UJ-01 : Onboarding & Connexion Hybride (Zéro-Configuration)
+
+- **Entry Point :** L'utilisateur lance MobiCloud.
+- **Goal :** Intégrer le réseau local de manière invisible, découvrir les pairs, et afficher le "Dashboard Tactique" pour rassurer l'utilisateur.
+- **Flow :**
+
+```mermaid
+graph TD
+    A[Ouverture App] --> B{Permissions Vitales ?}
+    B -- Non --> C[Écran unique : Demande Permissions]
+    C --> B
+    B -- Oui --> D[Foreground Service Init]
+    D --> E[Requête Annuaire DDNS Silencieuse]
+    E --> F{Détection Super-Pair ?}
+    F -- Oui --> G[Connexion Socket]
+    F -- Non --> H[Calcul Score & Auto-Élection]
+    H --> I[Push IP sur DDNS]
+    G --> J[Affichage Dashboard Tactique]
+    I --> J
+```
+
+### UJ-02 : Envoi de Fichier (Fire-and-Forget)
+
+- **Entry Point :** Onglet Explorateur -> Bouton d'Action Flottant (FAB).
+- **Goal :** Dépôt d'un gros fichier déclenchant sa fragmentation et sa distribution de façon sécurisée (Zero-Trust).
+- **Flow :**
+
+```mermaid
+graph TD
+    A[Onglet Explorateur] --> B[Clic Ajout]
+    B --> C[Sélecteur Fichier OS]
+    C --> D[Modale Locale: En cours de hachage]
+    D --> E[Moteur C++: Erasure Coding & Chiffrement AES]
+    E --> F[Envoi blocs K+n aux, pairs]
+    F --> G[Notification SP / Catalogue MAJ]
+    G --> H[Fichier visible par tous]
+```
+
+### UJ-03 : Téléchargement Résilient
+
+- **Entry Point :** Onglet Explorateur -> Clic sur un fichier distant (couleur neutre).
+- **Goal :** Récupérer et reconstituer le fichier original via téléchargement concurrent.
+- **Flow :**
+
+```mermaid
+graph TD
+    A[Onglet Explorateur] --> B[Clic Fichier distant]
+    B --> C[Bottom Sheet: Statut fichier]
+    C --> D{Au moins K Fragments dispo ?}
+    D -- Non --> E[Bouton inactif - Attente Pairs]
+    E --> D
+    D -- Oui --> F[Clic Télécharger]
+    F --> G[Traitement Concurrent + Remontée C++]
+    G --> H[Fichier Décrypté & Sauvegardé]
+    H --> I[Jauge Tactique devient Verte (100%)]
+```
+
+### Journey Patterns
+
+**Navigation Patterns :**
+- **Zéro Mode "Plein Écran" Transitoire :** Les actions de téléchargement n'amènent pas l'utilisateur sur une nouvelle page. Elles ouvrent des *Bottom Sheets* tactiques, permettant de garder en visuel l'état de la connexion (Dashboard) en arrière-plan.
+
+**Decision & Feedback Patterns :**
+- **Zéro-Blocage (Obtrusive Errors) :** Si la connexion P2P casse en plein milieu, pas de popup `Ok/Annuler` bloquante. Le statut du Header (qui est global à l'application) passe de Vert à Ambre fluo. Les téléchargements entrent en "Pause auto" sans alarmer inutilement.
+
+### Flow Optimization Principles
+
+- **Minimisation du chemin critique :** Le réseau travaille avant même que l'utilisateur affiche le Dashboard.
+- **Réduction du "Screen Jitter" :** En remplaçant les roues de chargement (spinners) par de simples journaux de logs textuels fixes (ex: `[====---] 40%`) pour la progression du découpage Erasure Coding.
+
+## Component Strategy
+
+### Design System Components
+
+L'interface s'appuie sur Material Design 3 (Compose) mais avec un "Override" radical (Suppression des ombres `elevation=0dp`, fond OLED absolu, suppression des ondulations tactiles / ripples inutiles).
+- **Fondations conservées :** `Scaffold` (structure de l'écran), `NavigationBar` (Navigation basse), `FloatingActionButton` (Bouton d'ajout de l'Explorateur), `ModalBottomSheet` (Interface d'action sur les fichiers sans quitter le radar de vue).
+
+### Custom Components
+
+Pour implémenter avec succès l'âme du "Dashboard Tactique", nous concevrons 4 composants réutilisables spécifiques :
+
+#### 1. ReliabilityGauge (Indicateur de Santé Global)
+- **Purpose :** Montrer le Score de Fiabilité (qui décide si le nœud est Super-Pair ou non) en un clin d'œil.
+- **Anatomy :** Arc de cercle épuré tracé via le Canvas de Compose. Valeur en police `JetBrains Mono` au centre (ex: `94%`).
+- **States :** `Sain (Vert Terminal)`, `Alerte (Ambre)`, `Critique (Rouge)`. Re-calcule sa couleur instantanément en fonction des seuils de l'algorithme.
+
+#### 2. KpiDiagnosticCard (Cartes de Métriques)
+- **Purpose :** Afficher froidement les données brutes (Batterie absolue, Pairs BLE trouvés).
+- **Anatomy :** Boîte rectangulaire noire sans ombre. Bordure native fine `#333333`. Liseré contextuel vertical à gauche (Vert/Ambre) pour l'état en un coup d'œil.
+- **Micro-copy :** Un "Header Label" de taille 12 (Gris moyen) et un "Data Body" énorme de taille 24/32 (Blanc cassé, Monospace).
+
+#### 3. RadarLogConsole (Terminal P2P Passif)
+- **Purpose :** Prouver que le téléphone écoute le réseau (Heartbeats) sans consommer le GPU de l'appareil avec des ondes concentriques animées (anti-pattern de batterie).
+- **Anatomy :** Encadré texte de 3 ou 4 lignes qui se mettent à jour avec les "logs de découverte réseau" formattés proprement, avec une simple petite pastille textuelle qui clignote `[Actif]`.
+
+#### 4. ErasureProgressIndicator (Jauges P2P)
+- **Purpose :** Remplacer les barres de progression système classiques par une représentation par "blocs" qui rend tangible la notion d'Erasure Coding (Fragmentation sécurisée).
+- **Anatomy :** Composant affichant séquentiellement des éléments graphiques distincts au format `[====····] 4/10`, illustrant que le fichier n'est pas un flux uni continu mais bien l'assemblage mathématique de sous-fichiers.
+
+### Component Implementation Strategy
+
+Aucune de ces surcouches ne doit faire appel au compositing matériel intensif. Le rendu sera majoritairement accompli via `Modifier.drawBehind` dans Compose, qui est extrêmement économe.
+Les recompositions (raffraichissement de l'UI) ne se produiront que lorsque les variables `StateFlow` émises par le Core P2P seront modifiées en backend, avec la fonction native intelligente `collectAsStateWithLifecycle()` (suspend la mise à jour UI à la milliseconde où l'écran s'éteint pour chuter la consommation de batterie à zéro).
+
+### Implementation Roadmap
+
+**Phase 1 (Core Dashboard Vitale) :**
+- Développement prioritaire du composant `ReliabilityGauge` et des instances de `KpiDiagnosticCard`. Ils feront le socle de l'accueil validant le rôle du nœud.
+
+**Phase 2 (Feedback & Interactions) :**
+- Développement de l'`ErasureProgressIndicator` à inclure dans les Modales/Bottom Sheets du module Explorateur.
+
+**Phase 3 (Habillage & Transparence) :**
+- Développement de la `RadarLogConsole` pour remplacer les silences de l'interface lors des négociations réseau.
+
+## UX Consistency Patterns
+
+### Button Hierarchy
+
+Dans MobiCloud, notre approche *Fire-and-Forget* limite volontairement la charge interactive. La hiérarchie est donc rare mais très lisible :
+- **Primary / Global Action :** Le `FloatingActionButton` (FAB) de l'Explorateur. C'est le seul appel à l'action "puissant", déclenchant l'Upload (et donc l'Erasure Coding). Il est stylisé de manière très carrée et sans élévation (ombres).
+- **Secondary Actions :** Boutons filaires (Outlined Buttons) avec des bordures `#333333`. Utilisés uniquement dans les surcouches (Bottom Sheets) pour des actions de contrôle précises (ex: "Mettre le transfert en Pause" ou "Annuler").
+- **Tertiary Actions (Text/Icon Buttons) :** Pour la suppression ou les détails. La réaction au clic doit être crue et instantanée (suppression des lents effets de vagues temporelles de Material Design - Ripples désactivés).
+
+### Feedback Patterns
+
+La philosophie "Preuve de travail utilitariste" rejette toute popup bloquante au milieu de l'écran :
+- **Success (Fire-and-Forget) :** C'est silencieux. Le passage de la jauge Erasure Coding à `10/10` et le changement de couleur au Vert Terminal au sein même de la liste suffit. *Zéro popup*, zéro animation de validation.
+- **System Alterations (Warning) :** Les changements techniques extérieurs (ex: Perte du Wi-Fi direct, Chute de Batterie) ne génèrent aucune fenêtre d'erreur. C'est l'encart d'état en haut de l'écran qui bascule passiviment au statut `Ambre/Alerte`, coupant de lui-même les relais distants pour survivre.
+- **Transfer Failure (Error) :** Si un transfert échoue (ex: Pairs perdus avant l'obtention de K fragments), le composant liste affiche un simple tag `[ECHEC K-MIN]` en rouge matériel (`#FF3333`) avec un mini bouton de relance.
+
+### Navigation Patterns
+
+- **Bottom Navigation (Changement Transversal) :** La bascule entre notre Dashboard (Mon Nœud) et l'onglet Fichiers doit être *instantanément coupée*, désactivant le fade-in classique d'Android pour donner une perception de rapidité "Machine/Système".
+- **Bottom Sheets (Contextualité) :** Cliquer sur un fragment ou un transfert n'ouvre *jamais* une nouvelle page bloquante. Cela lève un "Tiroir bas" (Bottom Sheet). Cela permet à l'utilisateur de toujours garder visuellement conscience de la connexion en gardant son Dashboard ou sa liste derrière le tiroir.
+
+### Empty & Loading States (Anti-Spinner)
+
+- **Loading States :** Conformément à l'Anti-Pattern "Galaxie/Spinners" vu dans l'étape 3, l'attente réseau n'utilise *jamais* de roue ou de jauge circulaire animée de manière infinie. Nous utiliserons des logs textuels réels (`Negotiating TCP...`) ou le clignotement d'un curseur terminal `_`.
+- **Empty States (Réseau vide) :** Si la vue P2P est vide, on imprime un simple feedback technique clair : `> AUCUN PAIR DETECTE_` au centre de l'interface, encadré des bordures techniques du système.
+
+## Responsive Design & Accessibility
+
+### Responsive Strategy
+
+MobiCloud est une application native Android. L'expérience P2P cible des utilisateurs "terrain".
+- **Mobile-First Stricte :** L'interface "Dashboard" est conçue prioritairement pour les smartphones en orientation portrait. Elle prend la pleine largeur pour maximiser l'impact visuel des jauges et capteurs.
+- **Tablets (Compatibilité) :** La structure n'est pas étirée. Sur tablette, la vue d'accueil est centrée et cantonnée à la largeur maximale d'un téléphone en paysage (MaxWidth = `600dp`), empêchant toute déformation des interfaces utilitaires.
+
+### Breakpoint Strategy
+
+- **Form Factor "Compact" (Téléphones) :** `< 600dp`. L'écran englobe 100% de la surface. Layout complet avec `BottomNavigation` native en bas de l'écran.
+- **Form Factor "Medium/Expanded" (Tablettes/Pliables) :** `> 600dp`. Contrairement aux applications web fluides, notre interface se limite fonctionnellement à l'ergonomie mobile, centrée avec des marges grises (`#1a1a1a`), pour assumer l'aspect outil de poche (Pocket-tool / Terminal).
+
+### Accessibility Strategy
+
+- **Objectif de Conformité :** Cible *WCAG AA Minimum*.
+- **Contraste Éclairage Jour :** Les teintes choisies plus tôt (Noir OLED, Vert Terminal, Ambre Fluo) offrent nativement des ratios de contraste supérieurs à `7:1`, garantissant que le Dashboard reste lisible en forte luminosité extérieure (Soleil direct en marchant).
+- **Cibles Tactiles :** Adoption systématique de la règle Material : toute zone de clic excède la dimension barrière de `48x48dp` (indispensable pour l'usage "gros doigts" ou "en mouvement").
+- **Agrandissement Typographique :** Notre composant "KpiDiagnosticCard" est conçu avec du texte en "Sp" (Scaled Pixels) qui suit les règles système du téléphone Android (si l'utilisateur configure une police géante globale, nos cartes afficheront bien les chiffres en très gros sans casser le layout).
+
+### Testing Strategy
+
+- **Responsive :** Testé avec le composant "Preview" de Jetpack Compose sur 3 form factors (4.5", 6", Foldable).
+- **Accessibilité :** Utilisation du plugin natif pour s'assurer que même le `RadarLogConsole` est analysable en texte par la fonction système de lecture auditive (Google TalkBack) pour les non-voyants.
+- **Test de Terrain :** Tester le contraste des teintes (Vert/Noir vs Ambre/Noir) physiquement sous l'éblouissement du soleil (Étalonnage manuel).
+
+### Implementation Guidelines
+
+- Toutes les dimensions spatiales seront forcées en `dp` (Density-independent pixels) ; toutes les fontes en `sp`.
+- Les attributs de lecteurs d'écran (ex: `contentDescription` dans Jetpack Compose) définiront chaque module logique plutôt que chaque pièce. Par exemple, la jauge globale aura en attribut : *"Indicateur total, Votre fiabilité est actuellement à 94%."* plutôt que simplement détailler le cercle graphique lui-même.
 
 <!-- UX Design Specification Completed -->

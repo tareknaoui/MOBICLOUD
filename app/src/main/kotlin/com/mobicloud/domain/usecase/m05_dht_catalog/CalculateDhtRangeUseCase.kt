@@ -16,8 +16,18 @@ class CalculateDhtRangeUseCase {
      * @return `true` si la `key` tombe sous la juridiction de ce `nodeId`.
      */
     operator fun invoke(key: String, nodeId: String, successorId: String): Boolean {
+        // Pr\u00e9condition critique (BH-06) : la comparaison lexicographique sur String n'est correcte
+        // que si tous les identifiants ont exactement la m\u00eame longueur (ex: SHA-256 hex = 64 chars).
+        // Un ID tronqu\u00e9 ou de format diff\u00e9rent produirait silencieusement des r\u00e9sultats erron\u00e9s
+        // sur l'anneau DHT (ex: "ff" > "100" en lexico alors que 255 < 256 en d\u00e9cimal).
+        require(key.length == nodeId.length && nodeId.length == successorId.length) {
+            "Tous les IDs DHT doivent avoir la m\u00eame longueur pour garantir la validit\u00e9 " +
+            "de la comparaison lexicographique. Got: key=${key.length}, nodeId=${nodeId.length}, " +
+            "successorId=${successorId.length}"
+        }
+
         if (nodeId == successorId) {
-            // Nous sommes le seul nœud sur l'anneau, nous couvrons tout
+            // Nous sommes le seul n\u0153ud sur l'anneau, nous couvrons tout
             return true
         }
 

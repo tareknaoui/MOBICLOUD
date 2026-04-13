@@ -50,3 +50,9 @@
 
 - **Overflow arithmétique `Double→Long` sur valeurs extrêmes de backoff** [`UdpHeartbeatBroadcaster.kt:79`] — `(currentIntervalMs * backoffFactor).roundToLong()` peut lever une `ArithmeticException` si `currentIntervalMs` est extrêmement grand et `backoffFactor` très élevé. Cas impossible en production avec `maxIntervalMs=32000L`, mais non couvert par un guard arithmétique explicite. À solidifier si les paramètres de backoff deviennent configurables dynamiquement.
 - **Loop 5 crash silencieux sur exception `networkUtils.getCurrentState()`** [`MobicloudP2PService.kt:134`] — Si `NetworkUtils.getCurrentState()` lève une exception non capturée, `SupervisorJob` absorbe le crash de la coroutine Loop 5 sans notification. L'app perd silencieusement le monitoring réseau. À adresser lors d'une story de robustesse/observabilité du service P2P.
+
+## Deferred from: code review of 2-1-modele-dht-partitionne-crdt-jetpack-room-fr-05-1 (2026-04-11)
+
+- **BH-03 — `exportSchema = false` bloque les migrations Room futures** [`CatalogDatabase.kt:10`] — Décision technique consciente pour la phase de développement. À activer (`exportSchema = true`) et à configurer un dossier de schéma avant la première release publique pour permettre les migrations automatiques.
+- **AA-05 — Absence de validation de format des hashes cryptographiques** [`CatalogEntryEntity.kt`, `CatalogEntry.kt`] — `fileHash` et `ownerPubKeyHash` sont des `String` sans contrainte de format. Rien n'empêche de stocker une valeur lisible (non cryptographique). À adresser dans une story de hardening sécurité (validation longueur fixe + caractères hex).
+- **AA-06 — Aucune requête DAO de sélection par plage DHT** [`CatalogDao.kt`] — Aucune méthode `getEntriesInRange(start, end)` n'est disponible dans le DAO. Sera requis pour le Gossip épidémique de la Story 2.3. À planifier dans le sprint de l'Epic 2.

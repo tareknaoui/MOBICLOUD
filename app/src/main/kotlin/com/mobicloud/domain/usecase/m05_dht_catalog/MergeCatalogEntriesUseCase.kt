@@ -10,6 +10,9 @@ import com.mobicloud.domain.models.FragmentLocation
  */
 class MergeCatalogEntriesUseCase {
     operator fun invoke(local: CatalogEntry, remote: CatalogEntry): CatalogEntry {
+        // Guard Zero-Knowledge : les hashes ne peuvent pas être vides (ECH-01)
+        require(local.fileHash.isNotBlank()) { "local.fileHash cannot be blank" }
+        require(remote.fileHash.isNotBlank()) { "remote.fileHash cannot be blank" }
         // Validation: On ne fusionne que des fiches du même fichier
         require(local.fileHash == remote.fileHash) {
             "Cannot merge entries for different files: ${local.fileHash} vs ${remote.fileHash}"
@@ -20,12 +23,17 @@ class MergeCatalogEntriesUseCase {
             remote.versionClock > local.versionClock -> remote
             local.versionClock > remote.versionClock -> local
             else -> {
-                // versionClock identiques: on privilégie l'union des fragments de manière déterministe
+                // versionClock identiques : CRDT standard académique.
+                // Pour chaque fragmentIndex, on élit un seul gagnant : le fragment avec le fragmentHash
+                // lexicographiquement le plus grand. Garantit convergence déterministe et commutative
+                // sans timestamp physique (les horloges mobiles ne sont pas fiables). (D1-B)
                 val mergedFragments = (local.fragmentLocations + remote.fragmentLocations)
-                    .distinctBy { it.fragmentIndex to it.fragmentHash }
+                    .groupBy { it.fragmentIndex }
+                    .values
+                    .map { fragments -> fragments.maxByOrNull { it.fragmentHash }!! }
                     .sortedBy { it.fragmentIndex }
 
-                // Pour briser l'égalité de manière commutative, on prend le ownerPubKeyHash le plus grand lexicographiquement (si différent)
+                // Tie-breaker commutative sur ownerPubKeyHash (standard CRDT LWW)
                 val chosenOwner = if (remote.ownerPubKeyHash > local.ownerPubKeyHash) remote.ownerPubKeyHash else local.ownerPubKeyHash
 
                 CatalogEntry(

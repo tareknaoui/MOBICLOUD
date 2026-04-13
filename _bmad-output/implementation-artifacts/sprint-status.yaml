@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-03-27T01:15:29+01:00
-last_updated: 2026-04-09T14:53:00+02:00
+last_updated: 2026-04-11T01:51:00+02:00
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -56,8 +56,8 @@ development_status:
   1-5-backoff-progressif-dannonce-anti-saturation-fr-01-5: done
   epic-1-retrospective: optional
   epic-2: in-progress
-  2-1-modele-dht-partitionne-crdt-jetpack-room-fr-05-1: in-progress
-  2-2-election-basique-genesis-hashcash: backlog
+  2-1-modele-dht-partitionne-crdt-jetpack-room-fr-05-1: done
+  2-2-election-basique-genesis-hashcash: review
   2-3-filtres-de-bloom-parametres-et-gossip-epidemique: backlog
   2-4-transmission-delta-tcp-desynchronisation: backlog
   2-5-garbage-collector-et-time-to-live-purge-du-catalogue-fr-05-5: backlog

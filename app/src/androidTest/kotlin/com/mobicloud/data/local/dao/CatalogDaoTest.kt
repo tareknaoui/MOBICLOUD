@@ -6,8 +6,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.mobicloud.data.local.CatalogDatabase
 import com.mobicloud.data.local.entity.CatalogEntryEntity
 import com.mobicloud.data.local.entity.FragmentLocationEntity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -24,10 +26,12 @@ class CatalogDaoTest {
 
     @Before
     fun setup() {
+        // Pas de allowMainThreadQueries() (BH-04) : les tests doivent utiliser Dispatchers.IO
+        // pour reproduire le comportement de production et valider les guardrails du Repository.
         database = Room.inMemoryDatabaseBuilder(
             ApplicationProvider.getApplicationContext(),
             CatalogDatabase::class.java
-        ).allowMainThreadQueries().build()
+        ).build()
         dao = database.catalogDao()
     }
 
@@ -51,7 +55,7 @@ class CatalogDaoTest {
             nodeIds = "[\"node1\"]"
         )
 
-        dao.insertWithFragments(entry, listOf(fragment))
+        withContext(Dispatchers.IO) { dao.insertWithFragments(entry, listOf(fragment)) }
 
         val retrievedFlow = dao.getCatalogEntryFlow(hash).first()
         assertNotNull(retrievedFlow)
@@ -69,9 +73,9 @@ class CatalogDaoTest {
         val hash = "hash_sync"
         val entry = CatalogEntryEntity(hash, "pubkey_sync", 2L)
 
-        dao.insertWithFragments(entry, emptyList())
+        withContext(Dispatchers.IO) { dao.insertWithFragments(entry, emptyList()) }
 
-        val retrieved = dao.getCatalogEntry(hash)
+        val retrieved = withContext(Dispatchers.IO) { dao.getCatalogEntry(hash) }
         assertNotNull(retrieved)
         assertEquals(hash, retrieved?.catalogEntry?.fileHash)
         assertEquals("pubkey_sync", retrieved?.catalogEntry?.ownerPubKeyHash)
@@ -85,21 +89,21 @@ class CatalogDaoTest {
         val entry1 = CatalogEntryEntity(hash, "pub1", 1L)
         val frag1 = FragmentLocationEntity(0, hash, 0, "hash1", "[]")
         
-        dao.insertWithFragments(entry1, listOf(frag1))
+        withContext(Dispatchers.IO) { dao.insertWithFragments(entry1, listOf(frag1)) }
 
         val frag2 = FragmentLocationEntity(0, hash, 0, "hash2", "[]")
         val frag3 = FragmentLocationEntity(0, hash, 1, "hash3", "[]")
         // Updating entry but with 2 fragments now instead of 1
-        dao.insertWithFragments(entry1, listOf(frag2, frag3))
+        withContext(Dispatchers.IO) { dao.insertWithFragments(entry1, listOf(frag2, frag3)) }
 
-        val retrieved = dao.getCatalogEntry(hash)
+        val retrieved = withContext(Dispatchers.IO) { dao.getCatalogEntry(hash) }
         assertNotNull(retrieved)
         assertEquals(2, retrieved?.fragmentLocations?.size)
     }
 
     @Test
     fun testGetNonExistentEntry() = runBlocking {
-        val retrieved = dao.getCatalogEntry("missing_hash")
+        val retrieved = withContext(Dispatchers.IO) { dao.getCatalogEntry("missing_hash") }
         assertNull(retrieved)
     }
 }

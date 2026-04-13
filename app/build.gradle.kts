@@ -30,6 +30,7 @@ plugins {
     alias(libs.plugins.jetpack.application)
     alias(libs.plugins.jetpack.dagger.hilt)
     alias(libs.plugins.jetpack.firebase)
+    alias(libs.plugins.gms)
     alias(libs.plugins.jetpack.dokka)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -165,6 +166,9 @@ dependencies {
     // ... Analytics
     implementation(project(":firebase:analytics"))
 
+    // ... Firebase Realtime Database
+    implementation(libs.firebase.database.ktx)
+
     // ... Sync
     implementation(project(":sync"))
 
@@ -185,6 +189,7 @@ dependencies {
 
     // ... Testing
     testImplementation(libs.junit)
+    testImplementation("io.mockk:mockk:1.13.8")
     testImplementation(libs.kotlinx.coroutines.test)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.runner)

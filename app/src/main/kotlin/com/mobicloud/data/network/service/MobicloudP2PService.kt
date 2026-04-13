@@ -18,9 +18,13 @@ import com.mobicloud.data.p2p.UdpHeartbeatBroadcaster
 import com.mobicloud.data.p2p.UdpHeartbeatReceiver
 import com.mobicloud.core.network.utils.NetworkUtils
 import com.mobicloud.domain.models.NodeIdentity
+import com.mobicloud.domain.repository.BootstrapRepository
 import com.mobicloud.domain.repository.PeerRegistry
 import com.mobicloud.domain.repository.SecurityRepository
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.AndroidEntryPoint
+import com.mobicloud.data.p2p.tcp.TcpConnectionManager
+import com.mobicloud.data.network.PublicIpFetcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -43,6 +47,9 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var heartbeatReceiver: UdpHeartbeatReceiver
     @Inject lateinit var peerRegistry: PeerRegistry
     @Inject lateinit var networkUtils: NetworkUtils
+    @Inject lateinit var bootstrapRepository: BootstrapRepository
+    @Inject lateinit var tcpConnectionManager: TcpConnectionManager
+    @Inject lateinit var publicIpFetcher: PublicIpFetcher
 
     companion object {
         const val CHANNEL_ID = "mobicloud_p2p_channel"
@@ -90,6 +97,39 @@ class MobicloudP2PService : Service() {
             
             val identity = identityResult.getOrThrow()
             
+            // --- NOUVEAU: TCP Server & Firebase Announce ---
+            launch {
+                val tcpPortResult = tcpConnectionManager.startServer()
+                if (tcpPortResult.isSuccess) {
+                    val port = tcpPortResult.getOrThrow()
+                    val ipResult = publicIpFetcher.fetchPublicIp()
+                    
+                    val ipToAnnounce = ipResult.getOrElse { "127.0.0.1" }
+                    bootstrapRepository.announcePresence(ipToAnnounce, port)
+                }
+            }
+
+            // --- NOUVEAU: Firebase Discovery & TCP Handshake ---
+            launch {
+                bootstrapRepository.observeActivePeers().collectLatest { peers ->
+                    for (peer in peers) {
+                        if (peer.identity.publicId != identity.publicId) {
+                            peerRegistry.registerOrUpdatePeer(
+                                peer.identity, 
+                                peer.lastSeenTimestampMs,
+                                peer.source,
+                                peer.ipAddress,
+                                peer.port
+                            )
+                            // Handshake (Fire & Forget)
+                            launch {
+                                tcpConnectionManager.connectToPeer(peer)
+                            }
+                        }
+                    }
+                }
+            }
+
             // Loop 1: Broadcaster
             launch {
                 val result = heartbeatBroadcaster.startBroadcasting(identity)
@@ -188,6 +228,7 @@ class MobicloudP2PService : Service() {
     }
 
     override fun onDestroy() {
+        tcpConnectionManager.stopServer()
         serviceScope.cancel()
         releaseMulticastLock()
         super.onDestroy()

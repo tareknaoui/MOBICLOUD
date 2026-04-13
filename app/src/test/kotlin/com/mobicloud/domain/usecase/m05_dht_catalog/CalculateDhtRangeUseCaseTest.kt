@@ -34,6 +34,9 @@ class CalculateDhtRangeUseCaseTest {
         // out of range
         assertFalse(useCase(key = "3000", nodeId = nodeId, successorId = successorId))
         assertFalse(useCase(key = "e000", nodeId = nodeId, successorId = successorId))
+
+        // Cas limite (ECH-03) : key == successorId doit retourner false (plage semi-ouverte)
+        assertFalse(useCase(key = "2000", nodeId = nodeId, successorId = successorId))
     }
 
     @Test
