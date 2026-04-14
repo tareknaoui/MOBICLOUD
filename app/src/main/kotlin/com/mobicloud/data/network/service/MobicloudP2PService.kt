@@ -10,20 +10,20 @@ import android.content.pm.ServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.IBinder
-import android.os.SystemClock  // F-09: Préférer elapsedRealtime() vs currentTimeMillis() (insensible aux adjustments NTP)
+import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.mobicloud.compose.R
+import com.mobicloud.data.network.PublicIpFetcher
 import com.mobicloud.data.p2p.UdpHeartbeatBroadcaster
 import com.mobicloud.data.p2p.UdpHeartbeatReceiver
+import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.core.network.utils.NetworkUtils
-import com.mobicloud.domain.models.NodeIdentity
+import com.mobicloud.domain.models.HeartbeatPayload
 import com.mobicloud.domain.repository.BootstrapRepository
-import com.mobicloud.domain.repository.PeerRegistry
+import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import dagger.hilt.android.AndroidEntryPoint
-import com.mobicloud.data.p2p.tcp.TcpConnectionManager
-import com.mobicloud.data.network.PublicIpFetcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -32,19 +32,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 @AndroidEntryPoint
 class MobicloudP2PService : Service() {
 
     private var multicastLock: WifiManager.MulticastLock? = null
-    
+
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Inject lateinit var securityRepository: SecurityRepository
     @Inject lateinit var heartbeatBroadcaster: UdpHeartbeatBroadcaster
     @Inject lateinit var heartbeatReceiver: UdpHeartbeatReceiver
-    @Inject lateinit var peerRegistry: PeerRegistry
+    @Inject lateinit var peerRepository: PeerRepository
     @Inject lateinit var networkUtils: NetworkUtils
     @Inject lateinit var bootstrapRepository: BootstrapRepository
     @Inject lateinit var tcpConnectionManager: TcpConnectionManager
@@ -54,11 +55,13 @@ class MobicloudP2PService : Service() {
         const val CHANNEL_ID = "mobicloud_p2p_channel"
         const val NOTIFICATION_ID = 404
         const val MULTICAST_LOCK_TAG = "MobiCloud:P2PMulticastLock"
-        // F-10: HEARTBEAT_INTERVAL_MS supprimée (constante morte — la valeur normalIntervalMs
-        // est configurée directement dans le module DI qui instancie UdpHeartbeatBroadcaster).
-        private const val PEER_TIMEOUT_MS = 5000L
+        private const val PEER_TIMEOUT_MS = 15000L
         private const val EVICTION_CHECK_INTERVAL_MS = 1000L
+        private const val FIREBASE_ANNOUNCE_TIMEOUT_MS = 10_000L
     }
+
+    // P3: Guard contre les appels multiples de onStartCommand (START_STICKY)
+    @Volatile private var loopsStarted = false
 
     override fun onCreate() {
         super.onCreate()
@@ -79,95 +82,123 @@ class MobicloudP2PService : Service() {
         }
 
         acquireMulticastLock()
-        
-        startP2PNetworkLoops()
+
+        // P3: Évite de lancer plusieurs boucles P2P si START_STICKY redémarre le service
+        if (!loopsStarted) {
+            loopsStarted = true
+            startP2PNetworkLoops()
+        }
 
         return START_STICKY
     }
 
     private fun startP2PNetworkLoops() {
         serviceScope.launch {
-            val identityResult = securityRepository.getIdentity()
+            val identityResult = securityRepository.generateIdentity()
             if (identityResult.isFailure) {
                 Log.e("MobicloudP2PService", "Failed to retrieve identity: ${identityResult.exceptionOrNull()}")
                 stopSelf()
                 return@launch
             }
-            
+
             val identity = identityResult.getOrThrow()
-            
-            // --- NOUVEAU: TCP Server & Firebase Announce ---
+
+            // Démarrer le TCP server EN PREMIER pour obtenir le port avant de broadcaster
+            val tcpPortResult = tcpConnectionManager.startServer()
+            // P1: Si le TCP server échoue, on ne diffuse pas un port 0 inutilisable
+            if (tcpPortResult.isFailure) {
+                Log.e("MobicloudP2PService", "TCP server failed to start — aborting P2P loops", tcpPortResult.exceptionOrNull())
+                stopSelf()
+                return@launch
+            }
+            val tcpPort = tcpPortResult.getOrThrow()
+
+            val heartbeatPayload = HeartbeatPayload(
+                nodeId = identity.nodeId,
+                publicKeyBytes = identity.publicKeyBytes,
+                reliabilityScore = identity.reliabilityScore,
+                tcpPort = tcpPort
+            )
+
+            // D2: Firebase announce en parallèle avec withTimeout — ne bloque pas les boucles UDP locales
             launch {
-                val tcpPortResult = tcpConnectionManager.startServer()
-                if (tcpPortResult.isSuccess) {
-                    val port = tcpPortResult.getOrThrow()
-                    val ipResult = publicIpFetcher.fetchPublicIp()
-                    
-                    val ipToAnnounce = ipResult.getOrElse { "127.0.0.1" }
-                    bootstrapRepository.announcePresence(ipToAnnounce, port)
+                val ipToAnnounce = publicIpFetcher.fetchPublicIp().getOrElse { "127.0.0.1" }
+                try {
+                    withTimeout(FIREBASE_ANNOUNCE_TIMEOUT_MS) {
+                        bootstrapRepository.announcePresence(ipToAnnounce, tcpPort)
+                    }
+                } catch (e: Exception) {
+                    Log.w("MobicloudP2PService", "Firebase announce timeout ou échec — découverte locale non affectée", e)
                 }
             }
 
-            // --- NOUVEAU: Firebase Discovery & TCP Handshake ---
+            // Firebase Discovery & TCP Handshake
             launch {
                 bootstrapRepository.observeActivePeers().collectLatest { peers ->
                     for (peer in peers) {
                         if (peer.identity.nodeId != identity.nodeId) {
-                            peerRegistry.registerOrUpdatePeer(
-                                peer.identity, 
-                                peer.lastSeenTimestampMs,
+                            // P2: Normalise le timestamp Firebase vers elapsedRealtime pour cohérence avec l'éviction
+                            peerRepository.registerOrUpdatePeer(
+                                peer.identity,
+                                SystemClock.elapsedRealtime(),
                                 peer.source,
                                 peer.ipAddress,
                                 peer.port
-                            )
-                            // Handshake (Fire & Forget)
-                            launch {
-                                tcpConnectionManager.connectToPeer(peer)
+                            ).onFailure { Log.e("MobicloudP2PService", "Failed to register Firebase peer", it) }
+                            // D1: Handshake seulement si pas encore connecté à ce nœud
+                            if (!tcpConnectionManager.isConnected(peer.identity.nodeId)) {
+                                launch {
+                                    tcpConnectionManager.connectToPeer(peer)
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // Loop 1: Broadcaster
+            // Loop 1: Broadcaster — passe HeartbeatPayload (pas NodeIdentity)
             launch {
-                val result = heartbeatBroadcaster.startBroadcasting(identity)
+                val result = heartbeatBroadcaster.startBroadcasting(heartbeatPayload)
                 if (result.isFailure) {
                     Log.w("MobicloudP2PService", "Broadcast failed", result.exceptionOrNull())
                 }
             }
-            
-            // Loop 2: Receiver
+
+            // Loop 2: Receiver — utilise HeartbeatMessage avec senderIp et tcpPort
             launch {
                 heartbeatReceiver.receiveHeartbeats().collect { result ->
                     if (result.isSuccess) {
-                        val peerIdentity = result.getOrThrow()
-                        // Filter out loopback (our own heartbeats)
-                        if (peerIdentity.nodeId != identity.nodeId) {
+                        val msg = result.getOrThrow()
+                        if (msg.identity.nodeId != identity.nodeId) {
                             // F-09: elapsedRealtime() est monotone et insensible aux sauts NTP
-                            peerRegistry.registerOrUpdatePeer(peerIdentity, SystemClock.elapsedRealtime())
+                            peerRepository.registerOrUpdatePeer(
+                                identity = msg.identity,
+                                timestampMs = SystemClock.elapsedRealtime(),
+                                ipAddress = msg.senderIp,
+                                port = msg.tcpPort
+                            ).onFailure { Log.e("MobicloudP2PService", "Failed to register peer", it) }
                         }
                     } else {
                         Log.w("MobicloudP2PService", "Error receiving heartbeat", result.exceptionOrNull())
                     }
                 }
             }
-            
-            // Loop 3: Eviction
+
+            // Loop 3: Eviction — marque INACTIVE (ne supprime pas)
             launch {
                 while (isActive) {
-                    // F-09: Cohérence avec registerOrUpdatePeer — même référence temporelle monotone
-                    peerRegistry.evictStalePeers(PEER_TIMEOUT_MS, SystemClock.elapsedRealtime())
+                    peerRepository.evictStalePeers(PEER_TIMEOUT_MS, SystemClock.elapsedRealtime())
+                        .onFailure { Log.e("MobicloudP2PService", "Eviction failed", it) }
                     delay(EVICTION_CHECK_INTERVAL_MS)
                 }
             }
-            
-            // Loop 4: Stability Monitor
+
+            // Loop 4: Stability Monitor — filtre sur isActive
             launch {
-                peerRegistry.activePeers.collect { peers ->
-                    heartbeatBroadcaster.setStable(peers.isNotEmpty())
-                    if (peers.isEmpty()) {
-                        // Prospect if zero peers
+                peerRepository.peers.collect { peers ->
+                    val hasActivePeers = peers.any { it.isActive }
+                    heartbeatBroadcaster.setStable(hasActivePeers)
+                    if (!hasActivePeers) {
                         heartbeatBroadcaster.resetBackoff()
                     }
                 }
@@ -176,8 +207,6 @@ class MobicloudP2PService : Service() {
             // Loop 5: Network Monitoring
             launch {
                 networkUtils.getCurrentState().collect {
-                    // Any network state change might mean a disconnection or a new network
-                    // We need to actively prospect peers by resetting backoff
                     heartbeatBroadcaster.resetBackoff()
                 }
             }
@@ -227,6 +256,7 @@ class MobicloudP2PService : Service() {
     }
 
     override fun onDestroy() {
+        loopsStarted = false
         tcpConnectionManager.stopServer()
         serviceScope.cancel()
         releaseMulticastLock()

@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.mobicloud.core.security.KeystoreManager
 import com.mobicloud.data.local.CatalogDatabase
 import com.mobicloud.data.local.dao.IdentityDao
+import com.mobicloud.data.local.dao.PeerDao
 import com.mobicloud.data.repository_impl.IdentityRepositoryImpl
 import com.mobicloud.domain.repository.IdentityRepository
 import dagger.Binds
@@ -43,6 +44,12 @@ object IdentityModule {
     @Provides
     fun provideIdentityDao(database: CatalogDatabase): IdentityDao {
         return database.identityDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePeerDao(database: CatalogDatabase): PeerDao {
+        return database.peerDao()
     }
 
     @Provides

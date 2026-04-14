@@ -10,5 +10,6 @@ data class Peer(
     val lastSeenTimestampMs: Long,
     val source: DiscoverySource = DiscoverySource.LOCAL_UDP,
     val ipAddress: String? = null,
-    val port: Int? = null
+    val port: Int? = null,
+    val isActive: Boolean = true
 )

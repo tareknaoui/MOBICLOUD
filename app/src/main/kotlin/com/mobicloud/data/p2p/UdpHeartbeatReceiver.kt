@@ -1,9 +1,13 @@
 package com.mobicloud.data.p2p
 
+import com.mobicloud.domain.models.HeartbeatMessage
+import com.mobicloud.domain.models.HeartbeatPayload
 import com.mobicloud.domain.models.NodeIdentity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
@@ -22,28 +26,36 @@ class UdpHeartbeatReceiver(
 ) {
 
     @OptIn(ExperimentalSerializationApi::class)
-    fun receiveHeartbeats(): Flow<Result<NodeIdentity>> = flow {
+    fun receiveHeartbeats(): Flow<Result<HeartbeatMessage>> = flow {
         val buffer = ByteArray(bufferSize)
-        while (kotlinx.coroutines.currentCoroutineContext().isActive) {
+        while (currentCoroutineContext().isActive) {
             val result = try {
                 val packet = DatagramPacket(buffer, buffer.size)
                 withContext(ioDispatcher) {
                     socket.receive(packet)
                 }
-                
+
                 val payload = packet.data.copyOfRange(packet.offset, packet.offset + packet.length)
-                val identity = protoBuf.decodeFromByteArray<NodeIdentity>(payload)
-                Result.success(identity)
+                val heartbeatPayload = protoBuf.decodeFromByteArray<HeartbeatPayload>(payload)
+                val identity = NodeIdentity(
+                    nodeId = heartbeatPayload.nodeId,
+                    publicKeyBytes = heartbeatPayload.publicKeyBytes,
+                    reliabilityScore = heartbeatPayload.reliabilityScore
+                )
+                // P4: IP null → paquet inutilisable pour TCP, rejeté proprement via le catch
+                val senderIp = packet.address?.hostAddress
+                    ?: throw IllegalStateException("Paquet UDP sans adresse source — ignoré")
+                Result.success(HeartbeatMessage(identity, senderIp, heartbeatPayload.tcpPort))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 Result.failure(e)
             }
-            
-            if (kotlinx.coroutines.currentCoroutineContext().isActive) {
+
+            if (currentCoroutineContext().isActive) {
                 emit(result)
                 if (result.isFailure) {
-                    kotlinx.coroutines.delay(1000L) // Prevent tight loop on permanent IO failure
+                    delay(1000L) // Evite une boucle CPU serrée en cas d'erreur IO permanente
                 }
             }
         }

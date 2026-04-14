@@ -1,6 +1,6 @@
 package com.mobicloud.data.p2p
 
-import com.mobicloud.domain.models.NodeIdentity
+import com.mobicloud.domain.models.HeartbeatPayload
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
@@ -18,12 +18,19 @@ import java.util.concurrent.CopyOnWriteArrayList
 @OptIn(ExperimentalCoroutinesApi::class, ExperimentalSerializationApi::class)
 class UdpHeartbeatBroadcasterTest {
 
+    private fun makePayload(nodeId: String = "test_id") = HeartbeatPayload(
+        nodeId = nodeId,
+        publicKeyBytes = byteArrayOf(1, 2, 3),
+        reliabilityScore = 1.0f,
+        tcpPort = 8080
+    )
+
     @Test
-    fun `broadcastLoop correctly formats and sends Protobuf identity over UDP periodically`() = runTest {
+    fun `broadcastLoop correctly formats and sends Protobuf HeartbeatPayload over UDP periodically`() = runTest {
         // Arrange
-        val testIdentity = NodeIdentity("test_id", byteArrayOf(1, 2, 3))
+        val testPayload = makePayload()
         val protocolBuf = ProtoBuf { }
-        val expectedPayload = protocolBuf.encodeToByteArray(testIdentity)
+        val expectedBytes = protocolBuf.encodeToByteArray(testPayload)
 
         val sentPackets = CopyOnWriteArrayList<DatagramPacket>()
         val mockSocket = object : DatagramSocket() {
@@ -47,7 +54,7 @@ class UdpHeartbeatBroadcasterTest {
 
         // Act
         val job = launch(testDispatcher) {
-            broadcaster.startBroadcasting(testIdentity)
+            broadcaster.startBroadcasting(testPayload)
         }
 
         testScheduler.advanceTimeBy(350)
@@ -59,13 +66,13 @@ class UdpHeartbeatBroadcasterTest {
 
         val firstPacket = sentPackets[0]
         assertEquals("Port should match configured port", 4545, firstPacket.port)
-        assertTrue("Content should match expected protobuf payload", expectedPayload.contentEquals(firstPacket.data))
+        assertTrue("Content should match expected protobuf payload", expectedBytes.contentEquals(firstPacket.data))
     }
 
     @Test
     fun `broadcastLoop uses exponential backoff for delays up to max threshold`() = runTest {
         // Arrange
-        val testIdentity = NodeIdentity("test_id", byteArrayOf(1, 2, 3))
+        val testPayload = makePayload()
         val protocolBuf = ProtoBuf { }
 
         val sentTimes = CopyOnWriteArrayList<Long>()
@@ -90,7 +97,7 @@ class UdpHeartbeatBroadcasterTest {
 
         // Act
         val job = launch(testDispatcher) {
-            broadcaster.startBroadcasting(testIdentity)
+            broadcaster.startBroadcasting(testPayload)
         }
 
         // Let it run for 1 + 2 + 4 + 4 + 4 = 15 seconds total
@@ -108,17 +115,12 @@ class UdpHeartbeatBroadcasterTest {
     }
 
     /**
-     * F-08: Test réécrit pour éliminer le commentaire "Let's assume" et rendre le comportement
-     * déterministe. On ajoute runCurrent() après resetBackoff() pour forcer l'exécution de la
-     * coroutine et consommer le signal de reset avant d'avancer le temps virtuel.
-     *
-     * Comportement attendu : resetBackoff() interrompt le délai courant (via resetTrigger),
-     * la boucle redémarre immédiatement à initialIntervalMs=1000ms.
+     * F-08: resetBackoff() interrompt le délai courant et la boucle repart de initialIntervalMs.
      */
     @Test
     fun `resetBackoff interrupts current delay and restarts from initialIntervalMs`() = runTest {
         // Arrange
-        val testIdentity = NodeIdentity("test_id", byteArrayOf(1, 2, 3))
+        val testPayload = makePayload()
         val protocolBuf = ProtoBuf { }
 
         val sentTimes = CopyOnWriteArrayList<Long>()
@@ -142,30 +144,25 @@ class UdpHeartbeatBroadcasterTest {
         )
 
         val job = launch(testDispatcher) {
-            broadcaster.startBroadcasting(testIdentity)
+            broadcaster.startBroadcasting(testPayload)
         }
 
         // Phase 1: avance jusqu'à T=3000 → 3 paquets envoyés (T=0, T=1000, T=3000)
-        // La boucle dort maintenant 4000ms (prochain backoff) → réveil prévu à T=7000
         testScheduler.advanceTimeBy(3500)
         testScheduler.runCurrent()
 
-        // Vérifier l'état avant le reset
         assertTrue("Before reset: should have 3 packets (T=0,1000,3000)", sentTimes.size >= 3)
         assertEquals(0L, sentTimes[0])
         assertEquals(1000L, sentTimes[1])
         assertEquals(3000L, sentTimes[2])
 
         // Phase 2: reset du backoff au milieu du délai de 4000ms (à T=3500)
-        // resetBackoff() émet sur resetTrigger → withTimeout interrompu → boucle reprend
         broadcaster.resetBackoff()
-        testScheduler.runCurrent()  // Forcer la coroutine à consommer le signal de reset
+        testScheduler.runCurrent()
 
-        // Le paquet du reset doit être envoyé immédiatement : T=3500
         assertTrue("Reset packet sent at T=3500: sentTimes=$sentTimes", sentTimes.contains(3500L))
 
         // Phase 3: après reset, backoff repart de 1000ms
-        // T=3500 + 1000 = 4500, puis T=4500 + 2000 = 6500
         testScheduler.advanceTimeBy(5000)
         testScheduler.runCurrent()
         job.cancelAndJoin()
@@ -175,14 +172,12 @@ class UdpHeartbeatBroadcasterTest {
     }
 
     /**
-     * F-11: Teste que coerceAtMost() protège correctement contre un backoffFactor extrême.
-     * AC Task 4: "S'assurer que le calcul du délai ne déborde pas la capacité (Overflow memory)
-     * et respecte le maxDelay."
+     * F-11: coerceAtMost() protège contre un backoffFactor extrême.
      */
     @Test
     fun `backoff delay is strictly capped at maxIntervalMs even with extreme backoff factor`() = runTest {
         // Arrange
-        val testIdentity = NodeIdentity("test_id", byteArrayOf(1, 2, 3))
+        val testPayload = makePayload()
         val protocolBuf = ProtoBuf { }
 
         val sentTimes = CopyOnWriteArrayList<Long>()
@@ -194,7 +189,6 @@ class UdpHeartbeatBroadcasterTest {
 
         val testDispatcher = kotlinx.coroutines.test.StandardTestDispatcher(testScheduler)
 
-        // Facteur extrême : 1000 * 1e10 >> Long.MAX_VALUE si non plafonné
         val broadcaster = UdpHeartbeatBroadcaster(
             protoBuf = protocolBuf,
             socket = mockSocket,
@@ -207,13 +201,9 @@ class UdpHeartbeatBroadcasterTest {
         )
 
         val job = launch(testDispatcher) {
-            broadcaster.startBroadcasting(testIdentity)
+            broadcaster.startBroadcasting(testPayload)
         }
 
-        // Séquence attendue :
-        // T=0    → paquet 0 (burst initial)
-        // T=1000 → paquet 1 (après délai initial de 1000ms)
-        // T=1000+min(1000*1e10, 8000)=T=9000 → paquet 2 (après 8000ms capped)
         testScheduler.advanceTimeBy(10000)
         job.cancelAndJoin()
 
@@ -224,7 +214,7 @@ class UdpHeartbeatBroadcasterTest {
     }
 
     /**
-     * F-07: Teste que le constructeur rejette initialIntervalMs=0 avant tout I/O réseau.
+     * F-07: Le constructeur rejette initialIntervalMs=0.
      */
     @Test(expected = IllegalArgumentException::class)
     fun `constructor throws IllegalArgumentException when initialIntervalMs is zero`() {

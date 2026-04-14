@@ -34,8 +34,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
+import android.util.Log
 import dagger.hilt.android.AndroidEntryPoint
 import com.mobicloud.compose.MainActivityViewModel
+import com.mobicloud.domain.repository.NetworkServiceController
 import com.mobicloud.compose.ui.JetpackApp
 import com.mobicloud.ui.rememberJetpackAppState
 import com.mobicloud.core.network.utils.NetworkUtils
@@ -77,6 +79,9 @@ class MainActivity : AppCompatActivity() {
 
     @Inject
     lateinit var networkUtils: NetworkUtils
+
+    @Inject
+    lateinit var networkServiceController: NetworkServiceController
 
     private val viewModel: MainActivityViewModel by viewModels()
 
@@ -145,7 +150,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         checkForPermissions(permissions) {
-            // Permissions granted
+            // Ce callback s'exécute depuis le foreground de l'Activity — safe Android 12+
+            val result = networkServiceController.startService()
+            result.onFailure { e ->
+                Log.e("MainActivity", "[P2P-SERVICE] Échec démarrage service: ${e.message}", e)
+            }
         }
     }
 }

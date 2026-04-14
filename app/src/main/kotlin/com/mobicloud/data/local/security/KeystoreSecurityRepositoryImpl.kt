@@ -59,16 +59,9 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
     }
 
     override suspend fun generateIdentity(): Result<NodeIdentity> = withContext(Dispatchers.IO) {
-        // Guard: return existing identity rather than silently overwriting the keystore entry
-        try {
-            val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)
-            keyStore.load(null)
-            if (keyStore.containsAlias(KEY_ALIAS)) {
-                return@withContext getIdentity()
-            }
-        } catch (_: Exception) {
-            // Keystore unavailable — proceed to generation (will fallback if needed)
-        }
+        // Guard: return existing identity (hardware or software) rather than overwriting
+        val existing = getIdentity()
+        if (existing.isSuccess) return@withContext existing
 
         try {
             val keyPairGenerator = KeyPairGenerator.getInstance(

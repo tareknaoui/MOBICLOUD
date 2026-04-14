@@ -1,6 +1,6 @@
 package com.mobicloud.data.p2p
 
-import com.mobicloud.domain.models.NodeIdentity
+import com.mobicloud.domain.models.HeartbeatPayload
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -58,16 +58,16 @@ class UdpHeartbeatBroadcaster(
         }
     }
 
-    suspend fun startBroadcasting(identity: NodeIdentity): Result<Unit> = withContext(ioDispatcher) {
+    suspend fun startBroadcasting(payload: HeartbeatPayload): Result<Unit> = withContext(ioDispatcher) {
         try {
             val address = InetAddress.getByName(multicastAddress)
-            val payload = protoBuf.encodeToByteArray(identity)
+            val bytes = protoBuf.encodeToByteArray(payload)
 
             var currentIntervalMs = initialIntervalMs
 
             while (isActive) {
                 try {
-                    val packet = DatagramPacket(payload, payload.size, address, port)
+                    val packet = DatagramPacket(bytes, bytes.size, address, port)
                     socket.send(packet)
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e

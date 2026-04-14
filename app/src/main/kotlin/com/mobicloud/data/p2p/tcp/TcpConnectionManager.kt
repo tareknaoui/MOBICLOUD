@@ -10,6 +10,7 @@ import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.net.ServerSocket
 import java.net.Socket
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
 /**
@@ -20,6 +21,12 @@ class TcpConnectionManager @Inject constructor(
     private val securityRepository: SecurityRepository
 ) {
     private var serverSocket: ServerSocket? = null
+
+    /** Ensemble des nodeId avec lesquels un handshake TCP a déjà réussi. */
+    private val handshaked: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /** Retourne true si un handshake TCP a déjà été complété avec ce nœud. */
+    fun isConnected(nodeId: String): Boolean = nodeId in handshaked
 
     // F-03 [Review][Patch]: Référence stockée pour permettre interrupt() dans stopServer().
     private var serverThread: Thread? = null
@@ -117,6 +124,7 @@ class TcpConnectionManager @Inject constructor(
 
             // F-05 [Review][Patch]: Logs TESTPOC remplacés par des logs structurés au niveau INFO.
             Log.i("MobiCloud:TCP", "Handshake TCP sortant réussi | pair=$remoteId | ip=${peer.ipAddress}")
+            handshaked.add(peer.identity.nodeId)
         } catch (e: Exception) {
             Log.e("MobiCloud:TCP", "Erreur lors de la connexion sortante TCP vers ${peer.ipAddress}", e)
         } finally {
@@ -131,5 +139,6 @@ class TcpConnectionManager @Inject constructor(
         try {
             serverSocket?.close()
         } catch (e: Exception) {}
+        handshaked.clear()
     }
 }
