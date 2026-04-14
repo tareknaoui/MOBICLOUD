@@ -40,12 +40,12 @@ class KeystoreSecurityRepositoryImplTest {
         val identity = result.getOrNull()
         assertNotNull(identity)
         assertTrue(identity!!.publicKeyBytes.isNotEmpty())
-        assertTrue(identity.publicId.isNotEmpty())
-        // Verify publicId is 16 hex chars (SHA-256 prefix — F-2 fix)
-        assertEquals("publicId should be 16 hex characters", 16, identity.publicId.length)
+        assertTrue(identity.nodeId.isNotEmpty())
+        // Verify nodeId is 16 hex chars (SHA-256 prefix — F-2 fix)
+        assertEquals("nodeId should be 16 hex characters", 16, identity.nodeId.length)
         assertTrue(
-            "publicId should be lowercase hex",
-            identity.publicId.matches(Regex("[0-9a-f]{16}"))
+            "nodeId should be lowercase hex",
+            identity.nodeId.matches(Regex("[0-9a-f]{16}"))
         )
 
         // 2. Fetch Identity from Keystore to ensure persistence
@@ -53,7 +53,7 @@ class KeystoreSecurityRepositoryImplTest {
         assertTrue("Fetching identity should succeed", fetchedResult.isSuccess)
         val fetchedIdentity = fetchedResult.getOrNull()
 
-        assertEquals(identity.publicId, fetchedIdentity?.publicId)
+        assertEquals(identity.nodeId, fetchedIdentity?.nodeId)
 
         // 3. Prove Sign/Verify works internally (Sign with Private Key from Keystore)
         val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }

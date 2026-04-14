@@ -78,6 +78,7 @@ class UdpHeartbeatBroadcaster(
                     val delayTime = if (isStable.get()) normalIntervalMs else currentIntervalMs
                     withTimeout(delayTime) {
                         resetTrigger.first()
+
                     }
                     // Signal reçu (reset ou changement d'état) — recalculer l'intervalle
                     if (!isStable.get()) {

@@ -26,6 +26,7 @@
 
     <!-- Dark mode override: ensures correct post-splash theme transition in OLED dark mode -->
     <style name="Theme.Mobicloud.Splash" parent="NightAdjusted.Theme.Splash">
+        <item name="windowSplashScreenBackground">@android:color/black</item>
         <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
         <item name="postSplashScreenTheme">@style/Theme.Mobicloud</item>
     </style>

@@ -17,7 +17,7 @@ import javax.inject.Inject
  * Règles :
  * 1. Poids d'élection primaire : le Score de Fiabilité (SF) du nœud.
  * 2. Départage déterministe (Bris d'égalité) : basé sur l'ordre lexicographique des identifiants
- *    publics [NodeIdentity.publicId].
+ *    publics [NodeIdentity.nodeId].
  * 3. Si le nœud local est élu, un Genesis Hashcash est généré comme preuve inaugurale.
  */
 class BasicElectionUseCase @Inject constructor(
@@ -39,7 +39,7 @@ class BasicElectionUseCase @Inject constructor(
             // Évaluer le SF pour chaque candidat de façon concurrente
             val scoreMap = allNodes.map { node ->
                 async {
-                    val score = trustScoreProvider.getTrustScore(node.publicId)
+                    val score = trustScoreProvider.getTrustScore(node.nodeId)
                     node to score
                 }
             }.awaitAll()
@@ -56,10 +56,10 @@ class BasicElectionUseCase @Inject constructor(
                 } else {
                     // BH-06 Fix: S'assurer que les chaînes ont la même longueur pour
                     // la comparaison lexicographique déterministe des clés.
-                    require(node1.publicId.length == node2.publicId.length) {
-                        "Pour un bris d'égalité équitable, les IDs doivent avoir la même longueur. Recu: ${node1.publicId.length} != ${node2.publicId.length}"
+                    require(node1.nodeId.length == node2.nodeId.length) {
+                        "Pour un bris d'égalité équitable, les IDs doivent avoir la même longueur. Recu: ${node1.nodeId.length} != ${node2.nodeId.length}"
                     }
-                    node1.publicId.compareTo(node2.publicId)
+                    node1.nodeId.compareTo(node2.nodeId)
                 }
             })?.first ?: localIdentity // Cas dégénéré (liste vide) -> moi-même
 

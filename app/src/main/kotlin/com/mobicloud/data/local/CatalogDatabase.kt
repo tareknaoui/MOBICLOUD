@@ -7,8 +7,12 @@ import com.mobicloud.data.local.dao.CatalogDao
 import com.mobicloud.data.local.entity.CatalogEntryEntity
 import com.mobicloud.data.local.entity.FragmentLocationEntity
 
-@Database(entities = [CatalogEntryEntity::class, FragmentLocationEntity::class], version = 1, exportSchema = false)
+import com.mobicloud.data.local.dao.IdentityDao
+import com.mobicloud.data.local.entity.NodeIdentityEntity
+
+@Database(entities = [CatalogEntryEntity::class, FragmentLocationEntity::class, NodeIdentityEntity::class], version = 1, exportSchema = false)
 @TypeConverters(Converters::class)
 abstract class CatalogDatabase : RoomDatabase() {
     abstract fun catalogDao(): CatalogDao
+    abstract fun identityDao(): IdentityDao
 }

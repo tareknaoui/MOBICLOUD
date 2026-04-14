@@ -26,7 +26,7 @@ class FirebaseBootstrapRepositoryImpl @Inject constructor(
             val identity = securityRepository.getIdentity().getOrThrow()
             
             val nodeData = mapOf(
-                "publicId" to identity.publicId,
+                "nodeId" to identity.nodeId,
                 "publicKeyBytes" to Base64.encodeToString(identity.publicKeyBytes, Base64.NO_WRAP),
                 "ipAddress" to ip,
                 "port" to port,
@@ -35,7 +35,7 @@ class FirebaseBootstrapRepositoryImpl @Inject constructor(
 
             firebaseDatabase.reference
                 .child("active_nodes")
-                .child(identity.publicId)
+                .child(identity.nodeId)
                 .setValue(nodeData)
                 .await()
 
@@ -53,7 +53,7 @@ class FirebaseBootstrapRepositoryImpl @Inject constructor(
                 val peers = mutableListOf<Peer>()
                 for (child in snapshot.children) {
                     try {
-                        val publicId = child.child("publicId").getValue(String::class.java) ?: continue
+                        val nodeId = child.child("nodeId").getValue(String::class.java) ?: continue
                         val pubKeyB64 = child.child("publicKeyBytes").getValue(String::class.java) ?: continue
                         val ip = child.child("ipAddress").getValue(String::class.java) ?: continue
                         val port = child.child("port").getValue(Int::class.java) ?: continue
@@ -61,7 +61,7 @@ class FirebaseBootstrapRepositoryImpl @Inject constructor(
 
                         val publicKeyBytes = Base64.decode(pubKeyB64, Base64.NO_WRAP)
                         
-                        val identity = NodeIdentity(publicId, publicKeyBytes)
+                        val identity = NodeIdentity(nodeId, publicKeyBytes)
                         val peer = Peer(
                             identity = identity,
                             lastSeenTimestampMs = timestamp,

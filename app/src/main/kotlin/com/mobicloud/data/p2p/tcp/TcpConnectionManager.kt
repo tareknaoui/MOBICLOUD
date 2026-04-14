@@ -4,6 +4,7 @@ import android.util.Log
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.repository.SecurityRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
@@ -20,6 +21,9 @@ class TcpConnectionManager @Inject constructor(
 ) {
     private var serverSocket: ServerSocket? = null
 
+    // F-03 [Review][Patch]: Référence stockée pour permettre interrupt() dans stopServer().
+    private var serverThread: Thread? = null
+
     /**
      * Démarre le serveur ServerSocket sur un port disponible et l'écoute en arrière-plan.
      * @return Le port assigné pour annoncer sur Firebase.
@@ -30,7 +34,8 @@ class TcpConnectionManager @Inject constructor(
             val port = serverSocket!!.localPort
             Log.i("MobiCloud:TCP", "Serveur TCP P2P démarré localement sur le port $port")
 
-            Thread {
+            // F-03 [Review][Patch]: Thread stocké pour permettre stopServer() de l'interrompre proprement.
+            serverThread = Thread {
                 while (!Thread.currentThread().isInterrupted && serverSocket?.isClosed == false) {
                     try {
                         val clientSocket = serverSocket!!.accept()
@@ -41,7 +46,7 @@ class TcpConnectionManager @Inject constructor(
                         }
                     }
                 }
-            }.start()
+            }.also { it.start() }
 
             Result.success(port)
         } catch (e: Exception) {
@@ -52,21 +57,28 @@ class TcpConnectionManager @Inject constructor(
     /**
      * Gère une connexion P2P entrante.
      * Lit l'identité distante et envoie la sienne.
+     *
+     * F-01 [Review][Patch]: runBlocking supprimé — getIdentity() n'est pas suspend.
+     * F-02 [Review][Patch]: getOrElse remplace getOrThrow() pour éviter un crash non géré.
      */
     private fun handleIncomingConnection(socket: Socket) {
         try {
             val input = ObjectInputStream(socket.getInputStream())
             val remotePublicId = input.readUTF()
 
-            val localIdentity = securityRepository.getIdentity().getOrThrow()
+            // handleIncomingConnection runs on a plain Thread (not a coroutine).
+            // runBlocking is justified here: the thread is inherently blocking (socket I/O).
+            val localIdentity = runBlocking { securityRepository.getIdentity() }.getOrElse { error ->
+                Log.e("MobiCloud:TCP", "Impossible de récupérer l'identité locale (handshake entrant)", error)
+                return
+            }
+
             val output = ObjectOutputStream(socket.getOutputStream())
-            output.writeUTF(localIdentity.publicId)
+            output.writeUTF(localIdentity.nodeId)
             output.flush()
 
-            Log.w("TESTPOC", "===============================================")
-            Log.w("TESTPOC", "[SUCCESS] P2P_SUCCESS: Handshake TCP ENTRANT réussi avec le pair : $remotePublicId")
-            Log.w("TESTPOC", "IP Distante : ${socket.inetAddress.hostAddress}")
-            Log.w("TESTPOC", "===============================================")
+            // F-05 [Review][Patch]: Logs TESTPOC remplacés par des logs structurés au niveau INFO.
+            Log.i("MobiCloud:TCP", "Handshake TCP entrant réussi | pair=$remotePublicId | ip=${socket.inetAddress.hostAddress}")
         } catch (e: Exception) {
             Log.e("MobiCloud:TCP", "Erreur lors du Handshake entrant", e)
         } finally {
@@ -76,40 +88,46 @@ class TcpConnectionManager @Inject constructor(
 
     /**
      * Initie une connexion TCP avec un Pair distant (dont l'IP/Port ont été récupérés par Firebase).
+     *
+     * F-04 [Review][Patch]: Même pattern getOrElse que handleIncomingConnection — cohérence unifiée.
      */
     suspend fun connectToPeer(peer: Peer) = withContext(Dispatchers.IO) {
         if (peer.ipAddress == null || peer.port == null) return@withContext
         var socket: Socket? = null
         try {
-            val localIdentity = securityRepository.getIdentity().getOrThrow()
+            // F-04 [Review][Patch]: Pattern unifié avec handleIncomingConnection.
+            val localIdentity = securityRepository.getIdentity().getOrElse { error ->
+                Log.e("MobiCloud:TCP", "Impossible de récupérer l'identité locale (connexion sortante)", error)
+                return@withContext
+            }
             Log.i("MobiCloud:TCP", "Tentative de connexion TCP sortante vers ${peer.ipAddress}:${peer.port}...")
-            
+
             // Timeout à 5 secondes pour ne pas bloquer infiniment
             socket = Socket()
             socket.connect(java.net.InetSocketAddress(peer.ipAddress!!, peer.port!!), 5000)
-            
+
             // Envoi localIdentity -> Output
             val output = ObjectOutputStream(socket.getOutputStream())
-            output.writeUTF(localIdentity.publicId)
+            output.writeUTF(localIdentity.nodeId)
             output.flush()
 
             // Réception remoteIdentity <- Input
             val input = ObjectInputStream(socket.getInputStream())
             val remoteId = input.readUTF()
 
-            Log.w("TESTPOC", "===============================================")
-            Log.w("TESTPOC", "[SUCCESS] P2P_SUCCESS: Handshake TCP SORTANT réussi !")
-            Log.w("TESTPOC", "Le Node distant '$remoteId' (IP: ${peer.ipAddress}) a retourné un Ack.")
-            Log.w("TESTPOC", "PREUVE DU PONT ROUTIER SINGLE-HOP VALIDÉE.")
-            Log.w("TESTPOC", "===============================================")
+            // F-05 [Review][Patch]: Logs TESTPOC remplacés par des logs structurés au niveau INFO.
+            Log.i("MobiCloud:TCP", "Handshake TCP sortant réussi | pair=$remoteId | ip=${peer.ipAddress}")
         } catch (e: Exception) {
             Log.e("MobiCloud:TCP", "Erreur lors de la connexion sortante TCP vers ${peer.ipAddress}", e)
         } finally {
-            try { socket?.close() } catch(e: Exception) {}
+            try { socket?.close() } catch (e: Exception) {}
         }
     }
 
     fun stopServer() {
+        // F-03 [Review][Patch]: Interruption du thread avant fermeture de la socket.
+        serverThread?.interrupt()
+        serverThread = null
         try {
             serverSocket?.close()
         } catch (e: Exception) {}

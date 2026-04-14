@@ -1,0 +1,554 @@
+==== REPOSITORY CODE ====
+--- File: app/src/main/kotlin/com/mobicloud/domain/models/CatalogEntry.kt ---
+package com.mobicloud.domain.models
+
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.protobuf.ProtoNumber
+
+/**
+ * Représente une fiche de catalogue distribué.
+ * Conception strictement "Zero-Knowledge" :
+ * - Aucun nom de fichier
+ * - Aucune taille en clair
+ * - Aucune extension textuelle
+ * Uniquement des données cryptographiques et de routage (CRDT LWW basé sur versionClock).
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class CatalogEntry(
+    @ProtoNumber(1) val fileHash: String,
+    @ProtoNumber(2) val ownerPubKeyHash: String,
+    @ProtoNumber(3) val versionClock: Long,
+    @ProtoNumber(4) val fragmentLocations: List<FragmentLocation>
+)
+
+
+--- File: app/src/main/kotlin/com/mobicloud/domain/models/FragmentLocation.kt ---
+package com.mobicloud.domain.models
+
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.protobuf.ProtoNumber
+
+/**
+ * Représente un emplacement d'un fragment d'un fichier dans le réseau DHT.
+ * "Zero-Knowledge" : Aucune information permettant de déduire le contenu du fragment.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+@Serializable
+data class FragmentLocation(
+    @ProtoNumber(1) val fragmentIndex: Int,
+    @ProtoNumber(2) val fragmentHash: String,
+    @ProtoNumber(3) val nodeIds: List<String>
+)
+
+
+--- File: app/src/test/kotlin/com/mobicloud/domain/models/CatalogEntryTest.kt ---
+package com.mobicloud.domain.models
+
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.encodeToByteArray
+import kotlinx.serialization.protobuf.ProtoBuf
+import kotlinx.serialization.protobuf.ProtoNumber
+import org.junit.Assert.assertEquals
+import org.junit.Test
+
+@OptIn(ExperimentalSerializationApi::class)
+class CatalogEntryTest {
+
+    // A structure simulating a future version of gossip with an unknown key
+    @Serializable
+    data class FutureCatalogEntry(
+        @ProtoNumber(1) val fileHash: String,
+        @ProtoNumber(2) val ownerPubKeyHash: String,
+        @ProtoNumber(3) val versionClock: Long,
+        @ProtoNumber(4) val fragmentLocations: List<FragmentLocation>,
+        @ProtoNumber(5) val newUnknownField: String // New field added in the future
+    )
+
+    @Test
+    fun testSerializationIgnoresUnknownKeys() {
+        val futureEntry = FutureCatalogEntry(
+            fileHash = "hash123",
+            ownerPubKeyHash = "pubkey456",
+            versionClock = 1L,
+            fragmentLocations = emptyList(),
+            newUnknownField = "some extra data"
+        )
+        
+        // Use a format that ignores unknown keys, simulating our Gossip Protobuf parser configuration.
+        // It's a requirement of the task to tolerate a future mismatch in gossip structure.
+        // ProtoBuf { ... } doesn't have ignoreUnknownKeys natively like Json, but protobuf by design ignores unknown fields if not mapped.
+        val protoBuf = ProtoBuf { }
+        
+        val bytes = protoBuf.encodeToByteArray(futureEntry)
+        
+        // Standard decode. Since Protobuf naturally ignores unknown tags, this should succeed 
+        // without crashing and just ignore field 5.
+        val decodedEntry = protoBuf.decodeFromByteArray<CatalogEntry>(bytes)
+        
+        assertEquals("hash123", decodedEntry.fileHash)
+        assertEquals("pubkey456", decodedEntry.ownerPubKeyHash)
+        assertEquals(1L, decodedEntry.versionClock)
+        assertEquals(0, decodedEntry.fragmentLocations.size)
+    }
+}
+
+
+--- File: app/src/main/kotlin/com/mobicloud/data/local/entity/CatalogEntryEntity.kt ---
+package com.mobicloud.data.local.entity
+
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "catalog_entry")
+data class CatalogEntryEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "file_hash")
+    val fileHash: String,
+
+    @ColumnInfo(name = "owner_pub_key_hash")
+    val ownerPubKeyHash: String,
+
+    @ColumnInfo(name = "version_clock")
+    val versionClock: Long
+)
+
+
+--- File: app/src/main/kotlin/com/mobicloud/data/local/entity/FragmentLocationEntity.kt ---
+package com.mobicloud.data.local.entity
+
+import androidx.room.ColumnInfo
+import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
+import androidx.room.PrimaryKey
+
+@Entity(
+    tableName = "fragment_location",
+    foreignKeys = [
+        ForeignKey(
+            entity = CatalogEntryEntity::class,
+            parentColumns = ["file_hash"],
+            childColumns = ["catalog_file_hash"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index("catalog_file_hash")
+    ]
+)
+data class FragmentLocationEntity(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
+    @ColumnInfo(name = "catalog_file_hash")
+    val catalogFileHash: String,
+
+    @ColumnInfo(name = "fragment_index")
+    val fragmentIndex: Int,
+
+    @ColumnInfo(name = "fragment_hash")
+    val fragmentHash: String,
+
+    @ColumnInfo(name = "node_ids")
+    val nodeIds: String // List<String> inside JSON
+)
+
+
+--- File: app/src/main/kotlin/com/mobicloud/data/local/entity/CatalogEntryWithFragments.kt ---
+package com.mobicloud.data.local.entity
+
+import androidx.room.Embedded
+import androidx.room.Relation
+
+data class CatalogEntryWithFragments(
+    @Embedded val catalogEntry: CatalogEntryEntity,
+    @Relation(
+        parentColumn = "file_hash",
+        entityColumn = "catalog_file_hash"
+    )
+    val fragmentLocations: List<FragmentLocationEntity>
+)
+
+
+--- File: app/src/main/kotlin/com/mobicloud/data/local/dao/CatalogDao.kt ---
+package com.mobicloud.data.local.dao
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Transaction
+import com.mobicloud.data.local.entity.CatalogEntryEntity
+import com.mobicloud.data.local.entity.CatalogEntryWithFragments
+import com.mobicloud.data.local.entity.FragmentLocationEntity
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface CatalogDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCatalogEntry(entry: CatalogEntryEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertFragmentLocations(fragments: List<FragmentLocationEntity>)
+
+    @Transaction
+    @Query("SELECT * FROM catalog_entry WHERE file_hash = :hash")
+    fun getCatalogEntryFlow(hash: String): Flow<CatalogEntryWithFragments?>
+
+    @Transaction
+    @Query("SELECT * FROM catalog_entry")
+    fun getAllCatalogEntriesFlow(): Flow<List<CatalogEntryWithFragments>>
+
+    @Transaction
+    @Query("SELECT * FROM catalog_entry WHERE file_hash = :hash")
+    suspend fun getCatalogEntry(hash: String): CatalogEntryWithFragments?
+
+    @Query("DELETE FROM fragment_location WHERE catalog_file_hash = :hash")
+    suspend fun deleteFragmentLocations(hash: String)
+
+    @Transaction
+    suspend fun insertWithFragments(entry: CatalogEntryEntity, fragments: List<FragmentLocationEntity>) {
+        insertCatalogEntry(entry)
+        deleteFragmentLocations(entry.fileHash)
+        insertFragmentLocations(fragments)
+    }
+}
+
+
+--- File: app/src/main/kotlin/com/mobicloud/data/local/Converters.kt ---
+package com.mobicloud.data.local
+
+import androidx.room.TypeConverter
+import com.mobicloud.domain.models.FragmentLocation
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+class Converters {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    @TypeConverter
+    fun fromFragmentLocationList(value: List<FragmentLocation>?): String {
+        if (value == null) return "[]"
+        return json.encodeToString(value)
+    }
+
+    @TypeConverter
+    fun toFragmentLocationList(value: String?): List<FragmentLocation> {
+        if (value.isNullOrEmpty()) return emptyList()
+        return try {
+            json.decodeFromString(value)
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+}
+
+
+--- File: app/src/main/kotlin/com/mobicloud/data/local/CatalogDatabase.kt ---
+package com.mobicloud.data.local
+
+import androidx.room.Database
+import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
+import com.mobicloud.data.local.dao.CatalogDao
+import com.mobicloud.data.local.entity.CatalogEntryEntity
+import com.mobicloud.data.local.entity.FragmentLocationEntity
+
+@Database(entities = [CatalogEntryEntity::class, FragmentLocationEntity::class], version = 1, exportSchema = false)
+@TypeConverters(Converters::class)
+abstract class CatalogDatabase : RoomDatabase() {
+    abstract fun catalogDao(): CatalogDao
+}
+
+
+--- File: app/src/androidTest/kotlin/com/mobicloud/data/local/dao/CatalogDaoTest.kt ---
+package com.mobicloud.data.local.dao
+
+import androidx.room.Room
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.mobicloud.data.local.CatalogDatabase
+import com.mobicloud.data.local.entity.CatalogEntryEntity
+import com.mobicloud.data.local.entity.FragmentLocationEntity
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Before
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class CatalogDaoTest {
+
+    private lateinit var database: CatalogDatabase
+    private lateinit var dao: CatalogDao
+
+    @Before
+    fun setup() {
+        database = Room.inMemoryDatabaseBuilder(
+            ApplicationProvider.getApplicationContext(),
+            CatalogDatabase::class.java
+        ).allowMainThreadQueries().build()
+        dao = database.catalogDao()
+    }
+
+    @After
+    fun teardown() {
+        database.close()
+    }
+
+    @Test
+    fun testInsertAndGetFlowWithFragments() = runBlocking {
+        val hash = "hash_123"
+        val entry = CatalogEntryEntity(
+            fileHash = hash,
+            ownerPubKeyHash = "pubkey_1",
+            versionClock = 1L
+        )
+        val fragment = FragmentLocationEntity(
+            catalogFileHash = hash,
+            fragmentIndex = 0,
+            fragmentHash = "frag_hash",
+            nodeIds = "[\"node1\"]"
+        )
+
+        dao.insertWithFragments(entry, listOf(fragment))
+
+        val retrievedFlow = dao.getCatalogEntryFlow(hash).first()
+        assertNotNull(retrievedFlow)
+        assertEquals(hash, retrievedFlow?.catalogEntry?.fileHash)
+        assertEquals("pubkey_1", retrievedFlow?.catalogEntry?.ownerPubKeyHash)
+        assertEquals(1L, retrievedFlow?.catalogEntry?.versionClock)
+        
+        assertEquals(1, retrievedFlow?.fragmentLocations?.size)
+        assertEquals(0, retrievedFlow?.fragmentLocations?.get(0)?.fragmentIndex)
+        assertEquals("[\"node1\"]", retrievedFlow?.fragmentLocations?.get(0)?.nodeIds)
+    }
+
+    @Test
+    fun testInsertAndGetSync() = runBlocking {
+        val hash = "hash_sync"
+        val entry = CatalogEntryEntity(hash, "pubkey_sync", 2L)
+
+        dao.insertWithFragments(entry, emptyList())
+
+        val retrieved = dao.getCatalogEntry(hash)
+        assertNotNull(retrieved)
+        assertEquals(hash, retrieved?.catalogEntry?.fileHash)
+        assertEquals("pubkey_sync", retrieved?.catalogEntry?.ownerPubKeyHash)
+        assertEquals(2L, retrieved?.catalogEntry?.versionClock)
+        assertEquals(0, retrieved?.fragmentLocations?.size)
+    }
+
+    @Test
+    fun testUpdateEntryReplacesFragments() = runBlocking {
+        val hash = "update_hash"
+        val entry1 = CatalogEntryEntity(hash, "pub1", 1L)
+        val frag1 = FragmentLocationEntity(0, hash, 0, "hash1", "[]")
+        
+        dao.insertWithFragments(entry1, listOf(frag1))
+
+        val frag2 = FragmentLocationEntity(0, hash, 0, "hash2", "[]")
+        val frag3 = FragmentLocationEntity(0, hash, 1, "hash3", "[]")
+        // Updating entry but with 2 fragments now instead of 1
+        dao.insertWithFragments(entry1, listOf(frag2, frag3))
+
+        val retrieved = dao.getCatalogEntry(hash)
+        assertNotNull(retrieved)
+        assertEquals(2, retrieved?.fragmentLocations?.size)
+    }
+
+    @Test
+    fun testGetNonExistentEntry() = runBlocking {
+        val retrieved = dao.getCatalogEntry("missing_hash")
+        assertNull(retrieved)
+    }
+}
+
+
+--- File: app/src/main/kotlin/com/mobicloud/domain/usecase/m05_dht_catalog/MergeCatalogEntriesUseCase.kt ---
+package com.mobicloud.domain.usecase.m05_dht_catalog
+
+import com.mobicloud.domain.models.CatalogEntry
+import com.mobicloud.domain.models.FragmentLocation
+
+/**
+ * Use Case responsable de la fusion des entrées de catalogue.
+ * Utilise un algorithme CRDT LWW (Last-Writer-Wins) basé sur l'horloge logique `versionClock`.
+ * Propriété garantie: A ∪ B == B ∪ A (Commutativité).
+ */
+class MergeCatalogEntriesUseCase {
+    operator fun invoke(local: CatalogEntry, remote: CatalogEntry): CatalogEntry {
+        // Validation: On ne fusionne que des fiches du même fichier
+        require(local.fileHash == remote.fileHash) {
+            "Cannot merge entries for different files: ${local.fileHash} vs ${remote.fileHash}"
+        }
+
+        // LWW (Last-Writer-Wins): On préfère toujours la version la plus récente.
+        return when {
+            remote.versionClock > local.versionClock -> remote
+            local.versionClock > remote.versionClock -> local
+            else -> {
+                // versionClock identiques: on privilégie l'union des fragments de manière déterministe
+                val mergedFragments = (local.fragmentLocations + remote.fragmentLocations)
+                    .distinctBy { it.fragmentIndex to it.fragmentHash }
+                    .sortedBy { it.fragmentIndex }
+
+                // Pour briser l'égalité de manière commutative, on prend le ownerPubKeyHash le plus grand lexicographiquement (si différent)
+                val chosenOwner = if (remote.ownerPubKeyHash > local.ownerPubKeyHash) remote.ownerPubKeyHash else local.ownerPubKeyHash
+
+                CatalogEntry(
+                    fileHash = local.fileHash,
+                    ownerPubKeyHash = chosenOwner,
+                    versionClock = local.versionClock,
+                    fragmentLocations = mergedFragments
+                )
+            }
+        }
+    }
+}
+
+
+--- File: app/src/test/kotlin/com/mobicloud/domain/usecase/m05_dht_catalog/MergeCatalogEntriesUseCaseTest.kt ---
+package com.mobicloud.domain.usecase.m05_dht_catalog
+
+import com.mobicloud.domain.models.CatalogEntry
+import com.mobicloud.domain.models.FragmentLocation
+import org.junit.Assert.assertEquals
+
+import org.junit.Test
+
+class MergeCatalogEntriesUseCaseTest {
+
+    private val mergeUseCase = MergeCatalogEntriesUseCase()
+
+    @Test
+    fun testMergeLWW_newerVersionWins() {
+        val oldEntry = CatalogEntry("hash1", "pub1", 1L, emptyList())
+        val newEntry = CatalogEntry("hash1", "pub1", 2L, emptyList())
+
+        val result1 = mergeUseCase(oldEntry, newEntry)
+        val result2 = mergeUseCase(newEntry, oldEntry)
+
+        assertEquals(2L, result1.versionClock)
+        assertEquals(2L, result2.versionClock)
+        // Commutativity: A U B == B U A
+        assertEquals(result1, result2)
+    }
+
+    @Test
+    fun testMerge_identicalVersions_mergesFragments_commutativity() {
+        val f1 = FragmentLocation(0, "hash_f1", listOf("nodeA"))
+        val f2 = FragmentLocation(1, "hash_f2", listOf("nodeB"))
+
+        val entry1 = CatalogEntry("hash1", "pub1", 1L, listOf(f1))
+        val entry2 = CatalogEntry("hash1", "pub2", 1L, listOf(f2))
+
+        val result1 = mergeUseCase(entry1, entry2)
+        val result2 = mergeUseCase(entry2, entry1)
+
+        assertEquals(result1, result2) // Commutativity A U B == B U A
+        assertEquals(2, result1.fragmentLocations.size)
+        // Check deterministic tie breaker (lexicographical)
+        assertEquals("pub2", result1.ownerPubKeyHash)
+    }
+}
+
+
+--- File: app/src/main/kotlin/com/mobicloud/domain/usecase/m05_dht_catalog/CalculateDhtRangeUseCase.kt ---
+package com.mobicloud.domain.usecase.m05_dht_catalog
+
+/**
+ * Use Case responsable de déterminer la couverture d'une clé (ex: hash de fichier)
+ * sur l'anneau DHT (Distributed Hash Table).
+ *
+ * La plage de responsabilité d'un nœud P2P est le segment : [nodeId, successorId)
+ * L'anneau reboucle sur lui-même, donc si successorId < nodeId, la plage traverse le point zéro de l'anneau.
+ */
+class CalculateDhtRangeUseCase {
+    
+    /**
+     * @param key L'identifiant (hash) de la ressource ou fiche catalogue.
+     * @param nodeId L'ID de notre nœud P2P.
+     * @param successorId L'ID du nœud P2P suivant sur l'anneau (le successeur).
+     * @return `true` si la `key` tombe sous la juridiction de ce `nodeId`.
+     */
+    operator fun invoke(key: String, nodeId: String, successorId: String): Boolean {
+        if (nodeId == successorId) {
+            // Nous sommes le seul nœud sur l'anneau, nous couvrons tout
+            return true
+        }
+
+        return if (nodeId < successorId) {
+            // Plage normale continue: [nodeId, successorId)
+            key >= nodeId && key < successorId
+        } else {
+            // Plage coupée par le point de rebouclage: [nodeId, MAX] U [0, successorId)
+            key >= nodeId || key < successorId
+        }
+    }
+}
+
+
+--- File: app/src/test/kotlin/com/mobicloud/domain/usecase/m05_dht_catalog/CalculateDhtRangeUseCaseTest.kt ---
+package com.mobicloud.domain.usecase.m05_dht_catalog
+
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class CalculateDhtRangeUseCaseTest {
+    
+    private val useCase = CalculateDhtRangeUseCase()
+
+    @Test
+    fun testIsInRange_normalRange() {
+        val nodeId = "5000"
+        val successorId = "a000"
+        
+        // key >= 5000 and key < a000
+        assertTrue(useCase(key = "6000", nodeId = nodeId, successorId = successorId))
+        assertTrue(useCase(key = "5000", nodeId = nodeId, successorId = successorId))
+        assertFalse(useCase(key = "a000", nodeId = nodeId, successorId = successorId))
+        assertFalse(useCase(key = "4000", nodeId = nodeId, successorId = successorId))
+    }
+
+    @Test
+    fun testIsInRange_wrapAroundRange() {
+        // ID_DHT is near the end, and successor wraps around to the beginning
+        val nodeId = "f000"
+        val successorId = "2000"
+        
+        // key >= f000 OR key < 2000
+        assertTrue(useCase(key = "f500", nodeId = nodeId, successorId = successorId))
+        assertTrue(useCase(key = "1000", nodeId = nodeId, successorId = successorId))
+        assertTrue(useCase(key = "f000", nodeId = nodeId, successorId = successorId))
+        
+        // out of range
+        assertFalse(useCase(key = "3000", nodeId = nodeId, successorId = successorId))
+        assertFalse(useCase(key = "e000", nodeId = nodeId, successorId = successorId))
+    }
+
+    @Test
+    fun testIsInRange_singleNode() {
+        val nodeId = "5000"
+        val successorId = "5000"
+        
+        // If we are the only node, we cover the whole ring
+        assertTrue(useCase(key = "1000", nodeId = nodeId, successorId = successorId))
+        assertTrue(useCase(key = "5000", nodeId = nodeId, successorId = successorId))
+        assertTrue(useCase(key = "9000", nodeId = nodeId, successorId = successorId))
+    }
+}
+
+

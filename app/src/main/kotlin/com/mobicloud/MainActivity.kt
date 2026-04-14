@@ -139,10 +139,7 @@ class MainActivity : AppCompatActivity() {
                 windowSizeClass = calculateWindowSizeClass(this),
                 networkUtils = networkUtils,
             )
-            JetpackTheme(
-                darkTheme = themeSettings.darkTheme,
-                disableDynamicTheming = themeSettings.disableDynamicTheming,
-            ) {
+            JetpackTheme {
                 JetpackApp(appState)
             }
         }

@@ -15,20 +15,20 @@ class PeerRegistryImplTest {
     @Test
     fun `registerOrUpdatePeer adds new peer if not exists`() = runTest {
         val registry = PeerRegistryImpl()
-        val identity = NodeIdentity(publicId = "dev1", publicKeyBytes = "pub1".toByteArray())
+        val identity = NodeIdentity(nodeId = "dev1", publicKeyBytes = "pub1".toByteArray())
         
         registry.registerOrUpdatePeer(identity, 1000L)
         
         val activePeers = registry.activePeers.first()
         assertEquals(1, activePeers.size)
-        assertEquals("dev1", activePeers[0].identity.publicId)
+        assertEquals("dev1", activePeers[0].identity.nodeId)
         assertEquals(1000L, activePeers[0].lastSeenTimestampMs)
     }
 
     @Test
     fun `registerOrUpdatePeer updates timestamp for existing peer`() = runTest {
         val registry = PeerRegistryImpl()
-        val identity = NodeIdentity(publicId = "dev1", publicKeyBytes = "pub1".toByteArray())
+        val identity = NodeIdentity(nodeId = "dev1", publicKeyBytes = "pub1".toByteArray())
         
         registry.registerOrUpdatePeer(identity, 1000L)
         registry.registerOrUpdatePeer(identity, 5000L) // Update
@@ -41,8 +41,8 @@ class PeerRegistryImplTest {
     @Test
     fun `evictStalePeers removes peers exceeding timeout`() = runTest {
         val registry = PeerRegistryImpl()
-        val id1 = NodeIdentity(publicId = "dev1", publicKeyBytes = "pub1".toByteArray())
-        val id2 = NodeIdentity(publicId = "dev2", publicKeyBytes = "pub2".toByteArray())
+        val id1 = NodeIdentity(nodeId = "dev1", publicKeyBytes = "pub1".toByteArray())
+        val id2 = NodeIdentity(nodeId = "dev2", publicKeyBytes = "pub2".toByteArray())
         
         registry.registerOrUpdatePeer(id1, 1000L)
         registry.registerOrUpdatePeer(id2, 4000L)
@@ -55,6 +55,6 @@ class PeerRegistryImplTest {
         
         val activePeers = registry.activePeers.first()
         assertEquals(1, activePeers.size)
-        assertEquals("dev2", activePeers[0].identity.publicId)
+        assertEquals("dev2", activePeers[0].identity.nodeId)
     }
 }

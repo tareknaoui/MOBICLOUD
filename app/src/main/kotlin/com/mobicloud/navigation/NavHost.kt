@@ -14,25 +14,20 @@
  * limitations under the License.
  */
 
-package com.mobicloud.compose.navigation
+package com.mobicloud.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import com.mobicloud.ui.JetpackAppState
 import com.mobicloud.core.ui.utils.SnackbarAction
-import com.mobicloud.feature.auth.navigation.AuthNavGraph
-import com.mobicloud.feature.auth.navigation.authNavGraph
-import com.mobicloud.feature.auth.navigation.navigateToSignInScreen
-import com.mobicloud.feature.auth.navigation.navigateToSignUpScreen
-import com.mobicloud.feature.auth.navigation.signInScreen
-import com.mobicloud.feature.auth.navigation.signUpScreen
-import com.mobicloud.feature.home.navigation.HomeNavGraph
-import com.mobicloud.feature.home.navigation.homeNavGraph
-import com.mobicloud.feature.home.navigation.homeScreen
-import com.mobicloud.feature.home.navigation.itemScreen
-import com.mobicloud.feature.home.navigation.navigateToItemScreen
-import com.mobicloud.feature.profile.navigation.profileScreen
+import androidx.navigation.compose.composable
+import com.mobicloud.presentation.dashboard.DashboardRoute
+import com.mobicloud.presentation.dashboard.DashboardScreen
+import com.mobicloud.presentation.explorer.ExplorerRoute
+import com.mobicloud.presentation.explorer.ExplorerScreen
+import com.mobicloud.presentation.settings.SettingsRoute
+import com.mobicloud.presentation.settings.SettingsScreen
 
 /**
  * Composable function that sets up the navigation host for the Jetpack Compose application.
@@ -48,39 +43,20 @@ fun JetpackNavHost(
     modifier: Modifier = Modifier,
 ) {
     val navController = appState.navController
-    val startDestination =
-        if (appState.isUserLoggedIn) HomeNavGraph::class else AuthNavGraph::class
+    val startDestination = DashboardRoute
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
     ) {
-        authNavGraph(
-            nestedNavGraphs = {
-                signInScreen(
-                    onSignUpClick = navController::navigateToSignUpScreen,
-                    onShowSnackbar = onShowSnackbar,
-                )
-                signUpScreen(
-                    onSignInClick = navController::navigateToSignInScreen,
-                    onShowSnackbar = onShowSnackbar,
-                )
-            },
-        )
-        homeNavGraph(
-            nestedNavGraphs = {
-                homeScreen(
-                    onJetpackClick = navController::navigateToItemScreen,
-                    onShowSnackbar = onShowSnackbar,
-                )
-                itemScreen(
-                    onBackClick = navController::popBackStack,
-                    onShowSnackbar = onShowSnackbar,
-                )
-            },
-        )
-        profileScreen(
-            onShowSnackbar = onShowSnackbar,
-        )
+        composable<DashboardRoute> {
+            DashboardScreen()
+        }
+        composable<ExplorerRoute> {
+            ExplorerScreen()
+        }
+        composable<SettingsRoute> {
+            SettingsScreen()
+        }
     }
 }

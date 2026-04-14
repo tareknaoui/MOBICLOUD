@@ -52,7 +52,7 @@ class GenerateHashcashProofUseCase @Inject constructor(
             val extraBits = difficultyBits % 8
             val mask = if (extraBits > 0) 0xFF shl (8 - extraBits) else 0
 
-            val basePayload = "${identity.publicId}:$timestamp:"
+            val basePayload = "${identity.nodeId}:$timestamp:"
 
             // 3. Boucle CPU intensive (Preuve de Travail)
             while (true) {
@@ -78,7 +78,7 @@ class GenerateHashcashProofUseCase @Inject constructor(
 
             // 5. Création et sauvegarde — l'échec de persistance est propagé
             val token = HashcashToken(
-                resource = identity.publicId,
+                resource = identity.nodeId,
                 timestamp = timestamp,
                 nonce = nonce,
                 hash = hashHex,

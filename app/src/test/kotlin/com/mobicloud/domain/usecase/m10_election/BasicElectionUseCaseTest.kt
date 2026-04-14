@@ -1,19 +1,13 @@
 package com.mobicloud.domain.usecase.m10_election
 
-import com.mobicloud.domain.models.HashcashToken
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.repository.ITrustScoreProvider
 import com.mobicloud.domain.repository.SecurityRepository
-import com.mobicloud.domain.usecase.m01_auth_discovery.GenerateHashcashProofUseCase
 import io.mockk.coEvery
-import io.mockk.coVerify
-import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -22,7 +16,6 @@ class BasicElectionUseCaseTest {
 
     private lateinit var trustScoreProvider: ITrustScoreProvider
     private lateinit var securityRepository: SecurityRepository
-    private lateinit var generateHashcashProofUseCase: GenerateHashcashProofUseCase
     private lateinit var useCase: BasicElectionUseCase
 
     private val localIdentity = NodeIdentity("local_node_id_001", byteArrayOf(1))
@@ -31,14 +24,12 @@ class BasicElectionUseCaseTest {
     fun setUp() {
         trustScoreProvider = mockk()
         securityRepository = mockk()
-        generateHashcashProofUseCase = mockk()
 
         coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
 
         useCase = BasicElectionUseCase(
             trustScoreProvider = trustScoreProvider,
-            securityRepository = securityRepository,
-            generateHashcashUseCase = generateHashcashProofUseCase
+            securityRepository = securityRepository
         )
     }
 
@@ -64,9 +55,6 @@ class BasicElectionUseCaseTest {
         assertTrue(result.isSuccess)
         val election = result.getOrNull()!!
         assertEquals(node2, election.electedNode)
-        assertNull(election.genesisHashcash) // Local node didn't win, so no hashcash
-        
-        coVerify(exactly = 0) { generateHashcashProofUseCase.invoke(any()) }
     }
 
     @Test
@@ -115,29 +103,5 @@ class BasicElectionUseCaseTest {
         // Assert
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalArgumentException)
-    }
-
-    @Test
-    fun `election generates hashcash if local node wins`() = runTest {
-        // Arrange
-        val node1 = NodeIdentity("node_1_id", byteArrayOf(2))
-        val peers = listOf(Peer(node1, System.currentTimeMillis()))
-
-        coEvery { trustScoreProvider.getTrustScore("node_1_id") } returns 10
-        coEvery { trustScoreProvider.getTrustScore("local_node_id_001") } returns 90 // Local wins
-
-        val mockHashcash = HashcashToken("local_node_id_001", 123L, 456L, "hash", byteArrayOf(1))
-        coEvery { generateHashcashProofUseCase.invoke(18) } returns Result.success(mockHashcash)
-
-        // Act
-        val result = useCase(peers)
-
-        // Assert
-        assertTrue(result.isSuccess)
-        val election = result.getOrNull()!!
-        assertEquals(localIdentity, election.electedNode)
-        assertEquals(mockHashcash, election.genesisHashcash)
-        
-        coVerify(exactly = 1) { generateHashcashProofUseCase.invoke(18) }
     }
 }

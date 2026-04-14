@@ -14,18 +14,21 @@
  * limitations under the License.
  */
 
-package com.mobicloud.compose.navigation
+package com.mobicloud.navigation
 
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Radar
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mobicloud.compose.R
-import com.mobicloud.feature.home.navigation.Home
-import com.mobicloud.feature.profile.navigation.Profile
+import com.mobicloud.presentation.dashboard.DashboardRoute
+import com.mobicloud.presentation.explorer.ExplorerRoute
+import com.mobicloud.presentation.settings.SettingsRoute
 import kotlin.reflect.KClass
 
 /**
@@ -44,18 +47,25 @@ enum class TopLevelDestination(
     @StringRes val titleTextId: Int,
     val route: KClass<*>,
 ) {
-    HOME(
-        selectedIcon = Icons.Filled.Home,
-        unselectedIcon = Icons.Outlined.Home,
-        iconTextId = R.string.home,
-        titleTextId = R.string.home,
-        route = Home::class,
+    DASHBOARD(
+        selectedIcon = Icons.Filled.Radar,
+        unselectedIcon = Icons.Outlined.Radar,
+        iconTextId = R.string.dashboard,
+        titleTextId = R.string.dashboard,
+        route = DashboardRoute::class,
     ),
-    PROFILE(
-        selectedIcon = Icons.Filled.Person,
-        unselectedIcon = Icons.Outlined.Person,
-        iconTextId = R.string.profile,
-        titleTextId = R.string.profile,
-        route = Profile::class,
+    EXPLORER(
+        selectedIcon = Icons.Filled.Folder,
+        unselectedIcon = Icons.Outlined.Folder,
+        iconTextId = R.string.explorer,
+        titleTextId = R.string.explorer,
+        route = ExplorerRoute::class,
+    ),
+    SETTINGS(
+        selectedIcon = Icons.Filled.Settings,
+        unselectedIcon = Icons.Outlined.Settings,
+        iconTextId = R.string.settings,
+        titleTextId = R.string.settings,
+        route = SettingsRoute::class,
     ),
 }

@@ -29,13 +29,13 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navOptions
-import com.mobicloud.compose.navigation.TopLevelDestination
+import com.mobicloud.navigation.TopLevelDestination
 import com.mobicloud.core.extensions.stateInDelayed
 import com.mobicloud.core.network.utils.NetworkState
 import com.mobicloud.core.network.utils.NetworkUtils
-import com.mobicloud.feature.home.navigation.navigateToHomeNavGraph
-import com.mobicloud.feature.home.navigation.navigateToItemScreen
-import com.mobicloud.feature.profile.navigation.navigateToProfileScreen
+import com.mobicloud.presentation.dashboard.DashboardRoute
+import com.mobicloud.presentation.explorer.ExplorerRoute
+import com.mobicloud.presentation.settings.SettingsRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -157,13 +157,13 @@ class JetpackAppState(
      * Indicates if the FAB should be shown.
      */
     val shouldShowFab: Boolean
-        @Composable get() = currentTopLevelDestination == TopLevelDestination.HOME
+        @Composable get() = false // Replaced FAB with utilitarist design
 
     /**
      * Navigates to the item screen with no item ID (creates new item).
      */
     fun navigateToItemScreen() {
-        navController.navigateToItemScreen(null)
+        // Obsolete
     }
 
     /**
@@ -187,8 +187,9 @@ class JetpackAppState(
         }
 
         when (topLevelDestination) {
-            TopLevelDestination.HOME -> navController.navigateToHomeNavGraph(topLevelNavOptions)
-            TopLevelDestination.PROFILE -> navController.navigateToProfileScreen(topLevelNavOptions)
+            TopLevelDestination.DASHBOARD -> navController.navigate(DashboardRoute, topLevelNavOptions)
+            TopLevelDestination.EXPLORER -> navController.navigate(ExplorerRoute, topLevelNavOptions)
+            TopLevelDestination.SETTINGS -> navController.navigate(SettingsRoute, topLevelNavOptions)
         }
     }
 }

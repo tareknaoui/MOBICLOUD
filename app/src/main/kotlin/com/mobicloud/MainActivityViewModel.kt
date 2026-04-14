@@ -29,6 +29,9 @@ import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
+import com.mobicloud.domain.repository.IdentityRepository
+import kotlinx.coroutines.launch
+
 /**
  * Annotates a ViewModel class that is managed by Hilt's dependency injection system.
  *
@@ -38,7 +41,22 @@ import javax.inject.Inject
 @HiltViewModel
 class MainActivityViewModel @Inject constructor(
     userPreferencesDataSource: UserPreferencesDataSource,
+    private val identityRepository: IdentityRepository
 ) : ViewModel() {
+
+    init {
+        viewModelScope.launch {
+            // Initialisation silencieuse de l'identité cryptographique au démarrage.
+            // En cas d'échec, on log l'erreur sans bloquer l'UI (non-fatal au premier plan).
+            identityRepository.getIdentity().onFailure { error ->
+                android.util.Log.e(
+                    "MainActivityViewModel",
+                    "[IDENTITY-ERROR] Échec de l'initialisation de l'identité cryptographique : ${error.message}",
+                    error
+                )
+            }
+        }
+    }
 
     /**
      * Represents the state of the UI for user data.

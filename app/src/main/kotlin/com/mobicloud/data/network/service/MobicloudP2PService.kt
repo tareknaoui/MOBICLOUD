@@ -22,7 +22,6 @@ import com.mobicloud.domain.repository.BootstrapRepository
 import com.mobicloud.domain.repository.PeerRegistry
 import com.mobicloud.domain.repository.SecurityRepository
 import dagger.hilt.android.AndroidEntryPoint
-import dagger.hilt.android.AndroidEntryPoint
 import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.data.network.PublicIpFetcher
 import kotlinx.coroutines.CoroutineScope
@@ -113,7 +112,7 @@ class MobicloudP2PService : Service() {
             launch {
                 bootstrapRepository.observeActivePeers().collectLatest { peers ->
                     for (peer in peers) {
-                        if (peer.identity.publicId != identity.publicId) {
+                        if (peer.identity.nodeId != identity.nodeId) {
                             peerRegistry.registerOrUpdatePeer(
                                 peer.identity, 
                                 peer.lastSeenTimestampMs,
@@ -144,7 +143,7 @@ class MobicloudP2PService : Service() {
                     if (result.isSuccess) {
                         val peerIdentity = result.getOrThrow()
                         // Filter out loopback (our own heartbeats)
-                        if (peerIdentity.publicId != identity.publicId) {
+                        if (peerIdentity.nodeId != identity.nodeId) {
                             // F-09: elapsedRealtime() est monotone et insensible aux sauts NTP
                             peerRegistry.registerOrUpdatePeer(peerIdentity, SystemClock.elapsedRealtime())
                         }

@@ -22,7 +22,7 @@ class PeerRegistryImpl : PeerRegistry {
         port: Int?
     ) {
         _activePeers.update { currentPeers ->
-            val index = currentPeers.indexOfFirst { it.identity.publicId == identity.publicId }
+            val index = currentPeers.indexOfFirst { it.identity.nodeId == identity.nodeId }
             if (index == -1) {
                 currentPeers + Peer(identity, timestampMs, source, ipAddress, port)
             } else {

@@ -166,6 +166,9 @@ dependencies {
     // ... Analytics
     implementation(project(":firebase:analytics"))
 
+    // ... Firebase BOM
+    implementation(platform(libs.firebase.bom))
+
     // ... Firebase Realtime Database
     implementation(libs.firebase.database.ktx)
 

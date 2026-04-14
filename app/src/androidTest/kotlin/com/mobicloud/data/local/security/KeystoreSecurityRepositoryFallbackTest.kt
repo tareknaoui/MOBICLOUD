@@ -67,7 +67,7 @@ class KeystoreSecurityRepositoryFallbackTest {
         val identity = result.getOrNull()
         assertNotNull("Generated identity should not be null", identity)
         assertTrue("Public key bytes should not be empty", identity!!.publicKeyBytes.isNotEmpty())
-        assertTrue("Public ID should not be empty", identity.publicId.isNotEmpty())
+        assertTrue("Public ID should not be empty", identity.nodeId.isNotEmpty())
 
         // 2. Verify the identity can be retrieved via getIdentity()
         //    (no hardware key exists, so it falls through to EncryptedSharedPreferences)
@@ -79,9 +79,9 @@ class KeystoreSecurityRepositoryFallbackTest {
         val fetchedIdentity = fetchedResult.getOrNull()
         assertNotNull("Fetched identity should not be null", fetchedIdentity)
         assertEquals(
-            "Fetched identity publicId should match the generated identity",
-            identity.publicId,
-            fetchedIdentity!!.publicId
+            "Fetched identity nodeId should match the generated identity",
+            identity.nodeId,
+            fetchedIdentity!!.nodeId
         )
         assertTrue(
             "Fetched public key bytes should match",
@@ -99,10 +99,10 @@ class KeystoreSecurityRepositoryFallbackTest {
         assertTrue(result.isSuccess)
 
         val identity = result.getOrNull()!!
-        assertEquals("publicId should be exactly 16 characters", 16, identity.publicId.length)
+        assertEquals("nodeId should be exactly 16 characters", 16, identity.nodeId.length)
         assertTrue(
-            "publicId should be lowercase hexadecimal",
-            identity.publicId.matches(Regex("[0-9a-f]{16}"))
+            "nodeId should be lowercase hexadecimal",
+            identity.nodeId.matches(Regex("[0-9a-f]{16}"))
         )
     }
 
@@ -115,7 +115,7 @@ class KeystoreSecurityRepositoryFallbackTest {
         // First call
         val first = repository.generateSoftwareFallback()
         assertTrue(first.isSuccess)
-        val firstId = first.getOrNull()!!.publicId
+        val firstId = first.getOrNull()!!.nodeId
 
         // Second call (overwrites prefs — expected since generateSoftwareFallback was called directly)
         // The important assertion: getIdentity() after one fallback should return a consistent result
@@ -124,7 +124,7 @@ class KeystoreSecurityRepositoryFallbackTest {
         assertEquals(
             "getIdentity() should return the same identity that was last persisted",
             firstId,
-            fetched.getOrNull()!!.publicId
+            fetched.getOrNull()!!.nodeId
         )
     }
 }

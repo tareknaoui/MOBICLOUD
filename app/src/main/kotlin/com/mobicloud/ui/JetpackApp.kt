@@ -57,11 +57,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination
+import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
 import com.mobicloud.ui.JetpackAppState
 import com.mobicloud.compose.R
-import com.mobicloud.compose.navigation.JetpackNavHost
-import com.mobicloud.compose.navigation.TopLevelDestination
+import com.mobicloud.navigation.JetpackNavHost
+import com.mobicloud.navigation.TopLevelDestination
 import com.mobicloud.core.ui.components.AppBackground
 import com.mobicloud.core.ui.components.AppGradientBackground
 import com.mobicloud.core.ui.components.JetpackExtendedFab
@@ -71,7 +72,6 @@ import com.mobicloud.core.ui.components.JetpackTopAppBarWithAvatar
 import com.mobicloud.core.ui.theme.GradientColors
 import com.mobicloud.core.ui.theme.LocalGradientColors
 import com.mobicloud.core.ui.utils.SnackbarAction
-import com.mobicloud.feature.settings.ui.SettingsDialog
 import timber.log.Timber
 
 /**
@@ -88,7 +88,7 @@ fun JetpackApp(
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
 ) {
     val shouldShowGradientBackground =
-        appState.currentTopLevelDestination == TopLevelDestination.HOME
+        appState.currentTopLevelDestination == TopLevelDestination.DASHBOARD
     var showSettingsDialog by rememberSaveable { mutableStateOf(false) }
 
     AppBackground(modifier = modifier) {
@@ -154,27 +154,9 @@ private fun JetpackApp(
 
     val context = LocalContext.current
 
-    // Show the settings dialog if the flag is set
-    if (showSettingsDialog) {
-        // Resolve context once in composable scope for use in suspend callbacks
-        // Suppressing lint because we need context in suspend callback where composables aren't allowed
-        @Suppress("LocalContextGetResourceValueCall")
-        SettingsDialog(
-            onDismiss = { onDismissSettings() },
-            onShowSnackbar = { message, action, throwable ->
-                val actionPerformed = snackbarHostState.showSnackbar(
-                    message = message,
-                    actionLabel = context.getString(action.actionText),
-                    duration = SnackbarDuration.Short,
-                ) == SnackbarResult.ActionPerformed
-                if (actionPerformed && action == SnackbarAction.REPORT) {
-                    // TODO: Implémenter le système de reporting (ex. Firebase Crashlytics ou rapport utilisateur)
-                    Timber.w(throwable, "[REPORT] Action demandée par l'utilisateur — reporting non implémenté")
-                }
-                actionPerformed
-            },
-        )
-    }
+    // TODO: [Story Settings] SettingsDialog remplacée par un placeholder non-crashant (code review 1-2).
+    // La dialog sera implémentée dans la story dédiée aux Paramètres.
+    // if (showSettingsDialog) { /* SettingsDialog placeholder */ }
 
     // If there is no top-level destination, show the main scaffold
     if (appState.currentTopLevelDestination == null) {
@@ -399,6 +381,6 @@ private fun Modifier.notificationDot(): Modifier = composed {
  * @return True if the current NavDestination is in the hierarchy of the given top-level destination, false otherwise.
  */
 private fun NavDestination?.isTopLevelDestinationInHierarchy(destination: TopLevelDestination) =
-    this?.hierarchy?.any {
-        it.route?.contains(destination.name, true) == true
+    this?.hierarchy?.any { navDest ->
+        navDest.hasRoute(destination.route)
     } == true

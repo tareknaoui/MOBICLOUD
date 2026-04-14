@@ -19,17 +19,12 @@ package com.mobicloud.core.ui.theme
 import android.os.Build
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.annotation.VisibleForTesting
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialExpressiveTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.surfaceColorAtElevation
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 
 /**
@@ -69,14 +64,14 @@ val LightDefaultColorScheme = lightColorScheme(
  */
 @VisibleForTesting
 val DarkDefaultColorScheme = darkColorScheme(
-    primary = Purple80,
-    onPrimary = Purple20,
-    primaryContainer = Purple30,
-    onPrimaryContainer = Purple90,
-    secondary = Orange80,
-    onSecondary = Orange20,
-    secondaryContainer = Orange30,
-    onSecondaryContainer = Orange90,
+    primary = TerminalGreen,
+    onPrimary = PureBlack,
+    primaryContainer = Color(0xFF003300),
+    onPrimaryContainer = TerminalGreen,
+    secondary = PrimaryText,
+    onSecondary = PureBlack,
+    secondaryContainer = DarkSurfaceVariant,
+    onSecondaryContainer = PrimaryText,
     tertiary = Blue80,
     onTertiary = Blue20,
     tertiaryContainer = Blue30,
@@ -85,15 +80,15 @@ val DarkDefaultColorScheme = darkColorScheme(
     onError = Red20,
     errorContainer = Red30,
     onErrorContainer = Red90,
-    background = DarkPurpleGray10,
-    onBackground = DarkPurpleGray90,
-    surface = DarkPurpleGray10,
-    onSurface = DarkPurpleGray90,
-    surfaceVariant = PurpleGray30,
-    onSurfaceVariant = PurpleGray80,
-    inverseSurface = DarkPurpleGray90,
-    inverseOnSurface = DarkPurpleGray10,
-    outline = PurpleGray60,
+    background = PureBlack,
+    onBackground = PrimaryText,
+    surface = PureBlack,
+    onSurface = PrimaryText,
+    surfaceVariant = DarkSurfaceVariant,
+    onSurfaceVariant = SecondaryText,
+    inverseSurface = PrimaryText,
+    inverseOnSurface = PureBlack,
+    outline = SecondaryText,
 )
 
 /**
@@ -105,40 +100,21 @@ val DarkDefaultColorScheme = darkColorScheme(
  */
 @Composable
 fun JetpackTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
-    disableDynamicTheming: Boolean = false,
     content: @Composable () -> Unit,
 ) {
-    // Color scheme
-    val colorScheme = when {
-        !disableDynamicTheming && supportsDynamicTheming() -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        else -> if (darkTheme) DarkDefaultColorScheme else LightDefaultColorScheme
-    }
+    // Strictly override to DarkDefaultColorScheme to enforce OLED rule
+    val colorScheme = DarkDefaultColorScheme
+    
     // Gradient colors
-    val emptyGradientColors = GradientColors(container = colorScheme.surfaceColorAtElevation(2.dp))
-    val defaultGradientColors = GradientColors(
-        top = colorScheme.inverseOnSurface,
-        bottom = colorScheme.primaryContainer,
-        container = colorScheme.surface,
-    )
-    val gradientColors = when {
-        !disableDynamicTheming && supportsDynamicTheming() -> emptyGradientColors
-        else -> defaultGradientColors
-    }
-    // Background theme
+    val gradientColors = GradientColors() // Empty
+    
+    // Background theme with 0dp elevation for hardware/utilitarian aesthetic
     val defaultBackgroundTheme = BackgroundTheme(
-        color = colorScheme.surface,
-        tonalElevation = 2.dp,
+        color = colorScheme.background,
+        tonalElevation = 0.dp,
     )
 
-    val tintTheme = when {
-        !disableDynamicTheming && supportsDynamicTheming() -> TintTheme(colorScheme.primary)
-        else -> TintTheme()
-    }
+    val tintTheme = TintTheme()
     // Composition locals
     CompositionLocalProvider(
         LocalGradientColors provides gradientColors,

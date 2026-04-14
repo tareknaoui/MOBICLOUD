@@ -26,6 +26,8 @@
     <string name="back">Back</string>
     <string name="top_app_bar_action_icon_description">Settings</string>
     <string name="top_app_bar_navigation_icon_description">Search</string>
+    <string name="dashboard">Dashboard</string>
+    <string name="explorer">Explorer</string>
     <string name="settings">Settings</string>
     <string name="loading">Loading…</string>
     <string name="not_connected">⚠️ You aren’t connected to the internet</string>

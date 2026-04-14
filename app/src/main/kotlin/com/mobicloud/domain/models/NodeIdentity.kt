@@ -8,8 +8,9 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class NodeIdentity(
-    val publicId: String,
-    val publicKeyBytes: ByteArray
+    val nodeId: String,
+    val publicKeyBytes: ByteArray,
+    val reliabilityScore: Float = 1.0f
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -17,15 +18,17 @@ data class NodeIdentity(
 
         other as NodeIdentity
 
-        if (publicId != other.publicId) return false
+        if (nodeId != other.nodeId) return false
         if (!publicKeyBytes.contentEquals(other.publicKeyBytes)) return false
+        if (reliabilityScore != other.reliabilityScore) return false
 
         return true
     }
 
     override fun hashCode(): Int {
-        var result = publicId.hashCode()
+        var result = nodeId.hashCode()
         result = 31 * result + publicKeyBytes.contentHashCode()
+        result = 31 * result + reliabilityScore.hashCode()
         return result
     }
 }
