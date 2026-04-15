@@ -26,6 +26,7 @@ import com.mobicloud.domain.repository.SecurityRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
@@ -120,10 +121,19 @@ class MobicloudP2PService : Service() {
                 tcpPort = tcpPort
             )
 
-            // Firebase announce — délai 10s pour laisser la découverte locale s'établir
+            // Firebase announce — délai 10s, seulement si aucun pair local actif (AC1)
             launch {
                 delay(10_000L)
-                val ipToAnnounce = publicIpFetcher.fetchPublicIp().getOrElse { "127.0.0.1" }
+                if (peerRepository.peers.value.any { it.isActive }) {
+                    Log.d("MobicloudP2PService", "Pairs locaux actifs détectés — announce Firebase ignorée")
+                    return@launch
+                }
+                // F11: ne pas publier 127.0.0.1 sur Firebase — inutilisable par les pairs distants
+                val ipToAnnounce = publicIpFetcher.fetchPublicIp().getOrNull()
+                if (ipToAnnounce == null || ipToAnnounce == "127.0.0.1") {
+                    Log.w("MobicloudP2PService", "IP publique indisponible — announce Firebase ignorée")
+                    return@launch
+                }
                 try {
                     withTimeout(FIREBASE_ANNOUNCE_TIMEOUT_MS) {
                         signalingRepository.registerNode(ipToAnnounce, tcpPort)
@@ -136,23 +146,32 @@ class MobicloudP2PService : Service() {
 
             // Firebase Discovery & TCP Handshake
             launch {
-                signalingRepository.observeRemoteNodes().collectLatest { peers ->
-                    for (peer in peers) {
-                        // P2: Normalise le timestamp Firebase vers elapsedRealtime pour cohérence avec l'éviction
-                        peerRepository.registerOrUpdatePeer(
-                            peer.identity,
-                            SystemClock.elapsedRealtime(),
-                            peer.source,
-                            peer.ipAddress,
-                            peer.port
-                        ).onFailure { Log.e("MobicloudP2PService", "Failed to register Firebase peer", it) }
-                        // D1: Handshake seulement si pas encore connecté à ce nœud
-                        if (!tcpConnectionManager.isConnected(peer.identity.nodeId)) {
-                            launch {
-                                tcpConnectionManager.connectToPeer(peer)
+                // F02: jobs indexés par nodeId — évite de spawner plusieurs coroutines TCP pour le même pair
+                val connectionJobs = mutableMapOf<String, Job>()
+                try {
+                    signalingRepository.observeRemoteNodes().collectLatest { peers ->
+                        for (peer in peers) {
+                            // P2: Normalise le timestamp Firebase vers elapsedRealtime pour cohérence avec l'éviction
+                            peerRepository.registerOrUpdatePeer(
+                                peer.identity,
+                                SystemClock.elapsedRealtime(),
+                                peer.source,
+                                peer.ipAddress,
+                                peer.port
+                            ).onFailure { Log.e("MobicloudP2PService", "Failed to register Firebase peer", it) }
+                            // D1: Handshake seulement si pas encore connecté et aucun job en cours pour ce nœud
+                            val nodeId = peer.identity.nodeId
+                            if (!tcpConnectionManager.isConnected(nodeId) &&
+                                connectionJobs[nodeId]?.isActive != true) {
+                                connectionJobs[nodeId] = launch {
+                                    tcpConnectionManager.connectToPeer(peer)
+                                }
                             }
                         }
                     }
+                } catch (e: Exception) {
+                    // F03: Firebase onCancelled propage une exception — le service P2P reste actif (mode local seul)
+                    Log.w("MobicloudP2PService", "Firebase discovery interrompue — mode local seul", e)
                 }
             }
 

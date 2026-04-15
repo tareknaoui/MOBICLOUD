@@ -1,6 +1,7 @@
 package com.mobicloud.data.repository
 
 import android.util.Base64
+import android.util.Log
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
@@ -42,7 +43,13 @@ class SignalingRepositoryImpl @Inject constructor(
     }
 
     override fun observeRemoteNodes(): Flow<List<Peer>> = callbackFlow {
-        val localNodeId = securityRepository.getIdentity().getOrNull()?.nodeId
+        // F01: fail-fast si l'identité locale est indisponible — self-exclusion ne peut pas fonctionner sans nodeId
+        val identityResult = securityRepository.getIdentity()
+        if (identityResult.isFailure) {
+            close(identityResult.exceptionOrNull())
+            return@callbackFlow
+        }
+        val localNodeId = identityResult.getOrThrow().nodeId
         val reference = firebaseDatabase.reference.child(NODES_PATH)
 
         val listener = object : ValueEventListener {
@@ -58,7 +65,7 @@ class SignalingRepositoryImpl @Inject constructor(
                             ?: return@mapNotNull null
                         val ip = child.child("ip").getValue(String::class.java)
                             ?: return@mapNotNull null
-                        val port = child.child("port").getValue(Int::class.java)
+                        val port = child.child("port").getValue(Long::class.java)?.toInt()
                             ?: return@mapNotNull null
                         val timestamp = child.child("timestamp").getValue(Long::class.java)
                             ?: return@mapNotNull null
@@ -74,6 +81,7 @@ class SignalingRepositoryImpl @Inject constructor(
                             port = port
                         )
                     } catch (e: Exception) {
+                        Log.w("SignalingRepositoryImpl", "Entrée Firebase ignorée (parsing échoué) — nodeId=${child.key}", e)
                         null
                     }
                 }

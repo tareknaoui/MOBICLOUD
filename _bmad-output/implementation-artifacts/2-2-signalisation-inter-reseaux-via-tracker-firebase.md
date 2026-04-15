@@ -1,6 +1,6 @@
 # Story 2.2 : Signalisation Inter-Réseaux via Tracker Firebase
 
-Status: review
+Status: in-progress
 
 ## Story
 
@@ -357,6 +357,22 @@ claude-sonnet-4-6
 - Créé `SignalingModule.kt` : binding Hilt `@Binds @Singleton`, respecte la frontière architecturale (FirebaseModule.kt inchangé)
 - Modifié `MobicloudP2PService.kt` : `BootstrapRepository` remplacé par `SignalingRepository`, ajout `delay(10_000L)` avant l'announce Firebase, `observeRemoteNodes()` remplace `observeActivePeers()`, la vérification du nœud local est désormais dans `SignalingRepositoryImpl` (supprimée du service)
 - Créé `SignalingRepositoryImplTest.kt` : 4 tests JVM MockK couvrant TTL filtering, exclusion nœud local, Result.failure sur exception Firebase, et construction correcte de Peer avec `source = REMOTE_FIREBASE`
+
+### Review Findings
+
+- [x] [Review][Decision] AC1 — Délai 10s inconditionnel sans vérification des pairs locaux actifs → Option A appliquée : `peerRepository.peers.value.any { it.isActive }` ajouté [`MobicloudP2PService.kt:125`]
+- [x] [Review][Patch] F01 — `localNodeId` null : filtre d'auto-exclusion silencieusement désactivé → fail-fast si `getIdentity()` échoue [`SignalingRepositoryImpl.kt:45-50`]
+- [x] [Review][Patch] F02 — `collectLatest` + `launch{}` interne : prolifération non bornée de coroutines TCP → `connectionJobs: Map<nodeId, Job>` ajouté [`MobicloudP2PService.kt:145-157`]
+- [x] [Review][Patch] F03 — `onCancelled` ferme le flow avec exception sans catch dans le service → `try/catch` autour de `collectLatest` [`MobicloudP2PService.kt:141,160`]
+- [x] [Review][Patch] F06 — `Base64.decode` sans log : clé malformée ignorée silencieusement → `Log.w` ajouté dans le `catch` [`SignalingRepositoryImpl.kt:82`]
+- [x] [Review][Patch] F11 — IP fallback `127.0.0.1` publiée sur Firebase → guard `ipToAnnounce == null || == "127.0.0.1"` [`MobicloudP2PService.kt:131`]
+- [x] [Review][Patch] F12 — `port` Firebase : `getValue(Int::class.java)` → corrigé en `getValue(Long::class.java)?.toInt()` [`SignalingRepositoryImpl.kt:66`]
+- [x] [Review][Defer] F07 — TTL dérive d'horloge : `System.currentTimeMillis()` inter-appareils non synchronisés [`SignalingRepositoryImpl.kt:50,66`] — deferred, pre-existing (limitation Firebase sans Cloud Functions, noté dans Dev Notes)
+- [x] [Review][Defer] F08 — Règles de sécurité Firebase (`nodes/*`) absentes du diff — deferred, pre-existing (noté dans spec "Firebase Security Rules à vérifier")
+- [x] [Review][Defer] F09 — Nœuds morts non purgés côté serveur Firebase en cas de crash — deferred, pre-existing (limitation Firebase sans Cloud Functions, scope PFE)
+- [x] [Review][Defer] F10 — `await()` Firebase SDK non coopératif avec l'annulation du CoroutineScope [`MobicloudP2PService.kt:124-135`] — deferred, limitation SDK Firebase
+- [x] [Review][Defer] F16 — `onDisconnect()` fenêtre nœud fantôme si `setValue()` échoue sur session précédente [`SignalingRepositoryImpl.kt:40-41`] — deferred, limitation inhérente au pattern onDisconnect Firebase
+- [x] [Review][Defer] F18 — Couverture tests insuffisante : cas `localNodeId == null`, déduplication TCP, décodage clé invalide non testés — deferred, à compléter lors de la prochaine itération
 
 ### File List
 
