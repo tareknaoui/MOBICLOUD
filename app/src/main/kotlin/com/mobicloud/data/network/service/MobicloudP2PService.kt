@@ -20,8 +20,8 @@ import com.mobicloud.data.p2p.UdpHeartbeatReceiver
 import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.core.network.utils.NetworkUtils
 import com.mobicloud.domain.models.HeartbeatPayload
-import com.mobicloud.domain.repository.BootstrapRepository
 import com.mobicloud.domain.repository.PeerRepository
+import com.mobicloud.domain.repository.SignalingRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -47,7 +47,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var heartbeatReceiver: UdpHeartbeatReceiver
     @Inject lateinit var peerRepository: PeerRepository
     @Inject lateinit var networkUtils: NetworkUtils
-    @Inject lateinit var bootstrapRepository: BootstrapRepository
+    @Inject lateinit var signalingRepository: SignalingRepository
     @Inject lateinit var tcpConnectionManager: TcpConnectionManager
     @Inject lateinit var publicIpFetcher: PublicIpFetcher
 
@@ -120,36 +120,36 @@ class MobicloudP2PService : Service() {
                 tcpPort = tcpPort
             )
 
-            // D2: Firebase announce en parallèle avec withTimeout — ne bloque pas les boucles UDP locales
+            // Firebase announce — délai 10s pour laisser la découverte locale s'établir
             launch {
+                delay(10_000L)
                 val ipToAnnounce = publicIpFetcher.fetchPublicIp().getOrElse { "127.0.0.1" }
                 try {
                     withTimeout(FIREBASE_ANNOUNCE_TIMEOUT_MS) {
-                        bootstrapRepository.announcePresence(ipToAnnounce, tcpPort)
+                        signalingRepository.registerNode(ipToAnnounce, tcpPort)
+                            .onFailure { Log.w("MobicloudP2PService", "Firebase registerNode échec — mode local seul", it) }
                     }
                 } catch (e: Exception) {
-                    Log.w("MobicloudP2PService", "Firebase announce timeout ou échec — découverte locale non affectée", e)
+                    Log.w("MobicloudP2PService", "Firebase announce timeout — mode local seul", e)
                 }
             }
 
             // Firebase Discovery & TCP Handshake
             launch {
-                bootstrapRepository.observeActivePeers().collectLatest { peers ->
+                signalingRepository.observeRemoteNodes().collectLatest { peers ->
                     for (peer in peers) {
-                        if (peer.identity.nodeId != identity.nodeId) {
-                            // P2: Normalise le timestamp Firebase vers elapsedRealtime pour cohérence avec l'éviction
-                            peerRepository.registerOrUpdatePeer(
-                                peer.identity,
-                                SystemClock.elapsedRealtime(),
-                                peer.source,
-                                peer.ipAddress,
-                                peer.port
-                            ).onFailure { Log.e("MobicloudP2PService", "Failed to register Firebase peer", it) }
-                            // D1: Handshake seulement si pas encore connecté à ce nœud
-                            if (!tcpConnectionManager.isConnected(peer.identity.nodeId)) {
-                                launch {
-                                    tcpConnectionManager.connectToPeer(peer)
-                                }
+                        // P2: Normalise le timestamp Firebase vers elapsedRealtime pour cohérence avec l'éviction
+                        peerRepository.registerOrUpdatePeer(
+                            peer.identity,
+                            SystemClock.elapsedRealtime(),
+                            peer.source,
+                            peer.ipAddress,
+                            peer.port
+                        ).onFailure { Log.e("MobicloudP2PService", "Failed to register Firebase peer", it) }
+                        // D1: Handshake seulement si pas encore connecté à ce nœud
+                        if (!tcpConnectionManager.isConnected(peer.identity.nodeId)) {
+                            launch {
+                                tcpConnectionManager.connectToPeer(peer)
                             }
                         }
                     }
