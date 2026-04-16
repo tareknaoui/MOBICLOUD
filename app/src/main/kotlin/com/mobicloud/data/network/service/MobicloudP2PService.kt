@@ -175,7 +175,7 @@ class MobicloudP2PService : Service() {
                                 peer.ipAddress,
                                 peer.port
                             ).onSuccess {
-                                networkEventRepository.pushEvent("[FIREBASE] Pair distant : ${peer.identity.nodeId.take(8)}")
+                                networkEventRepository.pushEvent("[FIREBASE] Pair distant découvert : ${peer.identity.nodeId.take(8)}")
                             }.onFailure { Log.e("MobicloudP2PService", "Failed to register Firebase peer", it) }
                             // D1: Handshake seulement si pas encore connecté et aucun job en cours pour ce nœud
                             val nodeId = peer.identity.nodeId
@@ -183,7 +183,7 @@ class MobicloudP2PService : Service() {
                                 connectionJobs[nodeId]?.isActive != true) {
                                 connectionJobs[nodeId] = launch {
                                     tcpConnectionManager.connectToPeer(peer)
-                                    networkEventRepository.pushEvent("[TCP] Connexion avec ${nodeId.take(8)}")
+                                    networkEventRepository.pushEvent("[TCP] Connexion établie avec ${nodeId.take(8)}")
                                 }
                             }
                         }

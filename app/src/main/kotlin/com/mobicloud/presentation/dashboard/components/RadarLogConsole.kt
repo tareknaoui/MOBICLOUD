@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.runtime.remember
 import com.mobicloud.domain.models.NetworkLogEvent
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -26,13 +27,13 @@ private val borderColor = Color(0xFF333333)
 private val timestampColor = Color(0xFF9E9E9E)
 private val messageColor = Color(0xFFE0E0E0)
 private val activeColor = Color(0xFF00FF41)
-private val timeFormat = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
 
 @Composable
 fun RadarLogConsole(
     events: List<NetworkLogEvent>,
     modifier: Modifier = Modifier
 ) {
+    val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
     Column(
         modifier = modifier
             .border(1.dp, borderColor)
@@ -64,6 +65,7 @@ fun RadarLogConsole(
             )
         } else {
             // Les événements sont déjà en ordre chronologique inversé (prepend dans NetworkEventRepositoryImpl)
+            // reverseLayout = false est correct : index 0 = plus récent, affiché en tête
             LazyColumn(
                 modifier = Modifier.heightIn(max = 160.dp)
             ) {

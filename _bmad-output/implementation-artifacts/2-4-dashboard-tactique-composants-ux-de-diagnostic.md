@@ -1,6 +1,6 @@
 # Story 2.4 : Dashboard Tactique — Composants UX de Diagnostic
 
-Status: review
+Status: done
 
 ## Story
 
@@ -847,6 +847,16 @@ claude-sonnet-4-6
   - Bugs préexistants corrigés dans SignalingRepositoryImplTest (slot type, coEvery, Log mock, port Long)
 
 ### Review Findings
+
+- [x] [Review][Patch] Scope coroutine de `DiagnosticsRepositoryImpl` jamais annulé — injecté via AppModule `CoroutineScope` [DiagnosticsRepositoryImpl.kt:34]
+- [x] [Review][Patch] `SimpleDateFormat` non thread-safe — remplacé par `remember { SimpleDateFormat(...) }` dans le composable [RadarLogConsole.kt:29]
+- [x] [Review][Dismiss] `RadarLogConsole` : `reverseLayout = true` inapplicable — prepend déjà en place, ajout aurait inversé l'affichage [RadarLogConsole.kt:68]
+- [x] [Review][Patch] `[FIREBASE]` event message corrigé → `[FIREBASE] Pair distant découvert : ...` [MobicloudP2PService.kt:177]
+- [x] [Review][Patch] `[TCP]` event message corrigé → `[TCP] Connexion établie avec ...` [MobicloudP2PService.kt:185]
+- [x] [Review][Defer] `ConnectivityManager.activeNetwork` peut retourner données stale sur API 29+ [DiagnosticsRepositoryImpl.kt:56] — deferred, pattern pré-existant dans ReliabilityScoreProviderImpl
+- [x] [Review][Defer] Eviction StateFlow race condition — `peers.value` snapshot potentiellement stale après `evictStalePeers` [MobicloudP2PService.kt:229] — deferred, limitation architecturale pré-existante
+- [x] [Review][Defer] `connectionJobs` map croissance non bornée [MobicloudP2PService.kt:183] — deferred, bug pré-existant hors périmètre Story 2.4
+- [x] [Review][Defer] `hasActivePeers` peut flasher false au retour en foreground (WhileSubscribed 5s) [DashboardViewModel.kt:35] — deferred, comportement intentionnel WhileSubscribed
 
 ### Change Log
 

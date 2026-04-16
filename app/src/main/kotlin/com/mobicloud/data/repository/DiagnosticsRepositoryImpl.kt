@@ -14,8 +14,6 @@ import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.PeerRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,10 +26,10 @@ import javax.inject.Singleton
 class DiagnosticsRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val peerRepository: PeerRepository,
-    private val identityRepository: IdentityRepository
+    private val identityRepository: IdentityRepository,
+    private val scope: CoroutineScope
 ) : DiagnosticsRepository {
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val _diagnostics = MutableStateFlow(NodeDiagnostics.DEFAULT)
     override val diagnostics: StateFlow<NodeDiagnostics> = _diagnostics
 
