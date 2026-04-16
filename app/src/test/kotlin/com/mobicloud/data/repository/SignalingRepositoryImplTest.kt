@@ -1,6 +1,7 @@
 package com.mobicloud.data.repository
 
 import android.util.Base64
+import android.util.Log
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.DatabaseReference
@@ -10,6 +11,8 @@ import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.repository.SecurityRepository
+import io.mockk.CapturingSlot
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
@@ -45,6 +48,12 @@ class SignalingRepositoryImplTest {
 
     @Before
     fun setUp() {
+        mockkStatic(Log::class)
+        every { Log.w(any(), any<String>()) } returns 0
+        every { Log.w(any(), any<String>(), any()) } returns 0
+        every { Log.e(any(), any<String>()) } returns 0
+        every { Log.e(any(), any<String>(), any()) } returns 0
+        every { Log.d(any(), any<String>()) } returns 0
         securityRepository = mockk()
         firebaseDatabase = mockk()
         repository = SignalingRepositoryImpl(securityRepository, firebaseDatabase)
@@ -77,10 +86,11 @@ class SignalingRepositoryImplTest {
         timestamp: Long = System.currentTimeMillis()
     ): DataSnapshot {
         val child = mockk<DataSnapshot>()
+        every { child.key } returns nodeId
         every { child.child("nodeId").getValue(String::class.java) } returns nodeId
         every { child.child("publicKeyBase64").getValue(String::class.java) } returns pubKeyB64
         every { child.child("ip").getValue(String::class.java) } returns ip
-        every { child.child("port").getValue(Int::class.java) } returns port
+        every { child.child("port").getValue(Long::class.java) } returns port.toLong()
         every { child.child("timestamp").getValue(Long::class.java) } returns timestamp
         return child
     }
@@ -89,12 +99,12 @@ class SignalingRepositoryImplTest {
      * Configure les mocks Firebase pour `observeRemoteNodes()` et retourne
      * la référence "nodes/" ainsi que le slot capturant le ValueEventListener.
      */
-    private fun buildNodesRefMock(): Pair<DatabaseReference, slot<ValueEventListener>> {
+    private fun buildNodesRefMock(): Pair<DatabaseReference, CapturingSlot<ValueEventListener>> {
         val rootRef = mockk<DatabaseReference>()
         val nodesRef = mockk<DatabaseReference>()
         val listenerSlot = slot<ValueEventListener>()
 
-        every { securityRepository.getIdentity() } returns Result.success(localIdentity)
+        coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
         every { firebaseDatabase.reference } returns rootRef
         every { rootRef.child("nodes") } returns nodesRef
         every { nodesRef.addValueEventListener(capture(listenerSlot)) } returns mockk()
@@ -175,7 +185,7 @@ class SignalingRepositoryImplTest {
     @Test
     fun `registerNode retourne Result_failure si Firebase lance une exception`() =
         testScope.runTest {
-            every { securityRepository.getIdentity() } returns Result.success(localIdentity)
+            coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
 
             mockkStatic(Base64::class)
             every { Base64.encodeToString(any(), any()) } returns "AQID"

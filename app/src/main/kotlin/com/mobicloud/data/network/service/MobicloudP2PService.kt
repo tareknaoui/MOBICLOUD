@@ -24,6 +24,7 @@ import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SignalingRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.usecase.m01_discovery.CalculateReliabilityScoreUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -56,6 +57,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var signalingRepository: SignalingRepository
     @Inject lateinit var tcpConnectionManager: TcpConnectionManager
     @Inject lateinit var publicIpFetcher: PublicIpFetcher
+    @Inject lateinit var networkEventRepository: NetworkEventRepository
 
     companion object {
         const val CHANNEL_ID = "mobicloud_p2p_channel"
@@ -146,10 +148,15 @@ class MobicloudP2PService : Service() {
                 try {
                     withTimeout(FIREBASE_ANNOUNCE_TIMEOUT_MS) {
                         signalingRepository.registerNode(ipToAnnounce, tcpPort)
-                            .onFailure { Log.w("MobicloudP2PService", "Firebase registerNode échec — mode local seul", it) }
+                            .onSuccess { networkEventRepository.pushEvent("[TRACKER] Enregistrement Firebase réussi") }
+                            .onFailure {
+                                Log.w("MobicloudP2PService", "Firebase registerNode échec — mode local seul", it)
+                                networkEventRepository.pushEvent("[TRACKER] Firebase indisponible — mode local")
+                            }
                     }
                 } catch (e: Exception) {
                     Log.w("MobicloudP2PService", "Firebase announce timeout — mode local seul", e)
+                    networkEventRepository.pushEvent("[TRACKER] Firebase indisponible — mode local")
                 }
             }
 
@@ -167,13 +174,16 @@ class MobicloudP2PService : Service() {
                                 peer.source,
                                 peer.ipAddress,
                                 peer.port
-                            ).onFailure { Log.e("MobicloudP2PService", "Failed to register Firebase peer", it) }
+                            ).onSuccess {
+                                networkEventRepository.pushEvent("[FIREBASE] Pair distant : ${peer.identity.nodeId.take(8)}")
+                            }.onFailure { Log.e("MobicloudP2PService", "Failed to register Firebase peer", it) }
                             // D1: Handshake seulement si pas encore connecté et aucun job en cours pour ce nœud
                             val nodeId = peer.identity.nodeId
                             if (!tcpConnectionManager.isConnected(nodeId) &&
                                 connectionJobs[nodeId]?.isActive != true) {
                                 connectionJobs[nodeId] = launch {
                                     tcpConnectionManager.connectToPeer(peer)
+                                    networkEventRepository.pushEvent("[TCP] Connexion avec ${nodeId.take(8)}")
                                 }
                             }
                         }
@@ -204,7 +214,9 @@ class MobicloudP2PService : Service() {
                                 timestampMs = SystemClock.elapsedRealtime(),
                                 ipAddress = msg.senderIp,
                                 port = msg.tcpPort
-                            ).onFailure { Log.e("MobicloudP2PService", "Failed to register peer", it) }
+                            ).onSuccess {
+                                networkEventRepository.pushEvent("[UDP] Heartbeat reçu de ${msg.identity.nodeId.take(8)}")
+                            }.onFailure { Log.e("MobicloudP2PService", "Failed to register peer", it) }
                         }
                     } else {
                         Log.w("MobicloudP2PService", "Error receiving heartbeat", result.exceptionOrNull())
@@ -214,9 +226,17 @@ class MobicloudP2PService : Service() {
 
             // Loop 3: Eviction — marque INACTIVE (ne supprime pas)
             launch {
+                var previousActivePeerIds = emptySet<String>()
                 while (isActive) {
                     peerRepository.evictStalePeers(PEER_TIMEOUT_MS, SystemClock.elapsedRealtime())
                         .onFailure { Log.e("MobicloudP2PService", "Eviction failed", it) }
+                    val currentActivePeerIds = peerRepository.peers.value
+                        .filter { it.isActive }.map { it.identity.nodeId }.toSet()
+                    val evictedIds = previousActivePeerIds - currentActivePeerIds
+                    evictedIds.forEach { nodeId ->
+                        networkEventRepository.pushEvent("[PEER] ${nodeId.take(8)} → INACTIVE")
+                    }
+                    previousActivePeerIds = currentActivePeerIds
                     delay(EVICTION_CHECK_INTERVAL_MS)
                 }
             }
