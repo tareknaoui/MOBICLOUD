@@ -52,4 +52,10 @@ class IdentityRepositoryImpl @Inject constructor(
             newIdentity
         }
     }
+
+    override suspend fun updateReliabilityScore(nodeId: String, score: Float): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            identityDao.updateReliabilityScore(nodeId, score)
+        }
+    }
 }

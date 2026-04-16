@@ -5,6 +5,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
@@ -58,14 +59,26 @@ class UdpHeartbeatBroadcaster(
         }
     }
 
-    suspend fun startBroadcasting(payload: HeartbeatPayload): Result<Unit> = withContext(ioDispatcher) {
+    suspend fun startBroadcasting(
+        payload: HeartbeatPayload,
+        reliabilityScoreFlow: StateFlow<Float>? = null
+    ): Result<Unit> = withContext(ioDispatcher) {
         try {
             val address = InetAddress.getByName(multicastAddress)
-            val bytes = protoBuf.encodeToByteArray(payload)
+            var currentPayload = payload
+            var bytes = protoBuf.encodeToByteArray(currentPayload)
 
             var currentIntervalMs = initialIntervalMs
 
             while (isActive) {
+                // Mise à jour réactive du score avant chaque émission
+                reliabilityScoreFlow?.value?.let { latestScore ->
+                    if (latestScore != currentPayload.reliabilityScore) {
+                        currentPayload = currentPayload.copy(reliabilityScore = latestScore)
+                        bytes = protoBuf.encodeToByteArray(currentPayload)
+                    }
+                }
+
                 try {
                     val packet = DatagramPacket(bytes, bytes.size, address, port)
                     socket.send(packet)

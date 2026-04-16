@@ -14,6 +14,9 @@ interface IdentityDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertIdentity(identity: NodeIdentityEntity)
     
+    @Query("UPDATE node_identity SET reliability_score = :score WHERE node_id = :nodeId")
+    suspend fun updateReliabilityScore(nodeId: String, score: Float)
+
     @Query("DELETE FROM node_identity")
     suspend fun clearIdentity()
 }

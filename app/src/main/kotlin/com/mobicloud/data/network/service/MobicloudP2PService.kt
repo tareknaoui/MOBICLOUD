@@ -20,9 +20,11 @@ import com.mobicloud.data.p2p.UdpHeartbeatReceiver
 import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.core.network.utils.NetworkUtils
 import com.mobicloud.domain.models.HeartbeatPayload
+import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SignalingRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.usecase.m01_discovery.CalculateReliabilityScoreUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +32,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -44,6 +47,8 @@ class MobicloudP2PService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     @Inject lateinit var securityRepository: SecurityRepository
+    @Inject lateinit var identityRepository: IdentityRepository
+    @Inject lateinit var calculateReliabilityScoreUseCase: CalculateReliabilityScoreUseCase
     @Inject lateinit var heartbeatBroadcaster: UdpHeartbeatBroadcaster
     @Inject lateinit var heartbeatReceiver: UdpHeartbeatReceiver
     @Inject lateinit var peerRepository: PeerRepository
@@ -59,6 +64,8 @@ class MobicloudP2PService : Service() {
         private const val PEER_TIMEOUT_MS = 15000L
         private const val EVICTION_CHECK_INTERVAL_MS = 1000L
         private const val FIREBASE_ANNOUNCE_TIMEOUT_MS = 10_000L
+        private const val RELIABILITY_SCORE_INTERVAL_MS = 30_000L
+        private const val LOGTAG = "MobicloudP2PService"
     }
 
     // P3: Guard contre les appels multiples de onStartCommand (START_STICKY)
@@ -120,6 +127,8 @@ class MobicloudP2PService : Service() {
                 reliabilityScore = identity.reliabilityScore,
                 tcpPort = tcpPort
             )
+            // Score réactif : mis à jour par Loop 6 et consommé par le broadcaster à chaque cycle
+            val reliabilityScoreFlow = MutableStateFlow(identity.reliabilityScore)
 
             // Firebase announce — délai 10s, seulement si aucun pair local actif (AC1)
             launch {
@@ -175,9 +184,9 @@ class MobicloudP2PService : Service() {
                 }
             }
 
-            // Loop 1: Broadcaster — passe HeartbeatPayload (pas NodeIdentity)
+            // Loop 1: Broadcaster — passe HeartbeatPayload + flow réactif du score
             launch {
-                val result = heartbeatBroadcaster.startBroadcasting(heartbeatPayload)
+                val result = heartbeatBroadcaster.startBroadcasting(heartbeatPayload, reliabilityScoreFlow)
                 if (result.isFailure) {
                     Log.w("MobicloudP2PService", "Broadcast failed", result.exceptionOrNull())
                 }
@@ -227,6 +236,20 @@ class MobicloudP2PService : Service() {
             launch {
                 networkUtils.getCurrentState().collect {
                     heartbeatBroadcaster.resetBackoff()
+                }
+            }
+
+            // Loop 6: Recalcul périodique du score de fiabilité (AC #1, #2, #3, #4)
+            launch {
+                while (isActive) {
+                    delay(RELIABILITY_SCORE_INTERVAL_MS)
+                    calculateReliabilityScoreUseCase()
+                        .onSuccess { newScore ->
+                            identityRepository.updateReliabilityScore(identity.nodeId, newScore)
+                                .onFailure { Log.w(LOGTAG, "Persistance du score de fiabilité échouée", it) }
+                            reliabilityScoreFlow.value = newScore
+                        }
+                        .onFailure { Log.w(LOGTAG, "Recalcul du score de fiabilité échoué", it) }
                 }
             }
         }
