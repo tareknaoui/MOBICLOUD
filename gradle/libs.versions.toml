@@ -3,7 +3,7 @@
 # ... PROJECT ...
 java = "21"
 kotlin = "2.3.20"
-androidGradlePlugin = "9.1.0"
+androidGradlePlugin = "9.1.1"
 gmsPlugin = "4.4.4"
 ksp = "2.3.6"
 # TODO: Upgrade to Dokka 2.2.0-Beta when stable for better AGP 9 compatibility
