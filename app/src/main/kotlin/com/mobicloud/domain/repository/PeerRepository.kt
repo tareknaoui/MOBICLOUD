@@ -13,7 +13,8 @@ interface PeerRepository {
         timestampMs: Long,
         source: DiscoverySource = DiscoverySource.LOCAL_UDP,
         ipAddress: String? = null,
-        port: Int? = null
+        port: Int? = null,
+        isSuperPair: Boolean = false
     ): Result<Unit>
 
     suspend fun evictStalePeers(

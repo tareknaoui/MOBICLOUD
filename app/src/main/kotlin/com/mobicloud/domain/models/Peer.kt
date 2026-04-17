@@ -11,5 +11,6 @@ data class Peer(
     val source: DiscoverySource = DiscoverySource.LOCAL_UDP,
     val ipAddress: String? = null,
     val port: Int? = null,
-    val isActive: Boolean = true
+    val isActive: Boolean = true,
+    val isSuperPair: Boolean = false
 )

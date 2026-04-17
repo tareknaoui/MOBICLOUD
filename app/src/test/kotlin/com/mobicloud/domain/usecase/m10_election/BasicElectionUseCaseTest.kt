@@ -6,6 +6,7 @@ import com.mobicloud.domain.repository.ITrustScoreProvider
 import com.mobicloud.domain.repository.SecurityRepository
 import io.mockk.coEvery
 import io.mockk.mockk
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -49,7 +50,7 @@ class BasicElectionUseCaseTest {
         coEvery { trustScoreProvider.getTrustScore("local_node_id_001") } returns 30
 
         // Act
-        val result = useCase(peers)
+        val result = useCase(peers).first()
 
         // Assert
         assertTrue(result.isSuccess)
@@ -77,7 +78,7 @@ class BasicElectionUseCaseTest {
         coEvery { trustScoreProvider.getTrustScore("bbbb_node_id") } returns 50
 
         // Act
-        val result = useCase(peers)
+        val result = useCase(peers).first()
 
         // Assert
         assertTrue(result.isSuccess)
@@ -86,8 +87,8 @@ class BasicElectionUseCaseTest {
     }
 
     @Test
-    fun `election throws error if IDs have different lengths during tie break`() = runTest {
-        // Arrange (BH-06 fix testing)
+    fun `election ignores nodes with invalid ID lengths during tie break`() = runTest {
+        // Arrange (BH-06 vulnerability fix testing)
         val node1 = NodeIdentity("short", byteArrayOf(2))
         val localIdentityMatch = NodeIdentity("very_long_id", byteArrayOf(1))
         
@@ -98,10 +99,26 @@ class BasicElectionUseCaseTest {
         coEvery { trustScoreProvider.getTrustScore("very_long_id") } returns 50
 
         // Act
-        val result = useCase(peers)
+        val result = useCase(peers).first()
 
         // Assert
-        assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull() is IllegalArgumentException)
+        assertTrue(result.isSuccess)
+        val election = result.getOrNull()!!
+        assertEquals(localIdentityMatch, election.electedNode)
+    }
+
+    @Test
+    fun `election selects local node when peers list is empty`() = runTest {
+        // Arrange
+        val peers = emptyList<Peer>()
+        coEvery { trustScoreProvider.getTrustScore("local_node_id_001") } returns 30
+        
+        // Act
+        val result = useCase(peers).first()
+        
+        // Assert
+        assertTrue(result.isSuccess)
+        val election = result.getOrNull()!!
+        assertEquals(localIdentity, election.electedNode)
     }
 }

@@ -28,4 +28,18 @@ interface SecurityRepository {
      * @return La signature au format ByteArray, ou une erreur si l'identité n'est pas encore générée.
      */
     suspend fun signData(data: ByteArray): Result<ByteArray>
+
+    /**
+     * Vérifie une signature avec la clé publique fournie.
+     *
+     * @param data       Le payload binaire original.
+     * @param signature  La signature à vérifier.
+     * @param publicKey  La clé publique de l'émetteur (ByteArray brut).
+     * @return `true` si la signature est valide, `false` sinon.
+     */
+    suspend fun verifySignature(
+        data: ByteArray,
+        signature: ByteArray,
+        publicKey: ByteArray
+    ): Result<Boolean>
 }

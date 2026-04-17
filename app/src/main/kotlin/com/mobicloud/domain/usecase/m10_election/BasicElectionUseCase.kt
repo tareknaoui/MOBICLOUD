@@ -8,7 +8,10 @@ import com.mobicloud.domain.repository.SecurityRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOn
 import javax.inject.Inject
 
 /**
@@ -26,47 +29,39 @@ class BasicElectionUseCase @Inject constructor(
 ) {
     /**
      * @param peers Liste courante des pairs enregistrés.
-     * @return Résultat contenant [SuperPairElection] ou une [Exception].
+     * @return Flow contenant le résultat [SuperPairElection] ou une [Exception].
      */
-    suspend operator fun invoke(peers: List<Peer>): Result<SuperPairElection> = withContext(Dispatchers.Default) {
+    operator fun invoke(peers: List<Peer>): Flow<Result<SuperPairElection>> = flow {
         try {
-            val localIdentity = securityRepository.getIdentity()
-                .getOrElse { return@withContext Result.failure(it) }
+            val result = coroutineScope {
+                val localIdentity = securityRepository.getIdentity()
+                    .getOrElse { return@coroutineScope Result.failure(it) }
 
-            // Constituer la liste de toutes les entités de l'élection (incluant soi-même)
-            val allNodes = peers.map { it.identity } + localIdentity
+                // Constituer la liste de toutes les entités de l'élection (sans doublon)
+                val allNodes = (peers.map { it.identity } + localIdentity).distinctBy { it.nodeId }
 
-            // Évaluer le SF pour chaque candidat de façon concurrente
-            val scoreMap = allNodes.map { node ->
-                async {
-                    val score = trustScoreProvider.getTrustScore(node.nodeId)
-                    node to score
-                }
-            }.awaitAll()
-
-            // Déterminer le Super-Pair avec les règles de la Story 2.2
-            val electedNode = scoreMap.maxWithOrNull(Comparator { o1, o2 ->
-                val node1 = o1.first
-                val score1 = o1.second
-                val node2 = o2.first
-                val score2 = o2.second
-
-                if (score1 != score2) {
-                    score1.compareTo(score2)
-                } else {
-                    // BH-06 Fix: S'assurer que les chaînes ont la même longueur pour
-                    // la comparaison lexicographique déterministe des clés.
-                    require(node1.nodeId.length == node2.nodeId.length) {
-                        "Pour un bris d'égalité équitable, les IDs doivent avoir la même longueur. Recu: ${node1.nodeId.length} != ${node2.nodeId.length}"
+                // Évaluer le SF pour chaque candidat de façon concurrente
+                val scoreMap = allNodes.map { node ->
+                    async {
+                        val score = trustScoreProvider.getTrustScore(node.nodeId)
+                        node to score
                     }
-                    node1.nodeId.compareTo(node2.nodeId)
-                }
-            })?.first ?: localIdentity // Cas dégénéré (liste vide) -> moi-même
+                }.awaitAll()
 
-            Result.success(SuperPairElection(electedNode))
+                val maxScore = scoreMap.maxOfOrNull { it.second } 
+                    ?: return@coroutineScope Result.success(SuperPairElection(localIdentity))
 
+                val topCandidates = scoreMap.filter { it.second == maxScore }.map { it.first }
+
+                val expectedLength = localIdentity.nodeId.length
+                val validCandidates = topCandidates.filter { it.nodeId.length == expectedLength }
+
+                val electedNode = validCandidates.maxByOrNull { it.nodeId } ?: localIdentity
+                Result.success(SuperPairElection(electedNode))
+            }
+            emit(result)
         } catch (e: Exception) {
-            Result.failure(e)
+            emit(Result.failure(e))
         }
-    }
+    }.flowOn(Dispatchers.Default)
 }
