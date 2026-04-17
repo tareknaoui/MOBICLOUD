@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mobicloud.domain.models.NetworkType
+import com.mobicloud.domain.models.NodeRole
 import com.mobicloud.presentation.dashboard.components.KpiDiagnosticCard
 import com.mobicloud.presentation.dashboard.components.RadarLogConsole
 import com.mobicloud.presentation.dashboard.components.ReliabilityGauge
@@ -40,6 +41,7 @@ fun DashboardScreen(
     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
     val networkEvents by viewModel.networkEvents.collectAsStateWithLifecycle()
     val hasActivePeers by viewModel.hasActivePeers.collectAsStateWithLifecycle()
+    val nodeRole by viewModel.nodeRole.collectAsStateWithLifecycle()
 
     val uptimeFormatted = formatUptime(diagnostics.uptimeMs)
     val networkLabel = when (diagnostics.networkType) {
@@ -59,6 +61,15 @@ fun DashboardScreen(
         ReliabilityGauge(
             score = diagnostics.reliabilityScore,
             modifier = Modifier.padding(vertical = 16.dp)
+        )
+
+        // Badge rôle du nœud (Story 3.2)
+        Text(
+            text = if (nodeRole == NodeRole.SUPER_PAIR) "★ Super-Pair" else "● Nœud Connecté",
+            color = if (nodeRole == NodeRole.SUPER_PAIR) Color(0xFF00FF41) else Color(0xFF8BC34A),
+            fontSize = 13.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(bottom = 4.dp)
         )
 
         // Message si aucun pair détecté (AC #5)

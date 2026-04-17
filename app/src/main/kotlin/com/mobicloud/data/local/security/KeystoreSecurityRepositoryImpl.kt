@@ -138,6 +138,23 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
             .joinToString("") { "%02x".format(it) }
             .take(16)
 
+    override suspend fun verifySignature(
+        data: ByteArray,
+        signature: ByteArray,
+        publicKey: ByteArray
+    ): Result<Boolean> = withContext(Dispatchers.Default) {
+        try {
+            val pubKey = java.security.KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC)
+                .generatePublic(java.security.spec.X509EncodedKeySpec(publicKey))
+            val sig = java.security.Signature.getInstance("SHA256withECDSA")
+            sig.initVerify(pubKey)
+            sig.update(data)
+            Result.success(sig.verify(signature))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun signData(data: ByteArray): Result<ByteArray> = withContext(Dispatchers.IO) {
         try {
             val keyStore = KeyStore.getInstance(ANDROID_KEYSTORE)

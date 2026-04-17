@@ -12,6 +12,22 @@ interface PeerDao {
     @Upsert
     suspend fun insertOrUpdate(peer: PeerNodeEntity)
 
+    // Préserve is_super_pair si le nœud est déjà déclaré super-pair — évite que les heartbeats le réinitialisent à false
+    @Query("""INSERT OR REPLACE INTO peer_nodes
+        (node_id, public_key_bytes, reliability_score, ip_address, port, last_seen_timestamp_ms, is_active, source, is_super_pair)
+        VALUES (:nodeId, :publicKeyBytes, :reliabilityScore, :ipAddress, :port, :timestampMs, 1, :source,
+        MAX(:isSuperPair, COALESCE((SELECT is_super_pair FROM peer_nodes WHERE node_id = :nodeId), 0)))""")
+    suspend fun insertOrUpdatePreservingRole(
+        nodeId: String,
+        publicKeyBytes: ByteArray,
+        reliabilityScore: Float,
+        ipAddress: String?,
+        port: Int?,
+        timestampMs: Long,
+        source: String,
+        isSuperPair: Int
+    )
+
     @Query("UPDATE peer_nodes SET is_active = 0 WHERE last_seen_timestamp_ms < :cutoffMs")
     suspend fun markInactive(cutoffMs: Long)
 

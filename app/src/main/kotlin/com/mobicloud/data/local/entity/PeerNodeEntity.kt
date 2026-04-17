@@ -16,7 +16,8 @@ data class PeerNodeEntity(
     val port: Int?,
     @ColumnInfo(name = "last_seen_timestamp_ms") val lastSeenTimestampMs: Long,
     @ColumnInfo(name = "is_active") val isActive: Boolean = true,
-    val source: String = "LOCAL_UDP"
+    val source: String = "LOCAL_UDP",
+    @ColumnInfo(name = "is_super_pair") val isSuperPair: Boolean = false
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -41,7 +42,8 @@ fun PeerNodeEntity.toDomain() = Peer(
     source = runCatching { DiscoverySource.valueOf(source) }.getOrDefault(DiscoverySource.LOCAL_UDP),
     ipAddress = ipAddress,
     port = port,
-    isActive = isActive
+    isActive = isActive,
+    isSuperPair = isSuperPair
 )
 
 fun Peer.toEntity() = PeerNodeEntity(
@@ -52,5 +54,6 @@ fun Peer.toEntity() = PeerNodeEntity(
     port = port,
     lastSeenTimestampMs = lastSeenTimestampMs,
     isActive = isActive,
-    source = source.name
+    source = source.name,
+    isSuperPair = isSuperPair
 )

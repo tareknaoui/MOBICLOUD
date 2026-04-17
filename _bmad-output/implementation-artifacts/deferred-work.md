@@ -120,3 +120,18 @@
 - **Eviction StateFlow race condition** [`MobicloudP2PService.kt:229`] — `peerRepository.peers.value` snapshot peut être stale immédiatement après `evictStalePeers()` si la mise à jour StateFlow est dispatched asynchronément. Les events `[PEER] → INACTIVE` pourraient être loggés avec un cycle de retard. Limitation architecturale du pattern StateFlow snapshot.
 - **`connectionJobs` map croissance non bornée** [`MobicloudP2PService.kt:183`] — Bug pré-existant : les jobs complétés ne sont jamais supprimés de la map. En cas de nombreux pairs uniques sur la durée de vie du service, mémoire grignotée. À adresser lors d'une story de résilience/optimisation du service.
 - **`hasActivePeers` peut flasher `false` au retour en foreground** [`DashboardViewModel.kt:35`] — Comportement inhérent à `SharingStarted.WhileSubscribed(5000L)` : après 5s en arrière-plan, la valeur par défaut `false` est réémise brièvement au retour. Cosmétique, par design.
+
+## Deferred from: code review de 3-2-enregistrement-du-super-pair-sur-le-tracker-firebase (2026-04-17)
+
+- **`verifySignature` accepte une clé publique arbitraire sans validation de chaîne de confiance** [`KeystoreSecurityRepositoryImpl.kt:141`] — Hors périmètre story 3.2 (correction préalable). Conception sécurité à traiter dans une story de hardening cryptographique.
+- **Keepalive ne re-fetch pas l'IP publique sur changement de réseau** [`RegisterSuperPeerUseCase.kt`] — Comportement acceptable selon spec story 3.2. À adresser si la mobilité IP devient un cas d'usage prioritaire.
+- **`nodeRole` déduit depuis la DB locale (pas du résultat d'élection)** [`DashboardViewModel.kt`] — Pattern prescrit explicitement dans la spec. Décision architecturale consciente.
+- **`StubElectionNetworkClient` en production : tout nœud gagne toujours l'élection** [`StubElectionNetworkClient.kt`] — Intentionnel, transport UDP réel prévu dans une story future.
+- **`ReliabilityTrustScoreAdapter.getTrustScore` ignore le `nodeId` fourni** [`ReliabilityTrustScoreAdapter.kt:17`] — Usage actuel = nœud local uniquement. À corriger si des scores multi-nœuds distants deviennent nécessaires.
+- **`RunBullyElectionUseCase` ne ré-entre pas dans la boucle après abdication** — Périmètre Story 3.3. Le mécanisme `abdicate()` est en place ; la ré-entrée sera gérée dans Story 3.3.
+- **`reliabilityScore` figé à l'élection, non rafraîchi dans le keepalive** [`RegisterSuperPeerUseCase.kt:39`] — Décision de conception acceptable pour story 3.2.
+- **`evictStalePeers` : bases de temps mixtes `elapsedRealtime` vs `currentTimeMillis`** — Bug pré-existant non introduit par cette story.
+- **AC1/AC2 : enregistrement non conditionné à la confirmation du broadcast COORDINATOR** — Dépend du contrat interne de `RunBullyElectionUseCase` (non modifiable dans story 3.2).
+- **Pas de filtre TTL client-side pour les entrées `super-peers`** — `observeRemoteNodes` ne couvre que `nodes/`. Gap architectural à adresser post story 3.2.
+- **`CoroutineDispatcher` non qualifié dans `ElectionDispatcherModule`** [`ElectionModule.kt:35`] — Qualifier impossible sans modifier `RunBullyElectionUseCase` (spec story 3.2 interdit de modifier ce use case). À refactoriser si `RunBullyElectionUseCase` évolue.
+- **Deux interfaces `ITrustScoreProvider` avec noms identiques dans packages distincts** [`domain/repository/` vs `domain/usecase/m01_discovery/`] — Types JVM distincts (méthodes différentes), pas de conflit Hilt réel. Confusion de nommage à résoudre lors d'un refactoring de l'architecture du domaine.

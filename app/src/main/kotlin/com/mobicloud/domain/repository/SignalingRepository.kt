@@ -9,4 +9,15 @@ interface SignalingRepository {
 
     /** Observe les nœuds distants sur Firebase (TTL 60s filtré, nœud local exclu). */
     fun observeRemoteNodes(): Flow<List<Peer>>
+
+    /** Enregistre ce nœud comme Super-Pair sous `super-peers/{nodeId}`. */
+    suspend fun registerSuperPeer(
+        ip: String,
+        port: Int,
+        reliabilityScore: Float,
+        electedAt: Long
+    ): Result<Unit>
+
+    /** Supprime l'entrée `super-peers/{nodeId}` (abdication explicite). */
+    suspend fun unregisterSuperPeer(): Result<Unit>
 }

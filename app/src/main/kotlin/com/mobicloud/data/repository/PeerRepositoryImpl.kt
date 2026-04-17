@@ -31,19 +31,18 @@ class PeerRepositoryImpl @Inject constructor(
         timestampMs: Long,
         source: DiscoverySource,
         ipAddress: String?,
-        port: Int?
+        port: Int?,
+        isSuperPair: Boolean
     ): Result<Unit> = runCatching {
-        peerDao.insertOrUpdate(
-            PeerNodeEntity(
-                nodeId = identity.nodeId,
-                publicKeyBytes = identity.publicKeyBytes,
-                reliabilityScore = identity.reliabilityScore,
-                ipAddress = ipAddress,
-                port = port,
-                lastSeenTimestampMs = timestampMs,
-                isActive = true,
-                source = source.name
-            )
+        peerDao.insertOrUpdatePreservingRole(
+            nodeId = identity.nodeId,
+            publicKeyBytes = identity.publicKeyBytes,
+            reliabilityScore = identity.reliabilityScore,
+            ipAddress = ipAddress,
+            port = port,
+            timestampMs = timestampMs,
+            source = source.name,
+            isSuperPair = if (isSuperPair) 1 else 0
         )
     }
 

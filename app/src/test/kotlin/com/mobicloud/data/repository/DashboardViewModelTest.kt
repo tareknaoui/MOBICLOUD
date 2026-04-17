@@ -4,10 +4,15 @@ import com.mobicloud.domain.models.NetworkLogEvent
 import com.mobicloud.domain.models.NetworkType
 import com.mobicloud.domain.models.NodeDiagnostics
 import com.mobicloud.domain.models.ServiceStatus
+import com.mobicloud.domain.models.NodeIdentity
+import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.repository.DiagnosticsRepository
+import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NetworkServiceController
+import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.presentation.dashboard.DashboardViewModel
+import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -33,10 +38,13 @@ class DashboardViewModelTest {
     private lateinit var networkServiceController: NetworkServiceController
     private lateinit var diagnosticsRepository: DiagnosticsRepository
     private lateinit var networkEventRepository: NetworkEventRepository
+    private lateinit var peerRepository: PeerRepository
+    private lateinit var identityRepository: IdentityRepository
 
     private val serviceStatusFlow = MutableStateFlow(ServiceStatus.STOPPED)
     private val diagnosticsFlow = MutableStateFlow(NodeDiagnostics.DEFAULT)
     private val eventsFlow = MutableStateFlow<List<NetworkLogEvent>>(emptyList())
+    private val peersFlow = MutableStateFlow<List<Peer>>(emptyList())
 
     @Before
     fun setUp() {
@@ -45,10 +53,16 @@ class DashboardViewModelTest {
         networkServiceController = mockk()
         diagnosticsRepository = mockk()
         networkEventRepository = mockk()
+        peerRepository = mockk()
+        identityRepository = mockk()
 
         every { networkServiceController.serviceStatus } returns serviceStatusFlow
         every { diagnosticsRepository.diagnostics } returns diagnosticsFlow
         every { networkEventRepository.events } returns eventsFlow
+        every { peerRepository.peers } returns peersFlow
+        coEvery { identityRepository.getIdentity() } returns Result.success(
+            NodeIdentity("testNode", ByteArray(0), 0.8f)
+        )
     }
 
     @After
@@ -59,7 +73,9 @@ class DashboardViewModelTest {
     private fun createViewModel() = DashboardViewModel(
         networkServiceController,
         diagnosticsRepository,
-        networkEventRepository
+        networkEventRepository,
+        peerRepository,
+        identityRepository
     )
 
     @Test

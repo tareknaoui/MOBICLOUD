@@ -145,6 +145,12 @@ class FakeSecurityRepository : SecurityRepository {
         val str = "fake_signature_" + String(data, Charsets.UTF_8)
         return Result.success(str.toByteArray(Charsets.UTF_8))
     }
+
+    override suspend fun verifySignature(
+        data: ByteArray,
+        signature: ByteArray,
+        publicKey: ByteArray
+    ): Result<Boolean> = Result.success(true)
 }
 
 class FakeHashcashTokenRepository : HashcashTokenRepository {

@@ -36,17 +36,17 @@ class BasicElectionUseCaseTest {
 
     @Test
     fun `election selects node with highest trust score`() = runTest {
-        // Arrange
-        val node1 = NodeIdentity("node_1_id", byteArrayOf(2))
-        val node2 = NodeIdentity("node_2_id", byteArrayOf(3))
-        
+        // Arrange — IDs de même longueur que localIdentity (16 chars) pour passer le filtre BH-06
+        val node1 = NodeIdentity("local_node_id_aaa", byteArrayOf(2))
+        val node2 = NodeIdentity("local_node_id_bbb", byteArrayOf(3))
+
         val peers = listOf(
             Peer(node1, System.currentTimeMillis()),
             Peer(node2, System.currentTimeMillis())
         )
 
-        coEvery { trustScoreProvider.getTrustScore("node_1_id") } returns 50
-        coEvery { trustScoreProvider.getTrustScore("node_2_id") } returns 80
+        coEvery { trustScoreProvider.getTrustScore("local_node_id_aaa") } returns 50
+        coEvery { trustScoreProvider.getTrustScore("local_node_id_bbb") } returns 80
         coEvery { trustScoreProvider.getTrustScore("local_node_id_001") } returns 30
 
         // Act

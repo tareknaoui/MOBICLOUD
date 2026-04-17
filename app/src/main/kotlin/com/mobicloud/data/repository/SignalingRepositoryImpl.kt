@@ -18,12 +18,16 @@ import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 private const val NODES_PATH = "nodes"
+private const val SUPER_PEERS_PATH = "super-peers"
 private const val TTL_MS = 60_000L
 
 class SignalingRepositoryImpl @Inject constructor(
     private val securityRepository: SecurityRepository,
     private val firebaseDatabase: FirebaseDatabase
 ) : SignalingRepository {
+
+    // onDisconnect doit être enregistré une seule fois par session Firebase — évite l'accumulation de handlers
+    private var isSuperPeerDisconnectRegistered = false
 
     override suspend fun registerNode(ip: String, port: Int): Result<Unit> = runCatching {
         val identity = securityRepository.getIdentity().getOrThrow()
@@ -95,5 +99,39 @@ class SignalingRepositoryImpl @Inject constructor(
 
         reference.addValueEventListener(listener)
         awaitClose { reference.removeEventListener(listener) }
+    }
+
+    override suspend fun registerSuperPeer(
+        ip: String,
+        port: Int,
+        reliabilityScore: Float,
+        electedAt: Long
+    ): Result<Unit> = runCatching {
+        val identity = securityRepository.getIdentity().getOrThrow()
+        val ref = firebaseDatabase.reference.child(SUPER_PEERS_PATH).child(identity.nodeId)
+
+        val superPeerData = mapOf(
+            "nodeId"           to identity.nodeId,
+            "ip"               to ip,
+            "port"             to port,
+            "reliabilityScore" to reliabilityScore,
+            "electedAt"        to electedAt,
+            "lastKeepalive"    to System.currentTimeMillis(),
+            "timestamp"        to System.currentTimeMillis()
+        )
+
+        // onDisconnect enregistré une seule fois par session — les keepalives suivants n'accumulent pas de handlers
+        if (!isSuperPeerDisconnectRegistered) {
+            ref.onDisconnect().removeValue().await()
+            isSuperPeerDisconnectRegistered = true
+        }
+        ref.setValue(superPeerData).await()
+    }
+
+    override suspend fun unregisterSuperPeer(): Result<Unit> = runCatching {
+        isSuperPeerDisconnectRegistered = false
+        val identity = securityRepository.getIdentity().getOrThrow()
+        firebaseDatabase.reference.child(SUPER_PEERS_PATH).child(identity.nodeId)
+            .removeValue().await()
     }
 }

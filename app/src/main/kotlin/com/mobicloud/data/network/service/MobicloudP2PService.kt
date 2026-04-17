@@ -26,6 +26,8 @@ import com.mobicloud.domain.repository.SignalingRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.usecase.m01_discovery.CalculateReliabilityScoreUseCase
+import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
+import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +60,12 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var tcpConnectionManager: TcpConnectionManager
     @Inject lateinit var publicIpFetcher: PublicIpFetcher
     @Inject lateinit var networkEventRepository: NetworkEventRepository
+    @Inject lateinit var runBullyElectionUseCase: RunBullyElectionUseCase
+    @Inject lateinit var registerSuperPeerUseCase: RegisterSuperPeerUseCase
+
+    // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
+    @Volatile
+    private var superPeerJob: Job? = null
 
     companion object {
         const val CHANNEL_ID = "mobicloud_p2p_channel"
@@ -272,7 +280,32 @@ class MobicloudP2PService : Service() {
                         .onFailure { Log.w(LOGTAG, "Recalcul du score de fiabilité échoué", it) }
                 }
             }
+
+            // Loop 7: Écoute des élections Bully — lance le keepalive Super-Pair sur victoire
+            launch {
+                runBullyElectionUseCase().collect { result ->
+                    result
+                        .onSuccess { election ->
+                            Log.i(LOGTAG, "Élection remportée — démarrage keepalive Super-Pair Firebase")
+                            superPeerJob?.cancel()
+                            superPeerJob = launch {
+                                registerSuperPeerUseCase(tcpPort, election.electedAt).collect { regResult ->
+                                    regResult.onFailure {
+                                        Log.w(LOGTAG, "Enregistrement Super-Pair Firebase échoué — mode local", it)
+                                    }
+                                }
+                            }
+                        }
+                        .onFailure { Log.d(LOGTAG, "Élection non remportée : ${it.message}") }
+                }
+            }
         }
+    }
+
+    /** Arrête le keepalive Super-Pair (utilisé par Story 3.3 — abdication). */
+    fun abdicate() {
+        superPeerJob?.cancel()
+        superPeerJob = null
     }
 
     private fun createNotificationChannel() {

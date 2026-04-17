@@ -17,6 +17,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestDispatcher
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
@@ -56,7 +57,7 @@ class RunBullyElectionUseCaseTest {
         coEvery { trustScoreProvider.getTrustScore("localNodeId") } returns 1
     }
 
-    private fun buildUseCase(testDispatcher: UnconfinedTestDispatcher) = RunBullyElectionUseCase(
+    private fun buildUseCase(testDispatcher: TestDispatcher) = RunBullyElectionUseCase(
         peerRepository = peerRepository,
         securityRepository = securityRepository,
         trustScoreProvider = trustScoreProvider,
