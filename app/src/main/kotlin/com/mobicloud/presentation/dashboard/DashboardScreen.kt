@@ -42,6 +42,7 @@ fun DashboardScreen(
     val networkEvents by viewModel.networkEvents.collectAsStateWithLifecycle()
     val hasActivePeers by viewModel.hasActivePeers.collectAsStateWithLifecycle()
     val nodeRole by viewModel.nodeRole.collectAsStateWithLifecycle()
+    val isNetworkUnstable by viewModel.isNetworkUnstable.collectAsStateWithLifecycle()
 
     val uptimeFormatted = formatUptime(diagnostics.uptimeMs)
     val networkLabel = when (diagnostics.networkType) {
@@ -71,6 +72,17 @@ fun DashboardScreen(
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.padding(bottom = 4.dp)
         )
+
+        // AC#6 — Badge "Réseau instable" rouge (Story 3.4 : Circuit-Breaker actif)
+        if (isNetworkUnstable) {
+            Text(
+                text = "⚠ Réseau instable",
+                color = Color(0xFFFF1744),
+                fontSize = 13.sp,
+                fontFamily = FontFamily.Monospace,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
+        }
 
         // Message si aucun pair détecté (AC #5)
         if (!hasActivePeers) {

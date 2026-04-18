@@ -28,6 +28,7 @@ import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.usecase.m01_discovery.CalculateReliabilityScoreUseCase
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
+import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -62,6 +63,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var networkEventRepository: NetworkEventRepository
     @Inject lateinit var runBullyElectionUseCase: RunBullyElectionUseCase
     @Inject lateinit var registerSuperPeerUseCase: RegisterSuperPeerUseCase
+    @Inject lateinit var abdicateSuperPeerUseCase: AbdicateSuperPeerUseCase
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -76,6 +78,10 @@ class MobicloudP2PService : Service() {
         private const val FIREBASE_ANNOUNCE_TIMEOUT_MS = 10_000L
         private const val RELIABILITY_SCORE_INTERVAL_MS = 30_000L
         private const val LOGTAG = "MobicloudP2PService"
+        /** Durée du mandat Super-Pair avant abdication automatique (testable via overrideAbdicationDelayMs). */
+        const val ABDICATION_DELAY_MS = 30 * 60 * 1000L
+        /** Délai inter-cycle du monitoring d'élection — évite le hot-loop en période de cooldown. */
+        private const val ELECTION_RETRY_DELAY_MS = 5_000L
     }
 
     // P3: Guard contre les appels multiples de onStartCommand (START_STICKY)
@@ -281,22 +287,40 @@ class MobicloudP2PService : Service() {
                 }
             }
 
-            // Loop 7: Écoute des élections Bully — lance le keepalive Super-Pair sur victoire
+            // Loop 7: Monitoring Bully — relance automatiquement après chaque cycle (abdication incluse)
+            // Le while(isActive) est essentiel pour déclencher une nouvelle élection après abdication (AC#3).
+            // Un delay de 5s entre chaque cycle évite le hot-loop pendant la période de cooldown (5 min).
             launch {
-                runBullyElectionUseCase().collect { result ->
-                    result
-                        .onSuccess { election ->
-                            Log.i(LOGTAG, "Élection remportée — démarrage keepalive Super-Pair Firebase")
-                            superPeerJob?.cancel()
-                            superPeerJob = launch {
-                                registerSuperPeerUseCase(tcpPort, election.electedAt).collect { regResult ->
-                                    regResult.onFailure {
-                                        Log.w(LOGTAG, "Enregistrement Super-Pair Firebase échoué — mode local", it)
+                while (isActive) {
+                    runBullyElectionUseCase().collect { result ->
+                        result
+                            .onSuccess { election ->
+                                Log.i(LOGTAG, "Élection remportée — démarrage keepalive Super-Pair Firebase")
+                                superPeerJob?.cancel()
+                                superPeerJob = launch {
+                                    launch {
+                                        registerSuperPeerUseCase(tcpPort, election.electedAt).collect { regResult ->
+                                            regResult.onFailure {
+                                                Log.w(LOGTAG, "Enregistrement Super-Pair Firebase échoué — mode local", it)
+                                            }
+                                        }
+                                    }
+                                    launch {
+                                        Log.i(LOGTAG, "Timer d'abdication démarré (${ABDICATION_DELAY_MS / 60_000}min)")
+                                        delay(ABDICATION_DELAY_MS)
+                                        Log.i(LOGTAG, "Timer d'abdication expiré — exécution de l'abdication")
+                                        // F-05 : log l'échec broadcast mais procède toujours à l'abdication
+                                        abdicateSuperPeerUseCase()
+                                            .onFailure { Log.w(LOGTAG, "Broadcast ABDICATION échoué — abdication tout de même exécutée", it) }
+                                        networkEventRepository.pushEvent("[ELECTION] Abdication automatique après ${ABDICATION_DELAY_MS / 60_000}min")
+                                        abdicate() // Annule superPeerJob (keepalive Firebase)
                                     }
                                 }
                             }
-                        }
-                        .onFailure { Log.d(LOGTAG, "Élection non remportée : ${it.message}") }
+                            .onFailure { Log.d(LOGTAG, "Cycle d'élection terminé : ${it.message}") }
+                    }
+                    // Pause inter-cycle — évite le hot-loop quand le nœud est en cooldown
+                    delay(ELECTION_RETRY_DELAY_MS)
                 }
             }
         }

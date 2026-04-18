@@ -15,6 +15,7 @@ object AppModule {
 
     @Provides
     @Singleton
+    @ApplicationScope
     fun provideApplicationScope(): CoroutineScope {
         return CoroutineScope(SupervisorJob() + Dispatchers.Default)
     }

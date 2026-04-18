@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-04-17T23:30:00+01:00
+last_updated: 2026-04-18T12:08:00+01:00
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -57,8 +57,8 @@ development_status:
   epic-3: in-progress
   3-1-declenchement-protocole-delection-bully: done
   3-2-enregistrement-du-super-pair-sur-le-tracker-firebase: done
-  3-3-abdication-automatique-buffer-durgence-electoral: backlog
-  3-4-circuit-breaker-anti-avalanche-churn-30: backlog
+  3-3-abdication-automatique-buffer-durgence-electoral: done
+  3-4-circuit-breaker-anti-avalanche-churn-30: done
   epic-3-retrospective: optional
   epic-4: backlog
   4-1-modelisation-persistance-de-la-partition-dht-locale: backlog

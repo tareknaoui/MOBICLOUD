@@ -26,4 +26,21 @@ sealed class ElectionEvent {
      * Aucune action requise de la part de l'appelant.
      */
     object AliveReceived : ElectionEvent()
+
+    /**
+     * Un message d'abdication a été reçu, signalant qu'un Super-Pair existant démissionne de son rôle.
+     *
+     * @param senderNodeId L'identifiant du nœud qui abdique.
+     */
+    data class AbdicationReceived(val senderNodeId: String) : ElectionEvent()
+
+    /**
+     * Message intentionnellement ignoré en raison des règles métier de l'algorithme Bully :
+     *  - Nœud en période de cooldown post-abdication (ne peut pas participer à une élection)
+     *  - Score local inférieur à celui de l'émetteur (rester silencieux est la règle AC5)
+     *
+     * Distinct de [AliveReceived] qui représente un vrai message ALIVE réseau reçu.
+     * Aucune action requise de la part de l'appelant.
+     */
+    object Ignored : ElectionEvent()
 }

@@ -6,8 +6,10 @@ import com.mobicloud.domain.models.ElectionPayload
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
+import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.LocalRepairBuffer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -25,7 +27,10 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
     private val securityRepository: SecurityRepository,
     private val trustScoreProvider: ITrustScoreProvider,
     private val peerRepository: PeerRepository,
-    private val networkClient: IElectionNetworkClient
+    private val networkClient: IElectionNetworkClient,
+    private val electionStateManager: ElectionStateManager,
+    private val localRepairBuffer: LocalRepairBuffer,
+    private val networkEventRepository: NetworkEventRepository
 ) {
     operator fun invoke(): Flow<Result<ElectionEvent>> {
         return networkClient.incomingMessages.map { payload ->
@@ -50,7 +55,10 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
         return when (payload.type) {
 
             ElectionMessageType.ELECTION -> {
-                if (isHigherPriority(localScore, localIdentity.nodeId, payload.reliabilityScore, payload.senderNodeId)) {
+                if (electionStateManager.isInCooldown()) {
+                    // En cooldown — règle métier : ignorer silencieusement toute élection entrante
+                    Result.success(ElectionEvent.Ignored)
+                } else if (isHigherPriority(localScore, localIdentity.nodeId, payload.reliabilityScore, payload.senderNodeId)) {
                     // Étape 1 : Répondre ALIVE (le pair émetteur a un score inférieur)
                     val alivePayload = createPayload(localIdentity, localScore, ElectionMessageType.ALIVE)
                         .getOrElse { error ->
@@ -62,14 +70,49 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                     // Étape 2 : Signaler à l'appelant qu'il doit lancer sa propre candidature (AC4)
                     Result.success(ElectionEvent.ShouldStartOwnElection)
                 } else {
-                    // Notre score est inférieur — rester silencieux (AC5)
-                    Result.success(ElectionEvent.AliveReceived)
+                    // Score local inférieur — règle AC5 : rester silencieux
+                    Result.success(ElectionEvent.Ignored)
                 }
             }
 
             ElectionMessageType.ALIVE -> {
                 // Traité par RunBullyElectionUseCase via le SharedFlow ; aucune action ici.
                 Result.success(ElectionEvent.AliveReceived)
+            }
+
+            ElectionMessageType.ABDICATION -> {
+                // Vérifier la signature avant de rétrograder le Super-Pair actuel
+                val dataToVerify = "${payload.senderNodeId}:${payload.type.name}".toByteArray()
+                
+                val senderPeer = peerRepository.peers.value
+                    .find { it.identity.nodeId == payload.senderNodeId }
+
+                if (senderPeer == null) {
+                    return Result.failure(Exception("Received ABDICATION from unknown peer '${payload.senderNodeId}' — ignoring."))
+                }
+
+                // Check that the sender is actually the current Super-Peer
+                if (!senderPeer.isSuperPair) {
+                    networkEventRepository.pushEvent("WARNING: R\u00e9ception d'ABDICATION depuis '${payload.senderNodeId}' qui n'est pas Super-Pair \u2014 ignor\u00e9.")
+                    return Result.success(ElectionEvent.Ignored)
+                }
+
+                val isValid = securityRepository.verifySignature(
+                    data = dataToVerify,
+                    signature = payload.signatureBytes,
+                    publicKey = senderPeer.identity.publicKeyBytes
+                ).getOrElse { error ->
+                    return Result.failure(Exception("Signature verification failed for ABDICATION from '${payload.senderNodeId}'", error))
+                }
+
+                if (!isValid) {
+                    return Result.failure(Exception("Invalid signature on ABDICATION message from '${payload.senderNodeId}' — ignoring."))
+                }
+
+                // Signature valide -> Rétrograder explicitement le statut Super-Pair pour déclencher uen nouvelle élection via RunBully
+                peerRepository.clearSuperPairStatus(payload.senderNodeId)
+
+                Result.success(ElectionEvent.AbdicationReceived(payload.senderNodeId))
             }
 
             ElectionMessageType.COORDINATOR -> {
@@ -109,6 +152,16 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                     timestampMs = System.currentTimeMillis(),
                     isSuperPair = true
                 )
+
+                // AC#6 : Drainer le buffer de réparation et notifier le RadarLogConsole
+                val pendingRequests = localRepairBuffer.drain()
+                if (pendingRequests.isNotEmpty()) {
+                    networkEventRepository.pushEvent(
+                        "[BUFFER] ${pendingRequests.size} requête(s) de réparation drainées (FIFO) → nouveau Super-Pair ${payload.senderNodeId.take(8)}"
+                    )
+                }
+                // Future (Epic 7): Retransmettre ces requêtes au nouveau Super-Pair
+                // pendingRequests.forEach { request -> ... }
 
                 Result.success(ElectionEvent.CoordinatorRegistered(payload.senderNodeId))
             }

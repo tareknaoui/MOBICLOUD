@@ -11,6 +11,7 @@ import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NetworkServiceController
 import com.mobicloud.domain.repository.PeerRepository
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.CircuitBreakerUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,7 +27,8 @@ class DashboardViewModel @Inject constructor(
     diagnosticsRepository: DiagnosticsRepository,
     networkEventRepository: NetworkEventRepository,
     private val peerRepository: PeerRepository,
-    private val identityRepository: IdentityRepository
+    private val identityRepository: IdentityRepository,
+    circuitBreakerUseCase: CircuitBreakerUseCase
 ) : ViewModel() {
 
     val serviceStatus: StateFlow<ServiceStatus> = networkServiceController.serviceStatus
@@ -57,4 +59,8 @@ class DashboardViewModel @Inject constructor(
             NodeRole.PEER
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), NodeRole.PEER)
+
+    // AC#6 — Badge "Réseau instable" : vrai si le Circuit-Breaker est actif (Story 3.4)
+    val isNetworkUnstable: StateFlow<Boolean> = circuitBreakerUseCase.isCircuitOpen
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
 }

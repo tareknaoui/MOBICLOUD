@@ -21,4 +21,6 @@ interface PeerRepository {
         timeoutMs: Long,
         currentTimeMs: Long
     ): Result<Unit>
+
+    suspend fun clearSuperPairStatus(nodeId: String): Result<Unit>
 }

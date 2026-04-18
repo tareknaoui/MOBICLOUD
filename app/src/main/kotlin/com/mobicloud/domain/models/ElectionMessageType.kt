@@ -6,5 +6,6 @@ import kotlinx.serialization.Serializable
 enum class ElectionMessageType {
     ELECTION,
     ALIVE,
-    COORDINATOR
+    COORDINATOR,
+    ABDICATION
 }

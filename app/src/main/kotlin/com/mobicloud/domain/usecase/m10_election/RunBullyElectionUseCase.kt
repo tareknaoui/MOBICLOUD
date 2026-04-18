@@ -33,6 +33,7 @@ class RunBullyElectionUseCase @Inject constructor(
     private val securityRepository: SecurityRepository,
     private val trustScoreProvider: ITrustScoreProvider,
     private val networkClient: IElectionNetworkClient,
+    private val electionStateManager: ElectionStateManager,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     operator fun invoke(): Flow<Result<SuperPairElection>> = flow {
@@ -41,6 +42,11 @@ class RunBullyElectionUseCase @Inject constructor(
         // On observe le StateFlow des pairs et on attend que la condition
         // "aucun Super-Pair actif" persiste pendant exactement 5 secondes CONSÉCUTIVES.
         // Si un Super-Pair réapparaît pendant la fenêtre, le timer est réinitialisé.
+        if (electionStateManager.isInCooldown()) {
+            emit(Result.failure(Exception("Election aborted: Node is in cooldown.")))
+            return@flow
+        }
+
         peerRepository.peers
             .map { peers -> peers.none { it.isActive && it.isSuperPair } }
             .transformLatest { hasNoSuperPair ->

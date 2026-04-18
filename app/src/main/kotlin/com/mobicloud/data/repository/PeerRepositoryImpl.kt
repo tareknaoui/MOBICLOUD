@@ -48,4 +48,7 @@ class PeerRepositoryImpl @Inject constructor(
 
     override suspend fun evictStalePeers(timeoutMs: Long, currentTimeMs: Long): Result<Unit> =
         runCatching { peerDao.markInactive(currentTimeMs - timeoutMs) }
+
+    override suspend fun clearSuperPairStatus(nodeId: String): Result<Unit> =
+        runCatching { peerDao.clearSuperPairStatus(nodeId) }
 }
