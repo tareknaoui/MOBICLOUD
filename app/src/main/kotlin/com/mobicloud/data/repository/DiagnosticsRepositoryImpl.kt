@@ -7,6 +7,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.SystemClock
+import com.mobicloud.di.ApplicationScope
 import com.mobicloud.domain.models.NetworkType
 import com.mobicloud.domain.models.NodeDiagnostics
 import com.mobicloud.domain.repository.DiagnosticsRepository
@@ -27,7 +28,7 @@ class DiagnosticsRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     private val peerRepository: PeerRepository,
     private val identityRepository: IdentityRepository,
-    private val scope: CoroutineScope
+    @ApplicationScope private val scope: CoroutineScope
 ) : DiagnosticsRepository {
 
     private val _diagnostics = MutableStateFlow(NodeDiagnostics.DEFAULT)
