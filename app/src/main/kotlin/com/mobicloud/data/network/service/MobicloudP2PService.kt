@@ -22,6 +22,7 @@ import com.mobicloud.domain.repository.SignalingRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.usecase.m01_discovery.CalculateReliabilityScoreUseCase
+import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
@@ -55,6 +56,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var runBullyElectionUseCase: RunBullyElectionUseCase
     @Inject lateinit var registerSuperPeerUseCase: RegisterSuperPeerUseCase
     @Inject lateinit var abdicateSuperPeerUseCase: AbdicateSuperPeerUseCase
+    @Inject lateinit var gossipSyncUseCase: GossipSyncUseCase
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -124,6 +126,9 @@ class MobicloudP2PService : Service() {
                 return@launch
             }
             val tcpPort = tcpPortResult.getOrThrow()
+
+            // Guard P7: brancher le handler Gossip APRÈS que le serveur TCP soit prêt
+            tcpConnectionManager.gossipHandler = gossipSyncUseCase
 
             // Firebase announce — publie l'IP publique sur Firebase pour la fédération inter-réseaux
             launch {
@@ -212,6 +217,17 @@ class MobicloudP2PService : Service() {
                 }
             }
 
+            // Loop Gossip: cycle épidémique toutes les 2s pour synchroniser la partition DHT (AC#2, NFR-01)
+            launch {
+                while (isActive) {
+                    gossipSyncUseCase.runGossipCycle()
+                        .onFailure { e ->
+                            Log.w(LOGTAG, "Cycle Gossip échoué — service continue", e)
+                        }
+                    delay(2000L)
+                }
+            }
+
             // Loop 7: Monitoring Bully — relance automatiquement après chaque cycle (abdication incluse)
             // Le while(isActive) est essentiel pour déclencher une nouvelle élection après abdication (AC#3).
             // Un delay de 5s entre chaque cycle évite le hot-loop pendant la période de cooldown (5 min).
@@ -226,7 +242,7 @@ class MobicloudP2PService : Service() {
                                     launch {
                                         registerSuperPeerUseCase(tcpPort, election.electedAt).collect { regResult ->
                                             regResult.onFailure {
-                                                Log.w(LOGTAG, "Enregistrement Super-Pair Firebase échoué — mode local", it)
+                                                Log.w(LOGTAG, "Enregistrement Super-Pair Firebase échoué — cluster isolé (aucun fallback de découverte)", it)
                                             }
                                         }
                                     }

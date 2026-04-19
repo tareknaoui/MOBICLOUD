@@ -62,6 +62,7 @@ class RunBullyElectionUseCaseTest {
         securityRepository = securityRepository,
         trustScoreProvider = trustScoreProvider,
         networkClient = networkClient,
+        electionStateManager = ElectionStateManager(),
         defaultDispatcher = testDispatcher          // F-07 : injection du dispatcher de test
     )
 

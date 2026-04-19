@@ -46,18 +46,18 @@ class PeerRepositoryImplTest {
 
     @Test
     fun `registerOrUpdatePeer retourne Result_success et appelle peerDao_insertOrUpdate`() = runTest {
-        coEvery { peerDao.insertOrUpdate(any()) } returns Unit
+        coEvery { peerDao.insertOrUpdatePreservingRole(any(), any(), any(), any(), any(), any(), any(), any()) } returns Unit
 
         val result = repository.registerOrUpdatePeer(identity, 1000L)
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 1) { peerDao.insertOrUpdate(any()) }
+        coVerify(exactly = 1) { peerDao.insertOrUpdatePreservingRole(any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
     fun `registerOrUpdatePeer retourne Result_failure si peerDao_insertOrUpdate leve une exception`() = runTest {
         val exception = RuntimeException("DB error")
-        coEvery { peerDao.insertOrUpdate(any()) } throws exception
+        coEvery { peerDao.insertOrUpdatePreservingRole(any(), any(), any(), any(), any(), any(), any(), any()) } throws exception
 
         val result = repository.registerOrUpdatePeer(identity, 1000L)
 

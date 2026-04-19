@@ -1,13 +1,11 @@
 package com.mobicloud.domain.usecase.m06_m07_repair_migration
 
 import com.mobicloud.domain.models.RepairRequest
-import com.mobicloud.di.ApplicationScope
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -19,32 +17,25 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class LocalRepairBufferTest {
 
-    private lateinit var localRepairBuffer: LocalRepairBuffer
     private lateinit var circuitBreakerUseCase: CircuitBreakerUseCase
     private lateinit var isCircuitOpenFlow: MutableStateFlow<Boolean>
-    private lateinit var testScope: TestScope
 
     @Before
     fun setup() {
         circuitBreakerUseCase = mockk()
         isCircuitOpenFlow = MutableStateFlow(false)
         every { circuitBreakerUseCase.isCircuitOpen } returns isCircuitOpenFlow
-
-        val testDispatcher = StandardTestDispatcher()
-        testScope = TestScope(testDispatcher)
-
-        localRepairBuffer = LocalRepairBuffer(circuitBreakerUseCase, testScope)
     }
 
     @Test
-    fun `enqueue drops oldest request when capacity exceeds 50`() = testScope.runTest {
-        // Remplir avec 50 requêtes — aucune ne devrait être droppée
+    fun `enqueue drops oldest request when capacity exceeds 50`() = runTest {
+        val localRepairBuffer = LocalRepairBuffer(circuitBreakerUseCase, backgroundScope)
+
         for (i in 1..50) {
             val dropped = localRepairBuffer.enqueue(RepairRequest("block$i", "192.168.0.1", 8080))
             assertNull("Ne devrait pas dropper avant capacité max ($i/50)", dropped)
         }
 
-        // Ajouter la 51ème — doit dropper la première (block1)
         val dropped = localRepairBuffer.enqueue(RepairRequest("block51", "192.168.0.1", 8080))
 
         assertNotNull("L'élément le plus ancien devrait être retourné comme dropped", dropped)
@@ -57,7 +48,9 @@ class LocalRepairBufferTest {
     }
 
     @Test
-    fun `drain clears the buffer`() = testScope.runTest {
+    fun `drain clears the buffer`() = runTest {
+        val localRepairBuffer = LocalRepairBuffer(circuitBreakerUseCase, backgroundScope)
+
         localRepairBuffer.enqueue(RepairRequest("block1", "192.168.0.1", 8080))
 
         val drained1 = localRepairBuffer.drain()
@@ -68,14 +61,18 @@ class LocalRepairBufferTest {
     }
 
     @Test
-    fun `enqueue returns null when buffer is not full`() = testScope.runTest {
+    fun `enqueue returns null when buffer is not full`() = runTest {
+        val localRepairBuffer = LocalRepairBuffer(circuitBreakerUseCase, backgroundScope)
+
         val dropped = localRepairBuffer.enqueue(RepairRequest("block1", "192.168.0.1", 8080))
         assertNull("Aucun drop attendu pour un buffer vide", dropped)
         assertEquals(1, localRepairBuffer.size())
     }
 
     @Test
-    fun `drain returns empty list and keeps elements when circuit is open`() = testScope.runTest {
+    fun `drain returns empty list and keeps elements when circuit is open`() = runTest {
+        val localRepairBuffer = LocalRepairBuffer(circuitBreakerUseCase, backgroundScope)
+
         localRepairBuffer.enqueue(RepairRequest("block1", "192.168.0.1", 8080))
         localRepairBuffer.enqueue(RepairRequest("block2", "192.168.0.1", 8080))
 
@@ -97,8 +94,9 @@ class LocalRepairBufferTest {
      * quand le circuit passe OPEN → CLOSED, sans attendre un COORDINATOR explicite.
      */
     @Test
-    fun `pendingAfterCircuitClose emits buffered requests when circuit closes`() = testScope.runTest {
-        // Ouvrir le circuit puis remplir le buffer
+    fun `pendingAfterCircuitClose emits buffered requests when circuit closes`() = runTest {
+        val localRepairBuffer = LocalRepairBuffer(circuitBreakerUseCase, backgroundScope)
+
         isCircuitOpenFlow.value = true
         advanceTimeBy(100)
 
@@ -106,13 +104,11 @@ class LocalRepairBufferTest {
         localRepairBuffer.enqueue(RepairRequest("block2", "192.168.0.1", 8080))
         assertEquals(2, localRepairBuffer.size())
 
-        // Capturer l'émission
         val emitted = mutableListOf<List<RepairRequest>>()
-        val collectJob = kotlinx.coroutines.launch {
+        val collectJob = backgroundScope.launch {
             localRepairBuffer.pendingAfterCircuitClose.collect { emitted.add(it) }
         }
 
-        // Fermer le circuit → doit déclencher l'émission automatique
         isCircuitOpenFlow.value = false
         advanceTimeBy(100)
 

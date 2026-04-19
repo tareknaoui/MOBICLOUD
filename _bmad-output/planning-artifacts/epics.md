@@ -53,7 +53,7 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 - UX-DR5: Dark Mode OLED pur absolu — thème système Material Design 3, fond #000000 strict.
 - UX-DR6: Bottom Navigation à 3 onglets simples : Dashboard (état nœud) / Explorer (DHT fichiers) / Paramètres.
 - UX-DR7: ModalBottomSheet utilitaristes pour les actions contextuelles sur fichiers/blocs (stocker, supprimer, détails).
-- UX-DR8: Permissions réseau silencieuses et englobantes au lancement (Wi-Fi, Multicast, Réseau) sans friction utilisateur.
+- UX-DR8: Permissions réseau silencieuses et englobantes au lancement (Wi-Fi, Réseau) sans friction utilisateur.
 
 ### FR Coverage Map
 
@@ -85,7 +85,7 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 
 ### Epic 1: Fondation & Identité de Confiance du Nœud
 **Objectif:** L'utilisateur installe l'app, qui génère automatiquement une identité cryptographique infalsifiable (Android Keystore), configure l'UI (Dark OLED, navigation 3 onglets) et demande les permissions réseau. Le nœud est prêt à rejoindre le réseau.
-**FRs covered:** FR-01.3, UX-DR5, UX-DR6, UX-DR8, Architecture: Starter Template, Keystore Anti-Sybil, Foreground Service (sans MulticastLock).
+**FRs covered:** FR-01.3, UX-DR5, UX-DR6, UX-DR8, Architecture: Starter Template, Keystore Anti-Sybil, Foreground Service.
 
 ### Epic 2: Découverte Inter-Réseaux & Dashboard Tactique
 **Objectif:** L'utilisateur peut voir les nœuds pairs détectés à travers le NAT via le Tracker STUN/Firebase. Le Dashboard affiche les pairs, le score de fiabilité et les événements réseau en temps réel.
@@ -656,7 +656,7 @@ Afin de garantir l'équité des contributions au réseau et d'empêcher les comp
 **When** le Super-Pair traite la requête
 **Then** le Super-Pair vérifie le score Weight du demandeur dans la `PeerRegistry` locale
 **And** si le score Weight est ≤ 0, la bande passante allouée est réduite de 50% (bridage progressif)
-**And** si le score Weight est < -10, la requête est rejetée avec un message `KARMA_INSUFFICIENT`
+**And** si le score Weight est < -10, la requête est rejetée avec un message `WEIGHT_INSUFFICIENT`
 **And** la validation est directe peer-to-peer signée (sans certification collégiale DHT complexe)
 **And** le nœud bridé peut retrouver ses droits en servant des blocs (score remonte via Story 8.1)
 **And** les décisions de bridage sont loguées dans le `RadarLogConsole` (visibilité réseau)
@@ -697,6 +697,9 @@ Afin de comprendre ma réputation dans le réseau et gérer mes fichiers stocké
 ---
 
 ## Epic 9: Prédiction IA — Anticipation de Départ & Score de Fiabilité
+
+> **Statut : Futur — non-bloquant pour Story 4.1.**
+> Aucune infrastructure TFLite ni pipeline de données n'est requise pour les épics 1–8. Cet epic peut être planifié indépendamment une fois la couche DHT/Bully stabilisée.
 
 **Objectif :** Un modèle Random Forest embarqué (TFLite on-device) prédit la probabilité de départ imminent d'un nœud et son score de fiabilité futur. Le Super-Pair utilise ces prédictions pour anticiper les migrations avant même de recevoir un `DEPARTURE_NOTICE`, et pour élire le candidat le plus stable lors des élections Bully.
 

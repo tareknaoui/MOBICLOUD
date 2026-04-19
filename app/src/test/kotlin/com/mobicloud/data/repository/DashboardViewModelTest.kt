@@ -11,6 +11,7 @@ import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NetworkServiceController
 import com.mobicloud.domain.repository.PeerRepository
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.CircuitBreakerUseCase
 import com.mobicloud.presentation.dashboard.DashboardViewModel
 import io.mockk.coEvery
 import io.mockk.every
@@ -40,6 +41,7 @@ class DashboardViewModelTest {
     private lateinit var networkEventRepository: NetworkEventRepository
     private lateinit var peerRepository: PeerRepository
     private lateinit var identityRepository: IdentityRepository
+    private lateinit var circuitBreakerUseCase: CircuitBreakerUseCase
 
     private val serviceStatusFlow = MutableStateFlow(ServiceStatus.STOPPED)
     private val diagnosticsFlow = MutableStateFlow(NodeDiagnostics.DEFAULT)
@@ -55,6 +57,7 @@ class DashboardViewModelTest {
         networkEventRepository = mockk()
         peerRepository = mockk()
         identityRepository = mockk()
+        circuitBreakerUseCase = mockk(relaxed = true)
 
         every { networkServiceController.serviceStatus } returns serviceStatusFlow
         every { diagnosticsRepository.diagnostics } returns diagnosticsFlow
@@ -75,7 +78,8 @@ class DashboardViewModelTest {
         diagnosticsRepository,
         networkEventRepository,
         peerRepository,
-        identityRepository
+        identityRepository,
+        circuitBreakerUseCase
     )
 
     @Test

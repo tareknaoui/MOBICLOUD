@@ -1,13 +1,22 @@
 package com.mobicloud.data.p2p.tcp
 
 import android.util.Log
+import com.mobicloud.core.format.MobiCloudProtoBuf
 import com.mobicloud.domain.models.Peer
+import com.mobicloud.domain.models.gossip.BloomFilterGossip
+import com.mobicloud.domain.models.gossip.DeltaSyncRequest
+import com.mobicloud.domain.models.gossip.DeltaSyncResponse
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipIncomingHandler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
+import java.io.DataInputStream
+import java.io.DataOutputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
+import java.io.PushbackInputStream
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
@@ -24,6 +33,16 @@ class TcpConnectionManager @Inject constructor(
 
     /** Ensemble des nodeId avec lesquels un handshake TCP a déjà réussi. */
     private val handshaked: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    // F7: @Volatile garantit la visibilité JVM entre le thread service (write) et le thread accept (read)
+    @Volatile
+    var gossipHandler: GossipIncomingHandler? = null
+
+    companion object {
+        // F2: taille maximale d'un message Gossip pour prévenir les allocations OOM via pairs malveillants
+        private const val MAX_GOSSIP_MESSAGE_BYTES = 1_000_000
+        private const val INCOMING_READ_TIMEOUT_MS = 3000
+    }
 
     /** Retourne true si un handshake TCP a déjà été complété avec ce nœud. */
     fun isConnected(nodeId: String): Boolean = nodeId in handshaked
@@ -63,18 +82,93 @@ class TcpConnectionManager @Inject constructor(
 
     /**
      * Gère une connexion P2P entrante.
-     * Lit l'identité distante et envoie la sienne.
+     * Lit le premier byte pour distinguer les messages Gossip du handshake legacy.
      *
      * F-01 [Review][Patch]: runBlocking supprimé — getIdentity() n'est pas suspend.
      * F-02 [Review][Patch]: getOrElse remplace getOrThrow() pour éviter un crash non géré.
      */
+    @OptIn(ExperimentalSerializationApi::class)
     private fun handleIncomingConnection(socket: Socket) {
         try {
-            val input = ObjectInputStream(socket.getInputStream())
+            socket.soTimeout = INCOMING_READ_TIMEOUT_MS  // F11: éviter blocage indéfini sur pair lent
+            val senderIp = socket.inetAddress.hostAddress ?: "unknown"
+            val senderPort = socket.port
+            val pushback = PushbackInputStream(socket.getInputStream(), 1)
+            val firstByte = pushback.read()
+            if (firstByte == -1) return
+
+            when (firstByte.toByte()) {
+                GossipChannel.GOSSIP_BLOOM -> handleIncomingBloomGossip(pushback, senderIp, senderPort)
+                GossipChannel.GOSSIP_DELTA_REQ -> handleIncomingDeltaRequest(socket, pushback)
+                else -> {
+                    // Legacy handshake — remettre le byte et traiter normalement
+                    pushback.unread(firstByte)
+                    handleLegacyHandshake(socket, pushback)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur lors du traitement de la connexion entrante", e)
+        } finally {
+            try { socket.close() } catch (_: Exception) {}
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun handleIncomingBloomGossip(
+        inp: java.io.InputStream,  // F12: socket inutilisé — paramètre supprimé
+        senderIp: String,
+        senderPort: Int
+    ) {
+        try {
+            val data = DataInputStream(inp)
+            val len = data.readInt()
+            // F2: rejet des messages surdimensionnés avant allocation
+            if (len <= 0 || len > MAX_GOSSIP_MESSAGE_BYTES) {
+                Log.w("MobiCloud:TCP", "GOSSIP_BLOOM taille invalide: $len — connexion rejetée")
+                return
+            }
+            val bytes = ByteArray(len)
+            data.readFully(bytes)
+            val msg = MobiCloudProtoBuf.decodeFromByteArray(BloomFilterGossip.serializer(), bytes)
+            gossipHandler?.onBloomGossipReceived(msg, senderIp, senderPort)
+                ?: Log.w("MobiCloud:TCP", "Bloom gossip reçu mais aucun handler configuré")
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur lecture GOSSIP_BLOOM", e)
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun handleIncomingDeltaRequest(socket: Socket, inp: java.io.InputStream) {
+        try {
+            val data = DataInputStream(inp)
+            val len = data.readInt()
+            // F2: rejet des messages surdimensionnés avant allocation
+            if (len <= 0 || len > MAX_GOSSIP_MESSAGE_BYTES) {
+                Log.w("MobiCloud:TCP", "GOSSIP_DELTA_REQ taille invalide: $len — connexion rejetée")
+                return
+            }
+            val bytes = ByteArray(len)
+            data.readFully(bytes)
+            val req = MobiCloudProtoBuf.decodeFromByteArray(DeltaSyncRequest.serializer(), bytes)
+            val response = gossipHandler?.onDeltaSyncRequestReceived(req)
+            if (response != null) {
+                val respBytes = MobiCloudProtoBuf.encodeToByteArray(DeltaSyncResponse.serializer(), response)
+                val out = DataOutputStream(socket.getOutputStream())
+                out.writeByte(GossipChannel.GOSSIP_DELTA_RESP.toInt())
+                out.writeInt(respBytes.size)
+                out.write(respBytes)
+                out.flush()
+            }
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur lecture GOSSIP_DELTA_REQ", e)
+        }
+    }
+
+    private fun handleLegacyHandshake(socket: Socket, inp: java.io.InputStream) {
+        try {
+            val input = ObjectInputStream(inp)
             val remotePublicId = input.readUTF()
 
-            // handleIncomingConnection runs on a plain Thread (not a coroutine).
-            // runBlocking is justified here: the thread is inherently blocking (socket I/O).
             val localIdentity = runBlocking { securityRepository.getIdentity() }.getOrElse { error ->
                 Log.e("MobiCloud:TCP", "Impossible de récupérer l'identité locale (handshake entrant)", error)
                 return
@@ -84,12 +178,9 @@ class TcpConnectionManager @Inject constructor(
             output.writeUTF(localIdentity.nodeId)
             output.flush()
 
-            // F-05 [Review][Patch]: Logs TESTPOC remplacés par des logs structurés au niveau INFO.
             Log.i("MobiCloud:TCP", "Handshake TCP entrant réussi | pair=$remotePublicId | ip=${socket.inetAddress.hostAddress}")
         } catch (e: Exception) {
-            Log.e("MobiCloud:TCP", "Erreur lors du Handshake entrant", e)
-        } finally {
-            try { socket.close() } catch (e: Exception) {}
+            Log.e("MobiCloud:TCP", "Erreur lors du Handshake legacy entrant", e)
         }
     }
 

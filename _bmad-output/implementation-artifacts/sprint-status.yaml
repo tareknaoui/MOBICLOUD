@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-04-18T16:45:00+02:00
+last_updated: 2026-04-19T21:00:00+02:00
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -61,8 +61,8 @@ development_status:
   3-4-circuit-breaker-anti-avalanche-churn-30: done
   epic-3-retrospective: optional
   epic-4: in-progress
-  4-1-modelisation-persistance-de-la-partition-dht-locale: review
-  4-2-protocole-gossip-epidemique-avec-filtres-de-bloom: backlog
+  4-1-modelisation-persistance-de-la-partition-dht-locale: done
+  4-2-protocole-gossip-epidemique-avec-filtres-de-bloom: done
   4-3-crdt-resolution-de-conflits-de-catalogue: backlog
   4-4-explorer-dht-affichage-du-catalogue-de-fichiers: backlog
   epic-4-retrospective: optional

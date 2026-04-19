@@ -1,6 +1,6 @@
 # Story 4.1: Modélisation & Persistance de la Partition DHT Locale
 
-Status: review
+Status: done
 
 ## Story
 
@@ -10,7 +10,7 @@ Afin de répondre aux requêtes de localisation de blocs sans aucune infrastruct
 
 ## Acceptance Criteria
 
-1. **Given** le nœud a rejoint le cluster et connaît ses pairs voisins
+1. **Given** le nœud a rejoint le cluster et s'est enregistré sur Firebase Tracker (découverte Firebase-only, pas de UDP fallback)
 2. **When** un bloc est stocké sur ce nœud
 3. **Then** une entrée `DhtEntry(blockId, nodeId, ipAddress, port, timestamp)` est insérée dans Room DB (table `dht_entries`)
 4. **And** la partition assignée est déterminée par hachage consistant : `hash(blockId) mod N` où N = nombre de nœuds qualifiés
@@ -337,38 +337,34 @@ Claude Haiku 4.5-20251001
 - `app/src/main/kotlin/com/mobicloud/data/repository/DiagnosticsRepositoryImpl.kt` (ajouté @ApplicationScope)
 - `app/src/main/kotlin/com/mobicloud/di/P2PModule.kt` (ajouté @ApplicationScope à CoroutineScope)
 
-## Review Findings (Code Review - 2026-04-18)
+## Review Findings (Code Review - 2026-04-19)
 
-**DECISION REQUIRED (3 items):**
-- [ ] [Review][Decision] **D1: Firebase-Only vs. Hybrid Discovery Architecture** — AC#1 violation: Peer discovery now requires Firebase (no UDP fallback). Offline clusters impossible. Options: (A) Restore UDP fallback, (B) Update Story 4.1 ACs, (C) Add hybrid retry logic.
-- [ ] [Review][Decision] **D2: Storage Quota & Block Hosting Scope** — Stories 1.5 & 5.5 added to epics.md but not implemented. Should these be included in this diff or deferred?
-- [ ] [Review][Decision] **D3: ML Model Safety Guarantees** — Epic 9 AI prediction: No guard preventing model invocation before mlReady flag set.
+**DECISIONS RESOLVED:**
+- [x] [Review][Decision] **D1: Firebase-Only Architecture** → **B choisi**: AC#1 mis à jour pour Firebase-only. Offline non supporté intentionnellement.
+- [x] [Review][Decision] **D2: Stories 1.5 & 5.5 Scope** → **Différé**: Stories séparées, restent dans epics.md comme travaux futurs.
+- [x] [Review][Decision] **D3: ML Model Safety** → **Futur marqué**: Epic 9 annoté "Statut: Futur — non-bloquant" dans epics.md.
 
-**PATCHES NEEDED (22 items):**
-- [ ] [Review][Patch] **P1: Database Schema Migration** — Room DB deserialization failure on old LOCAL_UDP enum values. Add migration script. [PeerNodeEntity.kt]
-- [ ] [Review][Patch] **P2: Firebase Public IP Unavailable** — Silent registration failure when IP fetch fails. Add timeout & retry. [MobicloudP2PService.kt:131-145]
-- [ ] [Review][Patch] **P3: Reliability Score Not Re-announced** — Score updates invisible to peers after UDP removal. Add Firebase re-registration on score change. [MobicloudP2PService.kt:202-213]
-- [ ] [Review][Patch] **P4: Documentation Outdated** — UX-DR8 mentions "Multicast" permission which was removed. Update spec. [epics.md:8,26-27,63]
-- [ ] [Review][Patch] **P5: Karma→Weight Naming** — One leftover reference: `KARMA_INSUFFICIENT` should be `WEIGHT_INSUFFICIENT`. [epics.md:333]
-- [ ] [Review][Patch] **P6: ConsistentHashRing Division-by-Zero** — No guard when peer registry empty (N=0). Add validation. [domain/usecase/m05_dht_catalog/ConsistentHashRing.kt]
-- [ ] [Review][Patch] **P7: Firebase Announce Timing Race** — TCP server port published before fully initialized. Verify synchronization. [MobicloudP2PService.kt:115-160]
-- [ ] [Review][Patch] **P8: Stability Monitoring Removed** — Loops 4&5 deleted without replacement. Network state adaptation gone. [MobicloudP2PService.kt:634-650 deleted]
-- [ ] [Review][Patch] **P9: Manifest Formatting** — AndroidManifest.xml indentation broken after permission deletion. Reformat. [AndroidManifest.xml:466]
-- [ ] [Review][Patch] **P10: Firebase Timeout** — No explicit timeout on Firebase operations. Can block indefinitely. Add withTimeoutOrNull(). [SignalingRepositoryImpl.kt]
-- [ ] [Review][Patch] **P11: Error Logging References "Mode Local"** — Messages misleading; no local mode exists. Clarify logging. [MobicloudP2PService.kt:175-186,576,582,593]
-- [ ] [Review][Patch] **P12: Hilt Injection Cleanup** — Verify no leftover @Inject references to removed UdpHeartbeat* classes. Grep codebase. [MobicloudP2PService.kt:512-514]
-- [ ] [Review][Patch] **P13: ML Model Safety** — Add mlReady guard to prevent model invocation before 50 snapshots collected. [m11_ai/PredictNodeDepartureUseCase.kt]
-- [ ] [Review][Patch] **P14: ConsistentHashRing Documentation** — Spec missing N=0 behavior definition. Add clarity. [Spec section 3.4]
-- [ ] [Review][Patch] **P15: Permission Comment Cleanup** — Remove comments referencing MulticastLock. [MobicloudP2PService.kt comments]
-- [ ] [Review][Patch] **P16-P22: Edge Case Handlers** — 7 Firebase/network edge cases (timeouts, empty peers, switching). See consolidated triage for JSON specs. [Multiple files]
+**PATCHES APPLIQUÉS (batch auto):**
+- [x] [Review][Patch] **P4: Documentation Outdated** — Supprimé "Multicast" de UX-DR8 et Epic 1. [epics.md]
+- [x] [Review][Patch] **P5: Karma→Weight Naming** — `KARMA_INSUFFICIENT` → `WEIGHT_INSUFFICIENT`. [epics.md]
+- [x] [Review][Patch] **P9: Manifest Formatting** — Indentation corrigée. [AndroidManifest.xml:24]
+- [x] [Review][Patch] **P11: Error Logging** — Message "mode local" remplacé par "cluster isolé (aucun fallback)". [MobicloudP2PService.kt:229]
+- [x] [Review][Patch] **P12: Hilt Cleanup** — Vérifié: aucun @Inject résiduel vers UdpHeartbeat*.
+
+**PATCHES ACTION ITEMS (à traiter dans prochains sprints):**
+- [ ] [Review][Patch] **P1: Room Migration LOCAL_UDP** — Risque ÉLEVÉ: désérialisation des anciens enregistrements LOCAL_UDP crash. [PeerNodeEntity.kt + migration script]
+- [ ] [Review][Patch] **P2: Firebase Public IP Timeout** — Enregistrement silencieux si IP fetch échoue. Ajouter `withTimeoutOrNull(5000L)`. [MobicloudP2PService.kt:131-145]
+- [ ] [Review][Patch] **P3: Reliability Score Non-annoncé** — Score calculé mais pas re-publié sur Firebase. Ajouter re-registration sur changement. [MobicloudP2PService.kt:202-213]
+- [ ] [Review][Patch] **P6: ConsistentHashRing N=0** — Division par zéro si aucun pair connu. Ajouter guard. [ConsistentHashRing.kt]
+- [ ] [Review][Patch] **P7: Firebase/TCP Race Condition** — Port annoncé avant TCP prêt. Vérifier synchronisation. [MobicloudP2PService.kt:115-160]
+- [ ] [Review][Patch] **P8: Network State Adaptation** — Loops 4&5 supprimées sans compensation. Firebase announce non adaptatif. [MobicloudP2PService.kt]
+- [ ] [Review][Patch] **P10: Firebase Timeout** — `withTimeoutOrNull()` manquant sur `observeRemoteNodes()`. [SignalingRepositoryImpl.kt]
+- [ ] [Review][Patch] **P13: ML Safety Guard** — `mlReady` guard manquant dans PredictNodeDepartureUseCase. [m11_ai/]
+- [ ] [Review][Patch] **P14: ConsistentHashRing Spec N=0** — Spec ne définit pas le comportement quand N=0. [documentation]
+- [ ] [Review][Patch] **P16-P22: Edge Cases Firebase/Network** — 7 cas limites réseau. Voir consolidated triage. [Multiple files]
 
 **DEFERRED (13 items):**
-- [x] [Review][Defer] **DF1: Epic 9 Implementation** — AI prediction stories added but not implemented; out of scope for Story 4.1.
-- [x] [Review][Defer] **DF2-DF13: Pre-existing or out-of-scope issues** — 12 additional items related to ML, future features, dependency chains.
+- [x] [Review][Defer] **DF1: Epic 9 Implementation** — AI prediction hors scope Story 4.1, différé — pre-existing
+- [x] [Review][Defer] **DF2-DF13: Out-of-scope issues** — 12 items ML/futurs — deferred, pre-existing
 
-**DISMISSED (4 items):**
-- Noise, false positives, or handled by other mechanisms (4 items dismissed)
-
----
-
-**Review Summary:** 3 decision-needed, 22 patches, 13 deferred, 4 dismissed. **CRITICAL RISK:** Story 4.1 AC#1 violated (peer discovery requires Firebase; offline impossible).
+**DISMISSED (4 items):** Faux positifs ou gérés ailleurs.

@@ -12,8 +12,6 @@ import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertFalse
@@ -27,32 +25,21 @@ class CircuitBreakerUseCaseTest {
     private lateinit var peerRepository: PeerRepository
     private lateinit var networkEventRepository: NetworkEventRepository
     private lateinit var peersFlow: MutableStateFlow<List<Peer>>
-    private lateinit var useCase: CircuitBreakerUseCase
-    private lateinit var testScope: TestScope
 
     @Before
     fun setup() {
         peerRepository = mockk()
         networkEventRepository = mockk()
         peersFlow = MutableStateFlow(emptyList())
-        val testDispatcher = StandardTestDispatcher()
-        testScope = TestScope(testDispatcher)
 
         every { peerRepository.peers } returns peersFlow
         every { networkEventRepository.pushEvent(any()) } just Runs
-
-        useCase = CircuitBreakerUseCase(
-            peerRepository = peerRepository,
-            networkEventRepository = networkEventRepository,
-            applicationScope = testScope
-        )
-        useCase.currentTimeProvider = { testScope.testScheduler.currentTime }
     }
 
     private fun createPeers(count: Int, active: Boolean): List<Peer> {
         return (1..count).map { i ->
             Peer(
-                identity = NodeIdentity("node$i", "pubkey"),
+                identity = NodeIdentity("node$i", ByteArray(0)),
                 lastSeenTimestampMs = 1000L,
                 isActive = active
             )
@@ -60,13 +47,18 @@ class CircuitBreakerUseCaseTest {
     }
 
     @Test
-    fun `does not activate circuit breaker when churn is under 30%`() = testScope.runTest {
-        // Initial state: 10 active peers
+    fun `does not activate circuit breaker when churn is under 30%`() = runTest {
+        val useCase = CircuitBreakerUseCase(
+            peerRepository = peerRepository,
+            networkEventRepository = networkEventRepository,
+            applicationScope = backgroundScope
+        )
+        useCase.currentTimeProvider = { testScheduler.currentTime }
+
         val initialPeers = createPeers(10, true)
         peersFlow.value = initialPeers
         advanceTimeBy(1000)
 
-        // Only 2 peers go offline (20% churn) — sous le seuil
         val updatedPeers = initialPeers.mapIndexed { index, peer ->
             if (index < 2) peer.copy(isActive = false) else peer
         }
@@ -80,12 +72,18 @@ class CircuitBreakerUseCaseTest {
      * P8 — Test à exactement 30% : "plus de 30%" signifie > 0.30, donc 3/10 = 30% exact NE doit PAS déclencher.
      */
     @Test
-    fun `does not activate circuit breaker at exactly 30% churn boundary`() = testScope.runTest {
+    fun `does not activate circuit breaker at exactly 30% churn boundary`() = runTest {
+        val useCase = CircuitBreakerUseCase(
+            peerRepository = peerRepository,
+            networkEventRepository = networkEventRepository,
+            applicationScope = backgroundScope
+        )
+        useCase.currentTimeProvider = { testScheduler.currentTime }
+
         val initialPeers = createPeers(10, true)
         peersFlow.value = initialPeers
         advanceTimeBy(1000)
 
-        // Exactement 3/10 = 30% : condition est churnRate > 0.3, donc 0.3 n'active PAS le breaker
         val updatedPeers = initialPeers.mapIndexed { index, peer ->
             if (index < 3) peer.copy(isActive = false) else peer
         }
@@ -96,13 +94,18 @@ class CircuitBreakerUseCaseTest {
     }
 
     @Test
-    fun `activates circuit breaker when churn exceeds 30%`() = testScope.runTest {
-        // Initial state: 10 active peers
+    fun `activates circuit breaker when churn exceeds 30%`() = runTest {
+        val useCase = CircuitBreakerUseCase(
+            peerRepository = peerRepository,
+            networkEventRepository = networkEventRepository,
+            applicationScope = backgroundScope
+        )
+        useCase.currentTimeProvider = { testScheduler.currentTime }
+
         val initialPeers = createPeers(10, true)
         peersFlow.value = initialPeers
         advanceTimeBy(1000)
 
-        // 4 peers go offline = 40% churn > 30%
         val updatedPeers = initialPeers.mapIndexed { index, peer ->
             if (index < 4) peer.copy(isActive = false) else peer
         }
@@ -114,8 +117,14 @@ class CircuitBreakerUseCaseTest {
     }
 
     @Test
-    fun `does not activate circuit breaker on cluster smaller than MIN_CLUSTER_SIZE`() = testScope.runTest {
-        // Cluster de 2 pairs (< 3) : même 100% de churn ne doit pas activer le breaker
+    fun `does not activate circuit breaker on cluster smaller than MIN_CLUSTER_SIZE`() = runTest {
+        val useCase = CircuitBreakerUseCase(
+            peerRepository = peerRepository,
+            networkEventRepository = networkEventRepository,
+            applicationScope = backgroundScope
+        )
+        useCase.currentTimeProvider = { testScheduler.currentTime }
+
         val initialPeers = createPeers(2, true)
         peersFlow.value = initialPeers
         advanceTimeBy(1000)
@@ -128,17 +137,29 @@ class CircuitBreakerUseCaseTest {
     }
 
     /**
-     * P6 — Fix du test fragile : avancer le temps au-delà de la fenêtre 5min (300s)
-     * afin que les drops enregistrés soient purgés par la fenêtre glissante avant la réévaluation.
+     * La réévaluation s'exécute toutes les 2 min (120 000ms). Le churn (ajouté à t≈1 000ms)
+     * sort de la fenêtre glissante de 5 min uniquement quand currentTime > 301 000ms.
+     *
+     * Calendrier des réévaluations :
+     *   t=122 000ms → churn toujours dans fenêtre → reschedule
+     *   t=242 000ms → churn toujours dans fenêtre → reschedule
+     *   t=362 000ms → churn < windowStart(62 000ms) → PURGÉ → circuit se ferme
+     *
+     * On avance donc à t=363 000ms (361 000 + 1 000 + 1 000 de setup = 363 000ms).
      */
     @Test
-    fun `deactivates circuit breaker after 2 minutes if churn is less than 10%`() = testScope.runTest {
-        // 1. État initial : 10 pairs actifs
+    fun `deactivates circuit breaker after 2 minutes if churn is less than 10%`() = runTest {
+        val useCase = CircuitBreakerUseCase(
+            peerRepository = peerRepository,
+            networkEventRepository = networkEventRepository,
+            applicationScope = backgroundScope
+        )
+        useCase.currentTimeProvider = { testScheduler.currentTime }
+
         val initialPeers = createPeers(10, true)
         peersFlow.value = initialPeers
         advanceTimeBy(1000)
 
-        // 2. Churn élevé : 40% → circuit s'ouvre
         val highChurnPeers = initialPeers.mapIndexed { index, peer ->
             if (index < 4) peer.copy(isActive = false) else peer
         }
@@ -146,13 +167,10 @@ class CircuitBreakerUseCaseTest {
         advanceTimeBy(1000)
         assertTrue(useCase.isCircuitOpen.value)
 
-        // P6 — Avancer au-delà des 5 minutes de fenêtre glissante (300 001 ms)
-        // pour que la réévaluation à t+2min voie un churnHistory vide (tous les drops purgés)
-        advanceTimeBy(301_000)
-
-        // Laisser la réévaluation s'exécuter
+        // Avancer jusqu'à la 3e réévaluation (t=362 000ms) où le churn est purgé
+        advanceTimeBy(361_000)
         advanceTimeBy(1000)
 
-        assertFalse("Le circuit doit se fermer après 2 min si churn < 10%", useCase.isCircuitOpen.value)
+        assertFalse("Le circuit doit se fermer après la 3e réévaluation (churn purgé)", useCase.isCircuitOpen.value)
     }
 }
