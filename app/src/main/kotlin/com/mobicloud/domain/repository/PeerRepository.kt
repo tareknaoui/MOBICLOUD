@@ -11,7 +11,7 @@ interface PeerRepository {
     suspend fun registerOrUpdatePeer(
         identity: NodeIdentity,
         timestampMs: Long,
-        source: DiscoverySource = DiscoverySource.LOCAL_UDP,
+        source: DiscoverySource = DiscoverySource.REMOTE_FIREBASE,
         ipAddress: String? = null,
         port: Int? = null,
         isSuperPair: Boolean = false

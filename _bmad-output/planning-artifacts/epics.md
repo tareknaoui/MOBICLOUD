@@ -13,7 +13,6 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 
 ### Functional Requirements
 
-- FR-01.1: Multicast UDP pour la découverte locale au sein d'un même sous-réseau, sans serveur central. (P0)
 - FR-01.2: Serveur Tracker agissant **uniquement** comme STUN/signaling pour fédérer des réseaux séparés (NAT) et lier les Super-Pairs. (P0)
 - FR-01.3: Tous les transferts (catalogue ou fichiers) se font en P2P direct de nœud à nœud (Zero-Trust, Zero-Knowledge). (P0)
 - FR-02.1: Calcul du Score de Fiabilité (Batterie, Uptime, IP locale) par chaque appareil local. (P0)
@@ -23,7 +22,7 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 - FR-04.1: Index global distribué dans un anneau DHT entre tous les pairs qualifiés du cluster (remplacement SQLite centralisé). (P0)
 - FR-04.2: Synchronisation de la DHT par protocole Gossip épidémique avec CRDT (convergence garantie sans autorité centrale). (P0)
 - FR-06.1: Migration proactive des blocs d'un nœud quittant un cluster (basculement réseau) vers le cluster local avant déconnexion. (P1)
-- FR-07.1: Système de Karma : gain lors du stockage/service de blocs, dépense lors du téléchargement ; bridage des freeriders (Time-Decay). (P1)
+- FR-07.1: Système de Weight : gain lors du stockage/service de blocs, dépense lors du téléchargement ; bridage des freeriders (Time-Decay). (P1)
 
 ### NonFunctional Requirements
 
@@ -34,7 +33,7 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 ### Additional Requirements
 
 - Starter Template : `atick-faisal/Jetpack-Android-Starter` (Clean Architecture : Compose + Hilt + Room + Coroutines/Flow). Obligatoire pour Story 1.1.
-- Foreground Service Android obligatoire pour la couche réseau P2P (MulticastLock Wi-Fi).
+- Foreground Service Android obligatoire pour la couche réseau P2P.
 - Protobuf (kotlinx.serialization) avec `ignoreUnknownKeys=true` pour la compatibilité forward des messages Gossip CRDT.
 - Android Keystore System (hardware-backed) pour l'identité nœud anti-Sybil persistée.
 - AES-256 GCM avec clés éphémères dérivées (Clé_Fichier + Index_Bloc) pour le chiffrement des fragments.
@@ -53,14 +52,13 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 - UX-DR4: Composant `ErasureProgressIndicator` — indicateur de progression multi-blocs de l'opération d'Erasure Coding (encodage et décodage).
 - UX-DR5: Dark Mode OLED pur absolu — thème système Material Design 3, fond #000000 strict.
 - UX-DR6: Bottom Navigation à 3 onglets simples : Dashboard (état nœud) / Explorer (DHT fichiers) / Paramètres.
-- UX-DR7: ModalBottomSheet utilitaristes pour les actions contextuelles sur fichiers/blocs (partager, supprimer, détails).
+- UX-DR7: ModalBottomSheet utilitaristes pour les actions contextuelles sur fichiers/blocs (stocker, supprimer, détails).
 - UX-DR8: Permissions réseau silencieuses et englobantes au lancement (Wi-Fi, Multicast, Réseau) sans friction utilisateur.
 
 ### FR Coverage Map
 
 | Exigence | Épic |
 |---|---|
-| FR-01.1 (UDP Multicast local) | Epic 2 |
 | FR-01.2 (Tracker STUN/Signaling) | Epic 2 |
 | FR-01.3 (P2P Zero-Trust bout-en-bout) | Epic 1 + Epic 5 |
 | FR-02.1 (Score Fiabilité) | Epic 2 |
@@ -70,7 +68,7 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 | FR-04.1 (Anneau DHT distribué) | Epic 4 + Epic 6 |
 | FR-04.2 (Gossip épidémique CRDT) | Epic 4 |
 | FR-06.1 (Migration proactive inter-réseaux) | Epic 7 |
-| FR-07.1 (Karma Anti-Clandestin + Time-Decay) | Epic 8 |
+| FR-07.1 (Weight Anti-Clandestin + Time-Decay) | Epic 8 |
 | NFR-01 (Convergence CRDT ≤ 3s) | Epic 4 |
 | NFR-02 (Latence migration < 5s) | Epic 7 |
 | NFR-03 (Overhead CPU ≤ 5%) | Epic 5 + Global |
@@ -87,11 +85,11 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 
 ### Epic 1: Fondation & Identité de Confiance du Nœud
 **Objectif:** L'utilisateur installe l'app, qui génère automatiquement une identité cryptographique infalsifiable (Android Keystore), configure l'UI (Dark OLED, navigation 3 onglets) et demande les permissions réseau. Le nœud est prêt à rejoindre le réseau.
-**FRs covered:** FR-01.3, UX-DR5, UX-DR6, UX-DR8, Architecture: Starter Template, Keystore Anti-Sybil, Foreground Service.
+**FRs covered:** FR-01.3, UX-DR5, UX-DR6, UX-DR8, Architecture: Starter Template, Keystore Anti-Sybil, Foreground Service (sans MulticastLock).
 
-### Epic 2: Découverte Hybride & Dashboard Tactique
-**Objectif:** L'utilisateur peut voir les nœuds pairs détectés — en local via UDP Multicast (Wifi), et à travers le NAT via le Tracker STUN/Firebase (4G). Le Dashboard affiche les pairs, le score de fiabilité et les événements réseau en temps réel.
-**FRs covered:** FR-01.1, FR-01.2, FR-02.1, UX-DR1, UX-DR2, UX-DR3.
+### Epic 2: Découverte Inter-Réseaux & Dashboard Tactique
+**Objectif:** L'utilisateur peut voir les nœuds pairs détectés à travers le NAT via le Tracker STUN/Firebase. Le Dashboard affiche les pairs, le score de fiabilité et les événements réseau en temps réel.
+**FRs covered:** FR-01.2, FR-02.1, UX-DR1, UX-DR2, UX-DR3.
 
 ### Epic 3: Gouvernance Décentralisée — Élection Bully & Super-Pair
 **Objectif:** L'écosystème de nœuds s'auto-organise : l'Algorithme Bully élit un Super-Pair à partir des scores de fiabilité, celui-ci enregistre sa présence sur le Tracker pour lier son cluster à la fédération, et abdique automatiquement après 30 minutes.
@@ -101,8 +99,8 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 **Objectif:** L'utilisateur peut voir dans l'Explorer la liste des fichiers disponibles dans le cluster, synchronisée de façon décentralisée via l'anneau DHT et les échanges Gossip épidémiques avec Filtres de Bloom garantissant une convergence ≤ 3s.
 **FRs covered:** FR-04.1, FR-04.2, NFR-01, Architecture: Filtres de Bloom, Protobuf CRDT ignoreUnknownKeys.
 
-### Epic 5: Partage de Fichiers Zero-Trust — Erasure Coding & Chiffrement
-**Objectif:** L'utilisateur peut partager un fichier qui est découpé en blocs K+N chiffrés (C++ NDK via JNI DirectByteBuffer) et distribués aux nœuds du cluster. L'ErasureProgressIndicator visualise l'opération. L'hébergeur ne peut jamais lire le bloc.
+### Epic 5: Stockage Distribué Zero-Trust — Erasure Coding & Chiffrement
+**Objectif:** L'utilisateur peut stocker un fichier qui est découpé en blocs K+N chiffrés (C++ NDK via JNI DirectByteBuffer) et distribués aux nœuds du cluster. L'ErasureProgressIndicator visualise l'opération. L'hébergeur ne peut jamais lire le bloc.
 **FRs covered:** FR-03.1, FR-03.2, UX-DR4, NFR-03, Architecture: JNI DirectByteBuffer batching, AES-256 GCM.
 
 ### Epic 6: Récupération Concurrentielle & Streaming Actif
@@ -113,9 +111,13 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 **Objectif:** Lorsqu'un nœud quitte le réseau (basculement réseau), le Super-Pair orchestre la migration proactive de ses blocs vers d'autres nœuds en moins de 5 secondes. Le Circuit-Breaker gèle les réparations si le churn dépasse 30% pour protéger les survivants.
 **FRs covered:** FR-06.1, NFR-02, Architecture: Circuit-Breaker Avalanche, Buffer d'urgence électoral.
 
-### Epic 8: Équité & Karma Anti-Clandestin
-**Objectif:** L'utilisateur voit son score Karma dynamique (gain en servant des blocs, dépense en téléchargeant, décroissance temporelle). Les freeriders sont bridés. Les actions Karma sont accessibles via ModalBottomSheet dans l'Explorer.
-**FRs covered:** FR-07.1, UX-DR7, Architecture: Validation Karma peer-to-peer signée, Time-Decay.
+### Epic 8: Équité & Weight Anti-Clandestin
+**Objectif:** L'utilisateur voit son score Weight dynamique (gain en servant des blocs, dépense en téléchargeant, décroissance temporelle). Les freeriders sont bridés. Les actions Weight sont accessibles via ModalBottomSheet dans l'Explorer.
+**FRs covered:** FR-07.1, UX-DR7, Architecture: Validation Weight peer-to-peer signée, Time-Decay.
+
+### Epic 9: Prédiction IA — Anticipation de Départ & Score de Fiabilité
+**Objectif:** Un modèle Random Forest embarqué (TFLite on-device) prédit la probabilité de départ imminent d'un nœud et son score de fiabilité futur, permettant au Super-Pair d'anticiper les migrations et d'élire le meilleur candidat lors des élections Bully.
+**FRs covered:** FR-06.1 (migration proactive améliorée), FR-02.2 (élection Bully améliorée), Architecture: TFLite Random Forest, Feature Engineering on-device.
 
 ---
 
@@ -172,6 +174,23 @@ Afin de disposer d'une identité de confiance infalsifiable et anti-Sybil utilis
 **And** la clé privée ne peut jamais être exportée hors du TEE/KeyStore (vérifiable par `isInsideSecureHardware`)
 **And** le tout est accessible via l'interface `domain/repository/IdentityRepository.kt` (Clean Architecture)
 
+### Story 1.5: Configuration du Quota de Stockage Alloué au Réseau
+
+En tant qu'utilisateur,
+Je veux définir combien de gigaoctets de mon stockage j'alloue au réseau MobiCloud,
+Afin de contrôler l'espace disque consommé par l'hébergement des blocs d'autres utilisateurs.
+
+**Acceptance Criteria:**
+
+**Given** l'utilisateur ouvre l'onglet "Paramètres"
+**When** il accède à la section "Contribution au réseau"
+**Then** un slider affiche l'espace allouable : de 0.5 GB à 80% de l'espace libre, par paliers de 0.5 GB
+**And** l'espace actuellement utilisé par les blocs hébergés est affiché (ex: "1.2 GB utilisés sur 3 GB alloués")
+**And** la valeur choisie est persistée dans `NodeSettings.allocatedStorageBytes` (Room DB)
+**And** si l'utilisateur réduit le quota en dessous de l'espace déjà utilisé, un dialog d'avertissement s'affiche : "Réduire ce quota supprimera des blocs hébergés et pénalisera votre Weight"
+**And** la valeur par défaut au premier lancement est `min(2 GB, 20% de l'espace libre)`
+**And** la valeur est accessible via `domain/repository/NodeSettingsRepository.kt`
+
 ### Story 1.4: Foreground Service Réseau & Permissions au Lancement
 
 En tant qu'utilisateur,
@@ -182,52 +201,34 @@ Afin que le service P2P de MobiCloud fonctionne en arrière-plan de façon conti
 
 **Given** l'app est lancée pour la première fois
 **When** l'écran de démarrage s'affiche
-**Then** les permissions `ACCESS_WIFI_STATE`, `CHANGE_WIFI_MULTICAST_STATE`, `INTERNET`, `ACCESS_NETWORK_STATE` sont demandées en un seul flux
+**Then** les permissions `ACCESS_WIFI_STATE`, `INTERNET`, `ACCESS_NETWORK_STATE` sont demandées en un seul flux
 **And** si l'utilisateur accorde les permissions, un `Foreground Service` est démarré avec une notification persistante discrète ("MobiCloud P2P actif")
-**And** le service acquiert un `MulticastLock` Wi-Fi pour empêcher l'OS de filtrer les paquets UDP
 **And** si le service est tué par l'OS, il redémarre automatiquement (`START_STICKY`)
 **And** l'état du service est exposé via un `StateFlow<ServiceStatus>` observable depuis le Dashboard
 
 ---
 
-## Epic 2: Découverte Hybride & Dashboard Tactique
+## Epic 2: Découverte Inter-Réseaux & Dashboard Tactique
 
-**Objectif :** L'utilisateur peut voir les nœuds pairs détectés — en local via UDP Multicast (Wifi), et à travers le NAT via le Tracker STUN/Firebase (4G). Le Dashboard affiche les pairs découverts, le score de fiabilité local et les événements réseau en temps réel.
+**Objectif :** L'utilisateur peut voir les nœuds pairs détectés à travers le NAT via le Tracker STUN/Firebase. Le Dashboard affiche les pairs découverts, le score de fiabilité local et les événements réseau en temps réel.
 
-### Story 2.1: Découverte Locale via UDP Multicast (Heartbeat)
+### Story 2.1: Signalisation Inter-Réseaux via Tracker Firebase
 
-En tant que nœud MobiCloud sur Wifi,
-Je veux envoyer et recevoir des heartbeats UDP Multicast,
-Afin de découvrir automatiquement les pairs présents sur le même sous-réseau sans aucun serveur central.
-
-**Acceptance Criteria:**
-
-**Given** deux appareils sont connectés au même réseau Wifi et le Foreground Service est actif
-**When** l'app démarre sur chaque appareil
-**Then** chaque nœud envoie périodiquement un message `HEARTBEAT` Protobuf en UDP Multicast (groupe `239.255.255.250:7777`)
-**And** chaque nœud reçoit les heartbeats des pairs et les enregistre dans une `PeerRegistry` locale (Room DB)
-**And** un pair non entendu depuis > 15 secondes est marqué `INACTIVE` dans la registry
-**And** les données du pair incluent `nodeId`, `publicKeyBytes`, `ipAddress`, `port`, `reliabilityScore`
-**And** le tout passe par `domain/repository/PeerRepository.kt` (interface Clean Architecture)
-**And** la `PeerRegistry` expose un `Flow<List<PeerNode>>` réactif
-
-### Story 2.2: Signalisation Inter-Réseaux via Tracker Firebase
-
-En tant que nœud MobiCloud sur réseau 4G,
+En tant que nœud MobiCloud,
 Je veux m'enregistrer auprès du Tracker Firebase et découvrir les Super-Pairs d'autres clusters,
-Afin de rejoindre la fédération MobiCloud même sans réseau local commun.
+Afin de rejoindre la fédération MobiCloud via internet.
 
 **Acceptance Criteria:**
 
-**Given** le nœud est sur un réseau 4G (pas de Multicast UDP disponible)
-**When** le service démarre et détecte l'absence de pairs locaux après 10 secondes
+**Given** le nœud démarre et le Foreground Service est actif
+**When** le service démarre
 **Then** le nœud s'enregistre sur Firebase Realtime Database avec ses métadonnées (`nodeId`, `publicKey`, `ip`, `port`, `timestamp`)
 **And** le nœud lit la liste des Super-Pairs inscrits sur Firebase et les ajoute à sa `PeerRegistry` locale
 **And** les entrées Firebase âgées de plus de 60 secondes sont ignorées (TTL)
 **And** la logique Firebase est encapsulée dans `data/repository/SignalingRepositoryImpl.kt` (interface `domain/repository/SignalingRepository.kt`)
-**And** si Firebase est inaccessible, le nœud reste en mode Multicast local seul (`Result.Failure` remontée proprement)
+**And** si Firebase est inaccessible, une `Result.Failure` est remontée proprement et loguée dans le `RadarLogConsole`
 
-### Story 2.3: Calcul du Score de Fiabilité Local
+### Story 2.2: Calcul du Score de Fiabilité Local
 
 En tant que nœud MobiCloud,
 Je veux mesurer et publier mon Score de Fiabilité (batterie, uptime, IP),
@@ -239,11 +240,11 @@ Afin que les autres nœuds puissent évaluer si je suis un candidat valide pour 
 **When** le score est recalculé toutes les 30 secondes
 **Then** le score composite est calculé : `BatteryLevel (40%) + Uptime (40%) + NetworkStability (20%)` normalisé entre 0.0 et 1.0
 **And** le score est persisté dans `NodeIdentity.reliabilityScore` (Room DB)
-**And** le score est inclus dans les messages Heartbeat UDP et les enregistrements Firebase
+**And** le score est inclus dans les enregistrements Firebase et les messages P2P signés
 **And** l'interface `domain/usecase/CalculateReliabilityScoreUseCase.kt` encapsule la logique
 **And** un mock `StaticMockTrustScore` est injectable via Hilt pour les tests unitaires
 
-### Story 2.4: Dashboard Tactique — Composants UX de Diagnostic
+### Story 2.3: Dashboard Tactique — Composants UX de Diagnostic
 
 En tant qu'utilisateur,
 Je veux voir un tableau de bord affichant mon état de nœud, les pairs découverts et les événements réseau en temps réel,
@@ -257,7 +258,7 @@ Afin d'avoir une visibilité complète sur la santé de mon cluster local.
 **And** les composants `KpiDiagnosticCard` affichent : Niveau de batterie, Uptime (hh:mm), Réseau actif (Wifi/4G), Nombre de pairs actifs
 **And** le composant `RadarLogConsole` affiche un flux scrollable des 50 derniers événements réseau P2P avec horodatage
 **And** les données sont mises à jour en temps réel via `StateFlow` (pas de pull manuel)
-**And** si aucun pair n'est découvert, un message "Aucun pair détecté — scan en cours..." s'affiche
+**And** si aucun pair n'est découvert, un message "Aucun pair détecté — connexion Firebase en cours..." s'affiche
 
 ---
 
@@ -399,13 +400,13 @@ Afin de savoir quels fichiers sont accessibles et par qui ils sont hébergés.
 **And** chaque entrée indique son état de disponibilité : "Complet" / "Partiel" / "Dégradé"
 **And** un pull-to-refresh déclenche une synchronisation Gossip manuelle immédiate
 **And** la liste est observable via `Flow<List<CatalogEntry>>` (mise à jour auto quand la DHT locale change)
-**And** un état vide "Catalogue vide — aucun fichier partagé dans le cluster" s'affiche si la DHT est vide
+**And** un état vide "Catalogue vide — aucun fichier stocké dans le cluster" s'affiche si la DHT est vide
 
 ---
 
-## Epic 5: Partage de Fichiers Zero-Trust — Erasure Coding & Chiffrement
+## Epic 5: Stockage Distribué Zero-Trust — Erasure Coding & Chiffrement
 
-**Objectif :** L'utilisateur peut partager un fichier qui est découpé en blocs K+N chiffrés (C++ NDK via JNI DirectByteBuffer) et distribués aux nœuds du cluster. L'`ErasureProgressIndicator` visualise l'opération. L'hébergeur ne peut jamais lire le bloc.
+**Objectif :** L'utilisateur peut stocker un fichier qui est découpé en blocs K+N chiffrés (C++ NDK via JNI DirectByteBuffer) et distribués aux nœuds du cluster. L'`ErasureProgressIndicator` visualise l'opération. L'hébergeur ne peut jamais lire le bloc.
 
 ### Story 5.1: Moteur Erasure Coding C++ (NDK/JNI)
 
@@ -444,12 +445,12 @@ Afin de ne jamais pouvoir lire le contenu du bloc que je stocke (Zero-Trust).
 ### Story 5.3: Distribution des Blocs aux Nœuds du Cluster
 
 En tant qu'utilisateur,
-Je veux partager un fichier depuis l'Explorer,
+Je veux stocker un fichier dans le réseau distribué depuis l'Explorer,
 Afin que ses blocs chiffrés soient distribués automatiquement aux nœuds disponibles du cluster via sockets TCP directs.
 
 **Acceptance Criteria:**
 
-**Given** l'utilisateur sélectionne un fichier et appuie sur "Partager" dans l'Explorer
+**Given** l'utilisateur sélectionne un fichier et appuie sur "Stocker" dans l'Explorer
 **When** la distribution est déclenchée
 **Then** le fichier est encodé en K+N blocs chiffrés (Stories 5.1 + 5.2)
 **And** le Super-Pair assigne un nœud destination par bloc (round-robin sur nœuds `ACTIVE` de la `PeerRegistry`)
@@ -463,17 +464,36 @@ Afin que ses blocs chiffrés soient distribués automatiquement aux nœuds dispo
 
 En tant qu'utilisateur,
 Je veux voir la progression du découpage et de la distribution de mes blocs Erasure en temps réel,
-Afin de comprendre l'état de mon opération de partage sans attendre la fin.
+Afin de comprendre l'état de mon opération de stockage sans attendre la fin.
 
 **Acceptance Criteria:**
 
-**Given** l'utilisateur a déclenché un partage de fichier
+**Given** l'utilisateur a déclenché un stockage de fichier
 **When** l'opération d'Erasure Coding et de distribution est en cours
 **Then** le composant `ErasureProgressIndicator` affiche une barre multi-étapes : "Encodage..." → "Chiffrement..." → "Distribution (X/K+N blocs)"
 **And** chaque bloc confirmé par ACK incrémente le compteur de blocs distribués
 **And** les blocs de données (K) et de parité (N) sont visuellement distincts dans l'indicateur
 **And** en cas d'erreur sur un bloc, celui-ci est affiché en rouge avec le message d'erreur
-**And** à la fin de la distribution réussie, un toast "Fichier partagé avec succès — X nœuds" s'affiche
+**And** à la fin de la distribution réussie, un toast "Fichier stocké avec succès sur X nœuds" s'affiche
+
+### Story 5.5: Réception & Hébergement de Blocs Distants
+
+En tant que nœud hébergeur,
+Je veux recevoir les blocs chiffrés d'autres utilisateurs et les persister localement,
+Afin de contribuer au réseau de stockage distribué et gagner du Weight en retour.
+
+**Acceptance Criteria:**
+
+**Given** le Foreground Service est actif et le TCP server écoute
+**When** un nœud distant envoie un bloc chiffré via socket TCP
+**Then** le bloc est reçu et son intégrité est vérifiée via son hash SHA-256
+**And** si le hash est valide, le bloc est persisté dans le stockage local (`/files/blocks/{blockId}`) avec ses métadonnées (`blockId`, `ownerId`, `sizeBytes`, `receivedAt`)
+**And** une entrée `HostedBlockEntity` est insérée en Room DB : `blockId`, `ownerId`, `filePath`, `sizeBytes`
+**And** un `ACK` signé contenant le hash SHA-256 du bloc est renvoyé au nœud émetteur
+**And** le Weight du nœud hébergeur est incrémenté de +1 via `UpdateWeightScoreUseCase` (Epic 8)
+**And** si le hash est invalide, le bloc est rejeté et un `NACK` est renvoyé (pas de Weight gagné)
+**And** si l'espace disque local est insuffisant (< 100 MB libres), la requête est rejetée avec `STORAGE_FULL`
+**And** la logique est dans `domain/usecase/m08_hosting/ReceiveAndHostBlockUseCase.kt`
 
 ---
 
@@ -603,56 +623,153 @@ Afin de déclencher automatiquement une auto-réparation pour restaurer la rési
 
 ---
 
-## Epic 8: Équité & Karma Anti-Clandestin
+## Epic 8: Équité & Weight Anti-Clandestin
 
-**Objectif :** L'utilisateur voit son score Karma dynamique (gain en servant des blocs, dépense en téléchargeant, décroissance temporelle). Les freeriders sont bridés. Les actions Karma sont accessibles via ModalBottomSheet dans l'Explorer.
+**Objectif :** L'utilisateur voit son score Weight dynamique (gain en servant des blocs, dépense en téléchargeant, décroissance temporelle). Les freeriders sont bridés. Les actions Weight sont accessibles via ModalBottomSheet dans l'Explorer.
 
-### Story 8.1: Moteur de Karma — Calcul, Persistance & Time-Decay
+### Story 8.1: Moteur de Weight — Calcul, Persistance & Time-Decay
 
 En tant que nœud MobiCloud,
-Je veux maintenir un score de Karma qui évolue selon mes contributions au réseau,
+Je veux maintenir un score de Weight qui évolue selon mes contributions au réseau,
 Afin que les nœuds égoïstes soient pénalisés et que ma participation continue soit récompensée.
 
 **Acceptance Criteria:**
 
 **Given** le nœud est actif dans le cluster
 **When** une transaction réseau se produit
-**Then** le score Karma augmente de +1 point lorsque le nœud sert un bloc (envoi TCP réussi avec ACK)
-**And** le score Karma diminue de -2 points lorsque le nœud télécharge un bloc (réception TCP)
+**Then** le score Weight augmente de +1 point lorsque le nœud sert un bloc (envoi TCP réussi avec ACK)
+**And** le score Weight diminue de -2 points lorsque le nœud télécharge un bloc (réception TCP)
 **And** un mécanisme de Time-Decay applique -5% du score toutes les heures d'inactivité (minimum 0)
-**And** le score Karma est persisté dans `NodeIdentity.karmaScore` (Room DB, mis à jour atomiquement)
-**And** chaque transaction Karma est signée par la clé privée du nœud (Anti-Replay : timestamp + nonce)
-**And** la logique est dans `domain/usecase/m09/UpdateKarmaScoreUseCase.kt`
+**And** le score Weight est persisté dans `NodeIdentity.weightScore` (Room DB, mis à jour atomiquement)
+**And** chaque transaction Weight est signée par la clé privée du nœud (Anti-Replay : timestamp + nonce)
+**And** la logique est dans `domain/usecase/m09/UpdateWeightScoreUseCase.kt`
 
-### Story 8.2: Validation Karma Pair-à-Pair & Bridage des Freeriders
+### Story 8.2: Validation Weight Pair-à-Pair & Bridage des Freeriders
 
 En tant que Super-Pair,
-Je veux valider les scores Karma des nœuds du cluster et brider ceux dont le score est négatif,
+Je veux valider les scores Weight des nœuds du cluster et brider ceux dont le score est négatif,
 Afin de garantir l'équité des contributions au réseau et d'empêcher les comportements parasites.
 
 **Acceptance Criteria:**
 
 **Given** un nœud demande un téléchargement de bloc
 **When** le Super-Pair traite la requête
-**Then** le Super-Pair vérifie le score Karma du demandeur dans la `PeerRegistry` locale
-**And** si le score Karma est ≤ 0, la bande passante allouée est réduite de 50% (bridage progressif)
-**And** si le score Karma est < -10, la requête est rejetée avec un message `KARMA_INSUFFICIENT`
+**Then** le Super-Pair vérifie le score Weight du demandeur dans la `PeerRegistry` locale
+**And** si le score Weight est ≤ 0, la bande passante allouée est réduite de 50% (bridage progressif)
+**And** si le score Weight est < -10, la requête est rejetée avec un message `KARMA_INSUFFICIENT`
 **And** la validation est directe peer-to-peer signée (sans certification collégiale DHT complexe)
 **And** le nœud bridé peut retrouver ses droits en servant des blocs (score remonte via Story 8.1)
 **And** les décisions de bridage sont loguées dans le `RadarLogConsole` (visibilité réseau)
 
-### Story 8.3: Affichage Karma & ModalBottomSheet dans l'Explorer
+### Story 8.4: Quota de Stockage & Weight Potentiel
 
 En tant qu'utilisateur,
-Je veux voir mon score Karma dans l'interface et accéder aux actions contextuelles sur mes fichiers,
-Afin de comprendre ma réputation dans le réseau et gérer mes fichiers partagés efficacement.
+Je veux voir le lien entre mon quota de stockage alloué et mon Weight potentiel gagnable,
+Afin de comprendre que plus j'offre d'espace au réseau, plus je peux stocker mes propres fichiers.
+
+**Acceptance Criteria:**
+
+**Given** l'utilisateur est sur l'onglet "Paramètres" section "Contribution au réseau"
+**When** il ajuste son quota de stockage
+**Then** un indicateur affiche en temps réel le Weight potentiel journalier estimé : `quota_GB × blocs_servis_moyen × 1 weight/bloc`
+**And** si le quota est à 0, un message d'avertissement s'affiche : "Quota à 0 — vous ne pouvez plus stocker de fichiers dans le réseau"
+**And** la Story 5.5 vérifie ce quota avant d'accepter un bloc : si `usedStorage >= allocatedStorage`, la requête est rejetée avec `STORAGE_FULL`
+**And** les blocs hébergés supprimés suite à une réduction de quota entraînent un malus Weight de -5 par bloc supprimé
+**And** le quota restant est visible dans la `KpiDiagnosticCard` du Dashboard (ex: "1.2 / 3 GB utilisés")
+**And** la logique de vérification est dans `domain/usecase/m08_hosting/CheckStorageQuotaUseCase.kt`
+
+### Story 8.3: Affichage Weight & ModalBottomSheet dans l'Explorer
+
+En tant qu'utilisateur,
+Je veux voir mon score Weight dans l'interface et accéder aux actions contextuelles sur mes fichiers,
+Afin de comprendre ma réputation dans le réseau et gérer mes fichiers stockés efficacement.
 
 **Acceptance Criteria:**
 
 **Given** l'utilisateur est sur l'onglet Explorer ou Dashboard
 **When** il consulte son profil de nœud
-**Then** son score Karma actuel est affiché dans la `KpiDiagnosticCard` (badge coloré : vert > 10, jaune 0-10, rouge < 0)
+**Then** son score Weight actuel est affiché dans la `KpiDiagnosticCard` (badge coloré : vert > 10, jaune 0-10, rouge < 0)
 **And** le Time-Decay restant est affiché (ex: "Prochain -5% dans 23min")
 **And** un appui long sur un fichier dans l'Explorer ouvre un `ModalBottomSheet` avec les actions : "Détails des blocs", "Supprimer ma copie", "Forcer synchronisation Gossip"
-**And** les détails d'un bloc incluent : `blockId` tronqué, nœud hébergeur, taille, état Karma requis pour téléchargement
-**And** si le Karma de l'utilisateur est insuffisant, l'action "Télécharger" dans le ModalBottomSheet est grisée avec un tooltip "Karma insuffisant"
+**And** les détails d'un bloc incluent : `blockId` tronqué, nœud hébergeur, taille, état Weight requis pour téléchargement
+**And** si le Weight de l'utilisateur est insuffisant, l'action "Télécharger" dans le ModalBottomSheet est grisée avec un tooltip "Weight insuffisant"
+
+---
+
+## Epic 9: Prédiction IA — Anticipation de Départ & Score de Fiabilité
+
+**Objectif :** Un modèle Random Forest embarqué (TFLite on-device) prédit la probabilité de départ imminent d'un nœud et son score de fiabilité futur. Le Super-Pair utilise ces prédictions pour anticiper les migrations avant même de recevoir un `DEPARTURE_NOTICE`, et pour élire le candidat le plus stable lors des élections Bully.
+
+### Story 9.1: Collecte des Features & Pipeline de Données
+
+En tant que nœud MobiCloud,
+Je veux collecter en continu les métriques de mon état système,
+Afin de constituer le dataset nécessaire à l'inférence du modèle de prédiction IA.
+
+**Acceptance Criteria:**
+
+**Given** le Foreground Service est actif
+**When** le collecteur de features s'exécute toutes les 30 secondes
+**Then** un `FeatureSnapshot` est enregistré en Room DB avec les champs suivants :
+- `batteryLevel` : niveau batterie actuel (0.0–1.0)
+- `batteryTrend` : delta batterie sur la dernière heure (%/h, négatif = décharge)
+- `networkStability` : ratio de paquets Firebase reçus sans erreur sur les 5 dernières minutes (0.0–1.0)
+- `uptimeHours` : durée de session active en heures
+- `timeOfDay` : heure de la journée normalisée (0.0–1.0)
+- `historicalAvgSessionLength` : durée moyenne des sessions passées en heures
+**And** les snapshots sont purgés automatiquement après 7 jours (Room DB TTL)
+**And** après 50 snapshots collectés, le flag `mlReady = true` est activé dans `NodeSettings`
+**And** la logique est dans `domain/usecase/m11_ai/CollectFeatureSnapshotUseCase.kt`
+
+### Story 9.2: Modèle TFLite — Prédiction de Départ Imminent
+
+En tant que Super-Pair,
+Je veux prédire la probabilité qu'un nœud quitte le réseau dans les 5 prochaines minutes,
+Afin de déclencher la migration de ses blocs de façon proactive avant même son départ.
+
+**Acceptance Criteria:**
+
+**Given** le flag `mlReady = true` sur un nœud pair et ses features sont disponibles dans la `PeerRegistry`
+**When** le Super-Pair exécute le cycle de prédiction toutes les 60 secondes
+**Then** le modèle `departure_predictor.tflite` (embarqué dans `assets/ml/`) est chargé via `org.tensorflow:tensorflow-lite`
+**And** les 6 features du `FeatureSnapshot` le plus récent sont passées au modèle en `FloatArray`
+**And** le modèle retourne `P(départ dans 5min)` entre 0.0 et 1.0
+**And** si `P(départ) >= 0.75`, le Super-Pair déclenche immédiatement le protocole de migration (Story 7.2) sans attendre `DEPARTURE_NOTICE`
+**And** l'événement est loggué dans le `RadarLogConsole` : `"[IA] Départ prédit pour {nodeId} — P=0.82 — migration anticipée"`
+**And** l'inférence s'exécute sur `Dispatchers.Default` et ne dépasse pas 5ms (modèle quantisé INT8)
+**And** la logique est dans `domain/usecase/m11_ai/PredictNodeDepartureUseCase.kt`
+
+### Story 9.3: Modèle TFLite — Prédiction du Score de Fiabilité Futur
+
+En tant que nœud participant à une élection Bully,
+Je veux que l'élection tienne compte du score de fiabilité **prédit dans 30 minutes** et non du score actuel,
+Afin d'éviter d'élire un Super-Pair dont la batterie ou la connexion va se dégrader imminemment.
+
+**Acceptance Criteria:**
+
+**Given** une élection Bully est déclenchée (Story 3.1)
+**When** chaque nœud calcule son score de candidature
+**Then** le modèle `score_predictor.tflite` est chargé et inféré avec les features locales
+**And** le modèle retourne `predicted_reliability_score` à horizon +30 minutes (0.0–1.0)
+**And** si `mlReady = false` (moins de 50 snapshots), le score actuel est utilisé comme fallback
+**And** le score prédit est inclus dans le message `ELECTION` Protobuf : champ `predictedScore`
+**And** les pairs comparent `predictedScore` en priorité sur `reliabilityScore` actuel lors de l'élection
+**And** la logique est dans `domain/usecase/m11_ai/PredictReliabilityScoreUseCase.kt`
+
+### Story 9.4: Dashboard IA — Visualisation des Prédictions
+
+En tant qu'utilisateur,
+Je veux voir les prédictions IA de mon nœud dans le Dashboard,
+Afin de comprendre comment le système anticipe mon comportement réseau.
+
+**Acceptance Criteria:**
+
+**Given** l'utilisateur est sur l'onglet "Dashboard"
+**When** le modèle IA a produit des prédictions
+**Then** une carte `AIPredictionCard` affiche :
+  - Score de fiabilité prédit dans 30min (barre de progression colorée)
+  - Probabilité de départ dans 5min (badge : vert < 25%, orange 25–75%, rouge > 75%)
+  - Statut du modèle : "IA active" ou "Collecte en cours (X/50 snapshots)"
+**And** si `P(départ) >= 0.75` sur le nœud local, une notification discrète s'affiche : "Votre nœud risque de quitter le réseau — migration en cours"
+**And** la carte est masquée si `mlReady = false`
+**And** les données sont exposées via `StateFlow<AIPredictionState>` dans le ViewModel du Dashboard
