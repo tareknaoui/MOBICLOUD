@@ -1,0 +1,1010 @@
+diff --git a/app/src/androidTest/kotlin/com/mobicloud/core/erasure/ErasureCodingJniTest.kt b/app/src/androidTest/kotlin/com/mobicloud/core/erasure/ErasureCodingJniTest.kt
+new file mode 100644
+index 0000000..bdda8db
+--- /dev/null
++++ b/app/src/androidTest/kotlin/com/mobicloud/core/erasure/ErasureCodingJniTest.kt
+@@ -0,0 +1,82 @@
++package com.mobicloud.core.erasure
++
++import androidx.test.ext.junit.runners.AndroidJUnit4
++import org.junit.Assert.assertArrayEquals
++import org.junit.Assert.assertEquals
++import org.junit.Test
++import org.junit.runner.RunWith
++import java.security.MessageDigest
++import java.util.Random
++
++/**
++ * Instrumented roundtrip test for the native C++ erasure coding kernel.
++ *
++ * Runs on-device (or on emulator) so that the `mobimath_lib.so` matching the target ABI is
++ * actually loaded. Cross-checks the native output against [PureKotlinErasureCodec] (same
++ * GF(256) algorithm in pure Kotlin) to prove bit-exact parity between the two implementations.
++ */
++@RunWith(AndroidJUnit4::class)
++class ErasureCodingJniTest {
++
++    private val kotlinRef = PureKotlinErasureCodec()
++
++    private fun sha256(bytes: ByteArray): ByteArray =
++        MessageDigest.getInstance("SHA-256").digest(bytes)
++
++    @Test
++    fun native_roundtrip_recovers_original_bytes_from_K_data_blocks() {
++        val k = 4
++        val n = 2
++        val blockSize = 64 * 1024
++        val rng = Random(0xC0FFEEL)
++        val data = List(k) { ByteArray(blockSize).also(rng::nextBytes) }
++
++        val parity = ErasureCodingJni.encode(data, k, n)
++        assertEquals(n, parity.size)
++
++        val recovered = ErasureCodingJni.decode(data, intArrayOf(0, 1, 2, 3), k, n)
++        for (i in 0 until k) assertArrayEquals(data[i], recovered[i])
++    }
++
++    @Test
++    fun native_roundtrip_recovers_from_mixed_data_and_parity_survivors() {
++        val k = 4
++        val n = 2
++        val blockSize = 32 * 1024
++        val rng = Random(0xFEEDL)
++        val data = List(k) { ByteArray(blockSize).also(rng::nextBytes) }
++
++        val parity = ErasureCodingJni.encode(data, k, n)
++        // Drop data[2] and data[3] — survive with data[0], data[1], parity[0], parity[1].
++        val survivors = listOf(data[0], data[1], parity[0], parity[1])
++        val indices = intArrayOf(0, 1, 4, 5)
++
++        val recovered = ErasureCodingJni.decode(survivors, indices, k, n)
++
++        for (i in 0 until k) assertArrayEquals(data[i], recovered[i])
++    }
++
++    @Test
++    fun native_parity_matches_pure_kotlin_reference_byte_for_byte() {
++        val k = 4
++        val n = 2
++        val blockSize = 16 * 1024
++        val rng = Random(0xBEEFL)
++        val data = List(k) { ByteArray(blockSize).also(rng::nextBytes) }
++
++        val nativeParity = ErasureCodingJni.encode(data, k, n)
++        val kotlinParity = kotlinRef.encode(data, k, n)
++
++        for (i in 0 until n) {
++            assertArrayEquals(
++                "Parity block $i diverges between native and Kotlin reference",
++                kotlinParity[i],
++                nativeParity[i],
++            )
++        }
++        assertArrayEquals(
++            sha256(kotlinParity.flatMap { it.toList() }.toByteArray()),
++            sha256(nativeParity.flatMap { it.toList() }.toByteArray()),
++        )
++    }
++}
+diff --git a/app/src/main/cpp/CMakeLists.txt b/app/src/main/cpp/CMakeLists.txt
+index 171d256..9fb1258 100644
+--- a/app/src/main/cpp/CMakeLists.txt
++++ b/app/src/main/cpp/CMakeLists.txt
+@@ -5,7 +5,8 @@ project("mobimath_lib")
+ add_library(
+         mobimath_lib
+         SHARED
+-        native-lib.cpp)
++        native-lib.cpp
++        erasure_coding/erasure_jni.cpp)
+ 
+ find_library(
+         log-lib
+diff --git a/app/src/main/cpp/erasure_coding/erasure_jni.cpp b/app/src/main/cpp/erasure_coding/erasure_jni.cpp
+new file mode 100644
+index 0000000..e097f8c
+--- /dev/null
++++ b/app/src/main/cpp/erasure_coding/erasure_jni.cpp
+@@ -0,0 +1,257 @@
++#include <jni.h>
++#include <android/log.h>
++#include <cstdint>
++#include <cstring>
++#include <vector>
++
++#define LOG_TAG "ErasureCodingJni"
++#define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
++
++namespace {
++
++constexpr uint16_t GF_POLY = 0x11d;
++
++uint8_t gf_log_tab[256];
++uint8_t gf_exp_tab[512];
++bool gf_tables_ready = false;
++
++void gf_init_tables() {
++    if (gf_tables_ready) return;
++    uint16_t x = 1;
++    for (int i = 0; i < 255; ++i) {
++        gf_exp_tab[i] = static_cast<uint8_t>(x);
++        gf_log_tab[x] = static_cast<uint8_t>(i);
++        x <<= 1;
++        if (x & 0x100) x ^= GF_POLY;
++    }
++    for (int i = 255; i < 512; ++i) {
++        gf_exp_tab[i] = gf_exp_tab[i - 255];
++    }
++    gf_tables_ready = true;
++}
++
++inline uint8_t gf_mul(uint8_t a, uint8_t b) {
++    if (a == 0 || b == 0) return 0;
++    return gf_exp_tab[gf_log_tab[a] + gf_log_tab[b]];
++}
++
++inline uint8_t gf_inv(uint8_t a) {
++    // a must be non-zero
++    return gf_exp_tab[255 - gf_log_tab[a]];
++}
++
++inline uint8_t gf_pow(uint8_t base, int exponent) {
++    if (base == 0) return 0;
++    int log_base = gf_log_tab[base];
++    int product = (log_base * exponent) % 255;
++    if (product < 0) product += 255;
++    return gf_exp_tab[product];
++}
++
++// Gauss-Jordan inversion of a k×k matrix in GF(256). Matrix is row-major.
++// Returns true on success, false if singular. On success, mat is replaced by its inverse.
++bool gf_invert_matrix(uint8_t* mat, int k) {
++    std::vector<uint8_t> inv(static_cast<size_t>(k) * k, 0);
++    for (int i = 0; i < k; ++i) inv[i * k + i] = 1;
++
++    for (int col = 0; col < k; ++col) {
++        int pivot = -1;
++        for (int row = col; row < k; ++row) {
++            if (mat[row * k + col] != 0) { pivot = row; break; }
++        }
++        if (pivot < 0) return false;
++        if (pivot != col) {
++            for (int j = 0; j < k; ++j) {
++                std::swap(mat[col * k + j], mat[pivot * k + j]);
++                std::swap(inv[col * k + j], inv[pivot * k + j]);
++            }
++        }
++        uint8_t pv_inv = gf_inv(mat[col * k + col]);
++        for (int j = 0; j < k; ++j) {
++            mat[col * k + j] = gf_mul(mat[col * k + j], pv_inv);
++            inv[col * k + j] = gf_mul(inv[col * k + j], pv_inv);
++        }
++        for (int row = 0; row < k; ++row) {
++            if (row == col) continue;
++            uint8_t factor = mat[row * k + col];
++            if (factor == 0) continue;
++            for (int j = 0; j < k; ++j) {
++                mat[row * k + j] ^= gf_mul(factor, mat[col * k + j]);
++                inv[row * k + j] ^= gf_mul(factor, inv[col * k + j]);
++            }
++        }
++    }
++    std::memcpy(mat, inv.data(), static_cast<size_t>(k) * k);
++    return true;
++}
++
++// Build the N×K parity-generator matrix of the systematic Reed-Solomon code.
++// Start from a (K+N)×K Vandermonde matrix V[i][j] = gf_pow(i+1, j), then multiply
++// by the inverse of its top K×K block so that the top becomes identity. The bottom
++// N×K block is the parity generator P (returned via out_P).
++bool build_parity_matrix(int k, int n, std::vector<uint8_t>& out_P) {
++    const int rows = k + n;
++    std::vector<uint8_t> V(static_cast<size_t>(rows) * k);
++    for (int i = 0; i < rows; ++i) {
++        for (int j = 0; j < k; ++j) {
++            V[i * k + j] = gf_pow(static_cast<uint8_t>(i + 1), j);
++        }
++    }
++    std::vector<uint8_t> Vtop_inv(static_cast<size_t>(k) * k);
++    std::memcpy(Vtop_inv.data(), V.data(), static_cast<size_t>(k) * k);
++    if (!gf_invert_matrix(Vtop_inv.data(), k)) return false;
++
++    out_P.assign(static_cast<size_t>(n) * k, 0);
++    for (int i = 0; i < n; ++i) {
++        for (int j = 0; j < k; ++j) {
++            uint8_t sum = 0;
++            for (int l = 0; l < k; ++l) {
++                sum ^= gf_mul(V[(k + i) * k + l], Vtop_inv[l * k + j]);
++            }
++            out_P[i * k + j] = sum;
++        }
++    }
++    return true;
++}
++
++// XOR into dst the result of multiplying src (length blockSize) by the GF(256) scalar coeff.
++inline void gf_xor_scaled(uint8_t* dst, const uint8_t* src, int block_size, uint8_t coeff) {
++    if (coeff == 0) return;
++    if (coeff == 1) {
++        for (int c = 0; c < block_size; ++c) dst[c] ^= src[c];
++        return;
++    }
++    int log_coeff = gf_log_tab[coeff];
++    for (int c = 0; c < block_size; ++c) {
++        uint8_t s = src[c];
++        if (s != 0) {
++            dst[c] ^= gf_exp_tab[gf_log_tab[s] + log_coeff];
++        }
++    }
++}
++
++void throw_illegal_argument(JNIEnv* env, const char* msg) {
++    jclass cls = env->FindClass("java/lang/IllegalArgumentException");
++    if (cls != nullptr) env->ThrowNew(cls, msg);
++}
++
++void throw_illegal_state(JNIEnv* env, const char* msg) {
++    jclass cls = env->FindClass("java/lang/IllegalStateException");
++    if (cls != nullptr) env->ThrowNew(cls, msg);
++}
++
++}  // namespace
++
++extern "C" JNIEXPORT void JNICALL
++Java_com_mobicloud_core_erasure_ErasureCodingJni_nativeEncode(
++        JNIEnv* env, jobject /*thiz*/,
++        jobject dataBuffer, jobject parityBuffer,
++        jint k, jint n, jint blockSize) {
++    gf_init_tables();
++    if (k < 1 || n < 1 || k + n > 255 || blockSize <= 0) {
++        throw_illegal_argument(env, "Invalid k/n/blockSize parameters");
++        return;
++    }
++    auto* data = static_cast<uint8_t*>(env->GetDirectBufferAddress(dataBuffer));
++    auto* parity = static_cast<uint8_t*>(env->GetDirectBufferAddress(parityBuffer));
++    if (data == nullptr || parity == nullptr) {
++        throw_illegal_argument(env, "Buffers must be direct");
++        return;
++    }
++    jlong data_cap = env->GetDirectBufferCapacity(dataBuffer);
++    jlong parity_cap = env->GetDirectBufferCapacity(parityBuffer);
++    if (data_cap < static_cast<jlong>(k) * blockSize ||
++        parity_cap < static_cast<jlong>(n) * blockSize) {
++        throw_illegal_argument(env, "Buffer capacities too small");
++        return;
++    }
++
++    std::vector<uint8_t> P;
++    if (!build_parity_matrix(k, n, P)) {
++        throw_illegal_state(env, "Failed to build parity matrix (singular Vandermonde)");
++        return;
++    }
++
++    for (int i = 0; i < n; ++i) {
++        uint8_t* p_row = parity + static_cast<size_t>(i) * blockSize;
++        std::memset(p_row, 0, blockSize);
++        for (int j = 0; j < k; ++j) {
++            uint8_t coeff = P[i * k + j];
++            gf_xor_scaled(p_row, data + static_cast<size_t>(j) * blockSize, blockSize, coeff);
++        }
++    }
++}
++
++extern "C" JNIEXPORT void JNICALL
++Java_com_mobicloud_core_erasure_ErasureCodingJni_nativeDecode(
++        JNIEnv* env, jobject /*thiz*/,
++        jobject survivorsBuffer, jobject survivorIndicesBuffer, jobject outputBuffer,
++        jint k, jint n, jint blockSize) {
++    gf_init_tables();
++    if (k < 1 || n < 1 || k + n > 255 || blockSize <= 0) {
++        throw_illegal_argument(env, "Invalid k/n/blockSize parameters");
++        return;
++    }
++    auto* survivors = static_cast<uint8_t*>(env->GetDirectBufferAddress(survivorsBuffer));
++    auto* indices_raw = static_cast<uint8_t*>(env->GetDirectBufferAddress(survivorIndicesBuffer));
++    auto* output = static_cast<uint8_t*>(env->GetDirectBufferAddress(outputBuffer));
++    if (survivors == nullptr || indices_raw == nullptr || output == nullptr) {
++        throw_illegal_argument(env, "Buffers must be direct");
++        return;
++    }
++    jlong surv_cap = env->GetDirectBufferCapacity(survivorsBuffer);
++    jlong idx_cap = env->GetDirectBufferCapacity(survivorIndicesBuffer);
++    jlong out_cap = env->GetDirectBufferCapacity(outputBuffer);
++    if (surv_cap < static_cast<jlong>(k) * blockSize ||
++        out_cap < static_cast<jlong>(k) * blockSize ||
++        idx_cap < static_cast<jlong>(k) * 4) {
++        throw_illegal_argument(env, "Buffer capacities too small");
++        return;
++    }
++
++    // Indices are stored as little-endian int32 (caller sets ByteOrder.LITTLE_ENDIAN).
++    auto read_le_int32 = [](const uint8_t* p) -> int32_t {
++        return static_cast<int32_t>(
++                static_cast<uint32_t>(p[0]) |
++                (static_cast<uint32_t>(p[1]) << 8) |
++                (static_cast<uint32_t>(p[2]) << 16) |
++                (static_cast<uint32_t>(p[3]) << 24));
++    };
++
++    std::vector<uint8_t> P;
++    if (!build_parity_matrix(k, n, P)) {
++        throw_illegal_state(env, "Failed to build parity matrix");
++        return;
++    }
++
++    // Build the K×K decoding matrix: for each survivor r, copy row `indices[r]` of the
++    // systematic (K+N)×K matrix. Top K rows are identity, bottom N rows are P.
++    std::vector<uint8_t> M(static_cast<size_t>(k) * k, 0);
++    for (int r = 0; r < k; ++r) {
++        int32_t idx = read_le_int32(indices_raw + r * 4);
++        if (idx < 0 || idx >= k + n) {
++            throw_illegal_argument(env, "Survivor index out of range");
++            return;
++        }
++        if (idx < k) {
++            M[r * k + idx] = 1;
++        } else {
++            std::memcpy(&M[r * k], &P[(idx - k) * k], k);
++        }
++    }
++
++    if (!gf_invert_matrix(M.data(), k)) {
++        throw_illegal_state(env, "Cannot decode: survivor matrix is singular");
++        return;
++    }
++
++    for (int i = 0; i < k; ++i) {
++        uint8_t* out_row = output + static_cast<size_t>(i) * blockSize;
++        std::memset(out_row, 0, blockSize);
++        for (int j = 0; j < k; ++j) {
++            uint8_t coeff = M[i * k + j];
++            gf_xor_scaled(out_row, survivors + static_cast<size_t>(j) * blockSize,
++                          blockSize, coeff);
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/core/erasure/ErasureCodec.kt b/app/src/main/kotlin/com/mobicloud/core/erasure/ErasureCodec.kt
+new file mode 100644
+index 0000000..c45065b
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/core/erasure/ErasureCodec.kt
+@@ -0,0 +1,39 @@
++package com.mobicloud.core.erasure
++
++/**
++ * Reed-Solomon Erasure Coding contract over GF(256).
++ *
++ * The interface is kept free of Android / NIO types so that the domain layer can depend on it
++ * without touching platform APIs. The production implementation is [ErasureCodingJni] which
++ * bridges to a native C++ kernel via DirectByteBuffer (zero-copy). Unit tests inject a pure-Kotlin
++ * fake that exercises the same GF(256) algebra on the host JVM.
++ */
++interface ErasureCodec {
++
++    /**
++     * Encodes [k] equal-length data blocks into [n] parity blocks.
++     *
++     * @param data exactly [k] blocks, all of the same length.
++     * @param k number of data blocks (must match [data].size).
++     * @param n number of parity blocks to produce.
++     * @return [n] parity blocks, each the same length as the input blocks.
++     */
++    fun encode(data: List<ByteArray>, k: Int, n: Int): List<ByteArray>
++
++    /**
++     * Reconstructs the original [k] data blocks from any [k] survivors (data or parity mixed).
++     *
++     * @param survivors exactly [k] blocks of the same length.
++     * @param survivorIndices indices in [0, k+n) identifying which rows of the systematic
++     *                        (K+N)×K generator matrix the survivors correspond to.
++     * @param k number of data blocks in the original encoding.
++     * @param n number of parity blocks in the original encoding.
++     * @return the [k] data blocks in their original order.
++     */
++    fun decode(
++        survivors: List<ByteArray>,
++        survivorIndices: IntArray,
++        k: Int,
++        n: Int,
++    ): List<ByteArray>
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/core/erasure/ErasureCodingJni.kt b/app/src/main/kotlin/com/mobicloud/core/erasure/ErasureCodingJni.kt
+new file mode 100644
+index 0000000..4656c8b
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/core/erasure/ErasureCodingJni.kt
+@@ -0,0 +1,88 @@
++package com.mobicloud.core.erasure
++
++import timber.log.Timber
++import java.nio.ByteBuffer
++import java.nio.ByteOrder
++
++object ErasureCodingJni : ErasureCodec {
++
++    init {
++        try {
++            System.loadLibrary("mobimath_lib")
++        } catch (e: UnsatisfiedLinkError) {
++            Timber.e(e, "Failed to load native library 'mobimath_lib'. JNI calls will fail.")
++        }
++    }
++
++    external fun nativeEncode(
++        dataBuffer: ByteBuffer,
++        parityBuffer: ByteBuffer,
++        k: Int,
++        n: Int,
++        blockSize: Int,
++    )
++
++    external fun nativeDecode(
++        survivorsBuffer: ByteBuffer,
++        survivorIndicesBuffer: ByteBuffer,
++        outputBuffer: ByteBuffer,
++        k: Int,
++        n: Int,
++        blockSize: Int,
++    )
++
++    override fun encode(data: List<ByteArray>, k: Int, n: Int): List<ByteArray> {
++        require(data.size == k) { "data must contain exactly k=$k blocks, got ${data.size}" }
++        val blockSize = data.first().size
++        require(data.all { it.size == blockSize }) { "all data blocks must have the same length" }
++        require(blockSize > 0) { "blockSize must be > 0" }
++
++        val dataBuffer = ByteBuffer.allocateDirect(k * blockSize).order(ByteOrder.LITTLE_ENDIAN)
++        for (block in data) dataBuffer.put(block)
++        dataBuffer.rewind()
++
++        val parityBuffer = ByteBuffer.allocateDirect(n * blockSize).order(ByteOrder.LITTLE_ENDIAN)
++
++        nativeEncode(dataBuffer, parityBuffer, k, n, blockSize)
++
++        return List(n) { i ->
++            val out = ByteArray(blockSize)
++            parityBuffer.position(i * blockSize)
++            parityBuffer.get(out)
++            out
++        }
++    }
++
++    override fun decode(
++        survivors: List<ByteArray>,
++        survivorIndices: IntArray,
++        k: Int,
++        n: Int,
++    ): List<ByteArray> {
++        require(survivors.size == k) { "need exactly k=$k survivors, got ${survivors.size}" }
++        require(survivorIndices.size == k) { "need exactly k=$k survivor indices" }
++        val blockSize = survivors.first().size
++        require(survivors.all { it.size == blockSize }) { "all survivors must have the same length" }
++        require(blockSize > 0) { "blockSize must be > 0" }
++
++        val survivorsBuffer = ByteBuffer.allocateDirect(k * blockSize).order(ByteOrder.LITTLE_ENDIAN)
++        for (s in survivors) survivorsBuffer.put(s)
++        survivorsBuffer.rewind()
++
++        val indicesBuffer = ByteBuffer.allocateDirect(k * Int.SIZE_BYTES)
++            .order(ByteOrder.LITTLE_ENDIAN)
++        for (idx in survivorIndices) indicesBuffer.putInt(idx)
++        indicesBuffer.rewind()
++
++        val outputBuffer = ByteBuffer.allocateDirect(k * blockSize).order(ByteOrder.LITTLE_ENDIAN)
++
++        nativeDecode(survivorsBuffer, indicesBuffer, outputBuffer, k, n, blockSize)
++
++        return List(k) { i ->
++            val out = ByteArray(blockSize)
++            outputBuffer.position(i * blockSize)
++            outputBuffer.get(out)
++            out
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/models/ErasureFragment.kt b/app/src/main/kotlin/com/mobicloud/domain/models/ErasureFragment.kt
+new file mode 100644
+index 0000000..b184191
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/domain/models/ErasureFragment.kt
+@@ -0,0 +1,38 @@
++package com.mobicloud.domain.models
++
++/**
++ * A single erasure-coding fragment produced by a Reed-Solomon encoder.
++ *
++ * Fragments of the same original file share [originalFileSize], which is used on decode to
++ * trim the trailing zero-padding introduced to align the file to a multiple of `k`.
++ *
++ * @property index position in the systematic (K+N)×K generator matrix: indices `[0, k)` are
++ *                 data fragments (copies of the original data), indices `[k, k+n)` are parity.
++ * @property isParity convenience flag: `index >= k`.
++ * @property data raw bytes of this fragment, still in clear text at this stage (encryption is
++ *                applied later in Story 5.2).
++ * @property originalFileSize size of the original file before padding, in bytes.
++ */
++data class ErasureFragment(
++    val index: Int,
++    val isParity: Boolean,
++    val data: ByteArray,
++    val originalFileSize: Long,
++) {
++    override fun equals(other: Any?): Boolean {
++        if (this === other) return true
++        if (other !is ErasureFragment) return false
++        return index == other.index &&
++                isParity == other.isParity &&
++                originalFileSize == other.originalFileSize &&
++                data.contentEquals(other.data)
++    }
++
++    override fun hashCode(): Int {
++        var result = index
++        result = 31 * result + isParity.hashCode()
++        result = 31 * result + data.contentHashCode()
++        result = 31 * result + originalFileSize.hashCode()
++        return result
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/models/ErasureParameters.kt b/app/src/main/kotlin/com/mobicloud/domain/models/ErasureParameters.kt
+new file mode 100644
+index 0000000..5f64221
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/domain/models/ErasureParameters.kt
+@@ -0,0 +1,18 @@
++package com.mobicloud.domain.models
++
++/**
++ * Configuration of a Reed-Solomon Erasure Coding pass.
++ *
++ * Defaults match the MVP profile: K=4 data blocks + N=2 parity blocks, tolerating the loss of
++ * any 2 fragments out of 6. Changing [k] or [n] requires `k + n <= 255` (GF(256) constraint).
++ *
++ * @property k number of data blocks (>= 1).
++ * @property n number of parity blocks (>= 1).
++ * @property blockSize preferred block size in bytes. Used as an upper bound for internal chunking
++ *                     of large files; for MVP, fragments are sized as `ceil(fileSize / k)`.
++ */
++data class ErasureParameters(
++    val k: Int = 4,
++    val n: Int = 2,
++    val blockSize: Int = 1 * 1024 * 1024,
++)
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/DecodeErasureFragmentsUseCase.kt b/app/src/main/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/DecodeErasureFragmentsUseCase.kt
+new file mode 100644
+index 0000000..351d35c
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/DecodeErasureFragmentsUseCase.kt
+@@ -0,0 +1,48 @@
++package com.mobicloud.domain.usecase.m08_m09_erasure_coding
++
++import com.mobicloud.core.erasure.ErasureCodec
++import com.mobicloud.domain.models.ErasureFragment
++import com.mobicloud.domain.models.ErasureParameters
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++import javax.inject.Inject
++
++/**
++ * Reconstructs the original file bytes from any K fragments out of K+N.
++ *
++ * Picks the first [ErasureParameters.k] fragments from the input list (callers are free to
++ * pre-filter which ones to pass), feeds them to the injected [ErasureCodec] along with their
++ * indices, concatenates the recovered data blocks, then trims to the original file size.
++ */
++class DecodeErasureFragmentsUseCase @Inject constructor(
++    private val codec: ErasureCodec,
++) {
++
++    suspend operator fun invoke(
++        fragments: List<ErasureFragment>,
++        params: ErasureParameters = ErasureParameters(),
++    ): Result<ByteArray> = withContext(Dispatchers.Default) {
++        runCatching {
++            require(params.k >= 1 && params.n >= 1 && params.k + params.n <= 255) {
++                "GF(256) constraint: k >= 1, n >= 1, k + n <= 255 (got k=${params.k}, n=${params.n})"
++            }
++            require(fragments.size >= params.k) {
++                "Need at least k=${params.k} fragments to reconstruct, got ${fragments.size}"
++            }
++
++            val selected = fragments.take(params.k)
++            val survivors = selected.map { it.data }
++            val indices = selected.map { it.index }.toIntArray()
++            val originalSize = selected.first().originalFileSize
++
++            val decoded = codec.decode(survivors, indices, params.k, params.n)
++
++            val fragmentSize = decoded.first().size
++            val assembled = ByteArray(fragmentSize * params.k)
++            for ((i, block) in decoded.withIndex()) {
++                System.arraycopy(block, 0, assembled, i * fragmentSize, block.size)
++            }
++            assembled.copyOf(originalSize.toInt())
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/EncodeErasureFragmentsUseCase.kt b/app/src/main/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/EncodeErasureFragmentsUseCase.kt
+new file mode 100644
+index 0000000..c9bbf94
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/EncodeErasureFragmentsUseCase.kt
+@@ -0,0 +1,59 @@
++package com.mobicloud.domain.usecase.m08_m09_erasure_coding
++
++import com.mobicloud.core.erasure.ErasureCodec
++import com.mobicloud.domain.models.ErasureFragment
++import com.mobicloud.domain.models.ErasureParameters
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++import java.io.File
++import javax.inject.Inject
++
++/**
++ * Encodes a file into K data + N parity fragments using Reed-Solomon over GF(256).
++ *
++ * The file is zero-padded to the next multiple of K bytes, split into K equal-length blocks,
++ * then fed to the injected [ErasureCodec] in a single batched call. Produces a deterministic
++ * ordering: indices `[0, k)` are data fragments, `[k, k+n)` are parity.
++ */
++class EncodeErasureFragmentsUseCase @Inject constructor(
++    private val codec: ErasureCodec,
++) {
++
++    suspend operator fun invoke(
++        file: File,
++        params: ErasureParameters = ErasureParameters(),
++    ): Result<List<ErasureFragment>> = withContext(Dispatchers.Default) {
++        runCatching {
++            require(params.k >= 1 && params.n >= 1 && params.k + params.n <= 255) {
++                "GF(256) constraint: k >= 1, n >= 1, k + n <= 255 (got k=${params.k}, n=${params.n})"
++            }
++            require(file.exists() && file.isFile) { "File not found or not a regular file: $file" }
++
++            val bytes = file.readBytes()
++            val originalSize = bytes.size.toLong()
++            require(originalSize > 0) { "File is empty, cannot encode" }
++
++            val fragmentSize = (bytes.size + params.k - 1) / params.k
++            val paddedSize = fragmentSize * params.k
++            val padded = bytes.copyOf(paddedSize)
++
++            val dataBlocks = List(params.k) { i ->
++                padded.copyOfRange(i * fragmentSize, (i + 1) * fragmentSize)
++            }
++            val parityBlocks = codec.encode(dataBlocks, params.k, params.n)
++
++            val dataFragments = dataBlocks.mapIndexed { i, data ->
++                ErasureFragment(index = i, isParity = false, data = data, originalFileSize = originalSize)
++            }
++            val parityFragments = parityBlocks.mapIndexed { i, data ->
++                ErasureFragment(
++                    index = params.k + i,
++                    isParity = true,
++                    data = data,
++                    originalFileSize = originalSize,
++                )
++            }
++            dataFragments + parityFragments
++        }
++    }
++}
+diff --git a/app/src/test/kotlin/com/mobicloud/core/erasure/PureKotlinErasureCodec.kt b/app/src/test/kotlin/com/mobicloud/core/erasure/PureKotlinErasureCodec.kt
+new file mode 100644
+index 0000000..8ef256c
+--- /dev/null
++++ b/app/src/test/kotlin/com/mobicloud/core/erasure/PureKotlinErasureCodec.kt
+@@ -0,0 +1,177 @@
++package com.mobicloud.core.erasure
++
++/**
++ * Pure-Kotlin Reed-Solomon Erasure Coding over GF(256).
++ *
++ * Test-only implementation that mirrors the algorithm of the native C++ kernel
++ * (`erasure_jni.cpp`) so that the UseCases can be exercised on the host JVM without loading the
++ * `.so` library. Uses the same primitive polynomial (0x11D) and the same systematic Vandermonde
++ * construction, so the parity bytes it produces are bit-exact with the native implementation.
++ */
++class PureKotlinErasureCodec : ErasureCodec {
++
++    override fun encode(data: List<ByteArray>, k: Int, n: Int): List<ByteArray> {
++        require(data.size == k)
++        val blockSize = data.first().size
++        require(data.all { it.size == blockSize })
++
++        val p = buildParityMatrix(k, n)
++        return List(n) { i ->
++            val row = ByteArray(blockSize)
++            for (j in 0 until k) {
++                gfXorScaled(row, data[j], blockSize, p[i * k + j])
++            }
++            row
++        }
++    }
++
++    override fun decode(
++        survivors: List<ByteArray>,
++        survivorIndices: IntArray,
++        k: Int,
++        n: Int,
++    ): List<ByteArray> {
++        require(survivors.size == k)
++        require(survivorIndices.size == k)
++        val blockSize = survivors.first().size
++        require(survivors.all { it.size == blockSize })
++
++        val p = buildParityMatrix(k, n)
++        val m = IntArray(k * k)
++        for (r in 0 until k) {
++            val idx = survivorIndices[r]
++            require(idx in 0 until (k + n)) { "Invalid survivor index: $idx" }
++            if (idx < k) {
++                m[r * k + idx] = 1
++            } else {
++                for (j in 0 until k) {
++                    m[r * k + j] = p[(idx - k) * k + j].toInt() and 0xff
++                }
++            }
++        }
++        check(invertMatrix(m, k)) { "Cannot decode: survivor matrix is singular" }
++
++        return List(k) { i ->
++            val row = ByteArray(blockSize)
++            for (j in 0 until k) {
++                gfXorScaled(row, survivors[j], blockSize, m[i * k + j].toByte())
++            }
++            row
++        }
++    }
++
++    // ------------------------------------------------------------------------------------------
++    // GF(256) tables — initialized once per instance.
++    // ------------------------------------------------------------------------------------------
++
++    private val gfLog = IntArray(256)
++    private val gfExp = IntArray(512)
++
++    init {
++        var x = 1
++        for (i in 0 until 255) {
++            gfExp[i] = x
++            gfLog[x] = i
++            x = x shl 1
++            if (x and 0x100 != 0) x = x xor 0x11d
++        }
++        for (i in 255 until 512) gfExp[i] = gfExp[i - 255]
++    }
++
++    private fun gfMul(a: Int, b: Int): Int {
++        val ua = a and 0xff
++        val ub = b and 0xff
++        if (ua == 0 || ub == 0) return 0
++        return gfExp[gfLog[ua] + gfLog[ub]]
++    }
++
++    private fun gfInv(a: Int): Int {
++        val ua = a and 0xff
++        return gfExp[255 - gfLog[ua]]
++    }
++
++    private fun gfPow(base: Int, exponent: Int): Int {
++        val ub = base and 0xff
++        if (ub == 0) return 0
++        var product = (gfLog[ub] * exponent) % 255
++        if (product < 0) product += 255
++        return gfExp[product]
++    }
++
++    private fun gfXorScaled(dst: ByteArray, src: ByteArray, blockSize: Int, coeff: Byte) {
++        val uc = coeff.toInt() and 0xff
++        if (uc == 0) return
++        if (uc == 1) {
++            for (c in 0 until blockSize) dst[c] = (dst[c].toInt() xor src[c].toInt()).toByte()
++            return
++        }
++        val logCoeff = gfLog[uc]
++        for (c in 0 until blockSize) {
++            val s = src[c].toInt() and 0xff
++            if (s != 0) {
++                val prod = gfExp[gfLog[s] + logCoeff]
++                dst[c] = (dst[c].toInt() xor prod).toByte()
++            }
++        }
++    }
++
++    private fun buildParityMatrix(k: Int, n: Int): ByteArray {
++        val rows = k + n
++        val v = IntArray(rows * k)
++        for (i in 0 until rows) {
++            for (j in 0 until k) {
++                v[i * k + j] = gfPow(i + 1, j)
++            }
++        }
++        val vtopInv = IntArray(k * k)
++        for (i in 0 until k * k) vtopInv[i] = v[i]
++        check(invertMatrix(vtopInv, k))
++
++        val p = ByteArray(n * k)
++        for (i in 0 until n) {
++            for (j in 0 until k) {
++                var sum = 0
++                for (l in 0 until k) {
++                    sum = sum xor gfMul(v[(k + i) * k + l], vtopInv[l * k + j])
++                }
++                p[i * k + j] = sum.toByte()
++            }
++        }
++        return p
++    }
++
++    private fun invertMatrix(mat: IntArray, k: Int): Boolean {
++        val inv = IntArray(k * k)
++        for (i in 0 until k) inv[i * k + i] = 1
++
++        for (col in 0 until k) {
++            var pivot = -1
++            for (row in col until k) {
++                if (mat[row * k + col] != 0) { pivot = row; break }
++            }
++            if (pivot < 0) return false
++            if (pivot != col) {
++                for (j in 0 until k) {
++                    val t1 = mat[col * k + j]; mat[col * k + j] = mat[pivot * k + j]; mat[pivot * k + j] = t1
++                    val t2 = inv[col * k + j]; inv[col * k + j] = inv[pivot * k + j]; inv[pivot * k + j] = t2
++                }
++            }
++            val pvInv = gfInv(mat[col * k + col])
++            for (j in 0 until k) {
++                mat[col * k + j] = gfMul(mat[col * k + j], pvInv)
++                inv[col * k + j] = gfMul(inv[col * k + j], pvInv)
++            }
++            for (row in 0 until k) {
++                if (row == col) continue
++                val factor = mat[row * k + col]
++                if (factor == 0) continue
++                for (j in 0 until k) {
++                    mat[row * k + j] = mat[row * k + j] xor gfMul(factor, mat[col * k + j])
++                    inv[row * k + j] = inv[row * k + j] xor gfMul(factor, inv[col * k + j])
++                }
++            }
++        }
++        for (i in 0 until k * k) mat[i] = inv[i]
++        return true
++    }
++}
+diff --git a/app/src/test/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/ErasureRoundtripTest.kt b/app/src/test/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/ErasureRoundtripTest.kt
+new file mode 100644
+index 0000000..6bd2433
+--- /dev/null
++++ b/app/src/test/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/ErasureRoundtripTest.kt
+@@ -0,0 +1,130 @@
++package com.mobicloud.domain.usecase.m08_m09_erasure_coding
++
++import com.mobicloud.core.erasure.PureKotlinErasureCodec
++import com.mobicloud.domain.models.ErasureFragment
++import com.mobicloud.domain.models.ErasureParameters
++import kotlinx.coroutines.test.runTest
++import org.junit.Assert.assertArrayEquals
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertTrue
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++import java.io.File
++import java.security.MessageDigest
++import java.util.Random
++
++/**
++ * Host-JVM roundtrip tests for the Erasure Coding UseCases.
++ *
++ * The native `.so` cannot be loaded on a Windows/x86_64 host, so the UseCases are exercised with
++ * a pure-Kotlin reference codec ([PureKotlinErasureCodec]) that implements the same GF(256)
++ * algebra. This validates the UseCase-level contract (padding, ordering, Result handling,
++ * K-1 fragment failure). Bit-exact parity with the native kernel is further validated by the
++ * androidTest suite on real devices.
++ */
++class ErasureRoundtripTest {
++
++    @get:Rule
++    val temporaryFolder = TemporaryFolder()
++
++    private val codec = PureKotlinErasureCodec()
++    private val encode = EncodeErasureFragmentsUseCase(codec)
++    private val decode = DecodeErasureFragmentsUseCase(codec)
++
++    private fun sha256(bytes: ByteArray): ByteArray =
++        MessageDigest.getInstance("SHA-256").digest(bytes)
++
++    private fun randomFile(sizeBytes: Int, seed: Long = 0xC0FFEEL): File {
++        val f = temporaryFolder.newFile()
++        val payload = ByteArray(sizeBytes)
++        Random(seed).nextBytes(payload)
++        f.writeBytes(payload)
++        return f
++    }
++
++    @Test
++    fun `encode then decode first K blocks reproduces the original file bit-for-bit`() = runTest {
++        val file = randomFile(2_621_440)  // 2.5 MiB
++        val original = file.readBytes()
++
++        val fragments = encode(file).getOrThrow()
++        assertEquals(6, fragments.size)
++        assertEquals(4, fragments.count { !it.isParity })
++        assertEquals(2, fragments.count { it.isParity })
++
++        val recovered = decode(fragments.take(4)).getOrThrow()
++
++        assertArrayEquals(sha256(original), sha256(recovered))
++        assertArrayEquals(original, recovered)
++    }
++
++    @Test
++    fun `decode survives loss of the 2 first data blocks by using parity`() = runTest {
++        val file = randomFile(2_621_440)
++        val original = file.readBytes()
++
++        val fragments = encode(file).getOrThrow()
++        // Keep blocks [2, 3, 4, 5] — i.e. last 2 data + both parity.
++        val survivors = fragments.subList(2, 6)
++
++        val recovered = decode(survivors).getOrThrow()
++
++        assertArrayEquals(sha256(original), sha256(recovered))
++    }
++
++    @Test
++    fun `decode survives a mixed selection of data and parity fragments`() = runTest {
++        val file = randomFile(2_621_440)
++        val original = file.readBytes()
++
++        val fragments = encode(file).getOrThrow()
++        // Keep data[0], data[1], parity[0], parity[1] — drops data[2] and data[3].
++        val survivors = listOf(fragments[0], fragments[1], fragments[4], fragments[5])
++
++        val recovered = decode(survivors).getOrThrow()
++
++        assertArrayEquals(sha256(original), sha256(recovered))
++    }
++
++    @Test
++    fun `decode with only K-1 fragments returns a Failure Result`() = runTest {
++        val file = randomFile(2_621_440)
++
++        val fragments = encode(file).getOrThrow()
++        val tooFew = fragments.take(3)  // K - 1 = 3
++
++        val result = decode(tooFew)
++
++        assertTrue("Expected failure when given K-1 fragments", result.isFailure)
++        assertNotNull(result.exceptionOrNull())
++    }
++
++    @Test
++    fun `default parameters K equals 4 and N equals 2 are applied when none are provided`() = runTest {
++        val file = randomFile(2_621_440)
++
++        val fragments = encode(file).getOrThrow()
++
++        assertEquals(4, fragments.count { !it.isParity })
++        assertEquals(2, fragments.count { it.isParity })
++        assertEquals(0, fragments.first().index)
++        assertEquals(5, fragments.last().index)
++        // Defaults are the ones documented in ErasureParameters.
++        assertEquals(4, ErasureParameters().k)
++        assertEquals(2, ErasureParameters().n)
++    }
++
++    @Test
++    fun `fragments are emitted in index order with a stable data then parity layout`() = runTest {
++        val file = randomFile(2_621_440)
++
++        val fragments: List<ErasureFragment> = encode(file).getOrThrow()
++
++        for ((i, fragment) in fragments.withIndex()) {
++            assertEquals(i, fragment.index)
++            assertEquals(i >= 4, fragment.isParity)
++        }
++    }
++}

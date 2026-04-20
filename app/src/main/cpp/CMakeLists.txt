@@ -5,7 +5,8 @@ project("mobimath_lib")
 add_library(
         mobimath_lib
         SHARED
-        native-lib.cpp)
+        native-lib.cpp
+        erasure_coding/erasure_jni.cpp)
 
 find_library(
         log-lib
