@@ -6,6 +6,14 @@ import kotlinx.coroutines.flow.Flow
 interface DhtRepository {
     suspend fun insertEntry(blockId: String, nodeId: String, ipAddress: String, port: Int): Result<Unit>
 
+    suspend fun insertEntryWithTimestamp(
+        blockId: String,
+        nodeId: String,
+        ipAddress: String,
+        port: Int,
+        timestamp: Long
+    ): Result<Unit>
+
     suspend fun findByBlockId(blockId: String): Result<DhtEntry?>
 
     suspend fun findByNodeId(nodeId: String): Result<List<DhtEntry>>

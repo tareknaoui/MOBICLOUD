@@ -10,6 +10,7 @@ import com.mobicloud.domain.repository.DhtRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.usecase.m05_dht_catalog.ResolveDhtConflictUseCase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -27,6 +28,7 @@ class GossipSyncUseCase @Inject constructor(
     private val gossipOutboundPort: GossipOutboundPort,
     private val networkEventRepository: NetworkEventRepository,
     private val securityRepository: SecurityRepository,
+    private val resolveDhtConflictUseCase: ResolveDhtConflictUseCase,
     @ApplicationScope private val scope: CoroutineScope
 ) : GossipIncomingHandler {
 
@@ -165,7 +167,15 @@ class GossipSyncUseCase @Inject constructor(
         withContext(Dispatchers.Default) {
             try {
                 for (dto in response.entries) {
-                    dhtRepository.insertEntry(dto.blockId, dto.nodeId, dto.ipAddress, dto.port)
+                    val entry = DhtEntry(
+                        blockId = dto.blockId,
+                        nodeId = dto.nodeId,
+                        ipAddress = dto.ipAddress,
+                        port = dto.port,
+                        timestamp = dto.timestamp
+                    )
+                    resolveDhtConflictUseCase.resolve(entry)
+                        .onFailure { networkEventRepository.pushEvent("[CRDT] Résolution échouée pour ${dto.blockId.take(8)} : ${it.message}") }
                 }
                 networkEventRepository.pushEvent(
                     "[GOSSIP] Convergence : ${response.entries.size} entrées reçues de ${response.responderNodeId.take(8)}"

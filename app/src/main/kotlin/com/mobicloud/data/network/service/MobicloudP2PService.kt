@@ -23,6 +23,7 @@ import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.usecase.m01_discovery.CalculateReliabilityScoreUseCase
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
+import com.mobicloud.domain.usecase.m05_dht_catalog.ResolveDhtConflictUseCase
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
@@ -57,6 +58,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var registerSuperPeerUseCase: RegisterSuperPeerUseCase
     @Inject lateinit var abdicateSuperPeerUseCase: AbdicateSuperPeerUseCase
     @Inject lateinit var gossipSyncUseCase: GossipSyncUseCase
+    @Inject lateinit var resolveDhtConflictUseCase: ResolveDhtConflictUseCase
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -129,6 +131,13 @@ class MobicloudP2PService : Service() {
 
             // Guard P7: brancher le handler Gossip APRÈS que le serveur TCP soit prêt
             tcpConnectionManager.gossipHandler = gossipSyncUseCase
+
+            // AC#6: purge des tombstones expirés au démarrage du service
+            serviceScope.launch {
+                resolveDhtConflictUseCase.purgeExpiredTombstones()
+                    .onSuccess { count -> if (count > 0) Log.i(LOGTAG, "[CRDT] $count tombstones expirés purgés") }
+                    .onFailure { Log.w(LOGTAG, "[CRDT] Purge tombstones échouée : ${it.message}") }
+            }
 
             // Firebase announce — publie l'IP publique sur Firebase pour la fédération inter-réseaux
             launch {

@@ -9,11 +9,13 @@ import com.mobicloud.data.local.dao.CatalogDao
 import com.mobicloud.data.local.dao.DhtDao
 import com.mobicloud.data.local.dao.IdentityDao
 import com.mobicloud.data.local.dao.PeerDao
+import com.mobicloud.data.local.dao.TombstoneDao
 import com.mobicloud.data.local.entity.CatalogEntryEntity
 import com.mobicloud.data.local.entity.DhtEntryEntity
 import com.mobicloud.data.local.entity.FragmentLocationEntity
 import com.mobicloud.data.local.entity.NodeIdentityEntity
 import com.mobicloud.data.local.entity.PeerNodeEntity
+import com.mobicloud.data.local.entity.TombstoneEntryEntity
 
 @Database(
     entities = [
@@ -21,9 +23,10 @@ import com.mobicloud.data.local.entity.PeerNodeEntity
         FragmentLocationEntity::class,
         NodeIdentityEntity::class,
         PeerNodeEntity::class,
-        DhtEntryEntity::class
+        DhtEntryEntity::class,
+        TombstoneEntryEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -32,6 +35,7 @@ abstract class CatalogDatabase : RoomDatabase() {
     abstract fun identityDao(): IdentityDao
     abstract fun peerDao(): PeerDao
     abstract fun dhtDao(): DhtDao
+    abstract fun tombstoneDao(): TombstoneDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -53,6 +57,17 @@ abstract class CatalogDatabase : RoomDatabase() {
                 """.trimIndent())
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_dht_entries_block_id ON dht_entries(block_id)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_dht_entries_node_id ON dht_entries(node_id)")
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS tombstone_entries (
+                        block_id TEXT NOT NULL PRIMARY KEY,
+                        deleted_at INTEGER NOT NULL
+                    )
+                """.trimIndent())
             }
         }
     }

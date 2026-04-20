@@ -11,6 +11,7 @@ import com.mobicloud.domain.repository.DhtRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.usecase.m05_dht_catalog.ResolveDhtConflictUseCase
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -32,6 +33,7 @@ class GossipSyncUseCaseTest {
     private lateinit var gossipOutboundPort: GossipOutboundPort
     private lateinit var networkEventRepository: NetworkEventRepository
     private lateinit var securityRepository: SecurityRepository
+    private lateinit var resolveDhtConflictUseCase: ResolveDhtConflictUseCase
     private lateinit var useCase: GossipSyncUseCase
 
     private fun peer(id: String, ip: String = "192.168.1.$id", port: Int = 9090) = Peer(
@@ -50,14 +52,17 @@ class GossipSyncUseCaseTest {
         gossipOutboundPort = mockk()
         networkEventRepository = mockk(relaxed = true)
         securityRepository = mockk()
+        resolveDhtConflictUseCase = mockk(relaxed = true)
         coEvery { securityRepository.getIdentity() } returns
             Result.success(NodeIdentity("local-node", ByteArray(0), 1.0f))
+        coEvery { resolveDhtConflictUseCase.resolve(any()) } returns Result.success(Unit)
         useCase = GossipSyncUseCase(
             dhtRepository,
             peerRepository,
             gossipOutboundPort,
             networkEventRepository,
             securityRepository,
+            resolveDhtConflictUseCase,
             CoroutineScope(Dispatchers.Default)
         )
     }

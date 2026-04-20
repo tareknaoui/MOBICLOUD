@@ -30,6 +30,22 @@ class DhtRepositoryImpl @Inject constructor(
             dhtDao.insert(entry)
         }
 
+    override suspend fun insertEntryWithTimestamp(
+        blockId: String,
+        nodeId: String,
+        ipAddress: String,
+        port: Int,
+        timestamp: Long
+    ): Result<Unit> = runCatching {
+        dhtDao.insert(DhtEntryEntity(
+            blockId = blockId,
+            nodeId = nodeId,
+            ipAddress = ipAddress,
+            port = port,
+            timestamp = timestamp
+        ))
+    }
+
     override suspend fun findByBlockId(blockId: String): Result<DhtEntry?> =
         runCatching {
             dhtDao.findByBlockId(blockId)?.toDomain()
