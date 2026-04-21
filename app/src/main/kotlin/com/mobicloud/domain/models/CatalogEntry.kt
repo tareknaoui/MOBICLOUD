@@ -18,5 +18,6 @@ data class CatalogEntry(
     @ProtoNumber(1) val fileHash: String,
     @ProtoNumber(2) val ownerPubKeyHash: String,
     @ProtoNumber(3) val versionClock: Long,
-    @ProtoNumber(4) val fragmentLocations: List<FragmentLocation>
+    @ProtoNumber(4) val fragmentLocations: List<FragmentLocation>,
+    @ProtoNumber(5) val wrappedMasterKey: WrappedFileMasterKey? = null
 )

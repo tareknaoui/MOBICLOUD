@@ -49,4 +49,10 @@ interface CatalogRepository {
      * Lecture ponctuelle d'une fiche par son [fileHash].
      */
     suspend fun getEntry(hash: String): Result<CatalogEntry?>
+
+    /**
+     * Insère une entrée catalogue sans appliquer le filtre DHT.
+     * Réservé au nœud propriétaire qui distribue ses propres blocs (Story 5.3).
+     */
+    suspend fun insertOwnerEntry(entry: CatalogEntry): Result<Unit>
 }

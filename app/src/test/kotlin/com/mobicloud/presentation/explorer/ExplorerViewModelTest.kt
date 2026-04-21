@@ -1,9 +1,14 @@
 package com.mobicloud.presentation.explorer
 
+import android.content.Context
+import com.mobicloud.core.security.FragmentCipherUseCase
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.FragmentLocation
 import com.mobicloud.domain.repository.CatalogRepository
+import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
 import com.mobicloud.presentation.explorer.components.AvailabilityState
 import com.mobicloud.presentation.explorer.components.availabilityState
 import io.mockk.coEvery
@@ -32,6 +37,11 @@ class ExplorerViewModelTest {
 
     private lateinit var catalogRepository: CatalogRepository
     private lateinit var gossipSyncUseCase: GossipSyncUseCase
+    private lateinit var encodeErasureFragmentsUseCase: EncodeErasureFragmentsUseCase
+    private lateinit var fragmentCipherUseCase: FragmentCipherUseCase
+    private lateinit var distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase
+    private lateinit var securityRepository: SecurityRepository
+    private lateinit var context: Context
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
 
     @Before
@@ -39,6 +49,11 @@ class ExplorerViewModelTest {
         Dispatchers.setMain(testDispatcher)
         catalogRepository = mockk()
         gossipSyncUseCase = mockk(relaxed = true)
+        encodeErasureFragmentsUseCase = mockk(relaxed = true)
+        fragmentCipherUseCase = mockk(relaxed = true)
+        distributeEncryptedBlocksUseCase = mockk(relaxed = true)
+        securityRepository = mockk(relaxed = true)
+        context = mockk(relaxed = true)
         every { catalogRepository.getAllEntriesFlow() } returns catalogFlow
     }
 
@@ -47,7 +62,15 @@ class ExplorerViewModelTest {
         Dispatchers.resetMain()
     }
 
-    private fun createViewModel() = ExplorerViewModel(catalogRepository, gossipSyncUseCase)
+    private fun createViewModel() = ExplorerViewModel(
+        catalogRepository = catalogRepository,
+        gossipSyncUseCase = gossipSyncUseCase,
+        encodeErasureFragmentsUseCase = encodeErasureFragmentsUseCase,
+        fragmentCipherUseCase = fragmentCipherUseCase,
+        distributeEncryptedBlocksUseCase = distributeEncryptedBlocksUseCase,
+        securityRepository = securityRepository,
+        context = context
+    )
 
     // Test 1 — État vide initial
     @Test

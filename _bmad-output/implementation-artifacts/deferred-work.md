@@ -191,3 +191,23 @@
 - **`throw_illegal_argument`/`throw_illegal_state` sans `ExceptionCheck()` entre étapes** [`erasure_jni.cpp:134-144`] — Si `FindClass` déclenche `NoClassDefFoundError`/`OOM`, le `ThrowNew` subséquent est UB. Robustesse JNI.
 - **Triple copie mémoire sur encode (~3× fileSize peak RAM)** [`EncodeErasureFragmentsUseCase.kt`] — `readBytes → copyOf(padded) → copyOfRange × K`. Fatalement lié à la décision architecturale `blockSize` streaming (voir Review Decision dans la story).
 - **`gf_xor_scaled` inner loop en `int c`** [`erasure_jni.cpp:118-132`] — `blockSize > 2³¹` déclencherait un wrap silencieux. Bornage indirect par `Int` côté Kotlin ; latent si contrat change.
+
+## Deferred from: code review of 5-3-distribution-des-blocs-aux-noeuds-du-cluster (2026-04-21)
+
+- **Constantes timeout dupliquées entre `BlockTransferChannel` et companion object de `DistributeEncryptedBlocksUseCase`** — Intentionnel per spec contrainte #7 (le use case domaine ne doit pas importer depuis `data/`). Risque de dérive de valeurs. À consolider si la contrainte d'isolation domaine/data est levée dans une story future.
+- **Fallback peer non exclu des assignments primaires d'autres blocs** — Lors d'un retry (bloc échoué), le pair de fallback sélectionné peut déjà être le pair primaire pour un autre bloc. AC #5 spécifie un retry par bloc uniquement ; comportement conforme. Impact : concentration de charge sur peer[1] en cas de défaillances multiples. À réévaluer si une stratégie de distribution équilibrée est introduite.
+
+## Deferred from: code review of 5-4-erasureprogressindicator-feedback-ux-en-temps-reel (2026-04-21)
+
+- **W1 — Pas de feedback UI pour le tap ignoré pendant InProgress** [`ExplorerViewModel.kt:58`] — Le FAB est cliquable pendant `InProgress` mais l'appel est silencieusement ignoré par le guard. L'utilisateur ne reçoit aucune indication. À adresser dans une story UX future (désactiver le FAB ou afficher un toast court).
+- **W2 — Hash SHA-256 du plaintext dans le catalogue : metadata leak** [`ExplorerViewModel.kt`] — `fileHash = sha256Hex(fileBytes)` (hash du plaintext) est stocké dans `CatalogEntry`. Un adversaire avec accès lecture au catalogue peut confirmer la présence d'un fichier connu par hash. Décision architecturale à prendre dans une story de hardening sécurité (hash du ciphertext ou d'un salt dérivé à la place).
+- **W3 — `tempFile` créé avant le bloc `try`** [`ExplorerViewModel.kt:77`] — Si la coroutine est annulée dans la fenêtre d'une ligne entre la création du fichier et l'entrée dans `try`, le fichier cache n'est jamais supprimé. Narrow gap mais réel. Fix : déplacer la création de `tempFile` à l'intérieur du `try`.
+- **W4 — Read-modify-write non-atomique sur `_storeState` dans `onBlockResult`** [`ExplorerViewModel.kt:114`] — Pattern `val current = _storeState.value; _storeState.value = current.copy(...)` est correct aujourd'hui (callbacks séquentiels dans `forEachIndexed`), mais devient une race condition si `distribute()` parallélise les envois. Remplacer par `_storeState.update { current -> ... }` (CAS atomique) lors d'un refactoring de la couche distribution.
+
+## Deferred from: code review of 5-2-chiffrement-aes-256-gcm-des-fragments-zero-trust (2026-04-21)
+
+- **`recipientPublicKeyBytes` non validé avant parsing X.509** [`FragmentCipherUseCase.kt`] — Entrée malformée produit une exception capturée par `runCatching` → `Result.failure` déjà correct et sécurisé. Amélioration ergonomique future uniquement (message d'erreur plus précis).
+- **`EncryptedFragment` accepte `originalFileSize = 0` sans contrainte** [`EncryptedFragment.kt`] — Impact sémantique dépend de la logique de reconstruction aval (Story 6.x). Non bloquant pour story 5.2.
+- **Couverture de test insuffisante : fragments parity-only, single-fragment** [`FragmentCipherUseCaseTest.kt`] — Cas limites non requis par l'AC. À envisager dans une story de hardening tests.
+- **Ordre et unicité des indices de fragments dans `decrypt` non vérifiés** [`FragmentCipherUseCase.kt`] — Responsabilité de la couche appelante (Story 5.3+). Décision architecturale consciente.
+- **Valeur par défaut du sel HKDF (`ByteArray(32)`) non documentée** [`HkdfSha256.kt`] — Conforme RFC 5869 §2.2 (sel par défaut = zéros de longueur HashLen). Non spécifié dans la story — à documenter en commentaire lors du prochain passage.

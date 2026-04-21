@@ -1,6 +1,6 @@
 # Story 5.2: Chiffrement AES-256 GCM des Fragments (Zero-Trust)
 
-Status: review
+Status: done
 
 ## Story
 
@@ -254,3 +254,25 @@ Aucun blocage — tests JVM purs compilés et passés du premier coup (après co
 ## Change Log
 
 - Implémentation complète Story 5.2 : chiffrement AES-256-GCM Zero-Trust avec ECIES (Date: 2026-04-20)
+
+## Review Findings
+
+### Decision Needed
+
+- [x] [Review][Decision] Portée du `catch` dans `runCatching` vs. anti-pattern spec — Résolu : remplacé `runCatching` par `try-catch(GeneralSecurityException | IllegalArgumentException)` dans `encrypt` et `try-catch(GeneralSecurityException)` dans `decrypt`. Les exceptions inattendues (NPE, OOM) propagent maintenant en crash plutôt qu'être avalées silencieusement.
+
+### Patches
+
+- [x] [Review][Patch] HKDF counter truncation + `outputLen` sans validation [HkdfSha256.kt] — `require(outputLen in 1..(255 * 32))` ajouté. `prk` et `prev` zeroed après usage.
+- [x] [Review][Patch] `sharedSecret`, `wrappingKey` et `prk` jamais effacés en mémoire [FragmentCipherUseCase.kt, HkdfSha256.kt] — `sharedSecret.fill(0)` + `wrappingKey.fill(0)` dans blocs `finally` de `wrapFileMasterKey` et `unwrapFileMasterKey`. `prk.fill(0)` dans `hkdfSha256`.
+- [x] [Review][Patch] `WrappedFileMasterKey` sans bloc `init` de validation [WrappedFileMasterKey.kt] — `init { require(ephemeralPublicKeyBytes.isNotEmpty()); require(iv.size == 12); require(encryptedKey.isNotEmpty()) }` ajouté.
+- [x] [Review][Patch] `SecureRandom` instancié par fragment dans la boucle `.map` [FragmentCipherUseCase.kt] — Extrait en `private val secureRandom = SecureRandom()` au niveau de la classe `@Singleton`.
+- [x] [Review][Patch] Test 3 modifie le `ciphertext` au lieu de l'IV — non-conforme AC #6c [FragmentCipherUseCaseTest.kt] — Test renommé et modifié pour tampérer `frag.iv` (intégrité IV → GCM tag failure).
+
+### Deferred
+
+- [x] [Review][Defer] `recipientPublicKeyBytes` non validé avant parsing X.509 [FragmentCipherUseCase.kt] — Entrée malformée produit une exception capturée par `runCatching` → `Result.failure` déjà correct. Amélioration future uniquement. — deferred, pre-existing
+- [x] [Review][Defer] `EncryptedFragment` accepte `originalFileSize = 0` sans contrainte [EncryptedFragment.kt] — Impact sémantique dépend de la reconstruction aval (Story 6.x). — deferred, pre-existing
+- [x] [Review][Defer] Couverture de test insuffisante (fragments parity-only, single-fragment) [FragmentCipherUseCaseTest.kt] — Cas limites non requis par l'AC. — deferred, pre-existing
+- [x] [Review][Defer] Ordre et unicité des indices de fragments dans `decrypt` non vérifiés [FragmentCipherUseCase.kt] — Responsabilité de la couche appelante (Story 5.3+). — deferred, pre-existing
+- [x] [Review][Defer] Valeur par défaut du sel HKDF (`ByteArray(32)`) non documentée [HkdfSha256.kt] — Conforme RFC 5869 §2.2 mais non spécifié dans la story. Documentation future. — deferred, pre-existing

@@ -9,12 +9,14 @@ internal fun hkdfSha256(
     info: ByteArray,
     outputLen: Int = 32
 ): ByteArray {
+    require(outputLen in 1..(255 * 32)) { "outputLen must be in [1, 8160], got $outputLen" }
     val mac = Mac.getInstance("HmacSHA256")
     // Extract
     mac.init(SecretKeySpec(salt ?: ByteArray(32), "HmacSHA256"))
     val prk = mac.doFinal(ikm)
-    // Expand
+    // Expand — prk zeroed after mac.init since SecretKeySpec copies the bytes
     mac.init(SecretKeySpec(prk, "HmacSHA256"))
+    prk.fill(0)
     val result = ByteArray(outputLen)
     var prev = ByteArray(0)
     var pos = 0
@@ -29,5 +31,6 @@ internal fun hkdfSha256(
         pos += len
         ctr++
     }
+    prev.fill(0)
     return result
 }

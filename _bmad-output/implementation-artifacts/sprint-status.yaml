@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-04-20T21:00:00+02:00
+last_updated: 2026-04-21T22:30:00+02:00
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -68,9 +68,9 @@ development_status:
   epic-4-retrospective: optional
   epic-5: in-progress
   5-1-moteur-erasure-coding-c-ndkjni: done
-  5-2-chiffrement-aes-256-gcm-des-fragments-zero-trust: review
-  5-3-distribution-des-blocs-aux-noeuds-du-cluster: backlog
-  5-4-erasureprogressindicator-feedback-ux-en-temps-reel: backlog
+  5-2-chiffrement-aes-256-gcm-des-fragments-zero-trust: done
+  5-3-distribution-des-blocs-aux-noeuds-du-cluster: done
+  5-4-erasureprogressindicator-feedback-ux-en-temps-reel: in-progress  # patches appliqués, re-review requis
   epic-5-retrospective: optional
   epic-6: backlog
   6-1-localisation-des-blocs-via-requete-dht: backlog

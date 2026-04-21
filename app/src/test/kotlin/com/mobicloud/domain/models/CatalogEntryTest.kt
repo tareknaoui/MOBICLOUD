@@ -19,7 +19,7 @@ class CatalogEntryTest {
         @ProtoNumber(2) val ownerPubKeyHash: String,
         @ProtoNumber(3) val versionClock: Long,
         @ProtoNumber(4) val fragmentLocations: List<FragmentLocation>,
-        @ProtoNumber(5) val newUnknownField: String // New field added in the future
+        @ProtoNumber(6) val newUnknownField: String // New field added in the future (5 now used by wrappedMasterKey)
     )
 
     @Test

@@ -26,7 +26,7 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         DhtEntryEntity::class,
         TombstoneEntryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -68,6 +68,12 @@ abstract class CatalogDatabase : RoomDatabase() {
                         deleted_at INTEGER NOT NULL
                     )
                 """.trimIndent())
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE catalog_entry ADD COLUMN wrapped_master_key_json TEXT")
             }
         }
     }

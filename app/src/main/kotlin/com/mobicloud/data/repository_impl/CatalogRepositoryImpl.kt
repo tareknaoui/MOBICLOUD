@@ -1,10 +1,12 @@
 package com.mobicloud.data.repository_impl
 
+import android.util.Log
 import com.mobicloud.data.local.dao.CatalogDao
 import com.mobicloud.data.local.entity.CatalogEntryEntity
 import com.mobicloud.data.local.entity.FragmentLocationEntity
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.FragmentLocation
+import com.mobicloud.domain.models.WrappedFileMasterKey
 import com.mobicloud.domain.repository.CatalogRepository
 import com.mobicloud.domain.usecase.m05_dht_catalog.CalculateDhtRangeUseCase
 import kotlinx.coroutines.Dispatchers
@@ -15,14 +17,15 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 /**
- * Impl\u00e9mentation de [CatalogRepository] respectant les guardrails Clean Architecture :
- * - AC #6 : filtre DHT activ\u00e9 sur [insertEntry] via [CalculateDhtRangeUseCase].
- * - AC #9 : toutes les op\u00e9rations suspendues s'ex\u00e9cutent sur [Dispatchers.IO].
- * - AC #9 : toutes les op\u00e9rations retournent [Result]<T> pour une gestion explicite des erreurs.
+ * Implémentation de [CatalogRepository] respectant les guardrails Clean Architecture :
+ * - AC #6 : filtre DHT activé sur [insertEntry] via [CalculateDhtRangeUseCase].
+ * - AC #9 : toutes les opérations suspendues s'exécutent sur [Dispatchers.IO].
+ * - AC #9 : toutes les opérations retournent [Result]<T> pour une gestion explicite des erreurs.
  *
  * Convention de mapping :
  * - [CatalogEntry] ↔ [CatalogEntryEntity] + [List]<[FragmentLocationEntity]>
  * - [FragmentLocation.nodeIds] (List<String>) ↔ [FragmentLocationEntity.nodeIds] (String JSON)
+ * - [CatalogEntry.wrappedMasterKey] ↔ [CatalogEntryEntity.wrappedMasterKeyJson] (String JSON)
  */
 class CatalogRepositoryImpl(
     private val catalogDao: CatalogDao,
@@ -36,7 +39,10 @@ class CatalogRepositoryImpl(
         CatalogEntryEntity(
             fileHash = fileHash,
             ownerPubKeyHash = ownerPubKeyHash,
-            versionClock = versionClock
+            versionClock = versionClock,
+            wrappedMasterKeyJson = wrappedMasterKey?.let {
+                json.encodeToString(WrappedFileMasterKey.serializer(), it)
+            }
         )
 
     private fun FragmentLocation.toEntity(catalogFileHash: String): FragmentLocationEntity =
@@ -63,14 +69,22 @@ class CatalogRepositoryImpl(
             fileHash = catalogEntry.fileHash,
             ownerPubKeyHash = catalogEntry.ownerPubKeyHash,
             versionClock = catalogEntry.versionClock,
-            fragmentLocations = fragmentLocations.map { it.toDomain() }
+            fragmentLocations = fragmentLocations.map { it.toDomain() },
+            wrappedMasterKey = catalogEntry.wrappedMasterKeyJson?.let { jsonStr ->
+                try {
+                    json.decodeFromString(WrappedFileMasterKey.serializer(), jsonStr)
+                } catch (e: Exception) {
+                    Log.w("CatalogRepo", "Corrupted wrappedMasterKeyJson for ${catalogEntry.fileHash}: $e")
+                    null
+                }
+            }
         )
 
     // --- CatalogRepository impl ---
 
     /**
-     * Ins\u00e8re l'entr\u00e9e si et seulement si son [CatalogEntry.fileHash] est dans la partition DHT.
-     * Sinon, l'op\u00e9ration retourne [Result.success] silencieusement (AC #6).
+     * Insère l'entrée si et seulement si son [CatalogEntry.fileHash] est dans la partition DHT.
+     * Sinon, l'opération retourne [Result.success] silencieusement (AC #6).
      */
     override suspend fun insertEntry(
         entry: CatalogEntry,
@@ -90,6 +104,19 @@ class CatalogRepositoryImpl(
             catalogDao.insertWithFragments(entityEntry, entityFragments)
         }
     }
+
+    /**
+     * Insère une entrée catalogue sans appliquer le filtre DHT.
+     * Réservé au nœud propriétaire qui distribue ses propres blocs (Story 5.3).
+     */
+    override suspend fun insertOwnerEntry(entry: CatalogEntry): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val entityEntry = entry.toEntity()
+                val entityFragments = entry.fragmentLocations.map { it.toEntity(entry.fileHash) }
+                catalogDao.insertWithFragments(entityEntry, entityFragments)
+            }
+        }
 
     override suspend fun updateEntryOnly(entry: CatalogEntry): Result<Unit> =
         withContext(Dispatchers.IO) {

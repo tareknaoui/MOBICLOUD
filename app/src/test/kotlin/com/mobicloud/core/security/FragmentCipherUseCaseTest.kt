@@ -64,16 +64,16 @@ class FragmentCipherUseCaseTest {
     }
 
     @Test
-    fun `decrypt with tampered fragment ciphertext returns Result failure`() = runTest {
+    fun `decrypt with tampered fragment IV returns Result failure`() = runTest {
         val keyPair = generateKeyPair()
         val fragments = makeFragments()
 
         val bundle = useCase.encrypt(fragments, keyPair.public.encoded).getOrThrow()
 
         val tamperedFragment = bundle.encryptedFragments[0].let { frag ->
-            val tampered = frag.ciphertext.copyOf()
-            tampered[0] = (tampered[0].toInt() xor 0xFF).toByte()
-            frag.copy(ciphertext = tampered)
+            val tamperedIv = frag.iv.copyOf()
+            tamperedIv[0] = (tamperedIv[0].toInt() xor 0xFF).toByte()
+            frag.copy(iv = tamperedIv)
         }
         val tamperedBundle = bundle.copy(
             encryptedFragments = listOf(tamperedFragment) + bundle.encryptedFragments.drop(1)
@@ -81,7 +81,7 @@ class FragmentCipherUseCaseTest {
 
         val result = useCase.decrypt(tamperedBundle, keyPair.private)
 
-        assertTrue("Expected failure with tampered ciphertext", result.isFailure)
+        assertTrue("Expected failure with tampered IV (GCM integrity)", result.isFailure)
     }
 
     @Test

@@ -14,5 +14,8 @@ data class CatalogEntryEntity(
     val ownerPubKeyHash: String,
 
     @ColumnInfo(name = "version_clock")
-    val versionClock: Long
+    val versionClock: Long,
+
+    @ColumnInfo(name = "wrapped_master_key_json")
+    val wrappedMasterKeyJson: String? = null
 )
