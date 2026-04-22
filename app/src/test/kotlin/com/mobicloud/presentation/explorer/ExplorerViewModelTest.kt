@@ -43,6 +43,7 @@ class ExplorerViewModelTest {
     private lateinit var distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase
     private lateinit var securityRepository: SecurityRepository
     private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
+    private lateinit var downloadFileBlocksUseCase: com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
     private lateinit var context: Context
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
 
@@ -56,6 +57,7 @@ class ExplorerViewModelTest {
         distributeEncryptedBlocksUseCase = mockk(relaxed = true)
         securityRepository = mockk(relaxed = true)
         localizeFileBlocksUseCase = mockk(relaxed = true)
+        downloadFileBlocksUseCase = mockk(relaxed = true)
         context = mockk(relaxed = true)
         every { catalogRepository.getAllEntriesFlow() } returns catalogFlow
     }
@@ -73,6 +75,7 @@ class ExplorerViewModelTest {
         distributeEncryptedBlocksUseCase = distributeEncryptedBlocksUseCase,
         securityRepository = securityRepository,
         localizeFileBlocksUseCase = localizeFileBlocksUseCase,
+        downloadFileBlocksUseCase = downloadFileBlocksUseCase,
         context = context
     )
 

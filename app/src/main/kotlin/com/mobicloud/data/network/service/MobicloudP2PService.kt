@@ -25,6 +25,7 @@ import com.mobicloud.domain.usecase.m01_discovery.CalculateReliabilityScoreUseCa
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m05_dht_catalog.ResolveDhtConflictUseCase
 import com.mobicloud.domain.repository.DhtRepository
+import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
@@ -63,6 +64,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var resolveDhtConflictUseCase: ResolveDhtConflictUseCase
     @Inject lateinit var receiveAndHostBlockUseCase: ReceiveAndHostBlockUseCase
     @Inject lateinit var dhtRepository: DhtRepository
+    @Inject lateinit var hostedBlockRepository: HostedBlockRepository
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -128,6 +130,7 @@ class MobicloudP2PService : Service() {
             tcpConnectionManager.gossipHandler = gossipSyncUseCase
             tcpConnectionManager.blockReceiverHandler = receiveAndHostBlockUseCase
             tcpConnectionManager.dhtRelayHandler = dhtRepository
+            tcpConnectionManager.hostedBlockProvider = hostedBlockRepository
 
             // Démarrer le TCP server EN PREMIER pour obtenir le port avant d'annoncer sur Firebase
             val tcpPortResult = tcpConnectionManager.startServer()

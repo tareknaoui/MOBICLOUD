@@ -6,13 +6,17 @@ import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mobicloud.core.security.FragmentCipherUseCase
+import android.util.Log
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.ErasureParameters
+import com.mobicloud.domain.models.ResolvedBlockLocation
 import com.mobicloud.domain.repository.CatalogRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -41,6 +45,7 @@ class ExplorerViewModel @Inject constructor(
     private val distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase,
     private val securityRepository: SecurityRepository,
     private val localizeFileBlocksUseCase: LocalizeFileBlocksUseCase,
+    private val downloadFileBlocksUseCase: DownloadFileBlocksUseCase,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -71,16 +76,52 @@ class ExplorerViewModel @Inject constructor(
     }
 
     fun initiateDownload(fileHash: String) {
-        if (_downloadState.value is DownloadState.Locating) return
-        _downloadState.value = DownloadState.Locating(fileHash)
+        var shouldLaunch = false
+        _downloadState.update { current ->
+            if (current is DownloadState.Locating) current
+            else { shouldLaunch = true; DownloadState.Locating(fileHash) }
+        }
+        if (!shouldLaunch) return
         viewModelScope.launch {
             localizeFileBlocksUseCase.invoke(fileHash)
                 .onSuccess { map ->
                     _downloadState.value = DownloadState.Located(fileHash, map)
+                    startDownload(fileHash, map)
                 }
                 .onFailure { e ->
                     _downloadState.value = DownloadState.Error(fileHash, e.message ?: "Localisation échouée")
                 }
+        }
+    }
+
+    /**
+     * Story 6.2 — chaîne automatique après `Located` : déclenche la course K+2 et met à jour
+     * `_downloadState` à chaque progression. `k` provient de `ErasureParameters` (mêmes
+     * paramètres que l'encodage côté upload — symétrique).
+     */
+    private fun startDownload(fileHash: String, blockMap: Map<String, ResolvedBlockLocation>) {
+        val k = ErasureParameters().k
+        viewModelScope.launch {
+            downloadFileBlocksUseCase.invoke(blockMap, k).collect { state ->
+                when (state) {
+                    is DownloadProgressState.Progress -> {
+                        Log.i(
+                            "MobiCloud:DL",
+                            "fileHash=${fileHash.take(8)} progress=${state.received}/${state.k} failed=${state.failed}"
+                        )
+                        _downloadState.value = DownloadState.Downloading(
+                            fileHash = fileHash,
+                            received = state.received,
+                            k = state.k,
+                            failed = state.failed
+                        )
+                    }
+                    is DownloadProgressState.Completed ->
+                        _downloadState.value = DownloadState.Downloaded(fileHash, state.blocks)
+                    is DownloadProgressState.Failed ->
+                        _downloadState.value = DownloadState.Error(fileHash, state.reason)
+                }
+            }
         }
     }
 

@@ -1,6 +1,6 @@
 # Story 6.1: Localisation des Blocs via Requête DHT
 
-Status: review
+Status: done
 
 ## Story
 
@@ -475,6 +475,27 @@ app/src/test/kotlin/com/mobicloud/domain/usecase/m05_dht_catalog/LocalizeFileBlo
 app/src/test/kotlin/com/mobicloud/presentation/explorer/ErasureProgressViewModelTest.kt (MODIFIÉ)
 app/src/test/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModelTest.kt (MODIFIÉ)
 
+### Review Findings
+
+- [x] [Review][Decision] `reliabilityScore = 0f` hardcodé dans le path RING RELAY — Résolu option 3 : cherche le score dans `activePeers` par `relayEntry.nodeId`, fallback `0f` [LocalizeFileBlocksUseCase.kt]
+- [x] [Review][Patch] `runBlocking` dans `handleIncomingBlockTransfer` — rendu `suspend`, `runBlocking` supprimé [TcpConnectionManager.kt]
+- [x] [Review][Patch] Double `DataInputStream` wrapping sur le même `InputStream` — refactorisé en `val data = DataInputStream(inp)` unique [TcpConnectionManager.kt]
+- [x] [Review][Patch] `blockId` réseau non validé avec regex `^[0-9a-f]{64}$` avant `findByBlockId()` — validation + log ajoutés [TcpConnectionManager.kt]
+- [x] [Review][Patch] `DhtLookupResponseMessage(found=true)` avec `port=0` / `ipAddress=""` — validation avant construction `DhtEntry` [DhtRepositoryImpl.kt]
+- [x] [Review][Patch] `ReceiveBlockResult.TooBig` sans NACK — `sendNack(NACK_UNKNOWN)` ajouté [TcpConnectionManager.kt]
+- [x] [Review][Patch] `CatalogEntry` avec `fragmentLocations` vide → guard `isEmpty()` → `CatalogEntryNotFoundException` [LocalizeFileBlocksUseCase.kt]
+- [x] [Review][Patch] `initiateDownload` guard non atomique — remplacé par `_downloadState.update {}` atomique [ExplorerViewModel.kt]
+- [x] [Review][Patch] `FileNotFoundException` locale shadow — renommée `CatalogEntryNotFoundException`, test mis à jour [LocalizeFileBlocksUseCase.kt]
+- [x] [Review][Patch] Socket double-close dans guard path — `socket.close()` explicite supprimé [TcpConnectionManager.kt]
+- [x] [Review][Patch] `DhtEntry.nodeId`/`ipAddress`/`port` vides acceptés — validation ajoutée [DhtRepositoryImpl.kt]
+- [x] [Review][Patch] `fragmentHash` dupliqués — `distinctBy { it.fragmentHash }` ajouté [LocalizeFileBlocksUseCase.kt]
+- [x] [Review][Defer] Ring relay peut contacter le nœud local (self-loop TCP 3s) [LocalizeFileBlocksUseCase.kt:70] — deferred, pre-existing: nécessite injection du `localNodeId` dans le UseCase pour filtrer le nœud local de l'anneau
+- [x] [Review][Defer] `connectionScope` annulé dans `stopServer()` sans possibilité de recréation [TcpConnectionManager.kt:114] — deferred, pre-existing: low risk sur Android (nouvelle instance Service à chaque démarrage)
+- [x] [Review][Defer] `activePeers` snapshot peut devenir périmé pendant les itérations multi-blocs avec relay [LocalizeFileBlocksUseCase.kt:28] — deferred: comportement voulu par C3 (`.peers.value` snapshot), tradeoff documenté
+- [x] [Review][Defer] Peer-supplied `ipAddress`/`port` utilisés sans validation pour connexions TCP sortantes (SSRF) [DhtRepositoryImpl.kt:95] — deferred: design P2P inhérent, peers semi-trusted via Firebase/multicast
+- [x] [Review][Defer] Lookups de blocs séquentiels (N × 3s max) sans parallélisme [LocalizeFileBlocksUseCase.kt:40] — deferred: non requis par la spec 6.1, parallélisme candidat Story 6.2
+
 ## Change Log
 
 - 2026-04-22 : Implémentation complète Story 6.1 — LocalizeFileBlocksUseCase (PRIMARY/DHT FALLBACK/RING RELAY), messages Protobuf DHT (0x30/0x31), handler relay TCP, bouton Télécharger UI, 5 tests JVM (5/5 ✅)
+- 2026-04-22 : Code review — 1 decision_needed, 11 patch, 5 deferred, 8 dismissed

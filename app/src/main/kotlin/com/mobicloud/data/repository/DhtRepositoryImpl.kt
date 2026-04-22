@@ -97,6 +97,7 @@ class DhtRepositoryImpl @Inject constructor(
                     val respBytes = ByteArray(len).also { inp.readFully(it) }
                     val resp = ProtoBuf.decodeFromByteArray(DhtLookupResponseMessage.serializer(), respBytes)
                     if (!resp.found) null
+                    else if (resp.nodeId.isEmpty() || resp.ipAddress.isEmpty() || resp.port <= 0) null
                     else DhtEntry(resp.blockId, resp.nodeId, resp.ipAddress, resp.port, resp.timestamp)
                 }
             }

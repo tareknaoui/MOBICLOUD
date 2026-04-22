@@ -3,6 +3,7 @@ package com.mobicloud.data.repository_impl
 import android.content.Context
 import com.mobicloud.data.local.dao.HostedBlockDao
 import com.mobicloud.data.local.entity.HostedBlockEntity
+import com.mobicloud.domain.models.HostedBlockPayload
 import com.mobicloud.domain.repository.HostedBlockRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -82,5 +83,33 @@ class HostedBlockRepositoryImpl @Inject constructor(
             runCatching { File(entity.filePath).delete() }
             hostedBlockDao.deleteHostedBlock(blockId)
         }
+    }
+
+    /**
+     * Story 6.2 — lecture sous verrou partagé pour éviter une lecture pendant
+     * l'écriture atomique de [saveBlock]. Toute entrée invalide / orpheline → `Success(null)`.
+     */
+    override suspend fun getBlock(blockId: String): Result<HostedBlockPayload?> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                if (!BLOCK_ID_REGEX.matches(blockId)) return@runCatching null
+                val entity = hostedBlockDao.getHostedBlock(blockId) ?: return@runCatching null
+                val file = File(entity.filePath)
+                if (!file.exists() || !file.isFile) return@runCatching null
+                lockFor(blockId).withLock {
+                    val bytes = file.readBytes()
+                    HostedBlockPayload(
+                        blockId = entity.blockId,
+                        fragmentIndex = entity.fragmentIndex,
+                        isParity = entity.isParity,
+                        ciphertext = bytes
+                    )
+                }
+            }
+        }
+
+    companion object {
+        // Story 6.2 — défense en profondeur identique à ReceiveAndHostBlockUseCase
+        private val BLOCK_ID_REGEX = Regex("^[0-9a-f]{64}$")
     }
 }

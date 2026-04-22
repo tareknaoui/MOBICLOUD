@@ -6,10 +6,13 @@ import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.models.gossip.BloomFilterGossip
 import com.mobicloud.domain.models.gossip.DeltaSyncRequest
 import com.mobicloud.domain.models.gossip.DeltaSyncResponse
+import com.mobicloud.domain.models.BlockRequestMessage
+import com.mobicloud.domain.models.BlockResponseMessage
 import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.models.DhtLookupRequestMessage
 import com.mobicloud.domain.models.DhtLookupResponseMessage
 import com.mobicloud.domain.repository.DhtRepository
+import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipIncomingHandler
 import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
@@ -56,10 +59,15 @@ class TcpConnectionManager @Inject constructor(
     @Volatile
     var dhtRelayHandler: DhtRepository? = null
 
+    // Story 6.2 — provider local de blocs hébergés pour servir les BLOCK_REQUEST entrants
+    @Volatile
+    var hostedBlockProvider: HostedBlockRepository? = null
+
     companion object {
         // F2: taille maximale d'un message Gossip pour prévenir les allocations OOM via pairs malveillants
         private const val MAX_GOSSIP_MESSAGE_BYTES = 1_000_000
         private const val INCOMING_READ_TIMEOUT_MS = 3000
+        private val BLOCK_ID_REGEX = Regex("^[0-9a-f]{64}$")
     }
 
     /** Retourne true si un handshake TCP a déjà été complété avec ce nœud. */
@@ -126,6 +134,7 @@ class TcpConnectionManager @Inject constructor(
                 GossipChannel.GOSSIP_DELTA_REQ -> handleIncomingDeltaRequest(socket, pushback)
                 BlockTransferChannel.BLOCK_TRANSFER -> handleIncomingBlockTransfer(pushback, socket)
                 BlockTransferChannel.DHT_LOOKUP_REQ -> handleDhtLookupRelay(pushback, socket)
+                BlockTransferChannel.BLOCK_REQUEST -> handleBlockRequest(pushback, socket)
                 else -> {
                     // Legacy handshake — remettre le byte et traiter normalement
                     pushback.unread(firstByte)
@@ -191,7 +200,7 @@ class TcpConnectionManager @Inject constructor(
     }
 
     @OptIn(ExperimentalSerializationApi::class)
-    private fun handleIncomingBlockTransfer(inp: java.io.InputStream, socket: Socket) {
+    private suspend fun handleIncomingBlockTransfer(inp: java.io.InputStream, socket: Socket) {
         try {
             val data = DataInputStream(inp)
             val msgLen = data.readInt()
@@ -212,8 +221,7 @@ class TcpConnectionManager @Inject constructor(
                 return
             }
 
-            val result = runBlocking { handler.receive(message) }
-            when (result) {
+            when (val result = handler.receive(message)) {
                 is ReceiveBlockResult.Success -> {
                     val out = DataOutputStream(socket.getOutputStream())
                     val ackBytes = MobiCloudProtoBuf.encodeToByteArray(
@@ -225,12 +233,8 @@ class TcpConnectionManager @Inject constructor(
                     out.write(ackBytes)
                     out.flush()
                 }
-                // AC#6 : TooBig → aucun NACK, connexion fermée (protection mémoire symétrique
-                // au cas msgLen oversize ci-dessus).
-                is ReceiveBlockResult.TooBig -> {
-                    Log.w("MobiCloud:TCP", "BLOCK_TRANSFER TooBig côté UseCase — connexion fermée sans NACK")
-                }
-                // AC#5 : code d'erreur transmis dans le NACK (STORAGE_FULL explicite).
+                is ReceiveBlockResult.TooBig ->
+                    sendNack(socket, BlockTransferChannel.NACK_UNKNOWN)
                 is ReceiveBlockResult.StorageFull ->
                     sendNack(socket, BlockTransferChannel.NACK_STORAGE_FULL)
                 is ReceiveBlockResult.HashMismatch ->
@@ -246,10 +250,15 @@ class TcpConnectionManager @Inject constructor(
     @OptIn(ExperimentalSerializationApi::class)
     private suspend fun handleDhtLookupRelay(inp: InputStream, socket: Socket) {
         try {
-            val len = DataInputStream(inp).readInt()
-            if (len <= 0 || len > 1024) { socket.close(); return }
-            val reqBytes = ByteArray(len).also { DataInputStream(inp).readFully(it) }
+            val data = DataInputStream(inp)
+            val len = data.readInt()
+            if (len <= 0 || len > 1024) { return }
+            val reqBytes = ByteArray(len).also { data.readFully(it) }
             val req = ProtoBuf.decodeFromByteArray(DhtLookupRequestMessage.serializer(), reqBytes)
+            if (!BLOCK_ID_REGEX.matches(req.blockId)) {
+                Log.w("MobiCloud:TCP", "DHT_LOOKUP_REQ blockId invalide: ${req.blockId.take(16)}")
+                return
+            }
             val entry = dhtRelayHandler?.findByBlockId(req.blockId)?.getOrNull()
             val resp = if (entry != null) {
                 DhtLookupResponseMessage(entry.blockId, entry.nodeId, entry.ipAddress, entry.port, found = true, entry.timestamp)
@@ -265,6 +274,64 @@ class TcpConnectionManager @Inject constructor(
         } catch (e: Exception) {
             Log.e("MobiCloud:TCP", "Erreur handleDhtLookupRelay", e)
         }
+    }
+
+    /**
+     * Story 6.2 — sert un bloc hébergé localement.
+     *
+     * Lit `BlockRequestMessage`, récupère le bloc via `hostedBlockProvider`, répond `BLOCK_RESPONSE`
+     * (+ Protobuf payload) ou `BLOCK_NOT_FOUND` si absent / provider non configuré / blockId invalide.
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun handleBlockRequest(inp: InputStream, socket: Socket) {
+        try {
+            val data = DataInputStream(inp)
+            val len = data.readInt()
+            if (len <= 0 || len > BlockTransferChannel.MAX_REQUEST_PAYLOAD_BYTES) {
+                Log.w("MobiCloud:TCP", "BLOCK_REQUEST taille invalide: $len — connexion fermée")
+                return
+            }
+            val reqBytes = ByteArray(len).also { data.readFully(it) }
+            val req = MobiCloudProtoBuf.decodeFromByteArray(BlockRequestMessage.serializer(), reqBytes)
+            if (!BLOCK_ID_REGEX.matches(req.blockId)) {
+                Log.w("MobiCloud:TCP", "BLOCK_REQUEST blockId invalide: ${req.blockId.take(16)}")
+                sendBlockNotFound(socket)
+                return
+            }
+            val provider = hostedBlockProvider
+            if (provider == null) {
+                Log.w("MobiCloud:TCP", "BLOCK_REQUEST reçu mais aucun provider configuré")
+                sendBlockNotFound(socket)
+                return
+            }
+            val payload = provider.getBlock(req.blockId).getOrNull()
+            if (payload == null) {
+                sendBlockNotFound(socket)
+                return
+            }
+            val resp = BlockResponseMessage(
+                blockId = payload.blockId,
+                fragmentIndex = payload.fragmentIndex,
+                isParity = payload.isParity,
+                ciphertext = payload.ciphertext
+            )
+            val respBytes = MobiCloudProtoBuf.encodeToByteArray(BlockResponseMessage.serializer(), resp)
+            val out = DataOutputStream(socket.getOutputStream())
+            out.writeByte(BlockTransferChannel.BLOCK_RESPONSE.toInt())
+            out.writeInt(respBytes.size)
+            out.write(respBytes)
+            out.flush()
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur handleBlockRequest", e)
+        }
+    }
+
+    private fun sendBlockNotFound(socket: Socket) {
+        try {
+            val out = DataOutputStream(socket.getOutputStream())
+            out.writeByte(BlockTransferChannel.BLOCK_NOT_FOUND.toInt())
+            out.flush()
+        } catch (_: Exception) {}
     }
 
     private fun sendNack(socket: Socket, code: Int) {

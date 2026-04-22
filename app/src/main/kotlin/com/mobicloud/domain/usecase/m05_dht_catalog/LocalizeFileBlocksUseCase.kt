@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
-class FileNotFoundException(message: String) : Exception(message)
+class CatalogEntryNotFoundException(message: String) : Exception(message)
 
 @Singleton
 class LocalizeFileBlocksUseCase @Inject constructor(
@@ -21,16 +21,18 @@ class LocalizeFileBlocksUseCase @Inject constructor(
         withContext(Dispatchers.IO) {
             runCatching {
                 val entry = catalogRepository.getEntry(fileHash).getOrNull()
-                    ?: return@runCatching run {
-                        throw FileNotFoundException("Fichier introuvable dans le catalogue : $fileHash")
-                    }
+                    ?: throw CatalogEntryNotFoundException("Fichier introuvable dans le catalogue : $fileHash")
+
+                if (entry.fragmentLocations.isEmpty()) {
+                    throw CatalogEntryNotFoundException("Entrée catalogue sans fragments pour : $fileHash")
+                }
 
                 val activePeers = peerRepository.peers.value
                     .filter { it.isActive && it.ipAddress != null && it.port != null }
 
                 val resultMap = mutableMapOf<String, ResolvedBlockLocation>()
 
-                for (fragmentLocation in entry.fragmentLocations) {
+                for (fragmentLocation in entry.fragmentLocations.distinctBy { it.fragmentHash }) {
                     val blockId = fragmentLocation.fragmentHash
 
                     // PRIMARY : pairs actifs correspondant aux nodeIds de la FragmentLocation
@@ -77,13 +79,16 @@ class LocalizeFileBlocksUseCase @Inject constructor(
                                 relayPeer.port!!
                             ).getOrNull()
                             if (relayEntry != null) {
+                                val hostScore = activePeers
+                                    .find { it.identity.nodeId == relayEntry.nodeId }
+                                    ?.identity?.reliabilityScore ?: 0f
                                 resultMap[blockId] = ResolvedBlockLocation(
                                     blockId = blockId,
                                     fragmentIndex = fragmentLocation.fragmentIndex,
                                     nodeId = relayEntry.nodeId,
                                     ipAddress = relayEntry.ipAddress,
                                     port = relayEntry.port,
-                                    reliabilityScore = 0f
+                                    reliabilityScore = hostScore
                                 )
                             }
                         }

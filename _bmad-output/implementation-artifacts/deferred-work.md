@@ -228,6 +228,14 @@
 - **W8 — `gossipSyncUseCase.runGossipCycle()` sans timeout dans `distribute()`** [`DistributeEncryptedBlocksUseCase.kt:136`] — Si le gossip accroche, le Result de `storeFile()` est bloqué indéfiniment en état `Distributing`. Pre-existing, à résoudre avec un `withTimeout` lors d'une story de résilience réseau.
 - **W9 — `sha256Hex` dupliqué dans deux classes** [`ExplorerViewModel.kt:162`, `DistributeEncryptedBlocksUseCase.kt:141`] — Code identique copié-collé. Risk de dérive si l'algorithme évolue. À consolider dans un utilitaire `core/` lors d'un refactoring.
 
+## Deferred from: code review of 6-1-localisation-des-blocs-via-requete-dht (2026-04-22)
+
+- **Ring relay peut contacter le nœud local (self-loop TCP 3s)** [`LocalizeFileBlocksUseCase.kt:70`] — `ConsistentHashRing` inclut le nœud local dans l'anneau ; si `getPartition(blockId)` retourne le nodeId local, `remoteLookup` ouvre un socket vers soi-même, gaspillant 3s. Nécessite d'injecter le `localNodeId` dans le UseCase pour l'exclure de l'anneau.
+- **`connectionScope` annulé dans `stopServer()` sans possibilité de recréation** [`TcpConnectionManager.kt:114`] — `connectionScope` est un `val` ; après `cancel()`, tout `connectionScope.launch` est no-op. Low risk sur Android (nouvelle instance Service), mais correctif serait de recreer le scope dans `startServer()`.
+- **`activePeers` snapshot périmé pendant itérations multi-blocs** [`LocalizeFileBlocksUseCase.kt:28`] — Snapshot pris une seule fois avant la boucle (conforme à C3) ; des évictions pendant N × 3s de relay tournent vers des pairs morts. Tradeoff accepté.
+- **Peer-supplied `ipAddress`/`port` utilisés sans validation pour connexions TCP sortantes** [`DhtRepositoryImpl.kt:95`] — La `DhtEntry` reçue via réseau fournit l'IP et le port de connexion suivants sans validation d'unicast, loopback ou plage de port. Design P2P inhérent.
+- **Lookups de blocs séquentiels (N × 3s max) sans parallélisme** [`LocalizeFileBlocksUseCase.kt:40`] — Pour N fragments avec relay, la localisation totale peut prendre N × 3s. Parallélisme (N goroutines) non requis par la spec 6.1 ; candidat Story 6.2.
+
 ## Deferred from: code review of 5-5-reception-hebergement-de-blocs-distants — Passe 2 (2026-04-22)
 
 - **`blockLocks` ConcurrentHashMap croissance non bornée** [`HostedBlockRepositoryImpl.kt:lockFor`] — Chaque `blockId` unique crée une entrée `Mutex` qui n'est jamais purgée. Limité sur MVP (centaines d'entrées), mais à corriger avant déploiement longue durée avec un `Striped<Mutex>` ou cache à capacité fixe.

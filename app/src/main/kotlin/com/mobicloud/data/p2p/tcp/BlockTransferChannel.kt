@@ -16,6 +16,13 @@ object BlockTransferChannel {
     const val DHT_LOOKUP_REQ: Byte = 0x30
     const val DHT_LOOKUP_RESP: Byte = 0x31
 
+    // Story 6.2 — canal download bloc à la demande
+    const val BLOCK_REQUEST: Byte = 0x40
+    const val BLOCK_RESPONSE: Byte = 0x41
+    const val BLOCK_NOT_FOUND: Byte = 0x42
+    // Limite payload BlockRequestMessage — uniquement un blockId (64 chars hex) + overhead proto
+    const val MAX_REQUEST_PAYLOAD_BYTES = 256
+
     // Codes de raison NACK (transmis après le discriminant BLOCK_NACK comme Int)
     const val NACK_UNKNOWN: Int = 0
     const val NACK_STORAGE_FULL: Int = 1

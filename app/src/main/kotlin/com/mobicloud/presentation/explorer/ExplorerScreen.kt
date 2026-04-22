@@ -68,13 +68,16 @@ fun ExplorerScreen(
         }
     }
 
+    // Story 6.2 — snackbar feedback uniquement sur les états terminaux du download.
+    // Located n'est plus terminal (chaîné automatiquement vers Downloading) ; on attend Downloaded
+    // ou Error. UI de progression détaillée = périmètre Story 6.4.
     val terminalDownloadState = remember(downloadState) {
-        downloadState.takeIf { it is DownloadState.Located || it is DownloadState.Error }
+        downloadState.takeIf { it is DownloadState.Downloaded || it is DownloadState.Error }
     }
     LaunchedEffect(terminalDownloadState) {
         when (val s = terminalDownloadState) {
-            is DownloadState.Located -> snackbarHostState.showSnackbar(
-                "${s.blockMap.size} blocs localisés pour ${s.fileHash.take(8)}..."
+            is DownloadState.Downloaded -> snackbarHostState.showSnackbar(
+                "${s.blocks.size} blocs téléchargés pour ${s.fileHash.take(8)}..."
             )
             is DownloadState.Error -> snackbarHostState.showSnackbar("Erreur : ${s.message}")
             else -> Unit

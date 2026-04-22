@@ -55,6 +55,7 @@ class ErasureProgressViewModelTest {
     private lateinit var distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase
     private lateinit var securityRepository: SecurityRepository
     private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
+    private lateinit var downloadFileBlocksUseCase: com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
     private lateinit var context: Context
     private lateinit var contentResolver: ContentResolver
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
@@ -70,6 +71,7 @@ class ErasureProgressViewModelTest {
         distributeEncryptedBlocksUseCase = mockk()
         securityRepository = mockk()
         localizeFileBlocksUseCase = mockk(relaxed = true)
+        downloadFileBlocksUseCase = mockk(relaxed = true)
         context = mockk()
         contentResolver = mockk()
 
@@ -93,6 +95,7 @@ class ErasureProgressViewModelTest {
         distributeEncryptedBlocksUseCase = distributeEncryptedBlocksUseCase,
         securityRepository = securityRepository,
         localizeFileBlocksUseCase = localizeFileBlocksUseCase,
+        downloadFileBlocksUseCase = downloadFileBlocksUseCase,
         context = context
     )
 

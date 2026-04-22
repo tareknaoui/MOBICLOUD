@@ -126,7 +126,7 @@ class LocalizeFileBlocksUseCaseTest {
     }
 
     @Test
-    fun `file not found - catalogRepository returns null yields failure with FileNotFoundException`() = runTest(UnconfinedTestDispatcher()) {
+    fun `file not found - catalogRepository returns null yields failure with CatalogEntryNotFoundException`() = runTest(UnconfinedTestDispatcher()) {
         coEvery { catalogRepository.getEntry("unknown-hash") } returns Result.success(null)
         coEvery { peerRepository.peers } returns MutableStateFlow(emptyList())
 
@@ -135,7 +135,7 @@ class LocalizeFileBlocksUseCaseTest {
         assertTrue(result.isFailure)
         val exception = result.exceptionOrNull()
         assertNotNull(exception)
-        assertTrue(exception is FileNotFoundException)
+        assertTrue(exception is CatalogEntryNotFoundException)
         assertTrue(exception!!.message!!.contains("unknown-hash"))
     }
 

@@ -1,5 +1,7 @@
 package com.mobicloud.domain.repository
 
+import com.mobicloud.domain.models.HostedBlockPayload
+
 interface HostedBlockRepository {
     suspend fun saveBlock(
         blockId: String,
@@ -12,4 +14,13 @@ interface HostedBlockRepository {
     suspend fun blockExists(blockId: String): Boolean
 
     suspend fun deleteBlock(blockId: String)
+
+    /**
+     * Story 6.2 — lecture d'un bloc hébergé localement pour le servir via TCP.
+     *
+     * @return `Success(payload)` si le bloc est trouvé et lisible,
+     *         `Success(null)` si absent (DB ou disque) ou si [blockId] a un format invalide,
+     *         `Failure(t)` en cas d'erreur I/O irrécupérable.
+     */
+    suspend fun getBlock(blockId: String): Result<HostedBlockPayload?>
 }
