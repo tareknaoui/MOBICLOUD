@@ -50,8 +50,16 @@ class BlockTransferClient @Inject constructor(
             val inp = DataInputStream(socket.getInputStream())
             val discriminator = inp.readByte()
             if (discriminator == BLOCK_NACK) {
+                // [Review][Patch] Le serveur transmet désormais un code de raison après le discriminant.
+                val nackCode = try { inp.readInt() } catch (_: Exception) { BlockTransferChannel.NACK_UNKNOWN }
+                val reason = when (nackCode) {
+                    BlockTransferChannel.NACK_STORAGE_FULL -> "STORAGE_FULL"
+                    BlockTransferChannel.NACK_HASH_MISMATCH -> "HASH_MISMATCH"
+                    BlockTransferChannel.NACK_IO_ERROR -> "IO_ERROR"
+                    else -> "UNKNOWN"
+                }
                 return@withContext Result.failure(
-                    IOException("Nœud ${peer.identity.nodeId} a rejeté le bloc ${block.blockId}")
+                    IOException("Nœud ${peer.identity.nodeId} a rejeté le bloc ${block.blockId} — $reason")
                 )
             }
             if (discriminator != BLOCK_ACK) {
@@ -70,8 +78,12 @@ class BlockTransferClient @Inject constructor(
             inp.readFully(ackBytes)
             val ack = MobiCloudProtoBuf.decodeFromByteArray(BlockAckMessage.serializer(), ackBytes)
 
+            // [Review][Patch] Domain separation : le payload signé est
+            // "$ACK_DOMAIN_PREFIX|$receiverNodeId|$blockHash".toByteArray(UTF-8)
+            val signingPayload = "${com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase.ACK_DOMAIN_PREFIX}|${ack.receiverNodeId}|${ack.blockHash}"
+                .toByteArray(Charsets.UTF_8)
             val valid = securityRepository.verifySignature(
-                data = ack.blockHash.encodeToByteArray(),
+                data = signingPayload,
                 signature = ack.signature,
                 publicKey = peer.identity.publicKeyBytes
             ).getOrDefault(false)

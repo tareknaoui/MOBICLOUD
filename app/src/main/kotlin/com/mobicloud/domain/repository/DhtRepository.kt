@@ -21,4 +21,6 @@ interface DhtRepository {
     suspend fun deleteByNodeId(nodeId: String): Result<Unit>
 
     fun observeAllEntries(): Flow<List<DhtEntry>>
+
+    suspend fun remoteLookup(blockId: String, peerIp: String, peerPort: Int): Result<DhtEntry?>
 }

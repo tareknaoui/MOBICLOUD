@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -38,7 +39,8 @@ fun CatalogEntry.availabilityState(): AvailabilityState {
 @Composable
 fun CatalogEntryCard(
     entry: CatalogEntry,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onDownload: ((String) -> Unit)? = null
 ) {
     val (badgeText, badgeColor) = when (entry.availabilityState()) {
         AvailabilityState.COMPLET -> "Complet" to Color(0xFF00FF41)
@@ -94,6 +96,13 @@ fun CatalogEntryCard(
                 fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(start = 8.dp)
             )
+            onDownload?.let { callback ->
+                if (entry.availabilityState() != AvailabilityState.DEGRADE) {
+                    TextButton(onClick = { callback(entry.fileHash) }) {
+                        Text("↓", color = badgeColor, fontSize = 14.sp, fontFamily = FontFamily.Monospace)
+                    }
+                }
+            }
         }
     }
 }

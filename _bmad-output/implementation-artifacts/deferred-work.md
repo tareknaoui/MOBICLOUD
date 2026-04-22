@@ -211,3 +211,24 @@
 - **Couverture de test insuffisante : fragments parity-only, single-fragment** [`FragmentCipherUseCaseTest.kt`] — Cas limites non requis par l'AC. À envisager dans une story de hardening tests.
 - **Ordre et unicité des indices de fragments dans `decrypt` non vérifiés** [`FragmentCipherUseCase.kt`] — Responsabilité de la couche appelante (Story 5.3+). Décision architecturale consciente.
 - **Valeur par défaut du sel HKDF (`ByteArray(32)`) non documentée** [`HkdfSha256.kt`] — Conforme RFC 5869 §2.2 (sel par défaut = zéros de longueur HashLen). Non spécifié dans la story — à documenter en commentaire lors du prochain passage.
+
+## Deferred from: code review of 5-5-reception-hebergement-de-blocs-distants (2026-04-22)
+
+- **TOCTOU sur `availableDiskBytes`** [`ReceiveAndHostBlockUseCase.kt`] — N réceptions concurrentes peuvent toutes passer le garde `< MIN_FREE_BYTES` et saturer le disque. Nécessite une réservation/quota global non trivial. Impact pratique limité en phase actuelle.
+- **Migration Room 6→7 sur device beta avec schéma `hosted_blocks` préexistant différent** [`CatalogDatabase.kt:MIGRATION_6_7`] — `CREATE TABLE IF NOT EXISTS` ne modifie pas une table existante. Scénario beta non reproductible en prod.
+- ~~**Chemins d'échec `signData` / `getIdentity` non couverts dans les tests UseCase**~~ — ✅ Traité le 2026-04-22 (passe 2) : 3 tests ajoutés (`getIdentity failure`, `signData failure`, idempotence `blockExists=true`).
+- **Tests d'intégration AC#1 (routing TCP discriminant 0x20) et AC#8 (delegation via `handleIncomingConnection`) absents** — Hors-périmètre des 5 tests JVM spécifiés ; relève d'un test instrumenté Android/Robolectric à adresser séparément.
+- **`fallbackToDestructiveMigration()` conservé dans `IdentityModule`** [`IdentityModule.kt:347`] — Retrait coordonné à planifier dans une story hardening DB dédiée. La migration explicite `MIGRATION_6_7` respecte l'intent de Dev Notes #1 (interdiction de *combler un gap*) ; le fallback reste un filet de sécurité. Retrait global nécessaire pour cohérence avec les migrations des stories 1-4.
+
+## Deferred from: code review of 5-4-erasureprogressindicator-feedback-ux-en-temps-reel — Passe 2 (2026-04-22)
+
+- **W5 — `readBytes()` entier en RAM + null SIZE bypass** [`ExplorerViewModel.kt:72-86`] — P6 ajoute une garde de taille via `OpenableColumns.SIZE`, mais si le provider retourne null pour SIZE, la garde est silencieusement skippée. Risque OOM pre-existing depuis story 5.1 (streaming différé à story 6.3). Streaming requis pour remédiation complète.
+- **W6 — Fallback à un seul nœud alternatif** [`DistributeEncryptedBlocksUseCase.kt:82-87`] — Le fallback sélectionne toujours `activePeers[1]` en cas d'échec multiple, créant une concentration de charge. Pre-existing design story 5.3.
+- **W7 — `blockId = sha256Hex(ciphertext)` : collision potentielle** [`DistributeEncryptedBlocksUseCase.kt:64`] — Si deux fragments produisent le même ciphertext (IV réutilisé ou bug encryption), ils partagent le même blockId, le second écrasant le premier dans la DHT. L'ID devrait inclure l'index du fragment. Pre-existing design story 5.3.
+- **W8 — `gossipSyncUseCase.runGossipCycle()` sans timeout dans `distribute()`** [`DistributeEncryptedBlocksUseCase.kt:136`] — Si le gossip accroche, le Result de `storeFile()` est bloqué indéfiniment en état `Distributing`. Pre-existing, à résoudre avec un `withTimeout` lors d'une story de résilience réseau.
+- **W9 — `sha256Hex` dupliqué dans deux classes** [`ExplorerViewModel.kt:162`, `DistributeEncryptedBlocksUseCase.kt:141`] — Code identique copié-collé. Risk de dérive si l'algorithme évolue. À consolider dans un utilitaire `core/` lors d'un refactoring.
+
+## Deferred from: code review of 5-5-reception-hebergement-de-blocs-distants — Passe 2 (2026-04-22)
+
+- **`blockLocks` ConcurrentHashMap croissance non bornée** [`HostedBlockRepositoryImpl.kt:lockFor`] — Chaque `blockId` unique crée une entrée `Mutex` qui n'est jamais purgée. Limité sur MVP (centaines d'entrées), mais à corriger avant déploiement longue durée avec un `Striped<Mutex>` ou cache à capacité fixe.
+- **`runBlocking` dans `handleIncomingBlockTransfer` à l'intérieur de `connectionScope.launch`** [`TcpConnectionManager.kt:handleIncomingBlockTransfer`] — Depuis l'introduction du `connectionScope.launch`, le `runBlocking` bloque un thread IO par transfert concurrent. Cohérent avec le pattern Gossip déjà déféré (F13 story 4.2). Fix global : rendre `handleIncomingConnection` et tous ses handlers `suspend` et supprimer les `runBlocking`. À planifier avec la correction des handlers Gossip.

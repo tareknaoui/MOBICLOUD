@@ -2,6 +2,7 @@ package com.mobicloud.presentation.explorer
 
 import android.content.ContentResolver
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
 import com.mobicloud.core.security.FragmentCipherUseCase
 import com.mobicloud.domain.models.CatalogEntry
@@ -14,6 +15,7 @@ import com.mobicloud.domain.models.WrappedFileMasterKey
 import com.mobicloud.domain.repository.CatalogRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
+import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
 import io.mockk.coEvery
@@ -52,6 +54,7 @@ class ErasureProgressViewModelTest {
     private lateinit var fragmentCipherUseCase: FragmentCipherUseCase
     private lateinit var distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase
     private lateinit var securityRepository: SecurityRepository
+    private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
     private lateinit var context: Context
     private lateinit var contentResolver: ContentResolver
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
@@ -66,6 +69,7 @@ class ErasureProgressViewModelTest {
         fragmentCipherUseCase = mockk()
         distributeEncryptedBlocksUseCase = mockk()
         securityRepository = mockk()
+        localizeFileBlocksUseCase = mockk(relaxed = true)
         context = mockk()
         contentResolver = mockk()
 
@@ -88,6 +92,7 @@ class ErasureProgressViewModelTest {
         fragmentCipherUseCase = fragmentCipherUseCase,
         distributeEncryptedBlocksUseCase = distributeEncryptedBlocksUseCase,
         securityRepository = securityRepository,
+        localizeFileBlocksUseCase = localizeFileBlocksUseCase,
         context = context
     )
 
@@ -108,20 +113,20 @@ class ErasureProgressViewModelTest {
     )
 
     private fun fakeEntry(nodeCount: Int = 6) = CatalogEntry(
-        fileHash = "abc123def456789012345678901234567890123456789012345678901234567",
+        fileHash = "abc123def4567890123456789012345678901234567890123456789012345678",
         ownerPubKeyHash = "ownerHash01234567",
         versionClock = System.currentTimeMillis(),
         fragmentLocations = (0 until nodeCount).map { FragmentLocation(it, "h$it", listOf("n$it")) }
     )
 
-    /**
-     * Avance le scheduler et laisse les threads IO réels terminer.
-     * withContext(Dispatchers.IO) utilise des vrais threads — advanceUntilIdle() peut retourner
-     * avant qu'ils aient posté leurs continuations. Cette double avance corrige la race condition.
-     */
+    // withContext(Dispatchers.IO) dispatche sur de vrais threads même avec StandardTestDispatcher.
+    // advanceUntilIdle() peut retourner avant que ces threads aient posté leurs continuations.
+    // Thread.sleep(100) laisse le temps aux threads IO de poster, puis advanceUntilIdle() les exécute.
+    // Limitation CI : le sleep réel peut être trop court sous forte charge. Fix structurel :
+    // injecter un TestDispatcher pour Dispatchers.IO dans le ViewModel (refactoring futur).
     private fun TestScope.advanceWithIoFlush() {
         advanceUntilIdle()
-        Thread.sleep(100) // laisse les threads IO poster leurs continuations
+        Thread.sleep(100)
         advanceUntilIdle()
     }
 
@@ -233,7 +238,7 @@ class ErasureProgressViewModelTest {
                 "États Distributing observés: ${distributingStates.map { "c=${it.confirmed},f=${it.failedIndices}" }}",
             stateAfterFailure
         )
-        assertEquals("failedIndices = [2]", listOf(2), stateAfterFailure!!.failedIndices)
+        assertEquals("failedIndices = {2}", setOf(2), stateAfterFailure!!.failedIndices)
         assertEquals("confirmed = 2 (bloc 2 en échec ne compte pas)", 2, stateAfterFailure.confirmed)
     }
 
@@ -277,5 +282,30 @@ class ErasureProgressViewModelTest {
         // Déblocage pour que la coroutine se termine proprement
         proceed.complete(Unit)
         advanceWithIoFlush()
+    }
+
+    // Test 4 — Fichier trop volumineux : storeFile() passe à Error sans lancer le pipeline
+    @Test
+    fun `storeFile rejette un fichier plus grand que 100 Mo`() = runTest {
+        val cursor: Cursor = mockk()
+        every { cursor.moveToFirst() } returns true
+        every { cursor.getColumnIndexOrThrow(any()) } returns 0
+        every { cursor.getLong(0) } returns 105_000_000L
+        every { cursor.close() } returns Unit
+        every { contentResolver.query(any(), any(), null, null, null) } returns cursor
+
+        val viewModel = createViewModel()
+        viewModel.storeFile(fakeUri)
+        advanceWithIoFlush()
+
+        val state = viewModel.storeState.value
+        assertTrue(
+            "L'état doit être Error pour fichier > 100 Mo (était: $state)",
+            state is StoreState.Error
+        )
+        assertTrue(
+            "Le message doit mentionner la taille max (100)",
+            (state as StoreState.Error).message.contains("100")
+        )
     }
 }

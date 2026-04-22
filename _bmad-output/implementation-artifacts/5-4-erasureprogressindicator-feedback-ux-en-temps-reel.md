@@ -1,6 +1,6 @@
 # Story 5.4: ErasureProgressIndicator — Feedback UX en Temps Réel
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -265,7 +265,23 @@ app/src/test/kotlin/com/mobicloud/
 - [x] [Review][Defer] W1 — Pas de feedback UI pour le tap ignoré pendant InProgress [ExplorerViewModel.kt:58] — deferred, pre-existing UX gap
 - [x] [Review][Defer] W2 — Hash SHA-256 du plaintext exposé dans le catalogue : metadata leak [ExplorerViewModel.kt ~L73] — deferred, pre-existing design decision
 - [x] [Review][Defer] W3 — `tempFile` créé avant le bloc `try` : narrow gap si annulation coroutine [ExplorerViewModel.kt ~L77] — deferred, pre-existing
-- [x] [Review][Defer] W4 — Read-modify-write non-atomique dans le callback onBlockResult : latent si distribution parallélisée [ExplorerViewModel.kt ~L114] — deferred, sequential today, use `.update{}` in future refactor
+- [x] [Review][Defer] W4 — Read-modify-write non-atomique dans le callback onBlockResult : latent si distribution parallélisée [ExplorerViewModel.kt ~L114] — ✅ RÉSOLU (re-review 2026-04-22) : `_storeState.update { }` déjà utilisé dans le code actuel.
+
+### Review Findings — Passe 2 (2026-04-22)
+
+- [x] [Review][Decision] D4 — AC6 déviation : `ErasureProgressIndicator` disparaît sur erreur globale au lieu de rester en état d'erreur — Comportement réel : état passe à `StoreState.Error` (qui n'est pas un `InProgress`), le composant disparaît et seule la Snackbar signale l'échec. Spec AC6 : "l'indicateur passe en état d'erreur global". Options : (a) accepter la déviation (Snackbar suffit, UX simplifiée), (b) ajouter `InProgress.Failed(message)` pour maintenir l'indicateur visible.
+- [x] [Review][Decision] D5 — Architecture Snackbar : `LaunchedEffect(storeState)` peut manquer l'état `Success` si la recomposition collecte `Success` → `Idle` dans la même frame — `scheduleReset()` remet à `Idle` après 5s mais sous charge `collectAsStateWithLifecycle` peut conflater. Options : (a) accepter le risque (marginal, 5s > durée snackbar), (b) migrer vers `SharedFlow` ou `Channel` pour les events one-shot UI.
+- [x] [Review][Patch] P8 — `IOException` non catchée dans `tempFile.writeBytes()` → UI bloquée indéfiniment à `InProgress.Encoding` [ExplorerViewModel.kt:97] — CORRIGÉ : `catch (CancellationException) { throw e }` + `catch (Exception)` ajoutés sur le bloc `try/finally` ; `_storeState` passe à Error avec message, `scheduleReset()` appelé.
+- [x] [Review][Patch] P9 — `failedIndices: List<Int>` au lieu de `Set<Int>` : doublons possibles si callback invoqué deux fois pour le même index [StoreState.kt:14] — CORRIGÉ : changé en `Set<Int> = emptySet()` ; assertion test mise à jour `listOf(2)` → `setOf(2)`.
+- [x] [Review][Patch] P10 — `Thread.sleep(100)` dans `advanceWithIoFlush()` : anti-pattern dans les tests coroutine [ErasureProgressViewModelTest.kt:124] — RÉSOLU : commentaire enrichi documentant la limitation CI et le fix structurel futur (injecter TestDispatcher pour IO).
+- [x] [Review][Patch] P11 — Absence de test pour le chemin "fichier trop volumineux" [ErasureProgressViewModelTest.kt] — CORRIGÉ : Test 4 ajouté, mocke `contentResolver.query()` retournant 105_000_000L, vérifie `StoreState.Error` avec message contenant "100".
+- [x] [Review][Patch] P12 — `fakeEntry` : `fileHash` de 63 caractères au lieu de 64 [ErasureProgressViewModelTest.kt:111] — CORRIGÉ : hash porté à 64 caractères.
+- [x] [Review][Patch] P13 — `LaunchedEffect(storeState)` retrigger à chaque mise à jour `Distributing` [ExplorerScreen.kt:56] — CORRIGÉ : `terminalState = remember(storeState) { storeState.takeIf { it is Success || it is Error } }` ; `LaunchedEffect(terminalState)` ne se relance que sur les états terminaux. Corrige également le cas "même fichier uploadé deux fois" (Success devenait null via Idle avant le second succès).
+- [x] [Review][Defer] W5 — `readBytes()` entier en RAM + null SIZE bypass P6 : OOM sur appareils bas de gamme si SIZE non rapporté par le provider [ExplorerViewModel.kt:72-86] — deferred, pre-existing depuis story 5.1 (streaming différé à story 6.3)
+- [x] [Review][Defer] W6 — Fallback à un seul nœud alternatif par bloc : concentration de charge sur `activePeers[1]` en cas de défaillances multiples [DistributeEncryptedBlocksUseCase.kt:82-87] — deferred, pre-existing design story 5.3
+- [x] [Review][Defer] W7 — `blockId = sha256Hex(ciphertext)` : collision potentielle si deux fragments produisent le même ciphertext [DistributeEncryptedBlocksUseCase.kt:64] — deferred, pre-existing design story 5.3
+- [x] [Review][Defer] W8 — `gossipSyncUseCase.runGossipCycle()` sans timeout dans `distribute()` : peut bloquer le retour du Result indéfiniment [DistributeEncryptedBlocksUseCase.kt:136] — deferred, pre-existing
+- [x] [Review][Defer] W9 — `sha256Hex` dupliqué dans `ExplorerViewModel` et `DistributeEncryptedBlocksUseCase` [ExplorerViewModel.kt:162, DistributeEncryptedBlocksUseCase.kt:141] — deferred, pre-existing duplication
 
 ## Dev Agent Record
 

@@ -11,10 +11,12 @@ import com.mobicloud.domain.models.ErasureParameters
 import com.mobicloud.domain.repository.CatalogRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
+import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -38,6 +40,7 @@ class ExplorerViewModel @Inject constructor(
     private val fragmentCipherUseCase: FragmentCipherUseCase,
     private val distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase,
     private val securityRepository: SecurityRepository,
+    private val localizeFileBlocksUseCase: LocalizeFileBlocksUseCase,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -50,6 +53,9 @@ class ExplorerViewModel @Inject constructor(
     private val _storeState = MutableStateFlow<StoreState>(StoreState.Idle)
     val storeState: StateFlow<StoreState> = _storeState.asStateFlow()
 
+    private val _downloadState = MutableStateFlow<DownloadState>(DownloadState.Idle)
+    val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
+
     private var resetJob: Job? = null
 
     fun refreshCatalog() {
@@ -61,6 +67,20 @@ class ExplorerViewModel @Inject constructor(
             } finally {
                 _isRefreshing.value = false
             }
+        }
+    }
+
+    fun initiateDownload(fileHash: String) {
+        if (_downloadState.value is DownloadState.Locating) return
+        _downloadState.value = DownloadState.Locating(fileHash)
+        viewModelScope.launch {
+            localizeFileBlocksUseCase.invoke(fileHash)
+                .onSuccess { map ->
+                    _downloadState.value = DownloadState.Located(fileHash, map)
+                }
+                .onFailure { e ->
+                    _downloadState.value = DownloadState.Error(fileHash, e.message ?: "Localisation échouée")
+                }
         }
     }
 
@@ -146,6 +166,13 @@ class ExplorerViewModel @Inject constructor(
                         scheduleReset()
                     }
 
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (_storeState.value is StoreState.InProgress) {
+                    _storeState.value = StoreState.Error("Erreur inattendue: ${e.message ?: "erreur inconnue"}")
+                    scheduleReset()
+                }
             } finally {
                 tempFile.delete()
             }

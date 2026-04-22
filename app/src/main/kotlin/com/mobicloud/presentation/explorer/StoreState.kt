@@ -11,7 +11,7 @@ sealed class StoreState {
             val confirmedIndices: Set<Int> = emptySet(),
             val total: Int,
             val dataBlockCount: Int,
-            val failedIndices: List<Int> = emptyList()
+            val failedIndices: Set<Int> = emptySet()
         ) : InProgress() {
             val confirmed: Int get() = confirmedIndices.size
         }

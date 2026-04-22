@@ -6,14 +6,26 @@ import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.models.gossip.BloomFilterGossip
 import com.mobicloud.domain.models.gossip.DeltaSyncRequest
 import com.mobicloud.domain.models.gossip.DeltaSyncResponse
+import com.mobicloud.domain.models.BlockTransferMessage
+import com.mobicloud.domain.models.DhtLookupRequestMessage
+import com.mobicloud.domain.models.DhtLookupResponseMessage
+import com.mobicloud.domain.repository.DhtRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipIncomingHandler
+import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
+import com.mobicloud.domain.usecase.m08_hosting.ReceiveBlockResult
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.protobuf.ProtoBuf
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.io.InputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.PushbackInputStream
@@ -38,6 +50,12 @@ class TcpConnectionManager @Inject constructor(
     @Volatile
     var gossipHandler: GossipIncomingHandler? = null
 
+    @Volatile
+    var blockReceiverHandler: ReceiveAndHostBlockUseCase? = null
+
+    @Volatile
+    var dhtRelayHandler: DhtRepository? = null
+
     companion object {
         // F2: taille maximale d'un message Gossip pour prévenir les allocations OOM via pairs malveillants
         private const val MAX_GOSSIP_MESSAGE_BYTES = 1_000_000
@@ -49,6 +67,10 @@ class TcpConnectionManager @Inject constructor(
 
     // F-03 [Review][Patch]: Référence stockée pour permettre interrupt() dans stopServer().
     private var serverThread: Thread? = null
+
+    // [Review][Patch] Scope dédié aux handlers de connexion entrante. Chaque connexion est
+    // traitée sur Dispatchers.IO pour ne plus bloquer le thread accept (anti-DoS).
+    private val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /**
      * Démarre le serveur ServerSocket sur un port disponible et l'écoute en arrière-plan.
@@ -65,7 +87,9 @@ class TcpConnectionManager @Inject constructor(
                 while (!Thread.currentThread().isInterrupted && serverSocket?.isClosed == false) {
                     try {
                         val clientSocket = serverSocket!!.accept()
-                        handleIncomingConnection(clientSocket)
+                        // [Review][Patch] Dispatch sur scope IO : le thread accept n'est plus bloqué
+                        // par le traitement (DB/signature/I/O). Un pair lent ne DoS plus le serveur.
+                        connectionScope.launch { handleIncomingConnection(clientSocket) }
                     } catch (e: Exception) {
                         if (serverSocket?.isClosed == false) {
                             Log.e("MobiCloud:TCP", "Erreur lors de l'acceptation de la socket", e)
@@ -88,7 +112,7 @@ class TcpConnectionManager @Inject constructor(
      * F-02 [Review][Patch]: getOrElse remplace getOrThrow() pour éviter un crash non géré.
      */
     @OptIn(ExperimentalSerializationApi::class)
-    private fun handleIncomingConnection(socket: Socket) {
+    private suspend fun handleIncomingConnection(socket: Socket) {
         try {
             socket.soTimeout = INCOMING_READ_TIMEOUT_MS  // F11: éviter blocage indéfini sur pair lent
             val senderIp = socket.inetAddress.hostAddress ?: "unknown"
@@ -100,6 +124,8 @@ class TcpConnectionManager @Inject constructor(
             when (firstByte.toByte()) {
                 GossipChannel.GOSSIP_BLOOM -> handleIncomingBloomGossip(pushback, senderIp, senderPort)
                 GossipChannel.GOSSIP_DELTA_REQ -> handleIncomingDeltaRequest(socket, pushback)
+                BlockTransferChannel.BLOCK_TRANSFER -> handleIncomingBlockTransfer(pushback, socket)
+                BlockTransferChannel.DHT_LOOKUP_REQ -> handleDhtLookupRelay(pushback, socket)
                 else -> {
                     // Legacy handshake — remettre le byte et traiter normalement
                     pushback.unread(firstByte)
@@ -162,6 +188,92 @@ class TcpConnectionManager @Inject constructor(
         } catch (e: Exception) {
             Log.e("MobiCloud:TCP", "Erreur lecture GOSSIP_DELTA_REQ", e)
         }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun handleIncomingBlockTransfer(inp: java.io.InputStream, socket: Socket) {
+        try {
+            val data = DataInputStream(inp)
+            val msgLen = data.readInt()
+            // AC#6 : payload oversize → connexion fermée immédiatement, PAS de NACK (protection mémoire).
+            // La fermeture est assurée par le finally de handleIncomingConnection.
+            if (msgLen <= 0 || msgLen > ReceiveAndHostBlockUseCase.MAX_BLOCK_PAYLOAD_BYTES) {
+                Log.w("MobiCloud:TCP", "BLOCK_TRANSFER taille invalide: $msgLen — connexion fermée sans NACK")
+                return
+            }
+            val msgBytes = ByteArray(msgLen)
+            data.readFully(msgBytes)
+            val message = MobiCloudProtoBuf.decodeFromByteArray(BlockTransferMessage.serializer(), msgBytes)
+
+            val handler = blockReceiverHandler
+            if (handler == null) {
+                Log.w("MobiCloud:TCP", "BLOCK_TRANSFER reçu mais aucun handler configuré")
+                sendNack(socket, BlockTransferChannel.NACK_UNKNOWN)
+                return
+            }
+
+            val result = runBlocking { handler.receive(message) }
+            when (result) {
+                is ReceiveBlockResult.Success -> {
+                    val out = DataOutputStream(socket.getOutputStream())
+                    val ackBytes = MobiCloudProtoBuf.encodeToByteArray(
+                        com.mobicloud.domain.models.BlockAckMessage.serializer(),
+                        result.ack
+                    )
+                    out.writeByte(BlockTransferChannel.BLOCK_ACK.toInt())
+                    out.writeInt(ackBytes.size)
+                    out.write(ackBytes)
+                    out.flush()
+                }
+                // AC#6 : TooBig → aucun NACK, connexion fermée (protection mémoire symétrique
+                // au cas msgLen oversize ci-dessus).
+                is ReceiveBlockResult.TooBig -> {
+                    Log.w("MobiCloud:TCP", "BLOCK_TRANSFER TooBig côté UseCase — connexion fermée sans NACK")
+                }
+                // AC#5 : code d'erreur transmis dans le NACK (STORAGE_FULL explicite).
+                is ReceiveBlockResult.StorageFull ->
+                    sendNack(socket, BlockTransferChannel.NACK_STORAGE_FULL)
+                is ReceiveBlockResult.HashMismatch ->
+                    sendNack(socket, BlockTransferChannel.NACK_HASH_MISMATCH)
+                is ReceiveBlockResult.IoError ->
+                    sendNack(socket, BlockTransferChannel.NACK_IO_ERROR)
+            }
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur lecture BLOCK_TRANSFER", e)
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun handleDhtLookupRelay(inp: InputStream, socket: Socket) {
+        try {
+            val len = DataInputStream(inp).readInt()
+            if (len <= 0 || len > 1024) { socket.close(); return }
+            val reqBytes = ByteArray(len).also { DataInputStream(inp).readFully(it) }
+            val req = ProtoBuf.decodeFromByteArray(DhtLookupRequestMessage.serializer(), reqBytes)
+            val entry = dhtRelayHandler?.findByBlockId(req.blockId)?.getOrNull()
+            val resp = if (entry != null) {
+                DhtLookupResponseMessage(entry.blockId, entry.nodeId, entry.ipAddress, entry.port, found = true, entry.timestamp)
+            } else {
+                DhtLookupResponseMessage(blockId = req.blockId, found = false)
+            }
+            val respBytes = ProtoBuf.encodeToByteArray(DhtLookupResponseMessage.serializer(), resp)
+            val out = DataOutputStream(socket.getOutputStream())
+            out.writeByte(BlockTransferChannel.DHT_LOOKUP_RESP.toInt())
+            out.writeInt(respBytes.size)
+            out.write(respBytes)
+            out.flush()
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur handleDhtLookupRelay", e)
+        }
+    }
+
+    private fun sendNack(socket: Socket, code: Int) {
+        try {
+            val out = DataOutputStream(socket.getOutputStream())
+            out.writeByte(BlockTransferChannel.BLOCK_NACK.toInt())
+            out.writeInt(code)
+            out.flush()
+        } catch (_: Exception) {}
     }
 
     private fun handleLegacyHandshake(socket: Socket, inp: java.io.InputStream) {
@@ -230,6 +342,8 @@ class TcpConnectionManager @Inject constructor(
         try {
             serverSocket?.close()
         } catch (e: Exception) {}
+        // [Review][Patch] Annulation des handlers en cours pour éviter les fuites de coroutines.
+        connectionScope.cancel()
         handshaked.clear()
     }
 }

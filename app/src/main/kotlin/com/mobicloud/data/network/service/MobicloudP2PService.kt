@@ -24,6 +24,8 @@ import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.usecase.m01_discovery.CalculateReliabilityScoreUseCase
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m05_dht_catalog.ResolveDhtConflictUseCase
+import com.mobicloud.domain.repository.DhtRepository
+import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
@@ -59,6 +61,8 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var abdicateSuperPeerUseCase: AbdicateSuperPeerUseCase
     @Inject lateinit var gossipSyncUseCase: GossipSyncUseCase
     @Inject lateinit var resolveDhtConflictUseCase: ResolveDhtConflictUseCase
+    @Inject lateinit var receiveAndHostBlockUseCase: ReceiveAndHostBlockUseCase
+    @Inject lateinit var dhtRepository: DhtRepository
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -119,6 +123,12 @@ class MobicloudP2PService : Service() {
 
             val identity = identityResult.getOrThrow()
 
+            // [Review][Patch] Brancher les handlers AVANT startServer() pour éliminer la race
+            // window où une connexion entrante arriverait pendant que handler == null.
+            tcpConnectionManager.gossipHandler = gossipSyncUseCase
+            tcpConnectionManager.blockReceiverHandler = receiveAndHostBlockUseCase
+            tcpConnectionManager.dhtRelayHandler = dhtRepository
+
             // Démarrer le TCP server EN PREMIER pour obtenir le port avant d'annoncer sur Firebase
             val tcpPortResult = tcpConnectionManager.startServer()
             // P1: Si le TCP server échoue, on ne publie pas un port 0 inutilisable
@@ -128,9 +138,6 @@ class MobicloudP2PService : Service() {
                 return@launch
             }
             val tcpPort = tcpPortResult.getOrThrow()
-
-            // Guard P7: brancher le handler Gossip APRÈS que le serveur TCP soit prêt
-            tcpConnectionManager.gossipHandler = gossipSyncUseCase
 
             // AC#6: purge des tombstones expirés au démarrage du service
             serviceScope.launch {

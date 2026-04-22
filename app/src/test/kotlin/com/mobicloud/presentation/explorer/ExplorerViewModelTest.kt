@@ -7,6 +7,7 @@ import com.mobicloud.domain.models.FragmentLocation
 import com.mobicloud.domain.repository.CatalogRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
+import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
 import com.mobicloud.presentation.explorer.components.AvailabilityState
@@ -41,6 +42,7 @@ class ExplorerViewModelTest {
     private lateinit var fragmentCipherUseCase: FragmentCipherUseCase
     private lateinit var distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase
     private lateinit var securityRepository: SecurityRepository
+    private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
     private lateinit var context: Context
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
 
@@ -53,6 +55,7 @@ class ExplorerViewModelTest {
         fragmentCipherUseCase = mockk(relaxed = true)
         distributeEncryptedBlocksUseCase = mockk(relaxed = true)
         securityRepository = mockk(relaxed = true)
+        localizeFileBlocksUseCase = mockk(relaxed = true)
         context = mockk(relaxed = true)
         every { catalogRepository.getAllEntriesFlow() } returns catalogFlow
     }
@@ -69,6 +72,7 @@ class ExplorerViewModelTest {
         fragmentCipherUseCase = fragmentCipherUseCase,
         distributeEncryptedBlocksUseCase = distributeEncryptedBlocksUseCase,
         securityRepository = securityRepository,
+        localizeFileBlocksUseCase = localizeFileBlocksUseCase,
         context = context
     )
 

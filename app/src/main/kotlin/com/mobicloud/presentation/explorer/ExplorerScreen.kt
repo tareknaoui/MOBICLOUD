@@ -50,15 +50,33 @@ fun ExplorerScreen(
     val entries by viewModel.catalogEntries.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val storeState by viewModel.storeState.collectAsStateWithLifecycle()
+    val downloadState by viewModel.downloadState.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(storeState) {
-        when (val state = storeState) {
+    // Clé stable : ne change que sur Success/Error, pas à chaque ACK de Distributing
+    val terminalState = remember(storeState) {
+        storeState.takeIf { it is StoreState.Success || it is StoreState.Error }
+    }
+    LaunchedEffect(terminalState) {
+        when (terminalState) {
             is StoreState.Success -> snackbarHostState.showSnackbar(
-                "Fichier stocké avec succès sur ${state.nodeCount} nœuds"
+                "Fichier stocké avec succès sur ${terminalState.nodeCount} nœuds"
             )
-            is StoreState.Error -> snackbarHostState.showSnackbar("Erreur : ${state.message}")
+            is StoreState.Error -> snackbarHostState.showSnackbar("Erreur : ${terminalState.message}")
+            else -> Unit
+        }
+    }
+
+    val terminalDownloadState = remember(downloadState) {
+        downloadState.takeIf { it is DownloadState.Located || it is DownloadState.Error }
+    }
+    LaunchedEffect(terminalDownloadState) {
+        when (val s = terminalDownloadState) {
+            is DownloadState.Located -> snackbarHostState.showSnackbar(
+                "${s.blockMap.size} blocs localisés pour ${s.fileHash.take(8)}..."
+            )
+            is DownloadState.Error -> snackbarHostState.showSnackbar("Erreur : ${s.message}")
             else -> Unit
         }
     }
@@ -116,7 +134,10 @@ fun ExplorerScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(entries, key = { it.fileHash }) { entry ->
-                            CatalogEntryCard(entry = entry)
+                            CatalogEntryCard(
+                                entry = entry,
+                                onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
+                            )
                         }
                     }
                 }

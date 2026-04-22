@@ -7,12 +7,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.mobicloud.data.local.dao.CatalogDao
 import com.mobicloud.data.local.dao.DhtDao
+import com.mobicloud.data.local.dao.HostedBlockDao
 import com.mobicloud.data.local.dao.IdentityDao
 import com.mobicloud.data.local.dao.PeerDao
 import com.mobicloud.data.local.dao.TombstoneDao
 import com.mobicloud.data.local.entity.CatalogEntryEntity
 import com.mobicloud.data.local.entity.DhtEntryEntity
 import com.mobicloud.data.local.entity.FragmentLocationEntity
+import com.mobicloud.data.local.entity.HostedBlockEntity
 import com.mobicloud.data.local.entity.NodeIdentityEntity
 import com.mobicloud.data.local.entity.PeerNodeEntity
 import com.mobicloud.data.local.entity.TombstoneEntryEntity
@@ -24,9 +26,10 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         NodeIdentityEntity::class,
         PeerNodeEntity::class,
         DhtEntryEntity::class,
-        TombstoneEntryEntity::class
+        TombstoneEntryEntity::class,
+        HostedBlockEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -36,6 +39,7 @@ abstract class CatalogDatabase : RoomDatabase() {
     abstract fun peerDao(): PeerDao
     abstract fun dhtDao(): DhtDao
     abstract fun tombstoneDao(): TombstoneDao
+    abstract fun hostedBlockDao(): HostedBlockDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -74,6 +78,22 @@ abstract class CatalogDatabase : RoomDatabase() {
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE catalog_entry ADD COLUMN wrapped_master_key_json TEXT")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS hosted_blocks (
+                        block_id TEXT NOT NULL PRIMARY KEY,
+                        owner_id TEXT NOT NULL,
+                        fragment_index INTEGER NOT NULL,
+                        is_parity INTEGER NOT NULL,
+                        file_path TEXT NOT NULL,
+                        size_bytes INTEGER NOT NULL,
+                        received_at INTEGER NOT NULL
+                    )
+                """.trimIndent())
             }
         }
     }
