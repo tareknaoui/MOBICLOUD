@@ -16,6 +16,8 @@ import com.mobicloud.domain.repository.CatalogRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
+import com.mobicloud.domain.models.EncryptionIdentity
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
 import io.mockk.coEvery
@@ -56,6 +58,7 @@ class ErasureProgressViewModelTest {
     private lateinit var securityRepository: SecurityRepository
     private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
     private lateinit var downloadFileBlocksUseCase: com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
+    private lateinit var assembleDownloadedFileUseCase: AssembleDownloadedFileUseCase
     private lateinit var context: Context
     private lateinit var contentResolver: ContentResolver
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
@@ -72,6 +75,7 @@ class ErasureProgressViewModelTest {
         securityRepository = mockk()
         localizeFileBlocksUseCase = mockk(relaxed = true)
         downloadFileBlocksUseCase = mockk(relaxed = true)
+        assembleDownloadedFileUseCase = mockk(relaxed = true)
         context = mockk()
         contentResolver = mockk()
 
@@ -80,6 +84,11 @@ class ErasureProgressViewModelTest {
         every { context.cacheDir } returns File(System.getProperty("java.io.tmpdir") ?: "/tmp")
         every { contentResolver.openInputStream(any()) } returns
             "test content".toByteArray().inputStream()
+        // Story 6.3 — encrypt path consomme désormais getEncryptionIdentity() (clé EC dédiée
+        // au chiffrement, distincte de l'identité Keystore SIGN/VERIFY).
+        coEvery { securityRepository.getEncryptionIdentity() } returns Result.success(
+            EncryptionIdentity(Random.nextBytes(91), mockk(relaxed = true))
+        )
     }
 
     @After
@@ -96,6 +105,7 @@ class ErasureProgressViewModelTest {
         securityRepository = securityRepository,
         localizeFileBlocksUseCase = localizeFileBlocksUseCase,
         downloadFileBlocksUseCase = downloadFileBlocksUseCase,
+        assembleDownloadedFileUseCase = assembleDownloadedFileUseCase,
         context = context
     )
 

@@ -151,6 +151,10 @@ class FakeSecurityRepository : SecurityRepository {
         signature: ByteArray,
         publicKey: ByteArray
     ): Result<Boolean> = Result.success(true)
+
+    // Story 6.3 — non utilisé par GenerateHashcashProofUseCase mais requis par le contrat.
+    override suspend fun getEncryptionIdentity(): Result<com.mobicloud.domain.models.EncryptionIdentity> =
+        Result.failure(UnsupportedOperationException("not needed in this fake"))
 }
 
 class FakeHashcashTokenRepository : HashcashTokenRepository {

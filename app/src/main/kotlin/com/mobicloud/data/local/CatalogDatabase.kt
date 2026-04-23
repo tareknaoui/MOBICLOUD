@@ -29,7 +29,7 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         TombstoneEntryEntity::class,
         HostedBlockEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -94,6 +94,29 @@ abstract class CatalogDatabase : RoomDatabase() {
                         received_at INTEGER NOT NULL
                     )
                 """.trimIndent())
+            }
+        }
+
+        // Story 6.3 — ajout colonne `iv` (12 bytes AES-GCM nonce) sur hosted_blocks.
+        // Sentinelle "legacy" (12 × 0x00) pour les blocs pré-existants : le client de
+        // téléchargement (BlockDownloadClient) détecte cette sentinelle et lève
+        // DownloadException.MasterKeyTransportGap — pas de tentative de déchiffrement
+        // sur un IV non fourni.
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE hosted_blocks ADD COLUMN iv BLOB NOT NULL DEFAULT x'000000000000000000000000'"
+                )
+            }
+        }
+
+        // Story 6.3 — `original_file_size` requis par le décodeur Erasure pour trimer le padding.
+        // 0L sentinelle "legacy" → DownloadException.MasterKeyTransportGap côté pipeline.
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE catalog_entry ADD COLUMN original_file_size INTEGER NOT NULL DEFAULT 0"
+                )
             }
         }
     }

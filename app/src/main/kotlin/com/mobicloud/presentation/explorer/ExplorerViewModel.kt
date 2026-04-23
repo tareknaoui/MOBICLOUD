@@ -14,6 +14,7 @@ import com.mobicloud.domain.repository.CatalogRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
@@ -46,6 +47,7 @@ class ExplorerViewModel @Inject constructor(
     private val securityRepository: SecurityRepository,
     private val localizeFileBlocksUseCase: LocalizeFileBlocksUseCase,
     private val downloadFileBlocksUseCase: DownloadFileBlocksUseCase,
+    private val assembleDownloadedFileUseCase: AssembleDownloadedFileUseCase,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -63,6 +65,16 @@ class ExplorerViewModel @Inject constructor(
 
     private var resetJob: Job? = null
 
+    // [Review][Patch] Tracker le job de download pour annulation en cas de relance concurrente.
+    private var downloadJob: Job? = null
+
+    // [Review][Patch] P7 — tracker le job de localisation : sans ça, un vieux `localize` en cours
+    // pouvait émettre `Located(fileHashA)` et écraser le state d'un download fileHashB plus récent.
+    private var locateJob: Job? = null
+
+    @Volatile private var downloadStartMs: Long = 0L
+    private var lastNodeCount: Int = 0
+
     fun refreshCatalog() {
         if (_isRefreshing.value) return
         viewModelScope.launch {
@@ -76,13 +88,18 @@ class ExplorerViewModel @Inject constructor(
     }
 
     fun initiateDownload(fileHash: String) {
-        var shouldLaunch = false
-        _downloadState.update { current ->
-            if (current is DownloadState.Locating) current
-            else { shouldLaunch = true; DownloadState.Locating(fileHash) }
-        }
-        if (!shouldLaunch) return
-        viewModelScope.launch {
+        // [Review][Patch] P6 — preemption : un utilisateur qui tape un fichier B pendant que
+        // A est `Locating` doit pouvoir basculer. On annule les deux jobs (locate + download)
+        // et on (re)pose l'état à `Locating(fileHash)`. Le même fichier tappé deux fois est
+        // idempotent (pas de relance si déjà en cours sur le même hash).
+        val current = _downloadState.value
+        if (current is DownloadState.Locating && current.fileHash == fileHash) return
+        if (current is DownloadState.Downloading && current.fileHash == fileHash) return
+        locateJob?.cancel()
+        downloadJob?.cancel()
+        downloadStartMs = System.currentTimeMillis()
+        _downloadState.value = DownloadState.Locating(fileHash)
+        locateJob = viewModelScope.launch {
             localizeFileBlocksUseCase.invoke(fileHash)
                 .onSuccess { map ->
                     _downloadState.value = DownloadState.Located(fileHash, map)
@@ -100,8 +117,11 @@ class ExplorerViewModel @Inject constructor(
      * paramètres que l'encodage côté upload — symétrique).
      */
     private fun startDownload(fileHash: String, blockMap: Map<String, ResolvedBlockLocation>) {
+        // [Review][Patch] `k` est invariant dans le projet : `ErasureParameters()` renvoie la
+        // valeur par défaut utilisée à l'upload (symétrie encode/decode). Si un jour `k`
+        // devient variable par fichier, il faudra le persister dans `CatalogEntry` et le lire ici.
         val k = ErasureParameters().k
-        viewModelScope.launch {
+        downloadJob = viewModelScope.launch {
             downloadFileBlocksUseCase.invoke(blockMap, k).collect { state ->
                 when (state) {
                     is DownloadProgressState.Progress -> {
@@ -109,20 +129,61 @@ class ExplorerViewModel @Inject constructor(
                             "MobiCloud:DL",
                             "fileHash=${fileHash.take(8)} progress=${state.received}/${state.k} failed=${state.failed}"
                         )
+                        lastNodeCount = state.contributions.map { it.nodeId }.toSet().size
                         _downloadState.value = DownloadState.Downloading(
                             fileHash = fileHash,
                             received = state.received,
                             k = state.k,
-                            failed = state.failed
+                            failed = state.failed,
+                            contributions = state.contributions,
+                            slowNodeIds = state.slowNodeIds,
+                            failedFragmentIndices = state.failedFragmentIndices
                         )
                     }
-                    is DownloadProgressState.Completed ->
-                        _downloadState.value = DownloadState.Downloaded(fileHash, state.blocks)
+                    is DownloadProgressState.Completed -> {
+                        // Story 6.3 — chaîne immédiate : déchiffrement + décodage EC + écriture
+                        // atomique. Voir AssembleDownloadedFileUseCase pour les garanties
+                        // (no partial visible, hash final, IV-transport gap, etc.).
+                        assembleDownloadedFileUseCase.invoke(fileHash, state.blocks)
+                            .collect { progress ->
+                                when (progress) {
+                                    is AssembleDownloadedFileUseCase.AssembleProgress.Decrypting -> {
+                                        Log.i(
+                                            "MobiCloud:ASM",
+                                            "fileHash=${fileHash.take(8)} decrypt=${progress.processed}/${progress.k}"
+                                        )
+                                        _downloadState.value = DownloadState.Decrypting(
+                                            fileHash = fileHash,
+                                            processed = progress.processed,
+                                            k = progress.k
+                                        )
+                                    }
+                                    is AssembleDownloadedFileUseCase.AssembleProgress.Finalized ->
+                                        _downloadState.value = when (val r = progress.result) {
+                                            is AssembleDownloadedFileUseCase.AssembleResult.Success -> {
+                                                val durationMs = System.currentTimeMillis() - downloadStartMs
+                                                DownloadState.Assembled(fileHash, r.filePath, durationMs, lastNodeCount)
+                                            }
+                                            is AssembleDownloadedFileUseCase.AssembleResult.Failure ->
+                                                DownloadState.Error(
+                                                    fileHash,
+                                                    r.exception.message ?: "échec reconstruction"
+                                                )
+                                        }
+                                }
+                            }
+                    }
                     is DownloadProgressState.Failed ->
                         _downloadState.value = DownloadState.Error(fileHash, state.reason)
                 }
             }
         }
+    }
+
+    fun resetDownloadState() {
+        downloadJob?.cancel()
+        locateJob?.cancel()
+        _downloadState.value = DownloadState.Idle
     }
 
     fun storeFile(uri: Uri) {
@@ -167,14 +228,18 @@ class ExplorerViewModel @Inject constructor(
 
                 _storeState.value = StoreState.InProgress.Encrypting
 
-                val localIdentity = securityRepository.getIdentity()
+                // Story 6.3 — `getIdentity()` retourne la clé Keystore SIGN/VERIFY (incompatible
+                // avec ECDH sur API < 31). Le wrap ECIES utilise une seconde paire dédiée
+                // (`getEncryptionIdentity()`), software-managée, stockée chiffrée. Voir
+                // Story 6.3 Contrainte #1 pour la justification.
+                val encryptionIdentity = securityRepository.getEncryptionIdentity()
                     .getOrElse { e ->
-                        _storeState.value = StoreState.Error("Identité locale indisponible: ${e.message ?: "erreur inconnue"}")
+                        _storeState.value = StoreState.Error("Identité chiffrement indisponible: ${e.message ?: "erreur inconnue"}")
                         scheduleReset()
                         return@launch
                     }
 
-                val bundle = fragmentCipherUseCase.encrypt(fragments, localIdentity.publicKeyBytes)
+                val bundle = fragmentCipherUseCase.encrypt(fragments, encryptionIdentity.publicKeyBytes)
                     .getOrElse { e ->
                         _storeState.value = StoreState.Error("Échec chiffrement: ${e.message ?: "erreur inconnue"}")
                         scheduleReset()

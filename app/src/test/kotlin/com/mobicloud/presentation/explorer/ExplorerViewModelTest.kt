@@ -1,14 +1,19 @@
 package com.mobicloud.presentation.explorer
 
 import android.content.Context
+import android.util.Log
 import com.mobicloud.core.security.FragmentCipherUseCase
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.FragmentLocation
+import com.mobicloud.domain.models.ResolvedBlockLocation
 import com.mobicloud.domain.repository.CatalogRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
 import com.mobicloud.presentation.explorer.components.AvailabilityState
 import com.mobicloud.presentation.explorer.components.availabilityState
@@ -16,9 +21,13 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
@@ -28,6 +37,7 @@ import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
@@ -44,12 +54,18 @@ class ExplorerViewModelTest {
     private lateinit var securityRepository: SecurityRepository
     private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
     private lateinit var downloadFileBlocksUseCase: com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
+    private lateinit var assembleDownloadedFileUseCase: com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
     private lateinit var context: Context
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
 
     @Before
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
+        mockkStatic(Log::class)
+        every { Log.i(any(), any()) } returns 0
+        every { Log.d(any(), any()) } returns 0
+        every { Log.e(any(), any()) } returns 0
+        every { Log.w(any(), any<String>()) } returns 0
         catalogRepository = mockk()
         gossipSyncUseCase = mockk(relaxed = true)
         encodeErasureFragmentsUseCase = mockk(relaxed = true)
@@ -58,6 +74,7 @@ class ExplorerViewModelTest {
         securityRepository = mockk(relaxed = true)
         localizeFileBlocksUseCase = mockk(relaxed = true)
         downloadFileBlocksUseCase = mockk(relaxed = true)
+        assembleDownloadedFileUseCase = mockk(relaxed = true)
         context = mockk(relaxed = true)
         every { catalogRepository.getAllEntriesFlow() } returns catalogFlow
     }
@@ -65,6 +82,7 @@ class ExplorerViewModelTest {
     @After
     fun tearDown() {
         Dispatchers.resetMain()
+        unmockkStatic(Log::class)
     }
 
     private fun createViewModel() = ExplorerViewModel(
@@ -76,6 +94,7 @@ class ExplorerViewModelTest {
         securityRepository = securityRepository,
         localizeFileBlocksUseCase = localizeFileBlocksUseCase,
         downloadFileBlocksUseCase = downloadFileBlocksUseCase,
+        assembleDownloadedFileUseCase = assembleDownloadedFileUseCase,
         context = context
     )
 
@@ -182,6 +201,112 @@ class ExplorerViewModelTest {
     fun `availabilityState retourne DEGRADE quand fragmentLocations est vide`() {
         val entry = makeCatalogEntry(fragmentLocations = emptyList())
         assertEquals(AvailabilityState.DEGRADE, entry.availabilityState())
+    }
+
+    // --- Story 6.4 Tests ---
+
+    // Test Story 6.4 #1 — contributions tracking : DownloadState.Downloading.contributions
+    @Test
+    fun `startDownload propage contributions depuis DownloadProgressState Progress`() = runTest {
+        val fileHash = "aabbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+        val blockMap = emptyMap<String, ResolvedBlockLocation>()
+        val contrib1 = DownloadProgressState.BlockContribution("nodeABC123", 0, 42L)
+        val contrib2 = DownloadProgressState.BlockContribution("nodeDEF456", 1, 85L)
+
+        coEvery { localizeFileBlocksUseCase.invoke(fileHash) } returns Result.success(blockMap)
+        every { downloadFileBlocksUseCase.invoke(any(), any()) } returns flowOf(
+            DownloadProgressState.Progress(
+                received = 2,
+                k = 4,
+                failed = 0,
+                contributions = listOf(contrib1, contrib2)
+            )
+        )
+        every { assembleDownloadedFileUseCase.invoke(any(), any()) } returns flow { }
+
+        val viewModel = createViewModel()
+        viewModel.initiateDownload(fileHash)
+        advanceUntilIdle()
+
+        val state = viewModel.downloadState.value
+        assertTrue("expected Downloading, got $state", state is DownloadState.Downloading)
+        state as DownloadState.Downloading
+        assertEquals(2, state.contributions.size)
+    }
+
+    // Test Story 6.4 #2 — slowNodeIds propagés
+    @Test
+    fun `startDownload propage slowNodeIds depuis DownloadProgressState Progress`() = runTest {
+        val fileHash = "aabbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+        val blockMap = emptyMap<String, ResolvedBlockLocation>()
+
+        coEvery { localizeFileBlocksUseCase.invoke(fileHash) } returns Result.success(blockMap)
+        every { downloadFileBlocksUseCase.invoke(any(), any()) } returns flowOf(
+            DownloadProgressState.Progress(
+                received = 1,
+                k = 4,
+                failed = 0,
+                slowNodeIds = setOf("abc123")
+            )
+        )
+        every { assembleDownloadedFileUseCase.invoke(any(), any()) } returns flow { }
+
+        val viewModel = createViewModel()
+        viewModel.initiateDownload(fileHash)
+        advanceUntilIdle()
+
+        val state = viewModel.downloadState.value
+        assertTrue(state is DownloadState.Downloading)
+        state as DownloadState.Downloading
+        assertTrue(state.slowNodeIds.contains("abc123"))
+    }
+
+    // Test Story 6.4 #3 — resetDownloadState remet Idle
+    @Test
+    fun `resetDownloadState remet downloadState à Idle`() = runTest {
+        val fileHash = "aabbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+        val blockMap = emptyMap<String, ResolvedBlockLocation>()
+
+        coEvery { localizeFileBlocksUseCase.invoke(fileHash) } returns Result.success(blockMap)
+        every { downloadFileBlocksUseCase.invoke(any(), any()) } returns flowOf(
+            DownloadProgressState.Progress(received = 1, k = 4, failed = 0)
+        )
+        every { assembleDownloadedFileUseCase.invoke(any(), any()) } returns flow { }
+
+        val viewModel = createViewModel()
+        viewModel.initiateDownload(fileHash)
+        advanceUntilIdle()
+
+        viewModel.resetDownloadState()
+        advanceUntilIdle()
+
+        assertEquals(DownloadState.Idle, viewModel.downloadState.value)
+    }
+
+    // Test Story 6.4 #4 — Assembled contient durationMs > 0
+    @Test
+    fun `startDownload produit Assembled avec durationMs positif`() = runTest {
+        val fileHash = "aabbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+        val blockMap = emptyMap<String, ResolvedBlockLocation>()
+
+        coEvery { localizeFileBlocksUseCase.invoke(fileHash) } returns Result.success(blockMap)
+        every { downloadFileBlocksUseCase.invoke(any(), any()) } returns flowOf(
+            DownloadProgressState.Completed(emptyMap())
+        )
+        every { assembleDownloadedFileUseCase.invoke(any(), any()) } returns flowOf(
+            AssembleDownloadedFileUseCase.AssembleProgress.Finalized(
+                AssembleDownloadedFileUseCase.AssembleResult.Success("/sdcard/test.txt")
+            )
+        )
+
+        val viewModel = createViewModel()
+        viewModel.initiateDownload(fileHash)
+        advanceUntilIdle()
+
+        val state = viewModel.downloadState.value
+        assertTrue("expected Assembled, got $state", state is DownloadState.Assembled)
+        state as DownloadState.Assembled
+        assertTrue("durationMs should be >= 0, got ${state.durationMs}", state.durationMs >= 0L)
     }
 
     private fun makeCatalogEntry(

@@ -9,8 +9,10 @@ import com.mobicloud.domain.models.gossip.DeltaSyncResponse
 import com.mobicloud.domain.models.BlockRequestMessage
 import com.mobicloud.domain.models.BlockResponseMessage
 import com.mobicloud.domain.models.BlockTransferMessage
+import com.mobicloud.domain.models.DepartureNoticeMessage
 import com.mobicloud.domain.models.DhtLookupRequestMessage
 import com.mobicloud.domain.models.DhtLookupResponseMessage
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.DepartureNoticeHandler
 import com.mobicloud.domain.repository.DhtRepository
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -32,6 +34,7 @@ import java.io.InputStream
 import java.io.ObjectInputStream
 import java.io.ObjectOutputStream
 import java.io.PushbackInputStream
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.ConcurrentHashMap
@@ -62,6 +65,10 @@ class TcpConnectionManager @Inject constructor(
     // Story 6.2 — provider local de blocs hébergés pour servir les BLOCK_REQUEST entrants
     @Volatile
     var hostedBlockProvider: HostedBlockRepository? = null
+
+    // Story 7.1 — handler du Super-Pair pour traiter les DEPARTURE_NOTICE entrants (implémenté en 7.2)
+    @Volatile
+    var departureHandler: DepartureNoticeHandler? = null
 
     companion object {
         // F2: taille maximale d'un message Gossip pour prévenir les allocations OOM via pairs malveillants
@@ -135,6 +142,7 @@ class TcpConnectionManager @Inject constructor(
                 BlockTransferChannel.BLOCK_TRANSFER -> handleIncomingBlockTransfer(pushback, socket)
                 BlockTransferChannel.DHT_LOOKUP_REQ -> handleDhtLookupRelay(pushback, socket)
                 BlockTransferChannel.BLOCK_REQUEST -> handleBlockRequest(pushback, socket)
+                DepartureChannel.DEPARTURE_NOTICE -> handleIncomingDepartureNotice(pushback)
                 else -> {
                     // Legacy handshake — remettre le byte et traiter normalement
                     pushback.unread(firstByte)
@@ -288,11 +296,21 @@ class TcpConnectionManager @Inject constructor(
             val data = DataInputStream(inp)
             val len = data.readInt()
             if (len <= 0 || len > BlockTransferChannel.MAX_REQUEST_PAYLOAD_BYTES) {
-                Log.w("MobiCloud:TCP", "BLOCK_REQUEST taille invalide: $len — connexion fermée")
+                Log.w("MobiCloud:TCP", "BLOCK_REQUEST taille invalide: $len — BLOCK_NOT_FOUND")
+                // [Review][Patch] P3 — renvoyer BLOCK_NOT_FOUND pour libérer le client rapidement
+                // au lieu de le laisser attendre son propre timeout.
+                sendBlockNotFound(socket)
                 return
             }
             val reqBytes = ByteArray(len).also { data.readFully(it) }
-            val req = MobiCloudProtoBuf.decodeFromByteArray(BlockRequestMessage.serializer(), reqBytes)
+            val req = try {
+                MobiCloudProtoBuf.decodeFromByteArray(BlockRequestMessage.serializer(), reqBytes)
+            } catch (e: Exception) {
+                // [Review][Patch] P3 — payload corrompu : répondre NOT_FOUND, pas de silence.
+                Log.w("MobiCloud:TCP", "BLOCK_REQUEST decode échoué", e)
+                sendBlockNotFound(socket)
+                return
+            }
             if (!BLOCK_ID_REGEX.matches(req.blockId)) {
                 Log.w("MobiCloud:TCP", "BLOCK_REQUEST blockId invalide: ${req.blockId.take(16)}")
                 sendBlockNotFound(socket)
@@ -309,11 +327,14 @@ class TcpConnectionManager @Inject constructor(
                 sendBlockNotFound(socket)
                 return
             }
+            // Story 6.3 — propagation IV depuis le stockage (HostedBlockEntity.iv)
+            // jusqu'au client demandeur pour permettre le déchiffrement AES-GCM.
             val resp = BlockResponseMessage(
                 blockId = payload.blockId,
                 fragmentIndex = payload.fragmentIndex,
                 isParity = payload.isParity,
-                ciphertext = payload.ciphertext
+                ciphertext = payload.ciphertext,
+                iv = payload.iv
             )
             val respBytes = MobiCloudProtoBuf.encodeToByteArray(BlockResponseMessage.serializer(), resp)
             val out = DataOutputStream(socket.getOutputStream())
@@ -322,7 +343,10 @@ class TcpConnectionManager @Inject constructor(
             out.write(respBytes)
             out.flush()
         } catch (e: Exception) {
+            // [Review][Patch] P3 — best-effort NOT_FOUND avant de fermer, pour que le client
+            // bascule immédiatement sur son fallback peer au lieu d'attendre un timeout.
             Log.e("MobiCloud:TCP", "Erreur handleBlockRequest", e)
+            sendBlockNotFound(socket)
         }
     }
 
@@ -399,6 +423,45 @@ class TcpConnectionManager @Inject constructor(
             Log.e("MobiCloud:TCP", "Erreur lors de la connexion sortante TCP vers ${peer.ipAddress}", e)
         } finally {
             try { socket?.close() } catch (e: Exception) {}
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun handleIncomingDepartureNotice(inp: InputStream) {
+        try {
+            val data = DataInputStream(inp)
+            val len = data.readInt()
+            if (len <= 0 || len > DepartureChannel.MAX_DEPARTURE_PAYLOAD_BYTES) {
+                Log.w("MobiCloud:TCP", "DEPARTURE_NOTICE taille invalide: $len — ignoré")
+                return
+            }
+            val bytes = ByteArray(len).also { data.readFully(it) }
+            val notice = MobiCloudProtoBuf.decodeFromByteArray(DepartureNoticeMessage.serializer(), bytes)
+            departureHandler?.onDepartureNoticeReceived(notice)
+                ?: Log.w("MobiCloud:TCP", "DEPARTURE_NOTICE reçu mais aucun handler (Story 7.2)")
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur lecture DEPARTURE_NOTICE", e)
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun sendDepartureNotice(
+        notice: DepartureNoticeMessage,
+        ip: String,
+        port: Int
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(ip, port), 3_000)
+                // Fix P7 : soTimeout couvre l'écriture — connect() ne protège que le handshake TCP
+                socket.soTimeout = 3_000
+                val out = DataOutputStream(socket.getOutputStream())
+                val bytes = MobiCloudProtoBuf.encodeToByteArray(DepartureNoticeMessage.serializer(), notice)
+                out.writeByte(DepartureChannel.DEPARTURE_NOTICE.toInt())
+                out.writeInt(bytes.size)
+                out.write(bytes)
+                out.flush()
+            }
         }
     }
 

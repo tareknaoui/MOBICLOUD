@@ -8,7 +8,8 @@ interface HostedBlockRepository {
         ownerId: String,
         fragmentIndex: Int,
         isParity: Boolean,
-        ciphertext: ByteArray
+        ciphertext: ByteArray,
+        iv: ByteArray
     ): Result<String>
 
     suspend fun blockExists(blockId: String): Boolean
@@ -23,4 +24,7 @@ interface HostedBlockRepository {
      *         `Failure(t)` en cas d'erreur I/O irrécupérable.
      */
     suspend fun getBlock(blockId: String): Result<HostedBlockPayload?>
+
+    /** Story 7.1 — retourne tous les blockId actuellement hébergés localement. */
+    suspend fun getAllBlockIds(): Result<List<String>>
 }

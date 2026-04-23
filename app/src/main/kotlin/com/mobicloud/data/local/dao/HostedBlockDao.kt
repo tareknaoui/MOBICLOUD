@@ -20,4 +20,8 @@ interface HostedBlockDao {
 
     @Query("DELETE FROM hosted_blocks WHERE block_id = :blockId")
     suspend fun deleteHostedBlock(blockId: String)
+
+    // Fix P9 : ORDER BY garantit un ordre stable pour la signature du payload DEPARTURE_NOTICE
+    @Query("SELECT block_id FROM hosted_blocks ORDER BY block_id ASC")
+    suspend fun getAllBlockIds(): List<String>
 }

@@ -42,15 +42,21 @@ class HostedBlockRepositoryImplTest {
         repo = HostedBlockRepositoryImpl(context, dao)
     }
 
-    private fun fakeEntity(blockId: String, file: File, fragmentIndex: Int = 3, isParity: Boolean = false) =
-        HostedBlockEntity(
-            blockId = blockId,
-            ownerId = "owner",
-            fragmentIndex = fragmentIndex,
-            isParity = isParity,
-            filePath = file.absolutePath,
-            sizeBytes = file.length()
-        )
+    private fun fakeEntity(
+        blockId: String,
+        file: File,
+        fragmentIndex: Int = 3,
+        isParity: Boolean = false,
+        iv: ByteArray = ByteArray(12) { 0x42.toByte() }
+    ) = HostedBlockEntity(
+        blockId = blockId,
+        ownerId = "owner",
+        fragmentIndex = fragmentIndex,
+        isParity = isParity,
+        filePath = file.absolutePath,
+        sizeBytes = file.length(),
+        iv = iv
+    )
 
     // --- Test 1 : Happy path ---
     @Test
@@ -99,4 +105,37 @@ class HostedBlockRepositoryImplTest {
         assertTrue(result.isSuccess)
         assertNull(result.getOrThrow())
     }
+
+    // --- Test 5 : Story 6.3 — round-trip iv via saveBlock + getBlock ---
+    @Test
+    fun `Story 6_3 — saveBlock persists iv and getBlock returns it intact`() = runTest {
+        val ciphertext = ByteArray(64) { (it * 2).toByte() }
+        val testIv = ByteArray(12) { (it + 1).toByte() }
+        coEvery { dao.insertHostedBlock(any()) } returns Unit
+
+        val capturedEntity = slotForEntity()
+        coEvery { dao.insertHostedBlock(capture(capturedEntity)) } returns Unit
+
+        val saved = repo.saveBlock(
+            blockId = validBlockId,
+            ownerId = "owner",
+            fragmentIndex = 2,
+            isParity = false,
+            ciphertext = ciphertext,
+            iv = testIv
+        )
+        assertTrue(saved.isSuccess)
+
+        val savedEntity = capturedEntity.captured
+        assertArrayEquals(testIv, savedEntity.iv)
+
+        // Lecture round-trip : monter un getBlock avec l'entity capturée
+        coEvery { dao.getHostedBlock(validBlockId) } returns savedEntity
+        val readBack = repo.getBlock(validBlockId)
+        assertTrue(readBack.isSuccess)
+        assertArrayEquals(testIv, readBack.getOrThrow()!!.iv)
+    }
+
+    private fun slotForEntity(): io.mockk.CapturingSlot<HostedBlockEntity> =
+        io.mockk.slot()
 }

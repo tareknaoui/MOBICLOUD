@@ -17,5 +17,11 @@ data class CatalogEntryEntity(
     val versionClock: Long,
 
     @ColumnInfo(name = "wrapped_master_key_json")
-    val wrappedMasterKeyJson: String? = null
+    val wrappedMasterKeyJson: String? = null,
+
+    // Story 6.3 — taille originale du fichier (octets) pour permettre au décodeur Erasure
+    // de trimer le padding lors du réassemblage. 0L pour les entrées pré-6.3 (le pipeline
+    // de téléchargement lèvera DownloadException.MasterKeyTransportGap).
+    @ColumnInfo(name = "original_file_size", defaultValue = "0")
+    val originalFileSize: Long = 0L
 )

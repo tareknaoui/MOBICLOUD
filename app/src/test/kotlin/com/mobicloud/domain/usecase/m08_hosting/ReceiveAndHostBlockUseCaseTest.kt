@@ -34,7 +34,7 @@ class ReceiveAndHostBlockUseCaseTest {
         coEvery { securityRepository.getIdentity() } returns Result.success(receiverIdentity)
         coEvery { securityRepository.signData(any()) } returns Result.success(fakeSignature)
         coEvery {
-            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any())
+            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any(), any())
         } returns Result.success("/tmp/blocks/fake")
     }
 
@@ -88,7 +88,8 @@ class ReceiveAndHostBlockUseCaseTest {
                 ownerId = message.ownerId,
                 fragmentIndex = message.fragmentIndex,
                 isParity = message.isParity,
-                ciphertext = message.ciphertext
+                ciphertext = message.ciphertext,
+                iv = message.iv
             )
         }
     }
@@ -102,7 +103,7 @@ class ReceiveAndHostBlockUseCaseTest {
 
         assertTrue("Result should be HashMismatch", result is ReceiveBlockResult.HashMismatch)
         coVerify(exactly = 0) {
-            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any())
+            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -115,7 +116,7 @@ class ReceiveAndHostBlockUseCaseTest {
 
         assertTrue("Result should be StorageFull", result is ReceiveBlockResult.StorageFull)
         coVerify(exactly = 0) {
-            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any())
+            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -130,14 +131,14 @@ class ReceiveAndHostBlockUseCaseTest {
 
         assertTrue("Result should be TooBig", result is ReceiveBlockResult.TooBig)
         coVerify(exactly = 0) {
-            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any())
+            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any(), any())
         }
     }
 
     @Test
     fun `repository failure returns IoError`() = runTest {
         coEvery {
-            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any())
+            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any(), any())
         } returns Result.failure(IOException("disk error"))
 
         val useCase = buildUseCase()
@@ -160,7 +161,7 @@ class ReceiveAndHostBlockUseCaseTest {
 
         assertTrue("Result should be IoError", result is ReceiveBlockResult.IoError)
         coVerify(exactly = 0) {
-            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any())
+            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -174,7 +175,29 @@ class ReceiveAndHostBlockUseCaseTest {
 
         assertTrue("Result should be IoError", result is ReceiveBlockResult.IoError)
         coVerify(exactly = 1) {
-            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any())
+            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun `Story 6_3 — message with invalid IV size returns HashMismatch and never persists`() = runTest {
+        val useCase = buildUseCase()
+        val ciphertext = Random.nextBytes(512)
+        val invalidIvMessage = BlockTransferMessage(
+            blockId = sha256hex(ciphertext),
+            ownerId = "node_owner_42",
+            fragmentIndex = 0,
+            isParity = false,
+            ciphertext = ciphertext,
+            iv = ByteArray(8), // taille invalide (≠ 12)
+            originalFileSize = 1024L
+        )
+
+        val result = useCase.receive(invalidIvMessage)
+
+        assertTrue("Result should be HashMismatch", result is ReceiveBlockResult.HashMismatch)
+        coVerify(exactly = 0) {
+            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -190,7 +213,7 @@ class ReceiveAndHostBlockUseCaseTest {
         val success = result as ReceiveBlockResult.Success
         assertEquals(message.blockId, success.ack.blockId)
         coVerify(exactly = 0) {
-            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any())
+            hostedBlockRepository.saveBlock(any(), any(), any(), any(), any(), any())
         }
     }
 }

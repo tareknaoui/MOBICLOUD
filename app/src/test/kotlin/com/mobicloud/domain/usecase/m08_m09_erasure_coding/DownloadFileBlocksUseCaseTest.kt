@@ -10,11 +10,15 @@ import com.mobicloud.domain.repository.PeerRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -65,7 +69,8 @@ class DownloadFileBlocksUseCaseTest {
         blockId = loc.blockId,
         fragmentIndex = loc.fragmentIndex,
         isParity = false,
-        ciphertext = ByteArray(32) { loc.fragmentIndex.toByte() }
+        ciphertext = ByteArray(32) { loc.fragmentIndex.toByte() },
+        iv = ByteArray(12) { (loc.fragmentIndex + 1).toByte() }
     )
 
     private fun fakePeer(nodeId: String, suffix: Int) = Peer(
@@ -192,6 +197,75 @@ class DownloadFileBlocksUseCaseTest {
             assertEquals(0, p.failed)
         }
         assertTrue(emissions.last() is DownloadProgressState.Completed)
+    }
+
+    // --- Tests Story 6.4 : contributions et slow nodes ---
+
+    // Test 6.4.1 — nœud lent détecté après 6s (> SLOW_THRESHOLD_MS = 5s)
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `invoke marque un nœud comme lent si le download dépasse SLOW_THRESHOLD_MS`() = runTest {
+        val k = 1
+        val loc = location(0, nodeId = "slow-node")
+        val blockMap = mapOf(loc.blockId to loc)
+
+        coEvery { blockDownloader.downloadBlock(any(), any()) } coAnswers {
+            delay(6_000L)
+            Result.success(downloadedBlock(firstArg()))
+        }
+
+        val emissions = mutableListOf<DownloadProgressState>()
+        val job = launch {
+            useCase.invoke(blockMap, k).collect { emissions.add(it) }
+        }
+        advanceTimeBy(6_001L)
+        job.join()
+
+        val progressWithSlow = emissions
+            .filterIsInstance<DownloadProgressState.Progress>()
+            .firstOrNull { it.slowNodeIds.isNotEmpty() }
+        assertNotNull("Aucune émission Progress avec slowNodeIds", progressWithSlow)
+        assertTrue(progressWithSlow!!.slowNodeIds.contains("slow-node"))
+    }
+
+    // Test 6.4.2 — nœud rapide (< 5s) n'apparaît PAS dans slowNodeIds
+    @Test
+    fun `invoke ne marque pas un nœud rapide comme lent`() = runTest {
+        val k = 1
+        val loc = location(0, nodeId = "fast-node")
+        val blockMap = mapOf(loc.blockId to loc)
+
+        coEvery { blockDownloader.downloadBlock(any(), any()) } coAnswers {
+            delay(100L)
+            Result.success(downloadedBlock(firstArg()))
+        }
+
+        val emissions = useCase.invoke(blockMap, k).toList()
+
+        val progress = emissions.filterIsInstance<DownloadProgressState.Progress>()
+        for (p in progress) {
+            assertFalse("fast-node ne devrait pas être lent", p.slowNodeIds.contains("fast-node"))
+        }
+    }
+
+    // Test 6.4.3 — contributions renseignées dans Progress
+    @Test
+    fun `invoke inclut les contributions dans Progress`() = runTest {
+        val k = 2
+        val locations = (0 until k).map { location(it) }
+        val blockMap = locations.associateBy { it.blockId }
+
+        coEvery { blockDownloader.downloadBlock(any(), any()) } coAnswers {
+            Result.success(downloadedBlock(firstArg()))
+        }
+
+        val emissions = useCase.invoke(blockMap, k).toList()
+
+        val lastProgress = emissions
+            .filterIsInstance<DownloadProgressState.Progress>()
+            .lastOrNull()
+        assertNotNull(lastProgress)
+        assertEquals(k, lastProgress!!.contributions.size)
     }
 
     // --- Test 6 : Dédupe par fragmentIndex ---

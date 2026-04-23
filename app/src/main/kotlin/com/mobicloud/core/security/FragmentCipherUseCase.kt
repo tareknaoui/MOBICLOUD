@@ -147,31 +147,8 @@ class FragmentCipherUseCase @Inject constructor() {
         }
     }
 
-    private fun unwrapFileMasterKey(
-        wrapped: WrappedFileMasterKey,
-        recipientPrivateKey: PrivateKey
-    ): ByteArray {
-        val ephemeralPublicKey = KeyFactory.getInstance("EC")
-            .generatePublic(X509EncodedKeySpec(wrapped.ephemeralPublicKeyBytes))
-
-        val sharedSecret = KeyAgreement.getInstance("ECDH").apply {
-            init(recipientPrivateKey)
-            doPhase(ephemeralPublicKey, true)
-        }.generateSecret()
-
-        val wrappingKey = hkdfSha256(ikm = sharedSecret, info = "ecies_key".toByteArray())
-        try {
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
-                init(
-                    Cipher.DECRYPT_MODE,
-                    SecretKeySpec(wrappingKey, "AES"),
-                    GCMParameterSpec(128, wrapped.iv)
-                )
-            }
-            return cipher.doFinal(wrapped.encryptedKey)
-        } finally {
-            sharedSecret.fill(0)
-            wrappingKey.fill(0)
-        }
-    }
+    // Story 6.3 — `unwrapFileMasterKey` extrait en `core/security/CryptoPrimitives.kt`
+    // pour permettre la réutilisation par AssembleDownloadedFileUseCase sans dupliquer
+    // le wiring ECDH + AES-GCM. Le helper top-level conserve un comportement strictement
+    // identique à l'ancienne méthode privée (zéro régression sur Story 5.2).
 }

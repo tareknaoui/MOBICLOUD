@@ -1,5 +1,5 @@
 # generated: 2026-04-13T21:26:35+02:00
-# last_updated: 2026-04-16T14:00:00+02:00
+# last_updated: 2026-04-23T00:00:00+02:00
 # project: PFE
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-04-22T00:00:00+02:00
+last_updated: 2026-04-23T23:00:00+02:00
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -75,12 +75,12 @@ development_status:
   epic-5-retrospective: optional
   epic-6: in-progress
   6-1-localisation-des-blocs-via-requete-dht: done
-  6-2-telechargement-concurrent-k2-multi-noeuds: review
-  6-3-pipeline-de-dechiffrement-reassemblage-streaming: backlog
-  6-4-ui-de-telechargement-notifications-de-progression: backlog
+  6-2-telechargement-concurrent-k2-multi-noeuds: done
+  6-3-pipeline-de-dechiffrement-reassemblage-streaming: done
+  6-4-ui-de-telechargement-notifications-de-progression: done
   epic-6-retrospective: optional
-  epic-7: backlog
-  7-1-detection-du-depart-imminent-dun-noeud: backlog
+  epic-7: in-progress
+  7-1-detection-du-depart-imminent-dun-noeud: done
   7-2-orchestration-de-la-migration-proactive-par-le-super-pair: backlog
   7-3-auto-reparation-detection-de-blocs-sous-repliques: backlog
   epic-7-retrospective: optional

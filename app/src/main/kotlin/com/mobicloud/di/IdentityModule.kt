@@ -43,7 +43,9 @@ object IdentityModule {
             CatalogDatabase.MIGRATION_3_4,
             CatalogDatabase.MIGRATION_4_5,
             CatalogDatabase.MIGRATION_5_6,
-            CatalogDatabase.MIGRATION_6_7
+            CatalogDatabase.MIGRATION_6_7,
+            CatalogDatabase.MIGRATION_7_8,
+            CatalogDatabase.MIGRATION_8_9
         ).fallbackToDestructiveMigration().build()
     }
 

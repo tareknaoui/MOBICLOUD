@@ -1,7 +1,7 @@
 package com.mobicloud.presentation.explorer
 
-import com.mobicloud.domain.models.DownloadedBlock
 import com.mobicloud.domain.models.ResolvedBlockLocation
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
 
 sealed class DownloadState {
     object Idle : DownloadState()
@@ -10,17 +10,34 @@ sealed class DownloadState {
         val fileHash: String,
         val blockMap: Map<String, ResolvedBlockLocation>
     ) : DownloadState()
+
     // Story 6.2 — progression du téléchargement K+2 compétitif.
+    // Story 6.4 — étendu avec contributions et slowNodeIds pour l'UI.
     data class Downloading(
         val fileHash: String,
         val received: Int,
         val k: Int,
-        val failed: Int
+        val failed: Int,
+        val contributions: List<DownloadProgressState.BlockContribution> = emptyList(),
+        val slowNodeIds: Set<String> = emptySet(),
+        val failedFragmentIndices: Set<Int> = emptySet()
     ) : DownloadState()
-    // Story 6.2 — set complet des blocs ciphertext, prêt pour le pipeline 6.3.
-    data class Downloaded(
+
+    // Story 6.3 — déchiffrement / décodage Erasure / réassemblage en cours.
+    data class Decrypting(
         val fileHash: String,
-        val blocks: Map<Int, DownloadedBlock>
+        val processed: Int,
+        val k: Int
     ) : DownloadState()
+
+    // Story 6.3 — fichier reconstitué et matérialisé sur disque (chemin absolu).
+    // Story 6.4 — étendu avec durationMs et nodeCount pour le BottomSheet.
+    data class Assembled(
+        val fileHash: String,
+        val filePath: String,
+        val durationMs: Long = 0L,
+        val nodeCount: Int = 0
+    ) : DownloadState()
+
     data class Error(val fileHash: String, val message: String) : DownloadState()
 }

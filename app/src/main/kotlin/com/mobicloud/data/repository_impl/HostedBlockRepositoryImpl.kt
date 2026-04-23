@@ -31,8 +31,10 @@ class HostedBlockRepositoryImpl @Inject constructor(
         ownerId: String,
         fragmentIndex: Int,
         isParity: Boolean,
-        ciphertext: ByteArray
+        ciphertext: ByteArray,
+        iv: ByteArray
     ): Result<String> = withContext(Dispatchers.IO) {
+        require(iv.size == 12) { "iv must be 12 bytes (AES-GCM nonce), got ${iv.size}" }
         lockFor(blockId).withLock {
             runCatching {
                 val blocksDir = File(context.filesDir, "blocks").also { it.mkdirs() }
@@ -60,7 +62,8 @@ class HostedBlockRepositoryImpl @Inject constructor(
                             fragmentIndex = fragmentIndex,
                             isParity = isParity,
                             filePath = blockFile.absolutePath,
-                            sizeBytes = ciphertext.size.toLong()
+                            sizeBytes = ciphertext.size.toLong(),
+                            iv = iv
                         )
                     )
                 } catch (e: Exception) {
@@ -94,18 +97,31 @@ class HostedBlockRepositoryImpl @Inject constructor(
             runCatching {
                 if (!BLOCK_ID_REGEX.matches(blockId)) return@runCatching null
                 val entity = hostedBlockDao.getHostedBlock(blockId) ?: return@runCatching null
-                val file = File(entity.filePath)
-                if (!file.exists() || !file.isFile) return@runCatching null
+                // [Review][Patch] P5 — existence check sous lock pour éviter TOCTOU avec
+                // deleteBlock/saveBlock concurrents : un `file.exists()=true` hors lock puis
+                // `readBytes` après suppression convertissait `null` (orphan) en `Result.failure`.
                 lockFor(blockId).withLock {
+                    val file = File(entity.filePath)
+                    if (!file.exists() || !file.isFile) return@runCatching null
                     val bytes = file.readBytes()
+                    // Story 6.3 — `entity.iv` peut être la sentinelle "legacy" (12 × 0x00) sur
+                    // les blocs hébergés avant la migration 7→8. On le retourne tel quel ; le
+                    // client lèvera DownloadException.MasterKeyTransportGap (jamais de tentative
+                    // de déchiffrement avec un IV non fourni).
                     HostedBlockPayload(
                         blockId = entity.blockId,
                         fragmentIndex = entity.fragmentIndex,
                         isParity = entity.isParity,
-                        ciphertext = bytes
+                        ciphertext = bytes,
+                        iv = entity.iv
                     )
                 }
             }
+        }
+
+    override suspend fun getAllBlockIds(): Result<List<String>> =
+        withContext(Dispatchers.IO) {
+            runCatching { hostedBlockDao.getAllBlockIds() }
         }
 
     companion object {

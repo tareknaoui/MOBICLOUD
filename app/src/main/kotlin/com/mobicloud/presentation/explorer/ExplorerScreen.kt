@@ -1,5 +1,8 @@
 package com.mobicloud.presentation.explorer
 
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.webkit.MimeTypeMap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -25,18 +28,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mobicloud.presentation.explorer.components.AssembledBottomSheet
 import com.mobicloud.presentation.explorer.components.CatalogEntryCard
+import com.mobicloud.presentation.explorer.components.DownloadProgressIndicator
 import com.mobicloud.presentation.explorer.components.ErasureProgressIndicator
+import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
+import java.io.File
 
 @Serializable
 object ExplorerRoute
@@ -53,6 +63,8 @@ fun ExplorerScreen(
     val downloadState by viewModel.downloadState.collectAsStateWithLifecycle()
 
     val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     // Clé stable : ne change que sur Success/Error, pas à chaque ACK de Distributing
     val terminalState = remember(storeState) {
@@ -68,20 +80,45 @@ fun ExplorerScreen(
         }
     }
 
-    // Story 6.2 — snackbar feedback uniquement sur les états terminaux du download.
-    // Located n'est plus terminal (chaîné automatiquement vers Downloading) ; on attend Downloaded
-    // ou Error. UI de progression détaillée = périmètre Story 6.4.
+    // Story 6.4 — Snackbar uniquement pour les erreurs ; Assembled est géré par le BottomSheet.
     val terminalDownloadState = remember(downloadState) {
-        downloadState.takeIf { it is DownloadState.Downloaded || it is DownloadState.Error }
+        downloadState.takeIf { it is DownloadState.Error }
     }
     LaunchedEffect(terminalDownloadState) {
-        when (val s = terminalDownloadState) {
-            is DownloadState.Downloaded -> snackbarHostState.showSnackbar(
-                "${s.blocks.size} blocs téléchargés pour ${s.fileHash.take(8)}..."
-            )
-            is DownloadState.Error -> snackbarHostState.showSnackbar("Erreur : ${s.message}")
-            else -> Unit
-        }
+        val s = terminalDownloadState as? DownloadState.Error ?: return@LaunchedEffect
+        val friendlyMessage = if (s.message.contains("blocs valides") || s.message.contains("nœuds actifs"))
+            "Fichier irrécupérable — trop peu de nœuds actifs"
+        else
+            "Erreur : ${s.message}"
+        snackbarHostState.showSnackbar(friendlyMessage)
+    }
+
+    val assembledState = downloadState as? DownloadState.Assembled
+    if (assembledState != null) {
+        AssembledBottomSheet(
+            state = assembledState,
+            onOpen = { filePath ->
+                val file = File(filePath)
+                try {
+                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                    val mimeType = MimeTypeMap.getSingleton()
+                        .getMimeTypeFromExtension(file.extension) ?: "application/octet-stream"
+                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, mimeType)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    try {
+                        context.startActivity(intent)
+                        viewModel.resetDownloadState()
+                    } catch (e: ActivityNotFoundException) {
+                        scope.launch { snackbarHostState.showSnackbar("Aucune application pour ouvrir ce fichier") }
+                    }
+                } catch (e: Exception) {
+                    scope.launch { snackbarHostState.showSnackbar("Impossible d'ouvrir le fichier") }
+                }
+            },
+            onDismiss = { viewModel.resetDownloadState() }
+        )
     }
 
     val storeLauncher = rememberLauncherForActivityResult(
@@ -111,6 +148,18 @@ fun ExplorerScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+
+            val inProgressDownloadState = downloadState.takeIf {
+                it is DownloadState.Downloading || it is DownloadState.Decrypting
+            }
+            if (inProgressDownloadState != null) {
+                DownloadProgressIndicator(
+                    state = inProgressDownloadState,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
 

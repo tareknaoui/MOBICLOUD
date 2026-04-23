@@ -27,6 +27,7 @@ import com.mobicloud.domain.usecase.m05_dht_catalog.ResolveDhtConflictUseCase
 import com.mobicloud.domain.repository.DhtRepository
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
+import com.mobicloud.core.network.NetworkChangeObserver
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
@@ -65,6 +66,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var receiveAndHostBlockUseCase: ReceiveAndHostBlockUseCase
     @Inject lateinit var dhtRepository: DhtRepository
     @Inject lateinit var hostedBlockRepository: HostedBlockRepository
+    @Inject lateinit var networkChangeObserver: NetworkChangeObserver
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -131,6 +133,9 @@ class MobicloudP2PService : Service() {
             tcpConnectionManager.blockReceiverHandler = receiveAndHostBlockUseCase
             tcpConnectionManager.dhtRelayHandler = dhtRepository
             tcpConnectionManager.hostedBlockProvider = hostedBlockRepository
+
+            // Story 7.1 — démarrer l'observation des changements réseau WiFi → 4G
+            networkChangeObserver.register()
 
             // Démarrer le TCP server EN PREMIER pour obtenir le port avant d'annoncer sur Firebase
             val tcpPortResult = tcpConnectionManager.startServer()
@@ -318,6 +323,7 @@ class MobicloudP2PService : Service() {
 
     override fun onDestroy() {
         loopsStarted = false
+        networkChangeObserver.unregister()
         tcpConnectionManager.stopServer()
         serviceScope.cancel()
         super.onDestroy()

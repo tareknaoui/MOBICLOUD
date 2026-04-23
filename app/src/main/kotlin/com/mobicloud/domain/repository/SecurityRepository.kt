@@ -1,5 +1,6 @@
 package com.mobicloud.domain.repository
 
+import com.mobicloud.domain.models.EncryptionIdentity
 import com.mobicloud.domain.models.NodeIdentity
 
 /**
@@ -42,4 +43,18 @@ interface SecurityRepository {
         signature: ByteArray,
         publicKey: ByteArray
     ): Result<Boolean>
+
+    /**
+     * Story 6.3 — Retourne (ou génère au premier appel) la paire EC P-256 dédiée
+     * au chiffrement ECIES.
+     *
+     * Distincte de [getIdentity] qui renvoie la clé Keystore hardware-backed
+     * `PURPOSE_SIGN | PURPOSE_VERIFY` — incompatible avec ECDH sur API < 31.
+     * La clé privée est software-managée (JCE) et stockée chiffrée via
+     * `EncryptedSharedPreferences` (AndroidX Security `MasterKey`).
+     *
+     * Voir Story 6.3 Contrainte #1 pour la justification de ce relâchement
+     * de posture (clé software vs hardware).
+     */
+    suspend fun getEncryptionIdentity(): Result<EncryptionIdentity>
 }

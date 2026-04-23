@@ -42,7 +42,8 @@ class CatalogRepositoryImpl(
             versionClock = versionClock,
             wrappedMasterKeyJson = wrappedMasterKey?.let {
                 json.encodeToString(WrappedFileMasterKey.serializer(), it)
-            }
+            },
+            originalFileSize = originalFileSize
         )
 
     private fun FragmentLocation.toEntity(catalogFileHash: String): FragmentLocationEntity =
@@ -77,7 +78,8 @@ class CatalogRepositoryImpl(
                     Log.w("CatalogRepo", "Corrupted wrappedMasterKeyJson for ${catalogEntry.fileHash}: $e")
                     null
                 }
-            }
+            },
+            originalFileSize = catalogEntry.originalFileSize
         )
 
     // --- CatalogRepository impl ---

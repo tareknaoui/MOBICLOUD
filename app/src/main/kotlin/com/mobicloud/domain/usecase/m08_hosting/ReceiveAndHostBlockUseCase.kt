@@ -43,6 +43,11 @@ class ReceiveAndHostBlockUseCase internal constructor(
             if (!BLOCK_ID_REGEX.matches(message.blockId)) {
                 return@withContext ReceiveBlockResult.HashMismatch
             }
+            // Story 6.3 — IV (12 bytes AES-GCM nonce) requis pour permettre au client
+            // de déchiffrer le bloc plus tard. Toute autre taille = pair non conforme → rejet.
+            if (message.iv.size != 12) {
+                return@withContext ReceiveBlockResult.HashMismatch
+            }
             if (diskSpaceProvider() < MIN_FREE_BYTES) {
                 return@withContext ReceiveBlockResult.StorageFull
             }
@@ -68,7 +73,8 @@ class ReceiveAndHostBlockUseCase internal constructor(
                     ownerId = message.ownerId,
                     fragmentIndex = message.fragmentIndex,
                     isParity = message.isParity,
-                    ciphertext = message.ciphertext
+                    ciphertext = message.ciphertext,
+                    iv = message.iv
                 )
                 if (saveResult.isFailure) {
                     return@withContext ReceiveBlockResult.IoError(

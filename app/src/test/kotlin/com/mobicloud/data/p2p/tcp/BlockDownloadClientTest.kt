@@ -93,10 +93,19 @@ class BlockDownloadClientTest {
         val blockId = sha256Hex(ciphertext)
         startServer { s ->
             readRequest(s)
-            writeResponse(s, BlockResponseMessage(blockId, fragmentIndex = 7, isParity = true, ciphertext = ciphertext))
+            writeResponse(s, BlockResponseMessage(
+                blockId,
+                fragmentIndex = 7,
+                isParity = true,
+                ciphertext = ciphertext,
+                iv = ByteArray(12) { 0xAB.toByte() }
+            ))
         }
 
-        val result = client.downloadBlock(location(blockId), timeoutMs = 2_000L)
+        val result = client.downloadBlock(
+            location(blockId).copy(fragmentIndex = 7),
+            timeoutMs = 2_000L
+        )
 
         assertTrue("expected success but got ${result.exceptionOrNull()}", result.isSuccess)
         val block = result.getOrThrow()
@@ -104,6 +113,7 @@ class BlockDownloadClientTest {
         assertEquals(7, block.fragmentIndex)
         assertTrue(block.isParity)
         assertArrayEquals(ciphertext, block.ciphertext)
+        assertArrayEquals(ByteArray(12) { 0xAB.toByte() }, block.iv)
         assertTrue(serverError == null)
     }
 
@@ -115,7 +125,13 @@ class BlockDownloadClientTest {
         startServer { s ->
             readRequest(s)
             // Le serveur prétend que c'est `expected` mais envoie un ciphertext qui ne match pas.
-            writeResponse(s, BlockResponseMessage(expected, fragmentIndex = 0, isParity = false, ciphertext = tampered))
+            writeResponse(s, BlockResponseMessage(
+                expected,
+                fragmentIndex = 0,
+                isParity = false,
+                ciphertext = tampered,
+                iv = ByteArray(12)
+            ))
         }
 
         val result = client.downloadBlock(location(expected), timeoutMs = 2_000L)
@@ -163,6 +179,33 @@ class BlockDownloadClientTest {
         assertTrue(
             "expected SocketTimeoutException, got ${result.exceptionOrNull()}",
             result.exceptionOrNull() is SocketTimeoutException
+        )
+    }
+
+    // --- Test 6 : Story 6.3 — IV taille invalide (≠ 12) → IOException ---
+    @Test
+    fun `Story 6_3 — downloadBlock fails with IOException when response IV size is invalid`() = runTest {
+        val ciphertext = ByteArray(64) { (it and 0xFF).toByte() }
+        val blockId = sha256Hex(ciphertext)
+        startServer { s ->
+            readRequest(s)
+            // Hash + fragmentIndex sont valides → seul l'IV est invalide.
+            writeResponse(s, BlockResponseMessage(
+                blockId,
+                fragmentIndex = 0,
+                isParity = false,
+                ciphertext = ciphertext,
+                iv = ByteArray(8) // taille invalide
+            ))
+        }
+
+        val result = client.downloadBlock(location(blockId), timeoutMs = 2_000L)
+
+        assertTrue(result.isFailure)
+        val cause = result.exceptionOrNull()
+        assertTrue(
+            "expected IOException about IV size, got $cause",
+            cause is IOException && (cause.message ?: "").contains("IV size invalide")
         )
     }
 

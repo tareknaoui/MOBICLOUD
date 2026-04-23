@@ -1,6 +1,6 @@
 # Story 6.2: Téléchargement Concurrent K+2 (Multi-Nœuds)
 
-Status: review
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -792,3 +792,35 @@ claude-opus-4-7 (1M context) — Claude Code
 **Fichiers modifiés (tests) :**
 - `app/src/test/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModelTest.kt` — ajout du paramètre `downloadFileBlocksUseCase` au constructeur (mock `relaxed = true`).
 - `app/src/test/kotlin/com/mobicloud/presentation/explorer/ErasureProgressViewModelTest.kt` — idem.
+
+### Review Findings
+
+Revue adversariale parallèle à 3 couches (Blind Hunter + Edge Case Hunter + Acceptance Auditor) sur 60+ findings bruts, dédupliqués et triés.
+
+**Acceptance Auditor verdict : ✅ clean — all 11 AC fully implemented, no violations.**
+
+**Passe 1 — hardening initial :**
+- [x] [Review][Patch] Pool K+2 — priorité à la couverture fragmentIndex avant fiabilité [app/src/main/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/DownloadFileBlocksUseCase.kt:50-62]
+- [x] [Review][Patch] `soTimeout` per-read contournable par pair "drip" — `withTimeout` wall-clock ajouté [app/src/main/kotlin/com/mobicloud/data/p2p/tcp/BlockDownloadClient.kt:50-54]
+- [x] [Review][Patch] Side-effect dans prédicat `firstOrNull { usedNodeIds.add }` — refactor en boucle explicite [app/src/main/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/DownloadFileBlocksUseCase.kt:80-86]
+- [x] [Review][Patch] `initiateDownload` — tracker `downloadJob` et annuler le download en cours sur relance [app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt:67, 89, 108]
+- [x] [Review][Patch] `k` hardcodé via `ErasureParameters()` — commentaire explicite sur l'invariant projet [app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt:103-106]
+
+**Passe 2 — bugs concrets détectés par les 3 couches adversariales :**
+- [x] [Review][Patch] P1 — `SerializationException` / `IllegalStateException` du décodage Protobuf non catchées → viole le contrat `Result<>` de `BlockDownloader` [app/src/main/kotlin/com/mobicloud/data/p2p/tcp/BlockDownloadClient.kt:55-67]
+- [x] [Review][Patch] P2 — `resp.fragmentIndex` non validé contre `location.fragmentIndex` : pair malicieux pouvait substituer un fragment au hash valide [app/src/main/kotlin/com/mobicloud/data/p2p/tcp/BlockDownloadClient.kt:117-124]
+- [x] [Review][Patch] P3 — `handleBlockRequest` ne répondait pas `BLOCK_NOT_FOUND` sur toutes les error paths (len invalide, decode error, catch Exception) → client bloqué jusqu'à son timeout au lieu de fallback immédiat [app/src/main/kotlin/com/mobicloud/data/p2p/tcp/TcpConnectionManager.kt:286-340]
+- [x] [Review][Patch] P4 — `k <= 0` non guardé : seul `blockMap.size < k` testait ; k=0 émettait `Completed(emptyMap)` silencieux [app/src/main/kotlin/com/mobicloud/domain/usecase/m08_m09_erasure_coding/DownloadFileBlocksUseCase.kt:42-50]
+- [x] [Review][Patch] P5 — TOCTOU dans `getBlock` : `file.exists()` hors lock convertissait un orphelin (null attendu) en `Result.failure` si `deleteBlock` passait entre exists et readBytes [app/src/main/kotlin/com/mobicloud/data/repository_impl/HostedBlockRepositoryImpl.kt:92-110]
+- [x] [Review][Patch] P6 — `initiateDownload` : un tap sur fichier B pendant A=Locating était silencieusement ignoré [app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt:85-95]
+- [x] [Review][Patch] P7 — vieux job `localize` non annulé sur preemption → race avec le nouveau `_downloadState` [app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt:72-74, 93, 96]
+
+**Deferred (pré-existant ou transverse) :**
+- [x] [Review][Defer] `blockLocks` de `HostedBlockRepositoryImpl` croît monotonement [HostedBlockRepositoryImpl.kt:25] — pré-existant (Story 5.5)
+- [x] [Review][Defer] `CONNECT_TIMEOUT_MS=5s` ajouté au budget `timeoutMs` ACK [BlockTransferChannel.kt:8] — pré-existant
+- [x] [Review][Defer] Pas de rate-limit serveur sur BLOCK_REQUEST (DoS disque) [TcpConnectionManager.kt:286] — vulnérabilité transverse au canal P2P
+- [x] [Review][Defer] `deleteBlock` n'acquiert pas le lock per-blockId → race avec `saveBlock` atomic rename [HostedBlockRepositoryImpl.kt:80-86] — pré-existant (Story 5.5)
+- [x] [Review][Defer] `ObjectInputStream` dans legacy handshake → vecteur RCE Java well-known [TcpConnectionManager.kt:346-364, 386-402] — pré-existant
+- [x] [Review][Defer] `INCOMING_READ_TIMEOUT_MS=3s` trop court pour un `BLOCK_REQUEST` serveur qui lit 2 MB disque [TcpConnectionManager.kt:69,125] — pré-existant
+- [x] [Review][Defer] `stopServer` cancel le `connectionScope` (val) → serveur non redémarrable [TcpConnectionManager.kt:81,405] — pré-existant
+- [x] [Review][Defer] `handleBlockRequest` charge tout le ciphertext en mémoire (2 MB × QPS) → pression heap sous flood [TcpConnectionManager.kt:307-317, HostedBlockRepositoryImpl.kt:99-107] — refactor streaming à planifier

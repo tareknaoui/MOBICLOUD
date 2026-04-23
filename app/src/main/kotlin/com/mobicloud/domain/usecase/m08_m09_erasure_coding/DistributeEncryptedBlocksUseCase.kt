@@ -127,7 +127,10 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                     nodeIds = listOf(delivery.nodeId)
                 )
             },
-            wrappedMasterKey = encryptedBundle.wrappedFileMasterKey
+            wrappedMasterKey = encryptedBundle.wrappedFileMasterKey,
+            // Story 6.3 — propagation taille originale pour permettre le trim Erasure côté
+            // récepteur. Les fragments partagent tous originalFileSize (cf. EncodeErasureFragmentsUseCase).
+            originalFileSize = encryptedBundle.encryptedFragments.firstOrNull()?.originalFileSize ?: 0L
         )
 
         catalogRepository.insertOwnerEntry(catalogEntry)

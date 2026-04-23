@@ -36,11 +36,18 @@ class MergeCatalogEntriesUseCase {
                 // Tie-breaker commutative sur ownerPubKeyHash (standard CRDT LWW)
                 val chosenOwner = if (remote.ownerPubKeyHash > local.ownerPubKeyHash) remote.ownerPubKeyHash else local.ownerPubKeyHash
 
+                // Story 6.3 — préserver originalFileSize (déterministe : max non-nul, sinon 0L)
+                // pour ne pas perdre l'info de trim Erasure lors d'un merge CRDT.
+                val mergedSize = maxOf(local.originalFileSize, remote.originalFileSize)
+                val mergedWrappedKey = local.wrappedMasterKey ?: remote.wrappedMasterKey
+
                 CatalogEntry(
                     fileHash = local.fileHash,
                     ownerPubKeyHash = chosenOwner,
                     versionClock = local.versionClock,
-                    fragmentLocations = mergedFragments
+                    fragmentLocations = mergedFragments,
+                    wrappedMasterKey = mergedWrappedKey,
+                    originalFileSize = mergedSize
                 )
             }
         }

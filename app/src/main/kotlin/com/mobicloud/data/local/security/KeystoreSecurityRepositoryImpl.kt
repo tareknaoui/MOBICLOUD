@@ -8,16 +8,22 @@ import android.security.keystore.StrongBoxUnavailableException
 import android.util.Base64
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
+import com.mobicloud.domain.models.EncryptionIdentity
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.repository.SecurityRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import java.security.KeyFactory
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.KeyStoreException
 import java.security.MessageDigest
+import java.security.PrivateKey
 import java.security.ProviderException
+import java.security.spec.PKCS8EncodedKeySpec
 import javax.inject.Inject
 
 class KeystoreSecurityRepositoryImpl @Inject constructor(
@@ -30,7 +36,17 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
         internal const val PREFS_FILE = "mobicloud_security_prefs"
         private const val PREF_KEY_PUBLIC = "software_public_key"
         private const val PREF_KEY_PRIVATE = "software_private_key"
+
+        // Story 6.3 — clés EC P-256 dédiées au chiffrement ECIES (paire distincte de
+        // l'identité Keystore SIGN/VERIFY, voir Contrainte #1).
+        private const val PREF_ENC_KEY_PUBLIC = "encryption_public_key"
+        private const val PREF_ENC_KEY_PRIVATE = "encryption_private_key"
     }
+
+    // Cache mémoire pour éviter de rejouer le PKCS#8 → PrivateKey à chaque déchiffrement.
+    // Mutex garantit l'atomicité du check-then-generate-then-assign (évite double génération concurrente).
+    private val encryptionIdentityMutex = Mutex()
+    private var cachedEncryptionIdentity: EncryptionIdentity? = null
 
     override suspend fun getIdentity(): Result<NodeIdentity> = withContext(Dispatchers.IO) {
         try {
@@ -154,6 +170,59 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
             Result.failure(e)
         }
     }
+
+    /**
+     * Story 6.3 — Retourne (ou génère au premier appel) la paire EC P-256 dédiée
+     * au chiffrement ECIES. Cache mémoire pour éviter le coût répété de
+     * désérialisation PKCS#8 → PrivateKey.
+     */
+    override suspend fun getEncryptionIdentity(): Result<EncryptionIdentity> =
+        withContext(Dispatchers.IO) {
+            encryptionIdentityMutex.withLock {
+                cachedEncryptionIdentity?.let { return@withContext Result.success(it) }
+                try {
+                    val prefs = getEncryptedPrefs()
+                    val storedPublic = prefs.getString(PREF_ENC_KEY_PUBLIC, null)
+                    val storedPrivate = prefs.getString(PREF_ENC_KEY_PRIVATE, null)
+
+                    val identity = if (storedPublic != null && storedPrivate != null) {
+                        val publicKeyBytes = Base64.decode(storedPublic, Base64.NO_WRAP)
+                        val privateKeyBytes = Base64.decode(storedPrivate, Base64.NO_WRAP)
+                        val privateKey = decodePrivateKey(privateKeyBytes)
+                        EncryptionIdentity(publicKeyBytes, privateKey)
+                    } else {
+                        // Génération + persistance atomique (idempotente : si déjà présent on lit).
+                        generateEncryptionIdentity(prefs)
+                    }
+                    cachedEncryptionIdentity = identity
+                    Result.success(identity)
+                } catch (e: Exception) {
+                    Result.failure(e)
+                }
+            }
+        }
+
+    private suspend fun generateEncryptionIdentity(
+        prefs: SharedPreferences
+    ): EncryptionIdentity = withContext(Dispatchers.Default) {
+        val keyPair = KeyPairGenerator.getInstance(KeyProperties.KEY_ALGORITHM_EC)
+            .apply { initialize(256) }
+            .generateKeyPair()
+        val publicKeyBytes = keyPair.public.encoded
+        val privateKeyBytes = keyPair.private.encoded
+
+        withContext(Dispatchers.IO) {
+            prefs.edit()
+                .putString(PREF_ENC_KEY_PUBLIC, Base64.encodeToString(publicKeyBytes, Base64.NO_WRAP))
+                .putString(PREF_ENC_KEY_PRIVATE, Base64.encodeToString(privateKeyBytes, Base64.NO_WRAP))
+                .commit()
+        }
+        EncryptionIdentity(publicKeyBytes, keyPair.private)
+    }
+
+    private fun decodePrivateKey(pkcs8Bytes: ByteArray): PrivateKey =
+        KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC)
+            .generatePrivate(PKCS8EncodedKeySpec(pkcs8Bytes))
 
     override suspend fun signData(data: ByteArray): Result<ByteArray> = withContext(Dispatchers.IO) {
         try {
