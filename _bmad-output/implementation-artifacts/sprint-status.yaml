@@ -84,8 +84,3 @@ development_status:
   7-2-orchestration-de-la-migration-proactive-par-le-super-pair: done
   7-3-auto-reparation-detection-de-blocs-sous-repliques: done
   epic-7-retrospective: optional
-  epic-8: backlog
-  8-1-moteur-de-karma-calcul-persistance-time-decay: backlog
-  8-2-validation-karma-pair-a-pair-bridage-des-freeriders: backlog
-  8-3-affichage-karma-modalbottomsheet-dans-lexplorer: backlog
-  epic-8-retrospective: optional
