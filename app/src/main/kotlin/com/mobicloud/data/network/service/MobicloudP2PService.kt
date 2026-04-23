@@ -26,6 +26,8 @@ import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m05_dht_catalog.ResolveDhtConflictUseCase
 import com.mobicloud.domain.repository.DhtRepository
 import com.mobicloud.domain.repository.HostedBlockRepository
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.ExecuteMigrationPlanUseCase
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.OrchestrateBlockMigrationUseCase
 import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
 import com.mobicloud.core.network.NetworkChangeObserver
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
@@ -67,6 +69,8 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var dhtRepository: DhtRepository
     @Inject lateinit var hostedBlockRepository: HostedBlockRepository
     @Inject lateinit var networkChangeObserver: NetworkChangeObserver
+    @Inject lateinit var orchestrateBlockMigrationUseCase: OrchestrateBlockMigrationUseCase
+    @Inject lateinit var executeMigrationPlanUseCase: ExecuteMigrationPlanUseCase
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -133,6 +137,9 @@ class MobicloudP2PService : Service() {
             tcpConnectionManager.blockReceiverHandler = receiveAndHostBlockUseCase
             tcpConnectionManager.dhtRelayHandler = dhtRepository
             tcpConnectionManager.hostedBlockProvider = hostedBlockRepository
+            // Story 7.2 — câblage des handlers de migration proactive
+            tcpConnectionManager.departureHandler = orchestrateBlockMigrationUseCase
+            tcpConnectionManager.migrationPlanHandler = executeMigrationPlanUseCase
 
             // Story 7.1 — démarrer l'observation des changements réseau WiFi → 4G
             networkChangeObserver.register()

@@ -12,7 +12,9 @@ import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.models.DepartureNoticeMessage
 import com.mobicloud.domain.models.DhtLookupRequestMessage
 import com.mobicloud.domain.models.DhtLookupResponseMessage
+import com.mobicloud.domain.models.MigrationPlanMessage
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.DepartureNoticeHandler
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.MigrationPlanHandler
 import com.mobicloud.domain.repository.DhtRepository
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -69,6 +71,10 @@ class TcpConnectionManager @Inject constructor(
     // Story 7.1 — handler du Super-Pair pour traiter les DEPARTURE_NOTICE entrants (implémenté en 7.2)
     @Volatile
     var departureHandler: DepartureNoticeHandler? = null
+
+    // Story 7.2 — handler du nœud partant qui exécute le plan de migration reçu du Super-Pair
+    @Volatile
+    var migrationPlanHandler: MigrationPlanHandler? = null
 
     companion object {
         // F2: taille maximale d'un message Gossip pour prévenir les allocations OOM via pairs malveillants
@@ -143,6 +149,7 @@ class TcpConnectionManager @Inject constructor(
                 BlockTransferChannel.DHT_LOOKUP_REQ -> handleDhtLookupRelay(pushback, socket)
                 BlockTransferChannel.BLOCK_REQUEST -> handleBlockRequest(pushback, socket)
                 DepartureChannel.DEPARTURE_NOTICE -> handleIncomingDepartureNotice(pushback)
+                DepartureChannel.MIGRATION_PLAN -> handleIncomingMigrationPlan(pushback)
                 else -> {
                     // Legacy handshake — remettre le byte et traiter normalement
                     pushback.unread(firstByte)
@@ -458,6 +465,44 @@ class TcpConnectionManager @Inject constructor(
                 val out = DataOutputStream(socket.getOutputStream())
                 val bytes = MobiCloudProtoBuf.encodeToByteArray(DepartureNoticeMessage.serializer(), notice)
                 out.writeByte(DepartureChannel.DEPARTURE_NOTICE.toInt())
+                out.writeInt(bytes.size)
+                out.write(bytes)
+                out.flush()
+            }
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun handleIncomingMigrationPlan(inp: InputStream) {
+        try {
+            val data = DataInputStream(inp)
+            val len = data.readInt()
+            if (len <= 0 || len > DepartureChannel.MAX_MIGRATION_PLAN_BYTES) {
+                Log.w("MobiCloud:TCP", "MIGRATION_PLAN taille invalide: $len — ignoré")
+                return
+            }
+            val bytes = ByteArray(len).also { data.readFully(it) }
+            val plan = MobiCloudProtoBuf.decodeFromByteArray(MigrationPlanMessage.serializer(), bytes)
+            migrationPlanHandler?.onMigrationPlanReceived(plan)
+                ?: Log.w("MobiCloud:TCP", "MIGRATION_PLAN reçu mais aucun handler")
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur lecture MIGRATION_PLAN", e)
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun sendMigrationPlan(
+        plan: MigrationPlanMessage,
+        ip: String,
+        port: Int
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(ip, port), 3_000)
+                socket.soTimeout = 3_000
+                val out = DataOutputStream(socket.getOutputStream())
+                val bytes = MobiCloudProtoBuf.encodeToByteArray(MigrationPlanMessage.serializer(), plan)
+                out.writeByte(DepartureChannel.MIGRATION_PLAN.toInt())
                 out.writeInt(bytes.size)
                 out.write(bytes)
                 out.flush()
