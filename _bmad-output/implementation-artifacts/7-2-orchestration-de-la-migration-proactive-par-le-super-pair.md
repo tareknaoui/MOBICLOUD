@@ -1,6 +1,6 @@
 # Story 7.2: Orchestration de la Migration Proactive par le Super-Pair
 
-Status: review
+Status: done
 
 ## Story
 
@@ -564,3 +564,39 @@ claude-opus-4-7[1m]
 
 - 2026-04-23 — Story 7.2 créée (ready-for-dev) : Orchestration migration proactive par le Super-Pair — `MigrationPlanMessage` Protobuf + canal 0x09 + `OrchestrateBlockMigrationUseCase` (DepartureNoticeHandler) + `ExecuteMigrationPlanUseCase` (MigrationPlanHandler) + MàJ DHT optimiste + Gossip — réutilise `BlockSender` existant pour transfert aveugle (AC#2) et vérification ACK signé (AC#3)
 - 2026-04-23 — Story 7.2 implémentée et marquée `review` : 6 AC satisfaits, 11 tests JVM passants (6 + 5), câblage handlers TCP dans `MobicloudP2PService`. Fix hors-scope : import `kotlinx.coroutines.cancel` dans `NetworkChangeObserver.kt` (bug pré-existant bloquant la compilation depuis commit `fdda938`).
+- 2026-04-23 — Story 7.2 re-review round 2 (post-hardening) : 8 patches appliqués (garde anti-self exécuteur, filtre candidats orchestrateur renforcé, `toSigHex` sign-extend fix + consolidation dans `domain/util/HexEncoding.kt`, port upper-bound, distinction `Result.failure` vs null payload, log plan vide, test parallélisme avec destinations distinctes). 9 findings différés (versioning protocole, `withTimeout` per-directive, validation adresse, NOTICE domain-prefix, etc.). Compilation + tests 7.2 : SUCCESS.
+
+### Review Findings
+
+- [x] [Review][Patch] **Durcir signature du plan : inclure destinationIp/port/publicKeyBytes** [OrchestrateBlockMigrationUseCase.kt, ExecuteMigrationPlanUseCase.kt] — appliqué. Payload signé étendu à `blockId:destNodeId:destIp:destPort:destPubKeyHex`. Helper `toSigHex()` déclaré en bas de chaque fichier.
+- [x] [Review][Defer] **Nonce/timestamp + lien au DEPARTURE_NOTICE** — résolu D2=2, déféré (cohérent Story 7.1). Voir deferred-work.md.
+- [x] [Review][Defer] **NFR-02 non-enforce sur écriture TCP bloquée** — résolu D3=3, déféré. Refactor NIO hors scope. Voir deferred-work.md.
+- [x] [Review][Patch] **Dédupliquer `hostedBlockIds` avec `.distinct()`** [OrchestrateBlockMigrationUseCase.kt] — appliqué. `uniqueBlockIds` préserve l'ordre de première apparition, log `Doublons détectés` si dédup effective. Round-robin et signature basés sur `uniqueBlockIds`.
+- [x] [Review][Patch] **`coroutineScope` → `supervisorScope`** [ExecuteMigrationPlanUseCase.kt] — appliqué. Import + body + `return@supervisorScope` labels.
+- [x] [Review][Patch] **Snapshot unique de `peerRepository.peers.value`** [OrchestrateBlockMigrationUseCase.kt] — appliqué. `val peersSnapshot = peerRepository.peers.value` dérive les 3 vues (self-check, lookup partant, candidats).
+- [x] [Review][Patch] **Validation défensive `destinationIp`/`destinationPort`** [ExecuteMigrationPlanUseCase.kt:executeDirective] — appliqué. Guard `if (ip.isBlank() || port <= 0) { log + return }` en tête de `executeDirective`.
+- [x] [Review][Patch] **Test 6 — `runCurrent()` + marge 1000ms** [OrchestrateBlockMigrationUseCaseTest.kt] — appliqué. `runCurrent()` avant et après `advanceTimeBy(4_500L)` ; advance final de `1_000L` dépasse nettement `NFR02_BUDGET_MS=5_000L`.
+- [x] [Review][Patch] **Imports inutilisés dans `ExecuteMigrationPlanUseCaseTest`** — appliqué. Supprimés `kotlinx.coroutines.launch` et `kotlinx.coroutines.test.advanceTimeBy`. (OrchestrateTest conserve ces imports : utilisés par test 6.)
+- [x] [Review][Defer] **`handleIncomingMigrationPlan` catch(Exception) large** [TcpConnectionManager.kt:handleIncomingMigrationPlan] — deferred, pre-existing. Pattern identique au `handleIncomingDepartureNotice` existant (Story 7.1) ; refactoring logging broader out of scope pour 7.2.
+- [x] [Review][Defer] **Boucle séquentielle `directives.forEach { dhtRepository.insertEntry(...) }`** [OrchestrateBlockMigrationUseCase.kt:~110] — deferred, pre-existing. Pour N élevé (~250 directives, plafond du spec), N écritures Room séquentielles pourraient impacter NFR-02 hors fenêtre `withTimeoutOrNull`. À profiler ; batch insert ou parallélisation si mesure le justifie.
+- [x] [Review][Defer] **Couverture tests manquante : handler nullability, mutation concurrente peers, throw dans coroutineScope** [OrchestrateBlockMigrationUseCaseTest.kt, ExecuteMigrationPlanUseCaseTest.kt] — deferred, pre-existing. Ne sont pas des bugs de code ; extension de test pouvant attendre si la logique ne change pas.
+
+### Review Findings — Round 2 (re-review post-hardening, 2026-04-23)
+
+- [x] [Review][Patch] **Garde anti-self manquante côté exécuteur** [ExecuteMigrationPlanUseCase.kt:executeDirective] — appliqué. Ajout de `if (directive.destinationNodeId == localNodeId) { log + return }` après la garde ip/port.
+- [x] [Review][Patch] **Garde défensive asymétrique sur `ipAddress`/`port` côté orchestrateur** [OrchestrateBlockMigrationUseCase.kt:80-85] — appliqué. Filtre candidats renforcé : `p.ipAddress?.isNotBlank() == true && (p.port ?: 0) in 1..65535`.
+- [x] [Review][Patch] **`toSigHex()` sign-extension Byte→Int** [ExecuteMigrationPlanUseCase.kt, OrchestrateBlockMigrationUseCase.kt] — appliqué. Fix `"%02x".format(it.toInt() and 0xff)` dans le nouveau helper partagé.
+- [x] [Review][Patch] **Port upper-bound non validé dans la garde défensive** [ExecuteMigrationPlanUseCase.kt:executeDirective] — appliqué. `destinationPort <= 0` renforcé en `destinationPort !in 1..65535`.
+- [x] [Review][Patch] **`toSigHex()` duplicé en `private` dans 2 fichiers** [ExecuteMigrationPlanUseCase.kt, OrchestrateBlockMigrationUseCase.kt] — appliqué. Helper consolidé dans `domain/util/HexEncoding.kt` (`internal fun ByteArray.toSigHex()`). Les 2 définitions file-private supprimées, import partagé ajouté.
+- [x] [Review][Patch] **Log "absent localement" collapse `Result.failure` et payload null** [ExecuteMigrationPlanUseCase.kt:81-87] — appliqué. `result.fold(onSuccess, onFailure)` distingue : failure → log "Lecture bloc échouée: <msg>" ; success(null) → log "absent localement". Pas de double log.
+- [x] [Review][Patch] **Test parallélisme utilise le même `destinationNodeId` pour 3 directives** [ExecuteMigrationPlanUseCaseTest.kt:165-169] — appliqué. 3 `destinationNodeId`/`ip`/`port` distincts (`d1`/`d2`/`d3`, `10.0.0.1-3`, ports `6001-3`) + 3 `coVerify(exactly=1)` par destination pour détecter un flatten.
+- [x] [Review][Patch] **Plan signé vide accepté silencieusement côté exécuteur** [ExecuteMigrationPlanUseCase.kt:57-69] — appliqué. Early-return avec log `"Plan vide reçu de <sp8> — aucune action"` après vérif identité.
+- [x] [Review][Defer] **Versioning du protocole de signature (rollout mixte)** [MigrationPlanMessage.kt] — deferred, closed cluster. Tout SP old-format produit une signature que les exécuteurs nouveau-format rejettent silencieusement. Cluster PFE restart complet = pas de risque immédiat. À adresser si déploiement en vague.
+- [x] [Review][Defer] **Round-robin divergence entre SPs pre/post-dedup** [OrchestrateBlockMigrationUseCase.kt:135-137] — deferred, même motif que #9 (rollout mixte).
+- [x] [Review][Defer] **`PER_BLOCK_TIMEOUT_MS` non-enforcé via `withTimeout` côté exécuteur** [ExecuteMigrationPlanUseCase.kt:executeDirective] — deferred. Le timeout est passé à `BlockSender.sendBlock` qui ne l'applique qu'au `soTimeout` (lectures) ; `connect()` + write bloquant peuvent dépasser. Wrapper avec `withTimeout(PER_BLOCK_TIMEOUT_MS)` possible mais interagit avec la décision NIO globale (cf. entrée existante deferred-work.md).
+- [x] [Review][Defer] **Collision payload sur `:` / `|` si nodeId/IP contient ces chars** [OrchestrateBlockMigrationUseCase.kt:149-151, ExecuteMigrationPlanUseCase.kt:33-35] — deferred. nodeId est hex SHA256 (pas de collision), IPv4 non plus. IPv6 literal (`fe80::1`) casserait la séparation. Fix durable : valider charset en entrée ou encoder via URL-encoding avant signature.
+- [x] [Review][Defer] **Validation adresse destination (0.0.0.0, loopback, link-local)** [ExecuteMigrationPlanUseCase.kt:executeDirective, OrchestrateBlockMigrationUseCase.kt:80-85] — deferred. Ni l'orchestrateur ni l'exécuteur ne filtrent ces adresses. Requiert une utility `InetAddresses.isRoutable()` partagée ; hors scope 7.2.
+- [x] [Review][Defer] **DHT polluée par `insertEntry` vers destination devenue offline entre étape 6 et 7** [OrchestrateBlockMigrationUseCase.kt:139-148] — deferred. Le snapshot couvre les étapes 1→3 mais l'étape 7 ne revérifie pas `dest.isActive`. Story 7.3 (auto-réparation) est le recovery path documenté.
+- [x] [Review][Defer] **Test #4 assertion `elapsed < 4_000L` fragile** [ExecuteMigrationPlanUseCaseTest.kt:184] — deferred, minor. Toute introduction d'un `withTimeout(PER_BLOCK_TIMEOUT_MS)` ferait passer le test à exactement 4_000ms → flip false. Laisser une marge (`elapsed < 4_500L`).
+- [x] [Review][Defer] **Test #6 n'assert pas la cancellation effective du send** [OrchestrateBlockMigrationUseCaseTest.kt:213-240] — deferred. Le test vérifie le log `"Timeout envoi"` mais pas que `sendMigrationPlan` est réellement annulé. Une mauvaise configuration `withTimeoutOrNull` où le send termine post-timeout ne serait pas détectée.
+- [x] [Review][Defer] **`DEPARTURE_NOTICE` signed payload sans domain-prefix tag** [OrchestrateBlockMigrationUseCase.kt:54] — deferred, pré-existant Story 7.1. Le payload `"${senderNodeId}:${blockIdsJoined}"` n'a pas de tag `"DEPARTURE_NOTICE_V1|"` — pas de collision inter-protocole aujourd'hui mais brittle aux futurs ajouts.

@@ -1,5 +1,5 @@
 # generated: 2026-04-13T21:26:35+02:00
-# last_updated: 2026-04-23T23:45:00+02:00
+# last_updated: 2026-04-23T23:59:00+02:00
 # project: PFE
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-04-23T23:45:00+02:00
+last_updated: 2026-04-23T23:59:00+02:00
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -81,8 +81,8 @@ development_status:
   epic-6-retrospective: optional
   epic-7: in-progress
   7-1-detection-du-depart-imminent-dun-noeud: done
-  7-2-orchestration-de-la-migration-proactive-par-le-super-pair: review
-  7-3-auto-reparation-detection-de-blocs-sous-repliques: backlog
+  7-2-orchestration-de-la-migration-proactive-par-le-super-pair: done
+  7-3-auto-reparation-detection-de-blocs-sous-repliques: done
   epic-7-retrospective: optional
   epic-8: backlog
   8-1-moteur-de-karma-calcul-persistance-time-decay: backlog

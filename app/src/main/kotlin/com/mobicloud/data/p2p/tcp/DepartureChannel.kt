@@ -9,4 +9,8 @@ object DepartureChannel {
     // Story 7.2 — canal du Super-Pair vers le nœud partant (plan de migration)
     const val MIGRATION_PLAN: Byte = 0x09
     const val MAX_MIGRATION_PLAN_BYTES = 64_000  // ~250 directives × 250 bytes
+
+    // Story 7.3 — canal du Super-Pair vers un donneur (plan de réplication d'un bloc)
+    const val REPLICATE_PLAN: Byte = 0x0A
+    const val MAX_REPLICATE_PLAN_BYTES = 2_000  // 1 directive × ~250 bytes + signature 72 bytes + marge
 }

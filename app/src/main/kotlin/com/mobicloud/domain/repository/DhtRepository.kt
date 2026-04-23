@@ -16,6 +16,9 @@ interface DhtRepository {
 
     suspend fun findByBlockId(blockId: String): Result<DhtEntry?>
 
+    // Story 7.3 — liste des nodeId distincts hébergeant un blockId (pour détection sous-réplication)
+    suspend fun findHostNodeIdsByBlockId(blockId: String): Result<List<String>>
+
     suspend fun findByNodeId(nodeId: String): Result<List<DhtEntry>>
 
     suspend fun deleteByNodeId(nodeId: String): Result<Unit>

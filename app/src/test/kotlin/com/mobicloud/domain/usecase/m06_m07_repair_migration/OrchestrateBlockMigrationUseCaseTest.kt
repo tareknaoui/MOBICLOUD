@@ -23,6 +23,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -224,9 +225,13 @@ class OrchestrateBlockMigrationUseCaseTest {
             completed = true
         }
 
-        advanceTimeBy(4_999L)
+        // S'assurer que la coroutine a atteint le point de suspension (`delay(10_000)`) avant de vérifier l'état.
+        runCurrent()
+        advanceTimeBy(4_500L)
+        runCurrent()
         assertTrue("ne doit pas être fini avant le budget NFR-02", !completed)
-        advanceTimeBy(2L)
+        // Dépasser `NFR02_BUDGET_MS = 5_000L` d'une marge suffisante pour éviter l'ambiguïté tick-boundary.
+        advanceTimeBy(1_000L)
         job.join()
 
         // La MàJ DHT et le gossip doivent TOUJOURS être tentés après timeout

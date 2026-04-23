@@ -13,8 +13,10 @@ import com.mobicloud.domain.models.DepartureNoticeMessage
 import com.mobicloud.domain.models.DhtLookupRequestMessage
 import com.mobicloud.domain.models.DhtLookupResponseMessage
 import com.mobicloud.domain.models.MigrationPlanMessage
+import com.mobicloud.domain.models.ReplicationPlanMessage
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.DepartureNoticeHandler
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.MigrationPlanHandler
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.ReplicationPlanHandler
 import com.mobicloud.domain.repository.DhtRepository
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -75,6 +77,10 @@ class TcpConnectionManager @Inject constructor(
     // Story 7.2 — handler du nœud partant qui exécute le plan de migration reçu du Super-Pair
     @Volatile
     var migrationPlanHandler: MigrationPlanHandler? = null
+
+    // Story 7.3 — handler du nœud donneur qui exécute la directive de réplication reçue du Super-Pair
+    @Volatile
+    var replicationPlanHandler: ReplicationPlanHandler? = null
 
     companion object {
         // F2: taille maximale d'un message Gossip pour prévenir les allocations OOM via pairs malveillants
@@ -150,6 +156,7 @@ class TcpConnectionManager @Inject constructor(
                 BlockTransferChannel.BLOCK_REQUEST -> handleBlockRequest(pushback, socket)
                 DepartureChannel.DEPARTURE_NOTICE -> handleIncomingDepartureNotice(pushback)
                 DepartureChannel.MIGRATION_PLAN -> handleIncomingMigrationPlan(pushback)
+                DepartureChannel.REPLICATE_PLAN -> handleIncomingReplicationPlan(pushback)
                 else -> {
                     // Legacy handshake — remettre le byte et traiter normalement
                     pushback.unread(firstByte)
@@ -503,6 +510,46 @@ class TcpConnectionManager @Inject constructor(
                 val out = DataOutputStream(socket.getOutputStream())
                 val bytes = MobiCloudProtoBuf.encodeToByteArray(MigrationPlanMessage.serializer(), plan)
                 out.writeByte(DepartureChannel.MIGRATION_PLAN.toInt())
+                out.writeInt(bytes.size)
+                out.write(bytes)
+                out.flush()
+            }
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun handleIncomingReplicationPlan(inp: InputStream) {
+        try {
+            val data = DataInputStream(inp)
+            val len = data.readInt()
+            if (len <= 0 || len > DepartureChannel.MAX_REPLICATE_PLAN_BYTES) {
+                Log.w("MobiCloud:TCP", "REPLICATE_PLAN taille invalide: $len — ignoré")
+                return
+            }
+            val bytes = ByteArray(len).also { data.readFully(it) }
+            val plan = MobiCloudProtoBuf.decodeFromByteArray(ReplicationPlanMessage.serializer(), bytes)
+            replicationPlanHandler?.onReplicationPlanReceived(plan)
+                ?: Log.w("MobiCloud:TCP", "REPLICATE_PLAN reçu mais aucun handler")
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e  // respect de l'annulation coopérative (scope teardown)
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur lecture REPLICATE_PLAN", e)
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun sendReplicationPlan(
+        plan: ReplicationPlanMessage,
+        ip: String,
+        port: Int
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(ip, port), 3_000)
+                socket.soTimeout = 3_000
+                val out = DataOutputStream(socket.getOutputStream())
+                val bytes = MobiCloudProtoBuf.encodeToByteArray(ReplicationPlanMessage.serializer(), plan)
+                out.writeByte(DepartureChannel.REPLICATE_PLAN.toInt())
                 out.writeInt(bytes.size)
                 out.write(bytes)
                 out.flush()

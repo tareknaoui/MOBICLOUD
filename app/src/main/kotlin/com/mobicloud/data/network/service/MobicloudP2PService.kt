@@ -27,7 +27,9 @@ import com.mobicloud.domain.usecase.m05_dht_catalog.ResolveDhtConflictUseCase
 import com.mobicloud.domain.repository.DhtRepository
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.ExecuteMigrationPlanUseCase
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.ExecuteReplicationPlanUseCase
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.OrchestrateBlockMigrationUseCase
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.TriggerAutoRepairUseCase
 import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
 import com.mobicloud.core.network.NetworkChangeObserver
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
@@ -71,6 +73,8 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var networkChangeObserver: NetworkChangeObserver
     @Inject lateinit var orchestrateBlockMigrationUseCase: OrchestrateBlockMigrationUseCase
     @Inject lateinit var executeMigrationPlanUseCase: ExecuteMigrationPlanUseCase
+    @Inject lateinit var triggerAutoRepairUseCase: TriggerAutoRepairUseCase
+    @Inject lateinit var executeReplicationPlanUseCase: ExecuteReplicationPlanUseCase
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -88,6 +92,8 @@ class MobicloudP2PService : Service() {
         const val ABDICATION_DELAY_MS = 30 * 60 * 1000L
         /** Délai inter-cycle du monitoring d'élection — évite le hot-loop en période de cooldown. */
         private const val ELECTION_RETRY_DELAY_MS = 5_000L
+        /** Story 7.3 — intervalle du scan auto-réparation (compromis détection vs thrash). */
+        private const val AUTO_REPAIR_SCAN_INTERVAL_MS = 10_000L
     }
 
     // P3: Guard contre les appels multiples de onStartCommand (START_STICKY)
@@ -140,6 +146,8 @@ class MobicloudP2PService : Service() {
             // Story 7.2 — câblage des handlers de migration proactive
             tcpConnectionManager.departureHandler = orchestrateBlockMigrationUseCase
             tcpConnectionManager.migrationPlanHandler = executeMigrationPlanUseCase
+            // Story 7.3 — handler du donneur qui exécute une directive de réplication reçue
+            tcpConnectionManager.replicationPlanHandler = executeReplicationPlanUseCase
 
             // Story 7.1 — démarrer l'observation des changements réseau WiFi → 4G
             networkChangeObserver.register()
@@ -256,6 +264,16 @@ class MobicloudP2PService : Service() {
                             Log.w(LOGTAG, "Cycle Gossip échoué — service continue", e)
                         }
                     delay(2000L)
+                }
+            }
+
+            // Story 7.3 — Loop Auto-Repair : scan périodique des blocs sous-répliqués.
+            // No-op silencieux si le nœud n'est pas Super-Pair (garde-fou interne).
+            launch {
+                while (isActive) {
+                    triggerAutoRepairUseCase.scanAndRepair()
+                        .onFailure { Log.w(LOGTAG, "Scan auto-réparation échoué", it) }
+                    delay(AUTO_REPAIR_SCAN_INTERVAL_MS)
                 }
             }
 

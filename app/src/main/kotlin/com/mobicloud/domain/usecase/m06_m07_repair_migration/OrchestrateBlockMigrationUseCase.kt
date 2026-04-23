@@ -9,6 +9,7 @@ import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
+import com.mobicloud.domain.util.toSigHex
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -33,8 +34,11 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             return
         }
 
+        // Snapshot unique de peerRepository.peers pour cohérence des étapes 1→3
+        val peersSnapshot = peerRepository.peers.value
+
         // 1) Le nœud courant DOIT être Super-Pair pour orchestrer (sinon le NOTICE a été mal-routé)
-        val selfIsSuperPair = peerRepository.peers.value
+        val selfIsSuperPair = peersSnapshot
             .any { it.identity.nodeId == identity.nodeId && it.isSuperPair && it.isActive }
         if (!selfIsSuperPair) {
             networkEventRepository.pushEvent("[MIGRATION] DEPARTURE_NOTICE ignoré — nœud local non Super-Pair")
@@ -42,7 +46,7 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
         }
 
         // 2) Vérification signature du NOTICE (le nœud partant signe "$nodeId:$blockIdsJoined")
-        val departingPeer = peerRepository.peers.value
+        val departingPeer = peersSnapshot
             .firstOrNull { it.identity.nodeId == notice.senderNodeId }
         if (departingPeer == null) {
             networkEventRepository.pushEvent("[MIGRATION] Émetteur ${notice.senderNodeId.take(8)} inconnu — plan annulé")
@@ -59,15 +63,26 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             return
         }
 
-        if (notice.hostedBlockIds.isEmpty()) {
+        // Dedup défensif : un NOTICE conforme (HostedBlockDao.getAllBlockIds = DISTINCT PK) ne contient pas
+        // de doublons ; s'en trouver indique un pair compromis ou un bug. On préserve l'ordre de première apparition.
+        val uniqueBlockIds = notice.hostedBlockIds.distinct()
+        if (uniqueBlockIds.size < notice.hostedBlockIds.size) {
+            networkEventRepository.pushEvent(
+                "[MIGRATION] Doublons détectés dans NOTICE ${notice.senderNodeId.take(8)} — dédupliqués"
+            )
+        }
+
+        if (uniqueBlockIds.isEmpty()) {
             networkEventRepository.pushEvent("[MIGRATION] ${notice.senderNodeId.take(8)} — aucun bloc à migrer")
             return
         }
 
-        // 3) Candidats destination : actifs, hors émetteur, avec ip/port connus, hors soi-même
-        val candidates = peerRepository.peers.value.filter { p ->
+        // 3) Candidats destination : actifs, hors émetteur, hors soi-même, avec ip non-blank et port valide
+        //    (défauts Protobuf ip="", port=0 et ports hors plage seraient rejetés côté exécuteur — autant filtrer ici)
+        val candidates = peersSnapshot.filter { p ->
             p.isActive &&
-            p.ipAddress != null && p.port != null &&
+            p.ipAddress?.isNotBlank() == true &&
+            (p.port ?: 0) in 1..65535 &&
             p.identity.nodeId != notice.senderNodeId &&
             p.identity.nodeId != identity.nodeId
         }
@@ -77,7 +92,7 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
         }
 
         // 4) Round-robin sur blockIds (ordre stable préservé du NOTICE)
-        val directives = notice.hostedBlockIds.mapIndexed { i, blockId ->
+        val directives = uniqueBlockIds.mapIndexed { i, blockId ->
             val dest = candidates[i % candidates.size]
             MigrateBlockDirective(
                 blockId = blockId,
@@ -88,9 +103,11 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             )
         }
 
-        // 5) Signature du plan (domain separation — séparateurs distincts)
-        val planSigPayload = "${identity.nodeId}|${directives.joinToString("|") { "${it.blockId}:${it.destinationNodeId}" }}"
-            .toByteArray()
+        // 5) Signature du plan (domain separation — payload durci : inclut IP/port/pubkey des destinations
+        //    pour empêcher une réécriture MITM qui redirigerait le transfert opaque vers un pair contrôlé)
+        val planSigPayload = "${identity.nodeId}|${directives.joinToString("|") {
+            "${it.blockId}:${it.destinationNodeId}:${it.destinationIp}:${it.destinationPort}:${it.destinationPublicKeyBytes.toSigHex()}"
+        }}".toByteArray()
         val planSignature = securityRepository.signData(planSigPayload).getOrElse {
             networkEventRepository.pushEvent("[MIGRATION] Signature du plan échouée — plan annulé")
             return

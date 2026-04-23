@@ -10,9 +10,10 @@ import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.util.toSigHex
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.supervisorScope
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,7 +31,7 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
         const val PER_BLOCK_TIMEOUT_MS = 4_000L
     }
 
-    override suspend fun onMigrationPlanReceived(plan: MigrationPlanMessage) = coroutineScope {
+    override suspend fun onMigrationPlanReceived(plan: MigrationPlanMessage) = supervisorScope {
         // 1) Vérification signature du plan avec la clé publique du Super-Pair annoncé
         val superPeer = peerRepository.peers.value
             .firstOrNull { it.identity.nodeId == plan.superPeerNodeId && it.isSuperPair }
@@ -38,10 +39,12 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
             networkEventRepository.pushEvent(
                 "[MIGRATION] Plan reçu d'un nœud non Super-Pair ${plan.superPeerNodeId.take(8)} — ignoré"
             )
-            return@coroutineScope
+            return@supervisorScope
         }
-        val planSigPayload = "${plan.superPeerNodeId}|${plan.directives.joinToString("|") { "${it.blockId}:${it.destinationNodeId}" }}"
-            .toByteArray()
+        // Payload durci : cohérent avec OrchestrateBlockMigrationUseCase — inclut IP/port/pubkey destination
+        val planSigPayload = "${plan.superPeerNodeId}|${plan.directives.joinToString("|") {
+            "${it.blockId}:${it.destinationNodeId}:${it.destinationIp}:${it.destinationPort}:${it.destinationPublicKeyBytes.toSigHex()}"
+        }}".toByteArray()
         val valid = securityRepository.verifySignature(
             data = planSigPayload,
             signature = plan.signatureBytes,
@@ -49,15 +52,23 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
         ).getOrDefault(false)
         if (!valid) {
             networkEventRepository.pushEvent("[MIGRATION] Signature plan invalide — ignoré")
-            return@coroutineScope
+            return@supervisorScope
         }
 
         val localId = securityRepository.getIdentity().getOrElse {
             networkEventRepository.pushEvent("[MIGRATION] identité locale indisponible — plan ignoré")
-            return@coroutineScope
+            return@supervisorScope
         }.nodeId
 
-        // 2) Exécution parallèle des directives — AC#2 transfert aveugle, AC#3 ACK signé vérifié par BlockSender
+        if (plan.directives.isEmpty()) {
+            networkEventRepository.pushEvent(
+                "[MIGRATION] Plan vide reçu de ${plan.superPeerNodeId.take(8)} — aucune action"
+            )
+            return@supervisorScope
+        }
+
+        // 2) Exécution parallèle des directives — AC#2 transfert aveugle, AC#3 ACK signé vérifié par BlockSender.
+        //    supervisorScope : un throw non-Result dans une directive n'annule pas ses sœurs.
         plan.directives.map { directive ->
             async {
                 executeDirective(directive, localId)
@@ -67,12 +78,38 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
     }
 
     private suspend fun executeDirective(directive: MigrateBlockDirective, localNodeId: String) {
-        // AC#2 : on lit le bloc déjà chiffré — pas de déchiffrement, transfert opaque
-        val payload = hostedBlockRepository.getBlock(directive.blockId).getOrNull()
-        if (payload == null) {
+        // Garde défensive : port hors plage valide, IP vide, ou destination == self
+        // (plan signé par un SP compromis pouvant rediriger un bloc vers le pair lui-même).
+        if (directive.destinationIp.isBlank() || directive.destinationPort !in 1..65535) {
             networkEventRepository.pushEvent(
-                "[MIGRATION] Bloc ${directive.blockId.take(16)} absent localement — ignoré"
+                "[MIGRATION] Directive ${directive.blockId.take(16)} → ${directive.destinationNodeId.take(8)} ignorée (adresse invalide)"
             )
+            return
+        }
+        if (directive.destinationNodeId == localNodeId) {
+            networkEventRepository.pushEvent(
+                "[MIGRATION] Directive ${directive.blockId.take(16)} ignorée — destination == self"
+            )
+            return
+        }
+        // AC#2 : on lit le bloc déjà chiffré — pas de déchiffrement, transfert opaque
+        val result = hostedBlockRepository.getBlock(directive.blockId)
+        val payload = result.fold(
+            onSuccess = { it },
+            onFailure = { err ->
+                networkEventRepository.pushEvent(
+                    "[MIGRATION] Lecture bloc ${directive.blockId.take(16)} échouée : ${err.message}"
+                )
+                null
+            }
+        )
+        if (payload == null) {
+            // Distingue succès-null (bloc réellement absent) du chemin failure déjà loggué ci-dessus.
+            if (result.isSuccess) {
+                networkEventRepository.pushEvent(
+                    "[MIGRATION] Bloc ${directive.blockId.take(16)} absent localement — ignoré"
+                )
+            }
             return
         }
         val destPeer = Peer(

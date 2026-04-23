@@ -23,8 +23,6 @@ import io.mockk.slot
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
@@ -164,10 +162,12 @@ class ExecuteMigrationPlanUseCaseTest {
 
     @Test
     fun `test 4 - execution parallele - 3 directives 2s chacune finissent en moins de 4s`() = runTest {
+        // Destinations distinctes pour que le test détecte un bug "flatten on first directive" :
+        // sans variation, 3 envois vers la même destination passeraient `coVerify(exactly = 3)` à tort.
         val directives = listOf(
-            directive(blockId = "a".repeat(64)),
-            directive(blockId = "b".repeat(64)),
-            directive(blockId = "c".repeat(64))
+            directive(blockId = "a".repeat(64), destinationNodeId = "d1".repeat(32), ip = "10.0.0.1", port = 6001),
+            directive(blockId = "b".repeat(64), destinationNodeId = "d2".repeat(32), ip = "10.0.0.2", port = 6002),
+            directive(blockId = "c".repeat(64), destinationNodeId = "d3".repeat(32), ip = "10.0.0.3", port = 6003)
         )
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
@@ -185,6 +185,10 @@ class ExecuteMigrationPlanUseCaseTest {
 
         assertTrue("Parallèle doit finir en < 4s (séquentiel = 6s), elapsed=$elapsed", elapsed < 4_000L)
         coVerify(exactly = 3) { blockSender.sendBlock(any(), any(), any()) }
+        // Chaque directive doit atteindre SA destination — détecte un bug "flatten sur la première directive".
+        coVerify(exactly = 1) { blockSender.sendBlock(any(), match { it.identity.nodeId == "d1".repeat(32) }, any()) }
+        coVerify(exactly = 1) { blockSender.sendBlock(any(), match { it.identity.nodeId == "d2".repeat(32) }, any()) }
+        coVerify(exactly = 1) { blockSender.sendBlock(any(), match { it.identity.nodeId == "d3".repeat(32) }, any()) }
     }
 
     @Test

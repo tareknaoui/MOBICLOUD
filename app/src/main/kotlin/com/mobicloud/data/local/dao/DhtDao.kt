@@ -16,6 +16,10 @@ interface DhtDao {
     @Query("SELECT * FROM dht_entries WHERE block_id = :blockId LIMIT 1")
     suspend fun findByBlockId(blockId: String): DhtEntryEntity?
 
+    // Story 7.3 — liste tous les hôtes distincts d'un blockId (utile pour calcul sous-réplication)
+    @Query("SELECT DISTINCT node_id FROM dht_entries WHERE block_id = :blockId")
+    suspend fun findNodeIdsByBlockId(blockId: String): List<String>
+
     @Query("SELECT * FROM dht_entries WHERE node_id = :nodeId")
     suspend fun findByNodeId(nodeId: String): List<DhtEntryEntity>
 

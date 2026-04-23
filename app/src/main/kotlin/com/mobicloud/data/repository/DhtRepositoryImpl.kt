@@ -61,6 +61,11 @@ class DhtRepositoryImpl @Inject constructor(
             dhtDao.findByBlockId(blockId)?.toDomain()
         }
 
+    override suspend fun findHostNodeIdsByBlockId(blockId: String): Result<List<String>> =
+        runCatching {
+            dhtDao.findNodeIdsByBlockId(blockId)
+        }
+
     override suspend fun findByNodeId(nodeId: String): Result<List<DhtEntry>> =
         runCatching {
             dhtDao.findByNodeId(nodeId).map { it.toDomain() }
