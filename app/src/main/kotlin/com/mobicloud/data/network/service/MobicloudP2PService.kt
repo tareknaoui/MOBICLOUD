@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import com.mobicloud.compose.R
 import com.mobicloud.data.network.PublicIpFetcher
 import com.mobicloud.data.p2p.tcp.TcpConnectionManager
@@ -107,15 +108,15 @@ class MobicloudP2PService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = createNotification()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForeground(
-                NOTIFICATION_ID,
-                notification,
+        ServiceCompat.startForeground(
+            this,
+            NOTIFICATION_ID,
+            notification,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
-            )
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
-        }
+            else
+                0
+        )
 
         // P3: Évite de lancer plusieurs boucles P2P si START_STICKY redémarre le service
         if (!loopsStarted) {

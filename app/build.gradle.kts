@@ -187,8 +187,8 @@ dependencies {
     ksp(libs.room.compiler)
 
     // ... LeakCanary
-    // TODO: Comment out the following line to disable LeakCanary
-    debugImplementation(libs.leakcanary.android)
+    // Désactivé — ServiceWatcher cause uid=-1 sur Android 12+ (binder UID lost in reflection proxy)
+    // debugImplementation(libs.leakcanary.android)
 
     // ... Testing
     testImplementation(libs.junit)
