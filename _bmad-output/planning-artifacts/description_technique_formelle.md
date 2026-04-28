@@ -29,9 +29,8 @@ MobiCloud repose sur **quatre piliers techniques** complémentaires :
 | **Intelligence Artificielle Embarquée** | Évaluation continue de la fiabilité de chaque nœud et déclenchement des migrations préventives |
 | **Erasure Coding Adaptatif (EC)** | Redondance mathématique ajustée dynamiquement à l'état du réseau |
 | **Catalogue Distribué par Gossip et DHT** | Mémoire collective des métadonnées, cohérente, sans serveur central |
-| **Gouvernance Économique (Karma)** | Système de réciprocité anti-exploitation garantissant la contribution de chaque participant |
 
-Le système est décomposé en **dix modules fonctionnels** dont les interactions sont décrites dans les sections suivantes.
+Le système est décomposé en **neuf modules fonctionnels** dont les interactions sont décrites dans les sections suivantes.
 
 ---
 
@@ -46,7 +45,7 @@ MobiCloud utilise un canal de communication P2P unifié pour l'ensemble de ses �
 
 **Règle fondamentale :** le routage multi-sauts via un nœud relais est **strictement interdit pour les fragments de données** : tout transfert de fragment doit s'effectuer en connexion directe entre l'émetteur et le récepteur. Si aucune connexion directe n'est possible, le nœud cible est exclu de la liste des candidats pour ce fragment.
 
-*Justification :* faire transiter un fragment de données lourd via un relais consomme la batterie de ce relais sans lui apporter de contrepartie en termes de Karma. Cette asymétrie crée un vecteur d'exploitation qui serait incompatible avec le modèle de réciprocité du système.
+*Justification :* faire transiter un fragment de données lourd via un relais consomme la batterie de ce relais sans contrepartie. Cette asymétrie crée un vecteur d'exploitation incompatible avec le modèle énergétique du système.
 
 ### 2.2 Identité Cryptographique et Coût d'Entrée
 
@@ -285,34 +284,11 @@ Le Super-Pair désigne un **Nœud Médecin**, de préférence un nœud stable qu
 
 ---
 
-### Module 9 — Auto-Régulation et Système Anti-Clandestin (Karma)
+### Module 9 — Élection du Coordinateur (Super-Pair)
 
-**Objectif :** prévenir l'exploitation du réseau par des nœuds "passagers clandestins" qui publieraient massivement sans contribuer au stockage collectif, ainsi que les comportements de "Trou Noir" (accepter des fragments puis les effacer).
+> **Note V4.0 :** Le système Karma / Anti-Clandestin (ex-Module 9) a été retiré du scope d'implémentation. La contribution thèse repose sur mobile-native + topologie super-peer/cluster ; les mécanismes d'incentives (Karma Token, PoR, détection Trous Noirs) sont documentés en perspective rapport. L'anti-Sybil est assuré par signature Android Keystore (hardware-backed), pas par PoW.
 
-**Mécanisme central — Le Karma :**  
-La monnaie d'échange du réseau est la réciprocité. Pour publier des données, un nœud doit héberger des données pour les autres. Le Ratio de Réciprocité est défini comme :
 
-```
-Karma = Volume_Hébergé_Utile / Volume_Publié_Actif
-```
-
-Le Karma n'est **pas auto-déclaré** par le nœud lui-même. Étant donné le partitionnement du catalogue (Module 5), le ratio de réciprocité nécessite une preuve. L'émetteur demande à ses "Gardiens DHT" (les nœuds responsables de la région de son identifiant local) de certifier son bilan : "Signez mon relevé de Karma". L'émetteur présente ce **"Jeton de Karma" (Karma Token)** lors d'un transfert. Le récepteur se contente d'en vérifier la signature cryptographique (principe Zero-Trust déterministe, robuste même au changement de Super-Pair).
-
-La publication est autorisée si et seulement si `Karma ≥ Effort_Redondance`, où `Effort_Redondance = (K + M) / K`. Ce ratio tient compte du fait qu'un fichier déposé sollicite le réseau pour K + M fragments, pas seulement K.
-
-**Correctifs Anti-Sybil et Anti-Collusion (v2.1) :**
-
-*Coût d'Entrée (Anti-Sybil) :* la création d'une identité exige une Preuve de Travail (PoW) calibrée à ~1 seconde. Ceci rend la création de milliers d'identités fictives économiquement prohibitive.
-
-*Crédit de départ restreint :* les nœuds en période d'intégration ne peuvent publier qu'avec des schémas EC à faible parité (M ≤ 2), limitant leur impact sur les ressources réseau.
-
-*Proof of Retrievability (PoR) (Anti-Collusion) :* périodiquement, un défi cryptographique est émis à destination d'un nœud hébergeur. Le challenger est désigné de manière **déterministe** par `Hash(ID_Fragment + Horloge_Logique_Réseau)`, ce qui empêche deux nœuds complices de se défier mutuellement. Le défi consiste à retourner le hachage d'un segment dont l'**offset est aléatoire et inconnu avant réception**, rendant impossible toute réponse correcte sans possession effective du fragment. Deux échecs consécutifs entraînent le bannissement du nœud et le déclenchement de réparations pour tous ses fragments.
-
-**Détection des Trous Noirs :** si un nœud répertorié comme hébergeur d'un fragment répond "introuvable" lors d'une requête de lecture, le demandeur génère une **Plainte Gossip signée** (preuve cryptographique de la défaillance). Trois plaintes de sources distinctes entraînent le bannissement du nœud, la perte de son Karma, et le déclenchement d'auto-réparations pour ses fragments.
-
----
-
-### Module 10 — Élection du Coordinateur (Super-Pair)
 
 **Objectif :** désigner de manière décentralisée, rapide et incontestable un nœud coordinateur chargé de dédoublonner les décisions critiques d'orchestration (ordres de réparation), sans lui accorder de privilèges sur les données.
 
@@ -346,8 +322,6 @@ Le candidat ayant résisté à toutes les révocations à l'expiration du chrono
 
 ```
 Utilisateur → Application
-
-[M9] Vérification du Karma → AUTORISÉ
        ↓
 [M3] Découpage → Chiffrement par bloc → Calcul EC adaptatif (via M2) → K+M Fragments scellés
        ↓

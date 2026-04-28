@@ -8,8 +8,8 @@
   lastStep: 8
   status: 'complete'
   completedAt: '2026-03-25T16:30:00+01:00'
-  lastRevision: '2026-04-13'
-  revisionReason: 'Pivot architectural V4.0 — Fédération de Clusters Hybride (Firebase STUN/Tracker remplace DHT pure inter-réseaux, Hashcash retiré)'
+  lastRevision: '2026-04-28'
+  revisionReason: 'Pivot V5.0 — Suppression totale de Firebase et consolidation de la signalisation + transport sur la couche Serveurs Relais HA WebSocket (Zero-Firebase). Karma/Weight retiré.'
   ---
 
   # Architecture Decision Document
@@ -20,8 +20,8 @@
 
   ### Requirements Overview
 
-  **Functional Requirements (V4.0 — Fédération de Clusters Hybride) :**
-  Le système repose sur une topologie de **Fédération de Clusters** où un serveur Firebase minimaliste agit uniquement comme **STUN/Tracker de signalisation** pour permettre la découverte inter-réseaux (4G ↔ Wifi). À l'intérieur d'un cluster, la découverte reste purement P2P (UDP Multicast). L'orchestration interne s'appuie sur : l'**Algorithme Bully** (élection Super-Pair), la **DHT + Gossip/CRDT** (catalogue distribué), l'**Erasure Coding C++ NDK** (résilience des données), et le système **Karma** (équité Anti-Clandestins). Le transfert de fichiers est toujours en TCP direct P2P (Zero-Trust). Le Super-Pair élu s'enregistre sur Firebase pour être découvrable depuis d'autres réseaux.
+  **Functional Requirements (V5.0 — Fédération de Clusters Hybride avec Serveurs Relais HA) :**
+  Le système repose sur une topologie de **Fédération de Clusters** où un cluster de **Serveurs Relais HA WebSocket** (min 2 instances Node.js, Zero-Knowledge) assure conjointement deux rôles : (1) **Signalisation** — annuaire en mémoire des Super-Pairs (`REGISTER_PEER`/`GET_PEERS`) ; (2) **Transport** — fallback Store-and-Forward 60s pour les blocs binaires chiffrés quand le P2P direct échoue (NAT symétrique). À l'intérieur d'un cluster, la découverte locale reste purement P2P (UDP Multicast). L'orchestration interne s'appuie sur : l'**Algorithme Bully** (élection Super-Pair), la **DHT + Gossip/CRDT** (catalogue distribué), et l'**Erasure Coding C++ NDK** (résilience des données). Le transfert de fichiers est prioritairement TCP direct P2P (Zero-Trust) avec fallback transparent vers les Serveurs Relais HA. **Aucune dépendance à Firebase ou tout autre service tiers.**
 
   **Non-Functional Requirements:**
   - **Résilience extrême :** Survie à un churn de 30% à 70% et auto-cicatrisation.
@@ -45,10 +45,11 @@
 
   Suite à l'analyse architecturale (Winston), les décisions critiques suivantes sont actées pour assainir l'implémentation par rapport au design théorique :
 
-  1. **Réseau P2P (Topologie Fédérée) :** L'architecture V4.0 adopte un modèle hybride. La découverte **locale** reste purement P2P via UDP Multicast (groupe `239.255.255.250:7777`). La découverte **inter-réseaux** utilise Firebase Realtime Database comme **Tracker STUN minimaliste** — il ne stocke que les métadonnées des Super-Pairs (`nodeId`, `ip`, `port`, `reliabilityScore`), aucune donnée utilisateur. Tous les transferts de fichiers restent TCP direct P2P.
-  2. **Synchronisation (DHT + Gossip) :** Le protocole Gossip épidémique est circumscrit aux *Replica Sets* (nœuds gérant la même partition DHT) pour les métadonnées de catalogue. Un Gossip ultra-léger (Heartbeat) persiste pour la topologie vivant/mort. Firebase n'est jamais impliqué dans la synchronisation du catalogue — c'est une responsabilité DHT/CRDT exclusive.
-  3. **Anti-Sybil (Keystore sans Hashcash) :** ⚠️ **Le Hashcash est retiré du scope V4.0.** L'anti-Sybil repose exclusivement sur l'**Android Keystore System** (hardware-backed EC P-256). L'identité (`KeyPair`) est générée une seule fois, persistée dans le TEE, et réutilisée pour signer tous les messages P2P. Cette approche épargne le CPU/batterie ARM lors des reconnexions tout en garantissant l'infalsifiabilité.
+  1. **Réseau P2P (Topologie Fédérée V5.0) :** L'architecture adopte un modèle hybride Zero-Firebase. La découverte **locale** reste purement P2P via UDP Multicast (groupe `239.255.255.250:7777`). La découverte **inter-réseaux** utilise un cluster de **Serveurs Relais HA WebSocket** (min 2 instances Node.js sur Render/Railway) comme annuaire dynamique — ils ne stockent que les métadonnées des Super-Pairs en RAM (`nodeId`, `ip`, `port`, `reliabilityScore`) avec TTL 60s, aucune donnée utilisateur. Le transfert de fichiers reste prioritairement TCP direct P2P avec fallback Store-and-Forward via les mêmes serveurs HA quand le NAT bloque.
+  2. **Synchronisation (DHT + Gossip) :** Le protocole Gossip épidémique est circumscrit aux *Replica Sets* (nœuds gérant la même partition DHT) pour les métadonnées de catalogue. Un Gossip ultra-léger (Heartbeat) persiste pour la topologie vivant/mort. Les Serveurs Relais HA ne sont JAMAIS impliqués dans la synchronisation du catalogue — c'est une responsabilité DHT/CRDT exclusive.
+  3. **Anti-Sybil (Keystore sans Hashcash) :** ⚠️ **Le Hashcash est retiré du scope V4.0.** L'anti-Sybil repose exclusivement sur l'**Android Keystore System** (hardware-backed EC P-256). L'identité (`KeyPair`) est générée une seule fois, persistée dans le TEE, et réutilisée pour signer tous les messages P2P **et** les handshakes WebSocket vers les Serveurs Relais HA.
   4. **Scission et Élection (Buffer d'Urgence) :** Pour pallier le "vide de pouvoir" lors d'une ré-élection du Super-Pair (Bully), chaque nœud potentiel implémente un `LocalRepairBuffer` in-memory (max 50 entrées). Les requêtes d'auto-réparation sont émises dès que le nouveau coordinateur annonce son mandat. L'abdication automatique du Super-Pair est déclenchée après 30 minutes (exclusion de l'élection pendant 5 min).
+  5. **Signalisation & Relais HA (Consolidé V5.0) :** Pour garantir la disponibilité de la couche signaling + transport inter-réseaux, un cluster de serveurs Node.js (`ws` 8.x) est déployé en **min 2 instances indépendantes** (régions différentes — ex: Render + Railway). Protocole binaire WSS, authentification systématique via signature Android Keystore au handshake. Les serveurs sont **zero-knowledge** pour les blocs (AES-256 GCM opaque) et agissent comme **annuaire RAM dynamique** pour la signalisation. Failover client séquentiel automatique en cas d'instance HS.
 
   ---
 
@@ -64,17 +65,28 @@
   ### 2. Réduction des Protocoles de Sécurité & Consensus
   - **Hashcash Anti-Sybil :** ⚠️ **Retiré définitivement du scope V4.0.** Remplacé par la signature Android Keystore (hardware-backed) — solution plus élégante et moins consommatrice.
   - **Proof of Retrievability (PoR) :** Retiré du scope d'implémentation.
-  - **Validation du Karma :** La certification collégiale par l'anneau DHT est simplifiée en une validation direct-peer signée (Anti-Replay conservé).
+  - **Système Karma / Weight (Anti-Clandestin) :** ⚠️ **Retiré définitivement du scope V4.0.** La contribution thèse repose désormais sur mobile-native + topologie super-peer/cluster ; le système d'incentives est documenté en perspective rapport.
   - **Split-Brain :** Documenté dans le rapport mais non implémenté (trop complexe à reproduire en démo).
 
-  ### 3. Tracker Firebase — Signalisation Minimaliste (NOUVEAU V4.0)
-  - **Rôle :** Firebase Realtime Database sert uniquement de **carnet d'adresses** pour les Super-Pairs. Il ne stocke ni catalogue DHT, ni données utilisateur, ni fragments.
-  - **Données stockées :** `super-peers/{nodeId}` → `{ip, port, reliabilityScore, electedAt}` + TTL 60s.
-  - **Sécurité Firebase :** Les règles de sécurité Firebase n'autorisent l'écriture que sur son propre `nodeId`. Toute lecture est publique (annuaire de rencontre).
-  - **Fallback :** Si Firebase est inaccessible, le nœud reste en mode Multicast local uniquement (`Result.Failure` remontée proprement via `SignalingRepository`).
+  ### 3. Suppression de Firebase — Signalisation sur Serveurs Relais HA (PIVOT V5.0)
+  - **Rôle :** Le cluster de Serveurs Relais HA WebSocket (min 2 instances Node.js) assume désormais le rôle de **carnet d'adresses** des Super-Pairs ET de **fallback de transport** pour les blocs binaires.
+  - **Données stockées (Signaling RAM) :** Annuaire en mémoire des Super-Pairs actifs (`nodeId`, `ip`, `port`, `reliabilityScore`, `last_seen`) avec TTL 60s. Aucune persistance disque, aucune base de données.
+  - **Données stockées (Relay RAM) :** Buffer Store-and-Forward des blocs chiffrés en attente de livraison (TTL 60s, RAM uniquement, purge automatique).
+  - **Sécurité :** Authentification obligatoire par signature Android Keystore EC P-256 sur tous les handshakes WebSocket (`REGISTER_PEER` et `UPLOAD`). Les blocs sont AES-256 GCM opaques (Zero-Knowledge — le serveur ne peut pas déchiffrer).
+  - **Hébergement :** Render.com / Railway.app via Docker (`relay-server/Dockerfile`, base `node:20-slim`).
+  - **Découverte & Failover :** URLs des Serveurs Relais HA hardcodées dans la config Android (ou servies via DNS futur). Le client gère le **failover séquentiel automatique** entre instances en cas d'échec.
+  - **Fallback Local :** Si tous les Serveurs Relais HA sont inaccessibles, le nœud reste en mode Multicast local uniquement (`Result.Failure` remontée proprement via `SignalingRepository`).
 
   ### 4. Validation au Churn
   - La preuve de résilience s'appuiera sur des scénarios manuels documentés et des logs structurés plutôt que sur un simulateur de réseau virtuel automatisé dédié.
+
+  ### 5. Serveurs Relais WebSocket HA (V5.0 — Haute Disponibilité)
+  - **Redondance :** Déploiement de minimum **deux instances indépendantes** (ex: Render + Railway, ou deux régions différentes).
+  - **Protocole :** WebSocket binaire sur port 443 (WSS).
+  - **Buffering :** RAM uniquement (Store-and-Forward), TTL 60s par bloc.
+  - **Capacité par bloc :** ~1 MB (fragments MobiCloud).
+  - **Endpoint santé :** `GET /health` retourne sessions actives + blocs en attente.
+  - **Graceful shutdown :** Gestion SIGTERM avec drainage des connexions en cours.
 
   ---
 
@@ -132,12 +144,13 @@
   - Data Serialization format for P2P messages (Protobuf)
   - Persistent Node Identity Anti-Sybil (Android Keystore — **Hashcash retiré**)
   - P2P Communication Protocol (Raw Sockets : UDP Multicast + TCP direct)
-  - **[NOUVEAU]** Inter-Network Signaling (Firebase Realtime Database — Tracker STUN uniquement)
+  - **[V5.0]** Inter-Network Signaling + Transport HA (Cluster Serveurs Relais Node.js WebSocket — Zero-Firebase)
 
   **Important Decisions (Shape Architecture):**
   - Local Database (Room SQLite)
   - Encryption Cipher (AES-256 GCM)
-  - **[NOUVEAU]** `SignalingRepository` interface (Domain) → `SignalingRepositoryImpl` (Data/Firebase)
+  - **[V5.0]** `SignalingRepository` + `RelayRepository` interfaces (Domain) → impl WebSocket HA (Data) — pattern unifié
+  - **[V5.0]** `BlockSenderWithRelay` wrapper qui implémente try-direct-then-relay-with-failover
 
   **Deferred Decisions (Post-MVP):**
   - SIMD ARM NEON optimisation pour l'Erasure Coding (reporté en perspective rapport)
@@ -151,13 +164,14 @@
 
   - **Identité du Nœud & Anti-Sybil :** Génération et persistance de la paire de clés asymétriques EC P-256 via l'**Android Keystore System** (Hardware-backed TEE). Empêche le clonage d'identité. ⚠️ **Hashcash N'EST PAS utilisé** (retiré V4.0).
   - **Chiffrement des Fragments :** AES-256 GCM avec clés éphémères dérivées `HKDF(FileMasterKey, BlockIndex)`. La `FileMasterKey` est chiffrée via ECIES avec la clé publique du destinataire. Clés éphémères en RAM uniquement.
-  - **Firebase Security Rules :** Écriture restreinte à `super-peers/{own-nodeId}`, lecture publique. Aucune donnée sensible sur Firebase.
+  - **Sécurité Serveurs Relais HA :** Authentification stricte par signature Android Keystore EC P-256 sur tous les handshakes WebSocket (`REGISTER_PEER` et `UPLOAD`). Le serveur est zero-knowledge — il ne peut pas déchiffrer les blocs (AES-256 GCM opaque). Aucune donnée sensible persistée (RAM uniquement, TTL 60s).
 
   ### API & Communication Patterns
 
   - **Transfert Data Lourd (Fragments) :** TCP Sockets directs via Kotlin Coroutines (`Dispatchers.IO`). Jamais multi-sauts.
   - **Découverte Locale (Heartbeat) :** UDP Multicast groupe `239.255.255.250:7777` — périmètre intra-sous-réseau.
-  - **Signalisation Inter-Réseaux (NOUVEAU V4.0) :** Firebase Realtime Database SDK (Android). Le nœud local lit les `super-peers/*` pour découvrir les Super-Pairs distants. Le Super-Pair élu écrit son entrée avec `onDisconnect().removeValue()` pour le nettoyage automatique.
+  - **Signalisation Inter-Réseaux (V5.0) :** Communication directe avec les Serveurs Relais HA via WebSocket binaire (OkHttp). Le Super-Pair élu envoie `REGISTER_PEER` (frame binaire signée EC P-256). Les autres nœuds envoient `GET_PEERS` pour récupérer l'annuaire. Le nettoyage est automatique via TTL RAM 60s côté serveur.
+  - **Transfert Relais HA (V5.0) :** Fallback automatique transparent. Si TCP direct échoue (NAT symétrique), `BlockSenderWithRelay` bascule sur `RelayRepository.uploadBlock()` qui pousse le bloc binaire chiffré au Serveur Relais HA. Le serveur le forward au destinataire dès qu'il est en ligne (Store-and-Forward 60s RAM).
   - **Pattern de Réveil Asynchrone :** Foreground Service avec `MulticastLock` Wi-Fi maintient l'écoute réseau active. Réveil via interruption I/O (socket TCP accepté) ou datagramme UDP `URGENT`.
 
   ### Decision Impact Analysis
@@ -247,9 +261,6 @@
   **Module 8 (Récupération) - Pipeline de Streaming Actif :**
   Le protocole de téléchargement compétitif (K+2) est couplé à un pipeline de rendu réactif : le désentrelacement et le déchiffrement débutent **dès** l'obtention des premiers fragments originaux, sans attendre la fin du téléchargement complet.
 
-  **Module 9 (Anti-Clandestin) - Dépréciation du Karma :**
-  Le score de Karma subit une décroissance temporelle (Time-Decay). Un nœud inactif perdra progressivement ses privilèges, forçant une participation continue au réseau.
-
   **Module 10 (Élection) - Abdication Forcée :**
   Pour prévenir l'épuisement matériel du nœud chef, le mandat de Super-Pair est strictement limité à 30 minutes automatiques. Au-delà, le nœud déclenche une passation de pouvoir et s'exclut de l'élection pour au moins 5 minutes.
 
@@ -270,14 +281,16 @@
   mobicloud-android/
   ├── build.gradle.kts
   ├── settings.gradle.kts
-  ├── gradle/libs.versions.toml             ← firebase-bom, firebase-database ajoutés
-  ├── google-services.json                  ← [NOUVEAU] Config Firebase projet
+  ├── gradle/libs.versions.toml             ← OkHttp pour WebSocket (Firebase RETIRÉ)
+  ├── relay-server/                         ← [V5.0] Serveur Node.js HA (package.json, server.js, Dockerfile)
   ├── app/
   │   ├── src/main/AndroidManifest.xml
   │   ├── src/main/kotlin/com/mobicloud/    ← package kotlin (non java)
   │   │   ├── MobicloudApplication.kt
   │   │   ├── di/                           (Hilt Modules)
-  │   │   │   └── SignalingModule.kt        ← [NOUVEAU] Bind SignalingRepository
+  │   │   │   ├── SignalingModule.kt        ← Bind SignalingRepository (HA WebSocket)
+  │   │   │   ├── RelayModule.kt            ← [V5.0] Bind RelayRepository + RelayWebSocketClient
+  │   │   │   └── BlockTransferModule.kt    ← Bind BlockSender → BlockSenderWithRelay
   │   │   ├── core/                         (Préoccupations Transverses)
   │   │   │   ├── network/                  (Raw Sockets, UDP Multicast, TCP)
   │   │   │   │   └── NetworkChangeObserver.kt  ← Détection basculement Wifi→4G
@@ -289,12 +302,14 @@
   │   │   │   └── format/                   (Protobuf + ignoreUnknownKeys=true)
   │   │   ├── domain/                       (Pure Kotlin — Zero Android imports)
   │   │   │   ├── models/                   (NodeIdentity, Fragment, CatalogEntry,
-  │   │   │   │                              DhtEntry, KarmaTransaction, NodeRole)
+  │   │   │   │                              DhtEntry, NodeRole)
   │   │   │   ├── repository/               (Interfaces pures)
   │   │   │   │   ├── PeerRepository.kt
   │   │   │   │   ├── DhtRepository.kt
   │   │   │   │   ├── IdentityRepository.kt
-  │   │   │   │   └── SignalingRepository.kt ← [NOUVEAU] Interface Tracker Firebase
+  │   │   │   │   ├── SignalingRepository.kt ← Interface Signaling (HA WebSocket)
+  │   │   │   │   ├── RelayRepository.kt    ← [V5.0] Interface Relay (HA WebSocket)
+  │   │   │   │   └── BlockSender.kt         ← Interface envoi bloc (impl: TCP-then-Relay)
   │   │   │   └── usecase/
   │   │   │       ├── m01_discovery/         (CalculateReliabilityScoreUseCase)
   │   │   │       ├── m03_m04_gossip_heartbeat/ (GossipSyncUseCase)
@@ -304,32 +319,39 @@
   │   │   │       │                              CircuitBreakerUseCase)
   │   │   │       ├── m08_m09_erasure_coding/ (EncodeErasureFragmentsUseCase,
   │   │   │       │                            DecodeErasureFragmentsUseCase)
-  │   │   │       ├── m09_karma/             (UpdateKarmaScoreUseCase)
   │   │   │       └── m10_election/          (RunBullyElectionUseCase)
   │   │   ├── data/                          (Couche Implémentation)
   │   │   │   ├── local/                     (Room DAOs + DataStore)
   │   │   │   │   ├── PeerDao.kt
   │   │   │   │   ├── DhtDao.kt
   │   │   │   │   └── IdentityDao.kt
-  │   │   │   ├── p2p/                       (Impl Canaux UDP + TCP)
-  │   │   │   │   ├── UdpHeartbeatBroadcaster.kt  ← Existant
-  │   │   │   │   └── TcpBlockTransferChannel.kt
+  │   │   │   ├── p2p/                       (Impl Canaux UDP + TCP + WebSocket)
+  │   │   │   │   ├── UdpHeartbeatBroadcaster.kt
+  │   │   │   │   ├── tcp/BlockTransferClient.kt    ← TCP direct
+  │   │   │   │   ├── websocket/RelayWebSocketClient.kt ← [V5.0] WSS unifié
+  │   │   │   │   └── BlockSenderWithRelay.kt   ← [V5.0] try-direct-then-relay
   │   │   │   └── repository/                (Implémentations)
   │   │   │       ├── PeerRepositoryImpl.kt
   │   │   │       ├── DhtRepositoryImpl.kt
   │   │   │       ├── IdentityRepositoryImpl.kt
-  │   │   │       └── SignalingRepositoryImpl.kt ← [NOUVEAU] Firebase SDK impl
+  │   │   │       ├── SignalingRepositoryImpl.kt ← [V5.0] HA WebSocket impl (PAS Firebase)
+  │   │   │       └── RelayRepositoryImpl.kt    ← [V5.0] HA WebSocket impl
   │   │   └── presentation/                  (Jetpack Compose UI)
   │   │       ├── theme/                     (Dark OLED #000000, Material3)
   │   │       ├── dashboard/                 (ReliabilityGauge, KpiDiagnosticCard,
   │   │       │                              RadarLogConsole)
   │   │       └── explorer/                  (DHT File Explorer, ErasureProgress,
-  │   │                                       ModalBottomSheet Karma)
+  │   │                                       ModalBottomSheet)
   │   ├── src/test/kotlin/com/mobicloud/     (Tests unitaires JVM — sans émulateur)
   │   └── src/androidTest/                   (Tests intégration)
-  └── cpp/                                   ← [NOUVEAU] Sources NDK C++
-      └── erasure_coding/
-          └── erasure_jni.cpp                (Galois Field GF(256) + JNI bridge)
+  ├── cpp/                                   ← [NOUVEAU] Sources NDK C++
+  │   └── erasure_coding/
+  │       └── erasure_jni.cpp                (Galois Field GF(256) + JNI bridge)
+  └── relay-server/                          ← [V5.0] Cluster Node.js HA (min 2 instances)
+      ├── package.json                       (dépendance ws 8.x, Jest)
+      ├── server.js                          (REGISTER_PEER, GET_PEERS, UPLOAD, FORWARD)
+      ├── Dockerfile                         (node:20-slim, EXPOSE 10000)
+      └── .dockerignore
   ```
 
   ### Architectural Boundaries
@@ -338,14 +360,15 @@
   La couche `core/network` cache entièrement la complexité Android (Multicast UDP, `MulticastLock`, TCP Sockets, `NetworkChangeObserver`). Le `domain` ne voit que des interfaces pures réactives (`Flow<P2PMessage>`). Vitale pour la testabilité JVM sans émulateur.
 
   **Security Boundaries :**
-  Seul `core/security` interagit avec l'`AndroidKeyStore`. Seul `data/repository/SignalingRepositoryImpl.kt` interagit avec le SDK Firebase. Le `domain` consomme uniquement des interfaces abstraites (`SignalingRepository`). La frontière est stricte : **aucun import Firebase dans domain/**.
+  Seul `core/security` interagit avec l'`AndroidKeyStore`. Seuls `data/repository/SignalingRepositoryImpl.kt` et `data/repository/RelayRepositoryImpl.kt` interagissent avec OkHttp/WebSocket. Le `domain` consomme uniquement des interfaces abstraites. La frontière est stricte : **aucun import OkHttp/WebSocket dans domain/**. **Aucune dépendance Firebase nulle part.**
 
-  **Firebase Boundary (NOUVEAU V4.0) :**
-  Firebase n'est qu'un détail d'implémentation de la couche `Data`. Les règles strictes :
-  - ❌ Aucun objet `DatabaseReference` ou `FirebaseDatabase` dans `domain/` ou `core/`
-  - ✅ `SignalingRepository.kt` (domain) : interface pure Kotlin avec `suspend fun` et `Flow<>`
-  - ✅ `SignalingRepositoryImpl.kt` (data) : implémente le bridge Firebase ↔ domain models
-  - ✅ `SignalingModule.kt` (di) : Hilt bind `SignalingRepository` → `SignalingRepositoryImpl`
+  **Server Boundary (V5.0 — Zero-Firebase) :**
+  La couche Serveurs Relais HA n'est qu'un détail d'implémentation de la couche `Data`. Les règles strictes :
+  - ❌ Aucun objet `OkHttpClient`, `WebSocket` ou `WebSocketListener` dans `domain/` ou `core/`
+  - ❌ Aucune dépendance Firebase autorisée (PRD V5.0)
+  - ✅ `SignalingRepository.kt` + `RelayRepository.kt` (domain) : interfaces pures Kotlin avec `suspend fun` et `Flow<>`
+  - ✅ `SignalingRepositoryImpl.kt` + `RelayRepositoryImpl.kt` (data) : implémentent le bridge WebSocket ↔ domain models
+  - ✅ `SignalingModule.kt` + `RelayModule.kt` (di) : Hilt bindings
 
   ### Requirements to Structure Mapping
 
@@ -364,32 +387,32 @@
 
   ---
 
-  ## Architecture Validation Results — Révision V4.0 (2026-04-13)
+  ## Architecture Validation Results — Révision V5.0 (2026-04-28)
 
   ### Coherence Validation ✅
 
   **Decision Compatibility:**
-  Toutes les décisions (Jetpack Compose, Clean Architecture, Raw Sockets, Room, Protobuf, **Firebase SDK**) sont parfaitement compatibles dans l'écosystème Kotlin moderne. Firebase Realtime Database Android SDK est mature et s'intègre nativement avec les Coroutines Kotlin via les extensions KTX. Aucune friction technologique identifiée.
+  Toutes les décisions (Jetpack Compose, Clean Architecture, Raw Sockets, Room, Protobuf, **OkHttp WebSocket**) sont parfaitement compatibles dans l'écosystème Kotlin moderne. OkHttp est déjà en dépendance transitive via Ktor — aucun ajout réseau majeur. Le serveur Node.js Relay (Docker) est isolé du projet Android. Aucune friction technologique identifiée.
 
   **Pattern Consistency :**
-  L'ajout de Firebase respecte strictement la Clean Architecture grâce à la frontière `SignalingRepository`. L'implémentation Firebase est invisible du `domain`. Les patterns existants (Coroutines, Hilt, `Result<T>`) sont préservés et étendus à la couche signaling.
+  La couche HA Signaling+Relay respecte strictement la Clean Architecture grâce aux frontières `SignalingRepository` + `RelayRepository`. L'implémentation WebSocket est invisible du `domain`. Les patterns existants (Coroutines, Hilt, `Result<T>`, `callbackFlow`) sont préservés.
 
   **Structure Alignment :**
-  La séparation `core/network` (P2P local) vs `data/repository/SignalingRepositoryImpl` (Firebase) vs `domain/repository/SignalingRepository` (interface) garantit la testabilité totale des algorithmes P2P en JVM sans Firebase ni émulateur.
+  La séparation `core/network` (P2P local) vs `data/p2p/websocket/RelayWebSocketClient` (HA) vs `domain/repository/{Signaling,Relay}Repository` (interfaces) garantit la testabilité totale des algorithmes P2P en JVM via MockWebServer/MockK.
 
   ### Requirements Coverage Validation ✅
 
-  **PRD V4.0 Coverage :**
-  | Exigence PRD V4.0 | Couverture Architecturale |
+  **PRD V5.0 Coverage :**
+  | Exigence PRD V5.0 | Couverture Architecturale |
   |---|---|
   | FR-01.1 (UDP Multicast local) | `core/network/` + Foreground Service |
-  | FR-01.2 (Firebase STUN/Tracker) | `data/repository/SignalingRepositoryImpl.kt` |
-  | FR-01.3 (TCP P2P Zero-Trust) | `data/p2p/TcpBlockTransferChannel.kt` |
-  | FR-02.2 (Bully Election + Firebase enregistrement) | `m10_election/RunBullyElectionUseCase.kt` + `SignalingRepository` |
+  | FR-01.2 (Serveurs Relais HA — Signaling) | `data/repository/SignalingRepositoryImpl.kt` (WebSocket) + `relay-server/` |
+  | FR-01.3 (TCP P2P Zero-Trust) | `data/p2p/tcp/BlockTransferClient.kt` |
+  | FR-02.2 (Bully Election + Enregistrement HA) | `m10_election/RunBullyElectionUseCase.kt` + `SignalingRepository` |
   | FR-03.1/03.2 (Erasure C++ + AES-256 GCM) | `cpp/erasure_coding/` + `core/security/` |
   | FR-04.1/04.2 (DHT + Gossip CRDT) | `m05_dht_catalog/` + `m03_m04_gossip_heartbeat/` |
   | FR-06.1 (Migration proactive) | `m06_m07_repair_migration/` |
-  | FR-07.1 (Karma Anti-Clandestin) | `m09_karma/UpdateKarmaScoreUseCase.kt` |
+  | FR-08.1 (Relais HA Fallback Zero-Knowledge) | `data/repository/RelayRepositoryImpl.kt` + `data/p2p/BlockSenderWithRelay.kt` + `relay-server/` |
 
   **Non-Functional Requirements Coverage :**
   - **NFR-01 (Convergence CRDT ≤ 3s) :** Gossip fan-out=2 cycles de 2s + Filtres de Bloom (échanges delta uniquement).
@@ -399,61 +422,68 @@
   ### Implementation Readiness Validation ✅
 
   **Decision Completeness :**
-  L'Agent Développeur a une clarté totale sur : les frameworks à utiliser, l'emplacement de chaque fichier, les frontières d'architecture, et les règles Firebase. Aucune ambiguïté.
+  L'Agent Développeur a une clarté totale sur : les frameworks à utiliser, l'emplacement de chaque fichier, les frontières d'architecture, et les règles Zero-Firebase. Aucune ambiguïté.
 
-  ### Architecture Completeness Checklist V4.0
+  ### Architecture Completeness Checklist V5.0
 
   **✅ Requirements Analysis**
-  - [x] Contexte projet V4.0 analysé (Fédération Clusters Hybride)
-  - [x] Firebase pivot documenté et intégré
+  - [x] Contexte projet V5.0 analysé (Fédération Clusters Hybride + Serveurs Relais HA)
+  - [x] Pivot Zero-Firebase documenté et intégré (signaling + transport consolidés sur HA WebSocket)
   - [x] Contraintes Android (Foreground Service, MulticastLock) identifiées
   - [x] Préoccupations transverses mappées
 
   **✅ Architectural Decisions**
-  - [x] Décisions critiques documentées (Firebase remplace DHT inter-réseau)
-  - [x] Stack technologique complet avec Firebase SDK
-  - [x] Retrait Hashcash documenté et justifié
-  - [x] Patterns d'intégration définis
+  - [x] Décisions critiques documentées (Serveurs Relais HA remplacent Firebase pour signaling ET fournissent fallback transport)
+  - [x] Stack technologique complet (OkHttp WebSocket côté Android, Node.js `ws` côté serveur)
+  - [x] Retrait Hashcash + Karma/Weight documenté et justifié
+  - [x] Patterns d'intégration définis (failover séquentiel multi-instance HA)
 
   **✅ Implementation Patterns**
   - [x] Conventions de nommage établies
-  - [x] Frontières Firebase strictes définies (`domain` zero-Firebase)
-  - [x] Patterns de communication spécifiés (UDP local + TCP data + Firebase signaling)
+  - [x] Frontières Clean Architecture strictes définies (`domain` zero-OkHttp/zero-Firebase)
+  - [x] Patterns de communication spécifiés (UDP local + TCP data direct + WebSocket HA fallback)
   - [x] Patterns de gestion d'erreurs documentés (`Result<T>` obligatoire)
 
   **✅ Project Structure**
-  - [x] Arborescence complète définie (inclut `cpp/`, `SignalingRepositoryImpl`, `google-services.json`)
+  - [x] Arborescence complète définie (inclut `cpp/`, `relay-server/`, `RelayWebSocketClient`, `BlockSenderWithRelay`)
   - [x] Frontières composants établies
   - [x] Points d'intégration cartographiés
-  - [x] Mapping PRD V4.0 → structure complet
+  - [x] Mapping PRD V5.0 → structure complet
 
-  ### Architecture Readiness Assessment — V4.0
+  ### Architecture Readiness Assessment — V5.0
 
   **Overall Status:** ✅ READY FOR IMPLEMENTATION
 
-  **Confidence Level:** HIGH — L'architecture V4.0 est pragmatique, démontrable et scientifiquement justifiée pour un PFE.
+  **Confidence Level:** HIGH — L'architecture V5.0 est pragmatique, démontrable, scientifiquement justifiée et 100% indépendante de services tiers.
 
-  **Key Strengths V4.0 :**
-  - Signalisation Firebase élégante et non intrusive (Firebase = détail d'implémentation isolé).
-  - Suppression du Hashcash simplifiée par Keystore hardware — plus robuste, moins énergivore.
-  - Algorithmes P2P avancés (Bully, DHT, Gossip, CRDT, Karma) 100% testables en JVM pur.
+  **Key Strengths V5.0 :**
+  - Couche HA Signaling+Relay unifiée — un seul serveur Node.js gère les 2 rôles, élégant et minimaliste.
+  - Zero-Firebase complet — démontre la décentralisation effective et défend le narratif thèse "le moins centralisé possible".
+  - Signature Keystore unifiée pour P2P et handshake WebSocket — robuste et énergétiquement efficace.
+  - Algorithmes P2P avancés (Bully, DHT, Gossip, CRDT) 100% testables en JVM pur.
+  - Failover multi-instance HA + fallback Multicast local = haute résilience.
   - Structure NDK C++ pour Erasure Coding proprement séparée du reste du projet.
 
   **Implementation Handoff**
 
-  **AI Agent Guidelines (V4.0) :**
-  - Ne JAMAIS importer Firebase dans `domain/` ou `core/`.
-  - Respecter strictement l'isolation `domain` (interfaces) vs `data` (implémentations Firebase/Room/TCP).
+  **AI Agent Guidelines (V5.0) :**
+  - Ne JAMAIS importer OkHttp / WebSocket / Firebase dans `domain/` ou `core/`.
+  - Respecter strictement l'isolation `domain` (interfaces) vs `data` (implémentations WebSocket/Room/TCP).
   - Utiliser `Result<T>` / `sealed class Resource<T>` pour tout retour de couche Data ou UseCase.
-  - Référez-vous constamment à `architecture.md` (V4.0) lors de la création de nouvelles Stories.
-  - Le `google-services.json` est le seul fichier d'intégration Firebase au niveau projet.
+  - Référez-vous constamment à `architecture.md` (V5.0) lors de la création de nouvelles Stories.
+  - Aucun `google-services.json`, aucune dépendance `firebase-*` autorisée.
 
-  **Stack de Dépendances V4.0 (libs.versions.toml additions) :**
+  **Stack de Dépendances V5.0 (libs.versions.toml additions) :**
   ```toml
   [versions]
-  firebase-bom = "33.x.x"  # Vérifier dernière version stable
+  okhttp = "4.12.0"  # WebSocket client + déjà transitif via Ktor
 
   [libraries]
-  firebase-database = { group = "com.google.firebase", name = "firebase-database-ktx" }
-  firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics-ktx" }
+  okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+  okhttp-mockwebserver = { group = "com.squareup.okhttp3", name = "mockwebserver", version.ref = "okhttp" }
   ```
+
+  **Dépendances RETIRÉES en V5.0 :**
+  - ❌ `firebase-bom`, `firebase-database-ktx`, `firebase-analytics-ktx` (toute la stack Firebase)
+  - ❌ `google-services.json` au niveau projet
+  - ❌ Plugin Gradle `com.google.gms.google-services`

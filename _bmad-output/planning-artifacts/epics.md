@@ -1,34 +1,60 @@
 ---
-stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-create-stories', 'step-04-final-validation']
-inputDocuments: ['prd.md', 'architecture.md', 'ux-design-specification.md']
+stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-create-stories', 'step-04-final-validation', 'step-05-add-relay-epic', 'step-06-zero-firebase-pivot', 'step-07-readiness-fix']
+inputDocuments: ['prd.md', 'architecture.md', 'architecture-connectivity-and-clustering.md', 'ux-design-specification.md', 'technical-serveur-relais-research.md', 'sprint-change-proposal-2026-04-28.md']
 ---
 
 # MobiCloud - Epic Breakdown
 
 ## Overview
 
-Ce document fournit la décomposition complète des épics et stories pour MobiCloud V4.0 (Architecture Fédération de Clusters Hybride). Il décompose les exigences du PRD V4.0, de l'Architecture, et de la Spécification UX en stories implémentables et actionnables.
+Ce document fournit la décomposition complète des épics et stories pour MobiCloud V5.0 (Architecture Fédération de Clusters Hybride avec Serveurs Relais HA — Zero-Firebase). Il décompose les exigences du PRD, de l'Architecture, et de la Spécification UX en stories implémentables et actionnables.
+
+## ⚠️ Implementation Sequencing (Ordre de Construction Obligatoire)
+
+Bien que les Epics soient numérotés 1 → 8 par cohérence fonctionnelle, **l'ordre d'implémentation séquentiel n'est pas linéaire**. L'Epic 8 (Couche Transport — Serveurs Relais HA) est une **fondation transport** dont dépendent Epic 2, Epic 3 et Epic 7.
+
+**Ordre d'exécution réel pour le dev agent :**
+
+1. **Epic 1** (Stories 1.1 → 1.6) — Fondation projet, identité, UI shell, foreground service.
+2. **Epic 8 — Foundation slice** (Stories 8.1 + 8.2) — Serveur Node.js HA + `RelayWebSocketClient.kt`. **À implémenter AVANT Story 2.1.**
+3. **Epic 2** (Stories 2.0 → 2.3) — Découverte Multicast UDP locale + signaling HA + Dashboard. Story 2.1 **consomme** `RelayWebSocketClient` de Story 8.2.
+4. **Epic 3** (Stories 3.1 → 3.4) — Élection Bully + REGISTER_PEER. Story 3.2 **réutilise** `SignalingRepository` de Story 2.1.
+5. **Epic 4** (Stories 4.1 → 4.4) — DHT + Gossip CRDT + Explorer.
+6. **Epic 5** (Stories 5.1 → 5.5) — Erasure Coding C++ + Chiffrement + Distribution.
+7. **Epic 6** (Stories 6.1 → 6.4) — Récupération concurrente K+2 + streaming.
+8. **Epic 7** (Stories 7.1 → 7.3) — Migration proactive + auto-réparation.
+9. **Epic 8 — Fallback slice** (Story 8.3) — Câblage du fallback Try-Direct-Then-Relay dans `BlockSenderWithRelay`. Dépend des Stories 5.3 et 7.2.
+
+**Règle d'or pour le dev agent :** ne jamais implémenter Story 2.1 sans avoir terminé Stories 8.1 + 8.2.
 
 ## Requirements Inventory
 
 ### Functional Requirements
 
-- FR-01.2: Serveur Tracker agissant **uniquement** comme STUN/signaling pour fédérer des réseaux séparés (NAT) et lier les Super-Pairs. (P0)
-- FR-01.3: Tous les transferts (catalogue ou fichiers) se font en P2P direct de nœud à nœud (Zero-Trust, Zero-Knowledge). (P0)
+- FR-01.1: **Multicast UDP** pour la découverte locale au sein d'un même sous-réseau (Wi-Fi campus / conférence). Chemin prioritaire avant tout recours à la couche Relais HA. (P0)
+- FR-01.2: Cluster de **Serveurs Relais HA** (min 2 instances Node.js/WebSocket) agissant strictement comme **annuaire de signalisation** (REGISTER_PEER / GET_PEERS) pour fédérer des réseaux séparés (NAT) et lier les Super-Pairs. Zero-Firebase. (P0)
+- FR-01.3: Tous les transferts (catalogue ou fichiers) se font en P2P direct de nœud à nœud (Zero-Trust, Zero-Knowledge), avec fallback transparent FR-08 si le direct échoue. (P0)
 - FR-02.1: Calcul du Score de Fiabilité (Batterie, Uptime, IP locale) par chaque appareil local. (P0)
-- FR-02.2: Élection locale d'un Super-Pair strictement via l'Algorithme Bully. Le gagnant relaie sa table de routage sur le Tracker STUN pour rejoindre la fédération. (P0)
+- FR-02.2: Élection locale d'un Super-Pair strictement via l'Algorithme Bully. Le gagnant s'enregistre auprès des Serveurs Relais HA (REGISTER_PEER) pour rejoindre la fédération. (P0)
 - FR-03.1: Erasure Coding vectoriel (C++ NDK) divisant le fichier en K+N blocs sans réplication redondante. (P0)
 - FR-03.2: Chiffrement asymétrique des fragments (Zero-Trust) — l'hébergeur ne peut pas lire le bloc qu'il stocke. (P0)
 - FR-04.1: Index global distribué dans un anneau DHT entre tous les pairs qualifiés du cluster (remplacement SQLite centralisé). (P0)
 - FR-04.2: Synchronisation de la DHT par protocole Gossip épidémique avec CRDT (convergence garantie sans autorité centrale). (P0)
+- FR-05.1: **Téléchargement concurrent K+2** — K+2 requêtes TCP parallèles, les 2 plus lentes annulées dès K blocs valides reçus. (P0)
+- FR-05.2: **Pipeline streaming actif** — déchiffrement et réassemblage Erasure démarrés dès les premiers K blocs disponibles, sans attendre la fin du téléchargement. (P0)
 - FR-06.1: Migration proactive des blocs d'un nœud quittant un cluster (basculement réseau) vers le cluster local avant déconnexion. (P1)
-- FR-07.1: Système de Weight : gain lors du stockage/service de blocs, dépense lors du téléchargement ; bridage des freeriders (Time-Decay). (P1)
+- FR-08.1: Serveurs Relais HA WebSocket Zero-Knowledge agissant comme **fallback de transport** (UPLOAD/FORWARD store-and-forward 60s RAM) pour les blocs chiffrés inter-réseaux quand le P2P direct échoue (NAT symétrique). (P0)
+- FR-08.2: **Fallback transparent Try-Direct-Then-Relay** — TCP direct (P1), Relais HA (P2), failover séquentiel inter-instances HA (P3) ; UseCase appelant agnostique du canal. (P0)
 
 ### NonFunctional Requirements
 
 - NFR-01 (Convergence CRDT): La synchronisation Gossip au sein d'un cluster doit garantir une convergence ≤ 3 secondes lors de l'ajout d'un nouveau bloc.
 - NFR-02 (Latence Migration): Déclenchement et orchestration de la migration des blocs en moins de 5 secondes avant coupure réseau imminente.
-- NFR-03 (Batterie/CPU): L'overhead du système CRDT/Gossip en arrière-plan ne doit pas excéder 5% d'utilisation CPU. Le NDK C++ pour Erasure Coding doit compenser la complexité de calcul.
+- NFR-03 (Batterie/CPU): L'overhead du système CRDT/Gossip en arrière-plan ne doit pas excéder 5% d'utilisation CPU sur 30 minutes de tourner-à-vide. Le NDK C++ pour Erasure Coding doit compenser la complexité de calcul.
+- NFR-04 (Résilience Churn): Circuit-Breaker Anti-Avalanche actif si > 30% des pairs deviennent INACTIVE en < 5 min ; reprise auto si churn < 10%.
+- NFR-05 (Sécurité Zero-Knowledge bout-en-bout): AES-256 GCM avec clés éphémères dérivées par bloc (HKDF) ; clé maître protégée par ECIES. Aucun nœud ni Relais ne peut déchiffrer.
+- NFR-06 (Mandat Super-Pair Limité): Abdication automatique après 30 min ; cooldown 5 min hors élection.
+- NFR-07 (Anti-Sybil — Identité Hardware-Backed): EC P-256 stockée dans Android Keystore TEE ; clé privée non exportable (`isInsideSecureHardware`).
 
 ### Additional Requirements
 
@@ -54,32 +80,44 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 - UX-DR6: Bottom Navigation à 3 onglets simples : Dashboard (état nœud) / Explorer (DHT fichiers) / Paramètres.
 - UX-DR7: ModalBottomSheet utilitaristes pour les actions contextuelles sur fichiers/blocs (stocker, supprimer, détails).
 - UX-DR8: Permissions réseau silencieuses et englobantes au lancement (Wi-Fi, Réseau) sans friction utilisateur.
+- UX-DR9: **Slider Quota Stockage** — composant Settings permettant de définir l'espace alloué au réseau (0.5 GB → 80% espace libre) avec affichage de l'espace actuellement utilisé.
+- UX-DR10: **Cloud Relay Badge** — indicateur visuel discret dans le Dashboard signalant l'état du fallback Relais HA (P2P direct ✓ / Relais actif / Hors-ligne).
 
 ### FR Coverage Map
 
-| Exigence | Épic |
-|---|---|
-| FR-01.2 (Tracker STUN/Signaling) | Epic 2 |
-| FR-01.3 (P2P Zero-Trust bout-en-bout) | Epic 1 + Epic 5 |
-| FR-02.1 (Score Fiabilité) | Epic 2 |
-| FR-02.2 (Algorithme Bully + Inscription Tracker) | Epic 3 |
-| FR-03.1 (Erasure Coding C++ K+N blocs) | Epic 5 |
-| FR-03.2 (Chiffrement asymétrique fragments) | Epic 5 |
-| FR-04.1 (Anneau DHT distribué) | Epic 4 + Epic 6 |
-| FR-04.2 (Gossip épidémique CRDT) | Epic 4 |
-| FR-06.1 (Migration proactive inter-réseaux) | Epic 7 |
-| FR-07.1 (Weight Anti-Clandestin + Time-Decay) | Epic 8 |
-| NFR-01 (Convergence CRDT ≤ 3s) | Epic 4 |
-| NFR-02 (Latence migration < 5s) | Epic 7 |
-| NFR-03 (Overhead CPU ≤ 5%) | Epic 5 + Global |
-| UX-DR1 (ReliabilityGauge) | Epic 2 |
-| UX-DR2 (KpiDiagnosticCard) | Epic 2 |
-| UX-DR3 (RadarLogConsole) | Epic 2 |
-| UX-DR4 (ErasureProgressIndicator) | Epic 5 |
-| UX-DR5 (Dark OLED) | Epic 1 |
-| UX-DR6 (Bottom Nav 3 onglets) | Epic 1 |
-| UX-DR7 (ModalBottomSheet) | Epic 8 |
-| UX-DR8 (Permissions silencieuses) | Epic 1 |
+| Exigence | Épic | Story(ies) |
+|---|---|---|
+| FR-01.1 (Multicast UDP locale) | Epic 2 | 2.0 |
+| FR-01.2 (Serveurs Relais HA — Signaling) | Epic 2 + Epic 8 | 2.1 / 8.1 / 8.2 |
+| FR-01.3 (P2P Zero-Trust bout-en-bout) | Epic 1 + Epic 5 | 5.3 / 5.5 |
+| FR-02.1 (Score Fiabilité) | Epic 2 | 2.2 |
+| FR-02.2 (Algorithme Bully + Inscription Relais HA) | Epic 3 | 3.1 / 3.2 |
+| FR-03.1 (Erasure Coding C++ K+N blocs) | Epic 5 | 5.1 |
+| FR-03.2 (Chiffrement asymétrique fragments) | Epic 5 | 5.2 |
+| FR-04.1 (Anneau DHT distribué) | Epic 4 + Epic 6 | 4.1 / 6.1 |
+| FR-04.2 (Gossip épidémique CRDT) | Epic 4 | 4.2 / 4.3 |
+| FR-05.1 (Téléchargement concurrent K+2) | Epic 6 | 6.2 |
+| FR-05.2 (Pipeline streaming actif) | Epic 6 | 6.3 |
+| FR-06.1 (Migration proactive inter-réseaux) | Epic 7 | 7.1 / 7.2 |
+| FR-08.1 (Relais HA Fallback Zero-Knowledge) | Epic 8 | 8.1 / 8.3 |
+| FR-08.2 (Fallback transparent Try-Direct-Then-Relay) | Epic 8 | 8.3 |
+| NFR-01 (Convergence CRDT ≤ 3s) | Epic 4 | 4.2 |
+| NFR-02 (Latence migration < 5s) | Epic 7 | 7.2 |
+| NFR-03 (Overhead CPU ≤ 5%) | Epic 5 + Global | 5.1 + 1.4 |
+| NFR-04 (Résilience Churn 30%/10%) | Epic 3 | 3.4 |
+| NFR-05 (Sécurité AES-256 GCM Zero-Knowledge) | Epic 5 + Epic 8 | 5.2 / 8.1 |
+| NFR-06 (Mandat Super-Pair ≤ 30 min) | Epic 3 | 3.3 |
+| NFR-07 (Anti-Sybil Keystore EC P-256) | Epic 1 | 1.3 |
+| UX-DR1 (ReliabilityGauge) | Epic 2 | 2.3 |
+| UX-DR2 (KpiDiagnosticCard) | Epic 2 | 2.3 |
+| UX-DR3 (RadarLogConsole) | Epic 2 | 2.3 |
+| UX-DR4 (ErasureProgressIndicator) | Epic 5 | 5.4 |
+| UX-DR5 (Dark OLED) | Epic 1 | 1.2 |
+| UX-DR6 (Bottom Nav 3 onglets) | Epic 1 | 1.2 |
+| UX-DR7 (ModalBottomSheet) | Epic 6 | 6.4 |
+| UX-DR8 (Permissions silencieuses) | Epic 1 | 1.4 |
+| UX-DR9 (Slider Quota Stockage) | Epic 1 | 1.6 |
+| UX-DR10 (Cloud Relay Badge) | Epic 8 | 8.3 |
 
 ## Epic List
 
@@ -88,11 +126,11 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 **FRs covered:** FR-01.3, UX-DR5, UX-DR6, UX-DR8, Architecture: Starter Template, Keystore Anti-Sybil, Foreground Service.
 
 ### Epic 2: Découverte Inter-Réseaux & Dashboard Tactique
-**Objectif:** L'utilisateur peut voir les nœuds pairs détectés à travers le NAT via le Tracker STUN/Firebase. Le Dashboard affiche les pairs, le score de fiabilité et les événements réseau en temps réel.
-**FRs covered:** FR-01.2, FR-02.1, UX-DR1, UX-DR2, UX-DR3.
+**Objectif:** L'utilisateur peut voir les nœuds pairs détectés en LAN via Multicast UDP **et** à travers le NAT via les **Serveurs Relais HA** (REGISTER_PEER/GET_PEERS, Zero-Firebase). Le Dashboard affiche les pairs, le score de fiabilité et les événements réseau en temps réel.
+**FRs covered:** FR-01.1, FR-01.2, FR-02.1, UX-DR1, UX-DR2, UX-DR3.
 
 ### Epic 3: Gouvernance Décentralisée — Élection Bully & Super-Pair
-**Objectif:** L'écosystème de nœuds s'auto-organise : l'Algorithme Bully élit un Super-Pair à partir des scores de fiabilité, celui-ci enregistre sa présence sur le Tracker pour lier son cluster à la fédération, et abdique automatiquement après 30 minutes.
+**Objectif:** L'écosystème de nœuds s'auto-organise : l'Algorithme Bully élit un Super-Pair à partir des scores de fiabilité, celui-ci enregistre sa présence auprès des **Serveurs Relais HA** pour lier son cluster à la fédération, et abdique automatiquement après 30 minutes.
 **FRs covered:** FR-02.2, Architecture: Abdication automatique, Buffer d'urgence électoral, Circuit-Breaker churn.
 
 ### Epic 4: Catalogue DHT & Synchronisation CRDT/Gossip
@@ -110,6 +148,11 @@ Ce document fournit la décomposition complète des épics et stories pour MobiC
 ### Epic 7: Résilience Extrême — Migration Proactive & Circuit-Breaker
 **Objectif:** Lorsqu'un nœud quitte le réseau (basculement réseau), le Super-Pair orchestre la migration proactive de ses blocs vers d'autres nœuds en moins de 5 secondes. Le Circuit-Breaker gèle les réparations si le churn dépasse 30% pour protéger les survivants.
 **FRs covered:** FR-06.1, NFR-02, Architecture: Circuit-Breaker Avalanche, Buffer d'urgence électoral.
+
+### Epic 8: Serveurs Relais HA WebSocket — Signaling & Transfert Inter-Réseaux
+**Objectif (user-outcome):** L'utilisateur peut joindre des nœuds derrière NAT symétrique (4G ↔ Wi-Fi) **sans perception de coupure** grâce à un canal de fallback transparent — l'app choisit automatiquement le meilleur chemin (P2P direct prioritaire, Relais HA en fallback). Le cluster de **serveurs relais WebSocket Zero-Knowledge** (min 2 instances HA Render/Railway) assure à la fois **signaling** (annuaire Super-Pairs) et **transport** (Store-and-Forward 60s RAM). Zero-Firebase complet.
+**FRs covered:** FR-01.2, FR-08.1, FR-08.2, NFR-05, UX-DR10, Architecture V5.0: Signalisation HA + Relay Fallback.
+**Sequencing:** Stories 8.1 + 8.2 = **foundation slice** (à implémenter avant Story 2.1). Story 8.3 = **fallback slice** (à implémenter après Stories 5.3 et 7.2).
 
 ---
 
@@ -166,7 +209,7 @@ Afin de disposer d'une identité de confiance infalsifiable et anti-Sybil utilis
 **And** la clé privée ne peut jamais être exportée hors du TEE/KeyStore (vérifiable par `isInsideSecureHardware`)
 **And** le tout est accessible via l'interface `domain/repository/IdentityRepository.kt` (Clean Architecture)
 
-### Story 1.5: Configuration du Quota de Stockage Alloué au Réseau
+### Story 1.6: Configuration du Quota de Stockage Alloué au Réseau
 
 En tant qu'utilisateur,
 Je veux définir combien de gigaoctets de mon stockage j'alloue au réseau MobiCloud,
@@ -179,7 +222,7 @@ Afin de contrôler l'espace disque consommé par l'hébergement des blocs d'autr
 **Then** un slider affiche l'espace allouable : de 0.5 GB à 80% de l'espace libre, par paliers de 0.5 GB
 **And** l'espace actuellement utilisé par les blocs hébergés est affiché (ex: "1.2 GB utilisés sur 3 GB alloués")
 **And** la valeur choisie est persistée dans `NodeSettings.allocatedStorageBytes` (Room DB)
-**And** si l'utilisateur réduit le quota en dessous de l'espace déjà utilisé, un dialog d'avertissement s'affiche : "Réduire ce quota supprimera des blocs hébergés et pénalisera votre Weight"
+**And** si l'utilisateur réduit le quota en dessous de l'espace déjà utilisé, un dialog d'avertissement s'affiche : "Réduire ce quota supprimera des blocs hébergés du réseau"
 **And** la valeur par défaut au premier lancement est `min(2 GB, 20% de l'espace libre)`
 **And** la valeur est accessible via `domain/repository/NodeSettingsRepository.kt`
 
@@ -193,32 +236,58 @@ Afin que le service P2P de MobiCloud fonctionne en arrière-plan de façon conti
 
 **Given** l'app est lancée pour la première fois
 **When** l'écran de démarrage s'affiche
-**Then** les permissions `ACCESS_WIFI_STATE`, `INTERNET`, `ACCESS_NETWORK_STATE` sont demandées en un seul flux
+**Then** les permissions `ACCESS_WIFI_STATE`, `INTERNET`, `ACCESS_NETWORK_STATE`, `CHANGE_WIFI_MULTICAST_STATE` sont demandées en un seul flux
 **And** si l'utilisateur accorde les permissions, un `Foreground Service` est démarré avec une notification persistante discrète ("MobiCloud P2P actif")
 **And** si le service est tué par l'OS, il redémarre automatiquement (`START_STICKY`)
 **And** l'état du service est exposé via un `StateFlow<ServiceStatus>` observable depuis le Dashboard
+**And** **NFR-03 mesurable** : sur 30 minutes de service tournant à vide (Gossip + heartbeat seuls, pas de transferts), la consommation CPU mesurée via Android Studio Profiler reste ≤ 5% en moyenne
 
 ---
 
 ## Epic 2: Découverte Inter-Réseaux & Dashboard Tactique
 
-**Objectif :** L'utilisateur peut voir les nœuds pairs détectés à travers le NAT via le Tracker STUN/Firebase. Le Dashboard affiche les pairs découverts, le score de fiabilité local et les événements réseau en temps réel.
+**Objectif :** L'utilisateur peut voir les nœuds pairs détectés en LAN via Multicast UDP **et** à travers le NAT via les **Serveurs Relais HA** (Zero-Firebase). Le Dashboard affiche les pairs découverts, le score de fiabilité local et les événements réseau en temps réel.
 
-### Story 2.1: Signalisation Inter-Réseaux via Tracker Firebase
+**Prérequis d'implémentation :** Stories 8.1 + 8.2 (foundation transport HA) doivent être terminées avant Story 2.1.
+
+### Story 2.0: Découverte Locale par Multicast UDP
 
 En tant que nœud MobiCloud,
-Je veux m'enregistrer auprès du Tracker Firebase et découvrir les Super-Pairs d'autres clusters,
-Afin de rejoindre la fédération MobiCloud via internet.
+Je veux découvrir mes pairs au sein du même sous-réseau Wi-Fi (campus, conférence) via Multicast UDP,
+Afin de rester P2P pur en LAN sans dépendre des Serveurs Relais HA quand ce n'est pas nécessaire.
 
 **Acceptance Criteria:**
 
-**Given** le nœud démarre et le Foreground Service est actif
+**Given** le Foreground Service est actif et l'appareil est connecté à un Wi-Fi
+**When** le module de découverte locale démarre
+**Then** un `MulticastLock` est acquis (`WifiManager.createMulticastLock`) et conservé tant que le service tourne
+**And** le nœud émet périodiquement (toutes les 5 s) un datagramme `HELLO` Protobuf signé EC P-256 sur l'adresse multicast `239.255.42.99:48999` (TTL 1 — local link)
+**And** le nœud écoute en parallèle les `HELLO` reçus sur le même groupe et insère chaque pair valide dans `PeerRegistry` (avec source `LAN_MULTICAST`)
+**And** la signature EC P-256 de chaque `HELLO` est vérifiée avant insertion dans `PeerRegistry`
+**And** la logique est encapsulée dans `data/repository/LocalDiscoveryRepositoryImpl.kt` (interface `domain/repository/LocalDiscoveryRepository.kt`)
+**And** si le réseau ne supporte pas le multicast (filtrage hotspot), un log INFO "Multicast indisponible — fallback Relais HA seul" est écrit dans `RadarLogConsole` après 30 s sans `HELLO` entrant
+**And** la découverte LAN est **prioritaire** sur la découverte Relais HA : un pair présent dans les deux est marqué `LAN_MULTICAST` (chemin direct préféré)
+
+### Story 2.1: Signalisation Inter-Réseaux via Serveurs Relais HA
+
+En tant que nœud MobiCloud,
+Je veux m'enregistrer auprès des Serveurs Relais HA WebSocket et découvrir les Super-Pairs d'autres clusters,
+Afin de rejoindre la fédération MobiCloud sans dépendance à un service tiers (Zero-Firebase).
+
+**Prérequis :** Stories 8.1 (serveur Node.js) et 8.2 (`RelayWebSocketClient.kt`) doivent être terminées.
+
+**Acceptance Criteria:**
+
+**Given** le nœud démarre et le Foreground Service est actif, et que `RelayWebSocketClient` (Story 8.2) est disponible
 **When** le service démarre
-**Then** le nœud s'enregistre sur Firebase Realtime Database avec ses métadonnées (`nodeId`, `publicKey`, `ip`, `port`, `timestamp`)
-**And** le nœud lit la liste des Super-Pairs inscrits sur Firebase et les ajoute à sa `PeerRegistry` locale
-**And** les entrées Firebase âgées de plus de 60 secondes sont ignorées (TTL)
-**And** la logique Firebase est encapsulée dans `data/repository/SignalingRepositoryImpl.kt` (interface `domain/repository/SignalingRepository.kt`)
-**And** si Firebase est inaccessible, une `Result.Failure` est remontée proprement et loguée dans le `RadarLogConsole`
+**Then** la classe `data/repository/SignalingRepositoryImpl.kt` (interface `domain/repository/SignalingRepository.kt`) **consomme** l'instance `RelayWebSocketClient` injectée via Hilt — pas de gestion WSS bas-niveau dans cette story
+**And** l'authentification EC P-256 (Keystore) est déléguée à `RelayWebSocketClient.connect()` (Story 8.2)
+**And** si le nœud est Super-Pair élu, `SignalingRepository.registerAsSuperPeer()` envoie `REGISTER_PEER` avec ses métadonnées (`nodeId`, `publicKey`, `ip`, `port`, `reliabilityScore`) via le client unifié
+**And** `SignalingRepository.fetchActiveSuperPeers()` envoie `GET_PEERS` et insère les pairs reçus dans `PeerRegistry` locale (source `RELAY_HA`)
+**And** les entrées HA âgées de plus de 60 secondes sont ignorées (TTL)
+**And** AUCUNE dépendance Firebase ; AUCUN OkHttp ou WebSocket directement importé dans cette story (tout passe par le client de Story 8.2)
+**And** le failover séquentiel inter-instances HA est entièrement géré par `RelayWebSocketClient` — `SignalingRepositoryImpl` reçoit simplement un `Result.Failure` si tous les serveurs sont injoignables
+**And** un échec total est logué dans le `RadarLogConsole`
 
 ### Story 2.2: Calcul du Score de Fiabilité Local
 
@@ -232,7 +301,7 @@ Afin que les autres nœuds puissent évaluer si je suis un candidat valide pour 
 **When** le score est recalculé toutes les 30 secondes
 **Then** le score composite est calculé : `BatteryLevel (40%) + Uptime (40%) + NetworkStability (20%)` normalisé entre 0.0 et 1.0
 **And** le score est persisté dans `NodeIdentity.reliabilityScore` (Room DB)
-**And** le score est inclus dans les enregistrements Firebase et les messages P2P signés
+**And** le score est inclus dans les enregistrements `REGISTER_PEER` envoyés aux Serveurs Relais HA et dans les messages P2P signés
 **And** l'interface `domain/usecase/CalculateReliabilityScoreUseCase.kt` encapsule la logique
 **And** un mock `StaticMockTrustScore` est injectable via Hilt pour les tests unitaires
 
@@ -250,13 +319,13 @@ Afin d'avoir une visibilité complète sur la santé de mon cluster local.
 **And** les composants `KpiDiagnosticCard` affichent : Niveau de batterie, Uptime (hh:mm), Réseau actif (Wifi/4G), Nombre de pairs actifs
 **And** le composant `RadarLogConsole` affiche un flux scrollable des 50 derniers événements réseau P2P avec horodatage
 **And** les données sont mises à jour en temps réel via `StateFlow` (pas de pull manuel)
-**And** si aucun pair n'est découvert, un message "Aucun pair détecté — connexion Firebase en cours..." s'affiche
+**And** si aucun pair n'est découvert, un message "Aucun pair détecté — connexion aux Serveurs Relais HA en cours..." s'affiche
 
 ---
 
 ## Epic 3: Gouvernance Décentralisée — Élection Bully & Super-Pair
 
-**Objectif :** L'écosystème de nœuds s'auto-organise : l'Algorithme Bully élit un Super-Pair à partir des scores de fiabilité, celui-ci s'enregistre sur le Tracker Firebase pour lier son cluster à la fédération, et abdique automatiquement après 30 minutes.
+**Objectif :** L'écosystème de nœuds s'auto-organise : l'Algorithme Bully élit un Super-Pair à partir des scores de fiabilité, celui-ci s'enregistre auprès des **Serveurs Relais HA** pour lier son cluster à la fédération, et abdique automatiquement après 30 minutes.
 
 ### Story 3.1: Déclenchement & Protocole d'Élection Bully
 
@@ -275,20 +344,21 @@ Afin que le cluster désigne automatiquement son meilleur coordinateur sans inte
 **And** tous les pairs mettent à jour leur `PeerRegistry` avec le nouveau Super-Pair désigné
 **And** la logique est encapsulée dans `domain/usecase/m10_election/RunBullyElectionUseCase.kt`
 
-### Story 3.2: Enregistrement du Super-Pair sur le Tracker Firebase
+### Story 3.2: Enregistrement du Super-Pair auprès des Serveurs Relais HA
 
 En tant que Super-Pair élu,
-Je veux publier ma présence sur Firebase,
-Afin que les nœuds d'autres clusters (4G) puissent me trouver et rejoindre la fédération.
+Je veux publier ma présence auprès des Serveurs Relais HA,
+Afin que les nœuds d'autres clusters (4G ou WiFi distinct) puissent me trouver et rejoindre la fédération.
 
 **Acceptance Criteria:**
 
 **Given** un nœud remporte l'élection Bully et devient Super-Pair
 **When** le message `COORDINATOR` est envoyé
-**Then** le Super-Pair s'enregistre sur Firebase Realtime Database sous `super-peers/{nodeId}` avec `{ip, port, reliabilityScore, electedAt}`
-**And** cet enregistrement est rafraîchi toutes les 30 secondes (keepalive) pour maintenir le TTL
-**And** si le Super-Pair abdique ou perd sa connexion, son entrée Firebase est supprimée (`onDisconnect().removeValue()`)
-**And** l'enregistrement réutilise `SignalingRepository` défini à l'Epic 2
+**Then** le Super-Pair envoie un message binaire `REGISTER_PEER` signé EC P-256 au Serveur Relais HA avec `{nodeId, ip, port, reliabilityScore, electedAt}`
+**And** cet enregistrement est rafraîchi toutes les 30 secondes (keepalive PING) pour maintenir le TTL en RAM
+**And** si le Super-Pair abdique ou la WSS se ferme, l'annuaire HA purge automatiquement l'entrée après expiration TTL (60s)
+**And** l'enregistrement réutilise `SignalingRepository` (impl HA WebSocket) défini à l'Epic 2
+**And** en cas d'échec d'enregistrement, le client bascule sur le serveur HA suivant (failover séquentiel)
 **And** l'état Super-Pair est exposé via `StateFlow<NodeRole>` (PEER / SUPER_PEER) dans le Dashboard
 
 ### Story 3.3: Abdication Automatique & Buffer d'Urgence Électoral
@@ -361,6 +431,7 @@ Afin que tous les nœuds convergent vers une vue cohérente du catalogue sans é
 **And** la convergence est atteinte en ≤ 3 secondes après une mise à jour de bloc (NFR-01)
 **And** le Gossip est circulaire : chaque nœud sélectionne aléatoirement 2 voisins par cycle (fan-out = 2)
 **And** la logique est dans `domain/usecase/m03_m04_gossip_heartbeat/GossipSyncUseCase.kt`
+**And** **NFR-01 mesurable** : `GossipSyncUseCase` instrumente `convergenceLatencyMs` (timestamp insertion locale → timestamp confirmation présence chez tous voisins) et l'expose via `Flow<GossipMetrics>` ; un test d'intégration sur 5 nœuds simulés valide que `convergenceLatencyMs ≤ 3000ms` au p95
 
 ### Story 4.3: CRDT — Résolution de Conflits de Catalogue
 
@@ -472,7 +543,7 @@ Afin de comprendre l'état de mon opération de stockage sans attendre la fin.
 
 En tant que nœud hébergeur,
 Je veux recevoir les blocs chiffrés d'autres utilisateurs et les persister localement,
-Afin de contribuer au réseau de stockage distribué et gagner du Weight en retour.
+Afin de contribuer au réseau de stockage distribué.
 
 **Acceptance Criteria:**
 
@@ -482,8 +553,7 @@ Afin de contribuer au réseau de stockage distribué et gagner du Weight en reto
 **And** si le hash est valide, le bloc est persisté dans le stockage local (`/files/blocks/{blockId}`) avec ses métadonnées (`blockId`, `ownerId`, `sizeBytes`, `receivedAt`)
 **And** une entrée `HostedBlockEntity` est insérée en Room DB : `blockId`, `ownerId`, `filePath`, `sizeBytes`
 **And** un `ACK` signé contenant le hash SHA-256 du bloc est renvoyé au nœud émetteur
-**And** le Weight du nœud hébergeur est incrémenté de +1 via `UpdateWeightScoreUseCase` (Epic 8)
-**And** si le hash est invalide, le bloc est rejeté et un `NACK` est renvoyé (pas de Weight gagné)
+**And** si le hash est invalide, le bloc est rejeté et un `NACK` est renvoyé
 **And** si l'espace disque local est insuffisant (< 100 MB libres), la requête est rejetée avec `STORAGE_FULL`
 **And** la logique est dans `domain/usecase/m08_hosting/ReceiveAndHostBlockUseCase.kt`
 
@@ -596,6 +666,7 @@ Afin de maintenir le niveau de résilience du cluster avant la déconnexion.
 **And** la DHT est mise à jour immédiatement (Gossip déclenché) pour refléter le nouveau propriétaire
 **And** toute l'opération doit être complétée en < 5 secondes (NFR-02)
 **And** la logique est dans `domain/usecase/m06_m07_repair_migration/OrchestrateBlockMigrationUseCase.kt`
+**And** **NFR-02 mesurable** : `OrchestrateBlockMigrationUseCase` instrumente `migrationDurationMs` (timestamp réception DEPARTURE_NOTICE → timestamp dernier ACK) et l'expose via `Flow<MigrationMetrics>` ; un test d'intégration valide `migrationDurationMs < 5000ms` pour un nœud hébergeant ≤ 10 blocs
 
 ### Story 7.3: Auto-Réparation — Détection de Blocs Sous-Répliqués
 
@@ -612,5 +683,65 @@ Afin de déclencher automatiquement une auto-réparation pour restaurer la rési
 **And** si le Circuit-Breaker (Story 3.4) est actif, les directives de réplication sont mises en queue dans le `LocalRepairBuffer`
 **And** après réplication réussie, la DHT est mise à jour et diffusée via Gossip
 **And** la logique est dans `domain/usecase/m06_m07_repair_migration/TriggerAutoRepairUseCase.kt`
+
+---
+
+## Epic 8: Serveurs Relais HA WebSocket — Signaling & Transfert Inter-Réseaux
+
+**Objectif :** L'utilisateur peut découvrir les Super-Pairs distants ET transférer des blocs chiffrés via un cluster de serveurs relais WebSocket Zero-Knowledge (min 2 instances HA) hébergés sur Render/Railway. Les serveurs assument deux rôles consolidés en V5.0 : (1) **Signaling** — annuaire RAM des Super-Pairs (`REGISTER_PEER`/`GET_PEERS`), (2) **Transport** — fallback Store-and-Forward 60s pour les blocs binaires (`UPLOAD`/`FORWARD`). Aucune dépendance Firebase.
+
+### Story 8.1: Serveur Relais HA Node.js — Signaling + Transport Unifiés
+
+En tant que système MobiCloud,
+Je veux disposer d'un cluster de serveurs Node.js WebSocket fixes et sécurisés gérant à la fois le signaling et le relay,
+Afin de permettre la découverte inter-clusters et le transfert de blocs entre téléphones sur des réseaux différents quand le P2P direct est bloqué par les NAT.
+
+**Acceptance Criteria:**
+
+**Given** au moins **deux instances Node.js indépendantes** sont déployées sur Render/Railway via Docker (`relay-server/` à la racine)
+**When** un client se connecte via WSS (port 443)
+**Then** le serveur accepte le handshake et authentifie le `nodeId` après vérification de la signature EC P-256
+**And** le serveur traite les messages binaires selon le protocole : `REGISTER_PEER` (Super-Pair → annuaire RAM avec TTL 60s), `GET_PEERS` (lecture annuaire), `UPLOAD` (bloc chiffré → buffer RAM), `FORWARD` (push au destinataire dès qu'il est en ligne), `PING/PONG` (keepalive)
+**And** les blocs non réclamés sont purgés après 60 secondes (Store-and-Forward éphémère, RAM uniquement)
+**And** le serveur ne peut JAMAIS déchiffrer les blocs (Zero-Knowledge — AES-256 GCM opaque)
+**And** un endpoint `GET /health` retourne le nombre de sessions actives + blocs en attente
+**And** le serveur gère SIGTERM (graceful shutdown)
+**And** le code est dans `relay-server/server.js` avec dépendance `ws` 8.x
+
+### Story 8.2: Client Android RelayWebSocketClient Unifié
+
+En tant que nœud MobiCloud,
+Je veux disposer d'un client WebSocket unifié qui gère à la fois l'enregistrement Super-Pair et le transfert de blocs,
+Afin d'avoir un canal de communication unique vers la couche Serveurs Relais HA.
+
+**Acceptance Criteria:**
+
+**Given** la liste des URLs des Serveurs Relais HA est en config (hardcodée ou fichier)
+**When** le client doit communiquer avec la couche HA (signaling ou relay)
+**Then** `RelayWebSocketClient.kt` ouvre une connexion WSS persistante via OkHttp `callbackFlow`
+**And** au `onOpen`, il envoie automatiquement `REGISTER` signé avec la clé EC P-256 du Keystore
+**And** il expose `fun connect(relayUrl: String): Flow<RelayEvent>` avec une `sealed class RelayEvent` (Connected, BlockReceived, Ack, Error, Disconnected)
+**And** il expose `fun uploadBlock(destNodeId, blockId, data)` qui envoie via frame binaire WebSocket
+**And** il gère la reconnexion automatique avec backoff exponentiel (1s, 2s, 4s, 8s, max 30s)
+**And** en cas d'échec sur le serveur courant, il bascule sur le suivant de la liste (failover séquentiel)
+**And** AUCUN import OkHttp/WebSocket dans la couche `domain/` (Clean Architecture stricte)
+
+### Story 8.3: Fallback Transparent Try-Direct-Then-Relay (Multi-Instance)
+
+En tant qu'utilisateur,
+Je veux que l'application choisisse automatiquement le meilleur chemin de transfert (TCP direct ou Relais HA),
+Afin que l'expérience de stockage reste fluide quel que soit mon environnement réseau.
+
+**Acceptance Criteria:**
+
+**Given** un transfert de bloc est déclenché par `DistributeBlocksUseCase` (Story 5.3) ou `OrchestrateBlockMigrationUseCase` (Story 7.2)
+**When** le `BlockSender` (= `BlockSenderWithRelay`) tente d'envoyer le bloc
+**Then** il tente d'abord une connexion TCP directe via `BlockTransferClient` (Priorité 1)
+**And** en cas d'échec (IOException, Timeout), il bascule automatiquement sur `RelayRepository.uploadBlock()` via la couche HA (Priorité 2)
+**And** en cas d'échec du Relais HA primaire, il tente automatiquement le Relais HA suivant (failover multi-instance, Priorité 3)
+**And** le succès ou l'échec final est remonté au UseCase via `Result<BlockAckMessage>` sans qu'il connaisse le canal utilisé
+**And** `DistributeBlocksUseCase` et `OrchestrateBlockMigrationUseCase` ne sont PAS modifiés (substitution transparente via `BlockTransferModule` Hilt)
+**And** l'état du canal de transfert actif est exposé via `StateFlow<TransferChannelState>` (DIRECT / RELAY_HA / OFFLINE) consommable par le Dashboard
+**And** le composant `CloudRelayBadge` (UX-DR10) affiche cet état dans le Dashboard avec 3 icônes distinctes (✓ direct / ☁ relay / ⚠ offline)
 
 ---

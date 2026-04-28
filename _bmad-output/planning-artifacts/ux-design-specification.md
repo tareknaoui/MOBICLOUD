@@ -1,13 +1,17 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-lastStep: 14
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15-readiness-fix]
+lastStep: 15
 inputDocuments: ["c:\\Users\\naoui\\Desktop\\Projets\\PFE\\_bmad-output\\planning-artifacts\\prd.md"]
+lastEdited: "2026-04-28"
+editHistory:
+  - date: "2026-04-28"
+    changes: "Alignement V5 — purge references obsoletes (Score IA -> Score de Fiabilite, BLE et Wi-Fi Direct supprimes au profit de Multicast UDP local + WSS Relais HA, permissions Bluetooth retirees) ; ajout UX-DR9 Slider Quota et UX-DR10 Cloud Relay Badge ; permissions alignees avec Story 1.4 (ACCESS_WIFI_STATE, INTERNET, ACCESS_NETWORK_STATE, CHANGE_WIFI_MULTICAST_STATE)."
 ---
 
 # UX Design Specification PFE
 
 **Author:** Naoui
-**Date:** 2026-03-27T00:47:16+01:00
+**Date:** 2026-03-27T00:47:16+01:00 — *Mis à jour 2026-04-28 (alignement V5)*
 
 ---
 
@@ -32,8 +36,7 @@ MobiCloud transforme un groupe de smartphones géolocalisés à proximité (camp
 
 ### Design Opportunities
 
-- **Gamification de l'Hébergement (Karma) :** Capitaliser visuellement sur le "Ratio de Réciprocité" pour créer un profil utilisateur valorisant l'hébergement de données et décourageant le parasitisme (free-riding).
-- **Tableau de bord statique et économe :** Créer un "cadran de diagnostiques" clair et basse consommation affichant les métriques essentielles (Batterie locale, Score IA, Karma) plutôt qu'une cartographie animée coûteuse en énergie.
+- **Tableau de bord statique et économe :** Créer un "cadran de diagnostiques" clair et basse consommation affichant les métriques essentielles (Batterie locale, Score de Fiabilité) plutôt qu'une cartographie animée coûteuse en énergie.
 - **Explorateur de fichiers DHT P2P :** L'interface principale doit se concentrer sur l'efficacité utilitariste d'un explorateur de fichiers décentralisé, offrant une navigation rapide sans fioritures.
 - **Onboarding sans friction :** Intégrer l'authentification et la génération des clés cryptographiques de manière transparente lors de la première connexion.
 
@@ -46,7 +49,7 @@ La valeur fondamentale de MobiCloud réside dans deux interactions principales :
 ### Platform Strategy
 
 - **Native Android :** Interface développée exclusivement de manière native (Jetpack Compose).
-- **Background-first (Headless) :** Le cœur du système s'exécute silencieusement via un Foreground Service (maintien du MulticastLock, découverte BLE, transferts Wi-Fi Direct), permettant au réseau de survivre même lorsque l'écran est éteint.
+- **Background-first (Headless) :** Le cœur du système s'exécute silencieusement via un Foreground Service (maintien du `MulticastLock` pour la découverte UDP locale, connexion WSS persistante vers les Serveurs Relais HA, sockets TCP directs pour les transferts), permettant au réseau de survivre même lorsque l'écran est éteint.
 - **UI Réactive et Économe :** L'interface utilisateur ne calcule rien : elle se contente d'observer les états émis par le service en arrière-plan via des Kotlin StateFlow, évitant tout réveil inutile du CPU.
 
 ### Effortless Interactions
@@ -57,13 +60,12 @@ La valeur fondamentale de MobiCloud réside dans deux interactions principales :
 ### Critical Success Moments
 
 - **Magie du hors-ligne :** Le moment où un utilisateur télécharge instantanément un document alors que son appareil n'a ni 4G ni Wi-Fi Internet.
-- **Hausse du Karma :** La satisfaction de voir son "Ratio de Réciprocité" (Karma) s'envoler après avoir hébergé de manière invisible les données du réseau, débloquant la capacité de publier ses propres fichiers lourds.
 - **Preuve d'efficience :** Le constat, après plusieurs heures de séminaire, que MobiCloud en tâche de fond n'a drainé que 2 ou 3% de la batterie.
 
 ### Experience Principles
 
 1. **L'utilitarisme comme boussole :** Prioriser de l'information claire et statique face aux animations coûteuses en énergie.
-2. **Confiance par la clarté :** Exposer les métriques vitales (Score IA de Fiabilité, Batterie, Karma) pour rendre le "Zero-Trust" et l'équité tangibles.
+2. **Confiance par la clarté :** Exposer les métriques vitales (Score de Fiabilité de Fiabilité, Batterie) pour rendre le "Zero-Trust" tangible.
 3. **Zéro-friction cryptographique :** La complexité cryptographique doit être mathématiquement paranoïaque en backend, mais totalement invisible en frontend.
 
 ## Desired Emotional Response
@@ -72,7 +74,7 @@ La valeur fondamentale de MobiCloud réside dans deux interactions principales :
 
 - **Confiance Absolue (Trust) :** L'utilisateur doit avoir la certitude intuitive que ses données sont en sécurité, même lorsqu'elles sont physiquement stockées chez des inconnus.
 - **Autonomie (Empowerment) :** Le soulagement profond de pouvoir sauvegarder et échanger des données critiques alors que toute infrastructure classique (Internet/Wi-Fi public) est défaillante ou absente.
-- **Fierté Communautaire (Pride) :** Le sentiment d'être un membre utile et récompensé d'un réseau d'entraide local, valorisé par le système de Karma.
+- **Fierté Communautaire (Pride) :** Le sentiment d'être un membre utile d'un réseau d'entraide local.
 
 ### Emotional Journey Mapping
 
@@ -85,17 +87,17 @@ La valeur fondamentale de MobiCloud réside dans deux interactions principales :
 
 - **Confiance > Scepticisme :** Vaincre la résistance psychologique initiale du concept "je laisse mes fichiers à des inconnus".
 - **Sérénité > Anxiété énergétique :** Désamorcer la peur historique des applications P2P qui drainent la batterie des smartphones.
-- **Accomplissement > Passivité :** Transformer l'hébergement passif en une boucle de gameplay gratifiante (Karma).
+- **Accomplissement > Passivité :** Rendre visible la contribution du nœud au réseau plutôt que de la cacher.
 
 ### Design Implications
 
 - **Design de Confiance (Zero-Trust) ➔** Emploi de métaphores visuelles de sécurité (cadenas, blocs, fragmentation cryptographique chiffrée) au moment de l'envoi.
 - **Design de Sérénité (Batterie) ➔** Esthétique utilitariste, mode sombre profond (économie OLED), absence totale d'animations superflues, typographie "data-driven" (style terminal/monospace) pour le cadran de diagnostic.
-- **Design de Fierté (Karma) ➔** Mise en majesté du "Ratio de Réciprocité" dans le profil, associant la fiabilité de l'appareil à la réputation de l'utilisateur.
+- **Design de Fierté ➔** Mise en majesté de la fiabilité du nœud (Score de Fiabilité, Uptime) dans le profil utilisateur.
 
 ### Emotional Design Principles
 
-1. **La transparence détruit la méfiance :** Exposer les scores bruts (Batterie, Score IA) désamorce la peur de la boîte noire algorithmique.
+1. **La transparence détruit la méfiance :** Exposer les scores bruts (Batterie, Score de Fiabilité) désamorce la peur de la boîte noire algorithmique.
 2. **La sobriété comme signal de performance :** Une interface sévère, statique et ultra-rapide communique implicitement le sérieux énergétique de l'application.
 3. **Récompenser l'altruisme réseau :** Héberger des données pour les autres n'est pas une corvée invisible, c'est un statut gagné.
 
@@ -115,16 +117,16 @@ La valeur fondamentale de MobiCloud réside dans deux interactions principales :
 **Interaction Patterns :**
 - *Statut de Service Persistant :* Une petite pastille de couleur globale (Vert/Ambre/Rouge) près du titre de l'application indiquant de façon non-intrusive la santé du Foreground Service.
 - *Micro-feedbacks cryptographiques :* Des icônes "cadenas" ou "matrices" qui s'activent de façon statique lors de l'upload pour signifier visuellement le découpage (Erasure Coding).
-- *Feedback d'attente technique :* Remplacer le "syndrome de l'écran vide" lors des négociations Wi-Fi Direct (3-5 sec) par un log console court statique plutôt qu'un spinner animée, préservant la batterie tout en informant l'avancée.
+- *Feedback d'attente technique :* Remplacer le "syndrome de l'écran vide" lors des négociations réseau (handshake WSS, premier Multicast UDP, 3-5 sec) par un log console court statique plutôt qu'un spinner animée, préservant la batterie tout en informant l'avancée.
 
 **Visual Patterns :**
-- *Dark Hub OLED :* Des fonds vraiment noirs (#000000) pour éteindre les pixels, avec l'utilisation de couleurs d'accentuation haute-visibilité (ex: un vert terminal ou un ambre orangé) uniquement pour les données vitales (Karma, Batterie).
+- *Dark Hub OLED :* Des fonds vraiment noirs (#000000) pour éteindre les pixels, avec l'utilisation de couleurs d'accentuation haute-visibilité (ex: un vert terminal ou un ambre orangé) uniquement pour les données vitales (Score Fiabilité, Batterie).
 
 ### Anti-Patterns to Avoid
 
 - **La "Galaxie" animée :** Représenter les nœuds par des particules flottantes en mouvement (drainage massif de batterie).
 - **Le tunnel d'onboarding lourd :** Imposer des écrans de création de profil alors que le réseau est asynchrone et sans serveur central ("Zéro-configuration" requis).
-- **Le syndrome de l'écran vide ("Empty State" silencieux) :** Un explorateur de fichiers vide sans feedback sur la recherche en cours des pairs BLE.
+- **Le syndrome de l'écran vide ("Empty State" silencieux) :** Un explorateur de fichiers vide sans feedback sur la recherche en cours des pairs (Multicast UDP local + Relais HA distant).
 
 ### Design Inspiration Strategy
 
@@ -172,7 +174,7 @@ L'architecture de l'information de MobiCloud est conçue pour être plate (flat 
 - **Écran d'Amorçage (Splash / Init) :**
   - Exécution silencieuse : Génération de la paire de clés cryptographiques locales.
 - **Écran des Permissions (Vital) :**
-  - Demandes groupées (Bluetooth/BLE, Localisation/Wi-Fi Direct, Stockage, Notifications pour le Foreground Service).
+  - Demandes groupées (`ACCESS_WIFI_STATE`, `INTERNET`, `ACCESS_NETWORK_STATE`, `CHANGE_WIFI_MULTICAST_STATE`, Stockage, Notifications pour le Foreground Service).
   - *Micro-copy :* Explication utilitariste ("Pourquoi nous avons besoin de ces accès pour créer le réseau hors-ligne").
 - *Redirection automatique et définitive vers l'Explorateur.*
 
@@ -188,24 +190,22 @@ C'est le cœur de l'interaction "Fire-and-Forget".
   - *Feedback Visuel :* Modale transitoire montrant la jauge de découpage (Erasure Coding) et de chiffrement (Icône Cadenas) avant injection sur le réseau.
 
 #### Onglet 2 : Mon Nœud (Tableau de Bord Diagnostique)
-L'écran matérialisant la "Confiance et la Fierté" (NFR-03 & Anti-clandestin).
+L'écran matérialisant la "Confiance" (NFR-03).
 - **En-tête Identité :** Hash tronqué du nœud (ex: `0x4F...B2A`).
 - **Bloc "Santé & Énergie" :**
-  - Score IA de Fiabilité (0-100%).
+  - Score de Fiabilité de Fiabilité (0-100%).
   - Impact Batterie (estimation statique, ex: `-2.4%/heure`).
-- **Bloc "Karma & Réciprocité" :**
-  - Ratio de Réciprocité (Volume Hébergé vs Volume Publié).
-  - Palier/Statut communautaire (ex: *Contributeur Solide*, *Nouveau Nœud*).
 - **Bloc "Stockage" :**
   - Jauge utilitariste de l'espace alloué aux fragments tiers vs Espace total disponible.
 
 #### Onglet 3 : Réseau P2P (Statut de la Constellation)
 Permet de diagnostiquer l'état du "Datalake" sans animations coûteuses.
 - **Cartes de Synthèse (Cards) :**
-  - Nœuds découverts (BLE).
-  - Connexions actives (Wi-Fi Direct).
+  - Pairs découverts en LAN (Multicast UDP).
+  - Pairs découverts via Relais HA (inter-réseaux).
+  - **Cloud Relay Badge (UX-DR10)** : indicateur d'état du canal de transfert actif (✓ Direct P2P / ☁ Relais HA / ⚠ Hors-ligne).
 - **Console de Logs (Terminal-style) :**
-  - Un composant texte défilant affichant les événements bruts du Foreground Service (`Découverte pair X...`, `Négociation WFD locale...`, `Réception fragment partiel...`). Cela remplace le "syndrome de l'écran vide" lors des temps de latence réseau.
+  - Un composant texte défilant affichant les événements bruts du Foreground Service (`Découverte pair X via UDP...`, `WSS Relais HA connecté...`, `Réception fragment partiel...`). Cela remplace le "syndrome de l'écran vide" lors des temps de latence réseau.
 
 ### 3. États Globaux Transverses
 
@@ -263,7 +263,7 @@ Cette direction s'impose comme une évidence car elle permet de démontrer visue
 
 Le design system appliquera ces composants majeurs en Jetpack Compose (en forçant la faible consommation d'énergie) :
 - **Indicateur de Santé Global :** Affichage central très visible du Score de Fiabilité algorithmique global de l'appareil (sans IA/Tensorflow).
-- **Les Cartes de Diagnostique :** Une grille modulaire affichant des données brutes avec de simples badges de couleur (Batterie : 42%, Ping DDNS, etc).
+- **Les Cartes de Diagnostique :** Une grille modulaire affichant des données brutes avec de simples badges de couleur (Batterie : 42%, Ping Relais HA, etc).
 - **Statut & Rôle :** Un badge en haut de l'écran affichant explicitement le statut du nœud dans sa topologie (Ex: `★ Super-Pair` ou `● Nœud Connecté`).
 - **Explorateur & Radar :** Un compteur de "Pairs à portée" sur le Dashboard, avec la gestion des fichiers transférée dans le premier onglet exclusif de la barre de navigation basse (Bottom Nav).
 
@@ -281,11 +281,11 @@ graph TD
     B -- Non --> C[Écran unique : Demande Permissions]
     C --> B
     B -- Oui --> D[Foreground Service Init]
-    D --> E[Requête Annuaire DDNS Silencieuse]
+    D --> E[GET_PEERS via Serveur Relais HA]
     E --> F{Détection Super-Pair ?}
-    F -- Oui --> G[Connexion Socket]
+    F -- Oui --> G[Connexion Socket TCP direct]
     F -- Non --> H[Calcul Score & Auto-Élection]
-    H --> I[Push IP sur DDNS]
+    H --> I[REGISTER_PEER via Serveur Relais HA]
     G --> J[Affichage Dashboard Tactique]
     I --> J
 ```
@@ -348,7 +348,7 @@ L'interface s'appuie sur Material Design 3 (Compose) mais avec un "Override" rad
 
 ### Custom Components
 
-Pour implémenter avec succès l'âme du "Dashboard Tactique", nous concevrons 4 composants réutilisables spécifiques :
+Pour implémenter avec succès l'âme du "Dashboard Tactique", nous concevrons 6 composants réutilisables spécifiques :
 
 #### 1. ReliabilityGauge (Indicateur de Santé Global)
 - **Purpose :** Montrer le Score de Fiabilité (qui décide si le nœud est Super-Pair ou non) en un clin d'œil.
@@ -356,7 +356,7 @@ Pour implémenter avec succès l'âme du "Dashboard Tactique", nous concevrons 4
 - **States :** `Sain (Vert Terminal)`, `Alerte (Ambre)`, `Critique (Rouge)`. Re-calcule sa couleur instantanément en fonction des seuils de l'algorithme.
 
 #### 2. KpiDiagnosticCard (Cartes de Métriques)
-- **Purpose :** Afficher froidement les données brutes (Batterie absolue, Pairs BLE trouvés).
+- **Purpose :** Afficher froidement les données brutes (Batterie absolue, Pairs LAN trouvés via Multicast UDP, Pairs distants via Relais HA).
 - **Anatomy :** Boîte rectangulaire noire sans ombre. Bordure native fine `#333333`. Liseré contextuel vertical à gauche (Vert/Ambre) pour l'état en un coup d'œil.
 - **Micro-copy :** Un "Header Label" de taille 12 (Gris moyen) et un "Data Body" énorme de taille 24/32 (Blanc cassé, Monospace).
 
@@ -367,6 +367,22 @@ Pour implémenter avec succès l'âme du "Dashboard Tactique", nous concevrons 4
 #### 4. ErasureProgressIndicator (Jauges P2P)
 - **Purpose :** Remplacer les barres de progression système classiques par une représentation par "blocs" qui rend tangible la notion d'Erasure Coding (Fragmentation sécurisée).
 - **Anatomy :** Composant affichant séquentiellement des éléments graphiques distincts au format `[====····] 4/10`, illustrant que le fichier n'est pas un flux uni continu mais bien l'assemblage mathématique de sous-fichiers.
+
+#### 5. StorageQuotaSlider (UX-DR9 — Allocation Réseau)
+- **Purpose :** Donner à l'utilisateur le contrôle visuel et numérique sur l'espace alloué à l'hébergement des blocs d'autres pairs (Story 1.6).
+- **Anatomy :** Slider horizontal Material 3 avec valeur affichée en `JetBrains Mono` (ex: `2.5 GB / 12 GB libres`). Sous le slider, une mini-jauge "Utilisé : 1.2 GB sur 2.5 GB alloués" en barre fine ambre/verte.
+- **Range :** 0.5 GB à 80% de l'espace libre, paliers de 0.5 GB. Valeur par défaut : `min(2 GB, 20% libre)`.
+- **States :** `OK (Vert)`, `Quasi-saturé (Ambre, > 90%)`, `Réduction confirmée (Dialog d'avertissement avant suppression de blocs hébergés)`.
+- **Placement :** Onglet "Paramètres" → section "Contribution au réseau".
+
+#### 6. CloudRelayBadge (UX-DR10 — État Canal Transfert)
+- **Purpose :** Rendre visible et tangible le mécanisme de fallback Try-Direct-Then-Relay (FR-08.2) — l'utilisateur voit en un coup d'œil si l'app communique en P2P direct ou via les Serveurs Relais HA.
+- **Anatomy :** Pastille discrète en haut du Dashboard (à côté du `ReliabilityGauge`). Trois icônes mutuellement exclusives :
+  - **✓ Direct** (Vert Terminal) : transferts en TCP P2P direct, performance maximale.
+  - **☁ Relais HA** (Ambre) : fallback actif via Serveurs Relais HA WebSocket (NAT symétrique détecté).
+  - **⚠ Hors-ligne** (Rouge) : ni direct ni relais joignables — mode dégradé.
+- **Source de vérité :** `StateFlow<TransferChannelState>` exposé par `BlockSenderWithRelay` (Story 8.3).
+- **Interaction :** tap → ModalBottomSheet expliquant en micro-copy l'état réseau ("Vous communiquez en pair-à-pair direct" / "Le P2P direct est bloqué — fallback via relais sécurisé Zero-Knowledge actif").
 
 ### Component Implementation Strategy
 
@@ -383,6 +399,8 @@ Les recompositions (raffraichissement de l'UI) ne se produiront que lorsque les 
 
 **Phase 3 (Habillage & Transparence) :**
 - Développement de la `RadarLogConsole` pour remplacer les silences de l'interface lors des négociations réseau.
+- Développement du `StorageQuotaSlider` (UX-DR9) intégré à l'écran Paramètres (Story 1.6).
+- Développement du `CloudRelayBadge` (UX-DR10) intégré au header du Dashboard (Story 8.3).
 
 ## UX Consistency Patterns
 
