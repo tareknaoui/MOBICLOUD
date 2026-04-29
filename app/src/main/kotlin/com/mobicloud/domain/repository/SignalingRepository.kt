@@ -1,23 +1,18 @@
 package com.mobicloud.domain.repository
 
-import com.mobicloud.domain.models.Peer
-import kotlinx.coroutines.flow.Flow
-
 interface SignalingRepository {
-    /** Enregistre le nœud local sur Firebase. Retourne Result.failure si inaccessible. */
-    suspend fun registerNode(ip: String, port: Int): Result<Unit>
-
-    /** Observe les nœuds distants sur Firebase (TTL 60s filtré, nœud local exclu). */
-    fun observeRemoteNodes(): Flow<List<Peer>>
-
-    /** Enregistre ce nœud comme Super-Pair sous `super-peers/{nodeId}`. */
-    suspend fun registerSuperPeer(
+    /** Enregistre ce nœud comme Super-Pair auprès des Serveurs Relais HA. */
+    suspend fun registerAsSuperPeer(
         ip: String,
         port: Int,
         reliabilityScore: Float,
-        electedAt: Long
+        electedAt: Long,
+        nodeId: String
     ): Result<Unit>
 
-    /** Supprime l'entrée `super-peers/{nodeId}` (abdication explicite). */
-    suspend fun unregisterSuperPeer(): Result<Unit>
+    /** Déclenche GET_PEERS et insère les Super-Pairs reçus dans PeerRepository (source = RELAY_HA). */
+    suspend fun fetchActiveSuperPeers(): Result<Unit>
+
+    /** Abdication explicite — le TTL 60s côté serveur purgera l'entrée automatiquement. */
+    suspend fun unregisterAsSuperPeer(): Result<Unit>
 }

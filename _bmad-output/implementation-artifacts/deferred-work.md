@@ -1,5 +1,19 @@
 # Deferred Work Log
 
+## Deferred from: code review of 3-2-enregistrement-du-super-pair-aupres-des-serveurs-relais-ha — 2e passage (2026-04-29)
+
+- **W1 — `connectionJobs` map croît sans nettoyage** — les jobs TCP terminés/annulés ne sont jamais retirés de `connectionJobs` dans `MobicloudP2PService`; pattern pré-existant depuis le code Firebase. [`MobicloudP2PService.kt:TCP Handshake loop`]
+- **W2 — `timestampMs` en `elapsedRealtime()` vs wall-clock TTL** — le filtre TTL est correct mais la sémantique de `timestampMs` (monotonic) est incohérente avec d'éventuelles comparaisons wall-clock en aval. Pré-existant, P4 du 1er review partiellement adressé. [`SignalingRepositoryImpl.kt:processPeerList`]
+- **W3 — Failover REGISTER_PEER au niveau message** — sur `sendRegisterPeer() = false`, le keepalive reprend sur la nouvelle connexion 30s plus tard ; acceptable par design mais ne satisfait pas une lecture stricte de l'AC#7. [`SignalingRepositoryImpl.kt:registerAsSuperPeer`]
+- **W4 — `ByteArray(0)` clé publique sans résolution démontrée** — D1 du 1er review, clé publique résolue lors du TCP handshake, aucune validation présente dans le diff. [`SignalingRepositoryImpl.kt:processPeerList`]
+
+## Deferred from: code review of 3-2-enregistrement-du-super-pair-aupres-des-serveurs-relais-ha (2026-04-29)
+
+- **W1 — Polling `fetchActiveSuperPeers` sans backoff exponentiel** — boucle `while(isActive)` dans `MobicloudP2PService` retente toutes les 30s sans délai exponentiel sur échec. Design choice délibéré, non bloquant fonctionnellement.
+- **W2 — `processPeerList` sans garantie d'accès séquentiel** — accessible comme `internal` depuis tests, mais appelée depuis un seul scope interne. Risque théorique si de futures sources concurrentes sont ajoutées.
+- **W3 — Race condition `superPeerJob` entre abdication `NonCancellable` et nouvelle élection** — si une nouvelle élection démarre pendant que `unregisterAsSuperPeer()` est en cours dans `withContext(NonCancellable)`, le nouveau `REGISTER_PEER` peut être suivi d'un `UNREGISTER_PEER` décalé. Nécessite une coordination `superPeerJob?.join()` avant relancement.
+- **W4 — Tests : comportement post-`RelayEvent.Disconnected` non couvert** — aucun test vérifie qu'après déconnexion du relais, `sendGetPeers` n'est plus appelé ni que la reconnexion est tentée. Ajouter dans une story de consolidation tests.
+
 ## Deferred from: code review of 0-1-initialisation-du-starter-clean-architecture (2026-03-27)
 
 - **Répertoires `domain/` et `data/` vides** — Pas de `.gitkeep` ou fichier placeholder. Les répertoires sont vides car le contenu sera livré par les stories 0-2 et suivantes. Pre-existing, non bloquant pour la story 0-1.
@@ -305,6 +319,33 @@
 - **`MAX_REPLICATE_PLAN_BYTES = 2_000` potentiellement tight** [`DepartureChannel.kt`] — 1 directive × ~250 bytes + signature 72 bytes = ~322 bytes. Marge confortable aujourd'hui, mais si pubkeys passent à Ed25519 étendu ou si la structure directive grossit, ajuster. À monitorer.
 - **`coVerify` sans `exactly=`** [`TriggerAutoRepairUseCaseTest.kt`] — Plusieurs assertions utilisent `coVerify { ... }` (at-least-1) au lieu de `coVerify(exactly = 1) { ... }`. Rigour test mineure, pas de bug.
 
+## Deferred from: code review of 8-3-fallback-transparent-try-direct-then-relay-multi-instance (2026-04-29)
+
+- **F8 — Race condition retry même blockId dans RelayWebSocketClient.uploadBlock()** [`RelayWebSocketClient.kt:166-187`] — Après timeout d'un upload (30s), le deferred est retiré de `pendingUploads`. Une réexécution avec le même blockId insère un nouveau deferred mais n'émet pas de nouveau frame UPLOAD → timeout infini. Code 8.2 non modifié en 8.3.
+- **F9 — repoScope CoroutineScope jamais annulé** [`RelayRepositoryImpl.kt:29`] — Scope Foreground Service prévu par commentaire dans le code. Scope à injecter depuis le ForegroundService. Pre-existing 8.2.
+- **F10 — Race condition _connectionState entre coroutine init et uploadBlock()** [`RelayRepositoryImpl.kt:57`] — Deux coroutines écrivent `_connectionState` sans synchronisation : la coroutine `collect` (Connected/Disconnected) et `uploadBlock()` (RELAY_HA). TOCTOU observable. Pre-existing 8.2.
+- **F11 — activeWebSocket null en fenêtre de démarrage** [`RelayWebSocketClient.kt:167`] — Si `uploadBlock()` est appelé avant que `connect()` ait émis `AUTH_OK`, la connexion est null et l'appel échoue sans mécanisme de queue. Pre-existing 8.2.
+- **F12 — TCP connect timeout non borné par timeoutMs** [`BlockTransferClient.kt`] — `socket.connect()` utilise `CONNECT_TIMEOUT_MS` constant, pas le `timeoutMs` caller. Divergence de contrat silencieuse. Pre-existing.
+- **F13 — timeoutMs non transmis à relayRepository.uploadBlock()** [`BlockSenderWithRelay.kt:58`] — Le chemin relay a un timeout fixe de 30s (RelayWebSocketClient) quel que soit le `timeoutMs` passé par l'appelant. Comportement architecturalement voulu pour le MVP.
+- **F14 — DiscoverySource.REMOTE_FIREBASE dans les tests** [`BlockSenderWithRelayTest.kt:49`] — Le test crée un `Peer` avec `source = DiscoverySource.REMOTE_FIREBASE`. Sémantiquement dépassé post-V5 Zero-Firebase ; le test compile et fonctionne correctement mais utilise un enum value obsolète.
+- **F15 — @OptIn(ExperimentalSerializationApi::class) dispersé** — Annotation présente dans BlockSenderWithRelay, BlockTransferClient, RelayRepositoryImpl. Pré-existant ; à centraliser si l'API se stabilise.
+
+## Deferred from: code review de 2-1-signalisation-inter-reseaux-via-serveurs-relais-ha (2026-04-29)
+
+- **`CoroutineScope(IO + SupervisorJob())` non managé dans `@Singleton`** [`SignalingRepositoryImpl.kt:30`] — Pas de chemin de fermeture ; le scope dure toute la vie du processus. Si `collect` se termine (Flow terminée par l'autre bout), la reconnexion ne redémarre pas. Reconnu dans la spec comme "Acceptable pour la thèse". À relier au ForegroundService scope en production.
+- **`connectionJobs` map jamais purgée des pairs évincés** [`MobicloudP2PService.kt:181`] — Pattern pré-existant identique à l'ancienne impl Firebase. Les `Job` complétés/annulés restent dans la map indéfiniment. Fuite mémoire proportionnelle au churn des peers. Déjà loggé en 2-4, désormais confirmé dans la migration HA.
+- **`activeWebSocket` set avant AUTH_OK** [`RelayWebSocketClient.kt:onOpen`] — `sendRegisterPeer`/`sendGetPeers` peuvent envoyer des frames avant la fin de l'handshake d'authentification EC P-256. Bug pré-existant Story 8.2, hors scope 2.1.
+- **`unregisterAsSuperPeer()` no-op — abdication par TTL seul** [`SignalingRepositoryImpl.kt:91`] — Par design (spec §3). Après abdication, le nœud reste visible comme Super-Pair sur le relais pendant ≤60s. Les pairs qui tentent une connexion TCP dans cette fenêtre essuient un échec silencieux. Acceptable pour la thèse ; un UNREGISTER explicite serait préférable en production.
+- **`connect()` Cold Flow — collections multiples** [`RelayWebSocketClient.kt:connect`] — Toute composante qui appelle `relayClient.connect()` ouvre une nouvelle connexion WebSocket physique. Architecture actuelle suppose un seul collecteur. À enforcer via `shareIn` ou documentation de contrat dans une story de hardening 8.x.
+
+## Deferred from: code review of 8-2-client-android-relaywebsocketclient-unifie (2026-04-29)
+
+- **`OkHttpClient` jamais fermé** [`RelayWebSocketClient.kt`] — Singleton = durée processus. `dispatcher.executorService` non shutdown. Acceptable pour le cycle de vie actuel ; à fermer proprement si le client est détruit (tests, refactoring DI).
+- **`repoScope` jamais annulé** [`RelayRepositoryImpl.kt:23`] — Scope Foreground Service prévu en Story 2.1 (commentaire présent dans le code). À remplacer par le scope injecté du ForegroundService lors de la refonte de `SignalingRepositoryImpl`.
+- **`fetchSuperPeers()` retourne toujours `emptyList()`** [`RelayRepositoryImpl.kt:42`] — Placeholder documenté ; implémentation complète prévue en Story 2.1 qui injecte `RelayWebSocketClient` dans `SignalingRepositoryImpl`.
+- **`RELAY_SERVER_URLS` hardcodé non injectable** [`RelayWebSocketClient.kt:20`] — Story 8.3 rend la liste configurable (fallback transparent + UI). Design intérimaire documenté dans le commentaire du code.
+- **`ByteArray` dans `data class BlockReceived`** [`RelayEvent.kt:5-9`] — `equals`/`hashCode` par référence (pas structurel). Aucun bug actif dans le code courant ; à migrer vers `List<Byte>` ou `equals` custom si comparaison structurelle est requise.
+
 ## Deferred from: code review of 7-1-detection-du-depart-imminent-dun-noeud (2026-04-23)
 
 - **Signature verification absente côté récepteur** [`TcpConnectionManager.kt:handleIncomingDepartureNotice`] — `handleIncomingDepartureNotice` désérialise et dispatche sans vérifier `signatureBytes`. Déféré Story 7.2 : `OrchestrateBlockMigrationUseCase` doit vérifier la signature avant d'agir sur le `DEPARTURE_NOTICE`.
@@ -330,3 +371,4 @@
 - **`LocalRepairBuffer.enqueue` : drop silencieux sans persistance ni retransmission au drain** [`LocalRepairBuffer.kt`] — sous churn soutenu avec Circuit OPEN, les demandes les plus anciennes sont évincées sans être ré-tentées. Pas de persistance disque ; au close du circuit, le `pendingAfterCircuitClose` flow n'est encore observé que par `ProcessIncomingElectionEventUseCase` COORDINATOR (TODO explicite déjà noté Story 3.3). Reste pré-existant, suivi long-cours.
 - **Couverture de tests manquante** [`TriggerAutoRepairUseCaseTest.kt`] — pas de test pour : (a) `findHostNodeIdsByBlockId` retournant `Failure` → dégradation gracieuse, (b) `peersFlow` mutant pendant un scan → finding StateFlow-lag, (c) round-trip signature émetteur→récepteur (aujourd'hui `Execute*Test` ne contient que des assertions structure/tag). Quand threshold passera à ≥ 2, la branche `sendReplicationPlan` sera exercée pour la première fois en prod → risque de régression.
 - **`distinct()` non borné sur `hostedBlockIds`** [`OrchestrateBlockMigrationUseCase.kt`] — une NOTICE avec une liste gigantesque de blocs déclenche O(n) hash. Pas de cap d'entrée côté récepteur. Vecteur DoS mineur, pré-existant Story 7.2.
+

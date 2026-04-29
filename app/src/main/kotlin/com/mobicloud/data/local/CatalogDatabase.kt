@@ -9,6 +9,7 @@ import com.mobicloud.data.local.dao.CatalogDao
 import com.mobicloud.data.local.dao.DhtDao
 import com.mobicloud.data.local.dao.HostedBlockDao
 import com.mobicloud.data.local.dao.IdentityDao
+import com.mobicloud.data.local.dao.NodeSettingsDao
 import com.mobicloud.data.local.dao.PeerDao
 import com.mobicloud.data.local.dao.TombstoneDao
 import com.mobicloud.data.local.entity.CatalogEntryEntity
@@ -16,6 +17,7 @@ import com.mobicloud.data.local.entity.DhtEntryEntity
 import com.mobicloud.data.local.entity.FragmentLocationEntity
 import com.mobicloud.data.local.entity.HostedBlockEntity
 import com.mobicloud.data.local.entity.NodeIdentityEntity
+import com.mobicloud.data.local.entity.NodeSettingsEntity
 import com.mobicloud.data.local.entity.PeerNodeEntity
 import com.mobicloud.data.local.entity.TombstoneEntryEntity
 
@@ -27,9 +29,10 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         PeerNodeEntity::class,
         DhtEntryEntity::class,
         TombstoneEntryEntity::class,
-        HostedBlockEntity::class
+        HostedBlockEntity::class,
+        NodeSettingsEntity::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -40,6 +43,7 @@ abstract class CatalogDatabase : RoomDatabase() {
     abstract fun dhtDao(): DhtDao
     abstract fun tombstoneDao(): TombstoneDao
     abstract fun hostedBlockDao(): HostedBlockDao
+    abstract fun nodeSettingsDao(): NodeSettingsDao
 
     companion object {
         val MIGRATION_2_3 = object : Migration(2, 3) {
@@ -116,6 +120,16 @@ abstract class CatalogDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE catalog_entry ADD COLUMN original_file_size INTEGER NOT NULL DEFAULT 0"
+                )
+            }
+        }
+
+        // Story 1.6 — quota de stockage alloué au réseau (singleton row id=0).
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS node_settings " +
+                    "(id INTEGER NOT NULL PRIMARY KEY, allocated_storage_bytes INTEGER NOT NULL)"
                 )
             }
         }

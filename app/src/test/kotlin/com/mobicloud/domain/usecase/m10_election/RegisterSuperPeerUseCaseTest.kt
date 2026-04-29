@@ -51,8 +51,8 @@ class RegisterSuperPeerUseCaseTest {
         coEvery { identityRepository.getIdentity() } returns Result.success(localIdentity)
         coEvery { publicIpFetcher.fetchPublicIp() } returns Result.success("203.0.113.42")
         coEvery { trustScoreProvider.getTrustScore("localNode123") } returns 85
-        coEvery { signalingRepository.registerSuperPeer(any(), any(), any(), any()) } returns Result.success(Unit)
-        coEvery { signalingRepository.unregisterSuperPeer() } returns Result.success(Unit)
+        coEvery { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) } returns Result.success(Unit)
+        coEvery { signalingRepository.unregisterAsSuperPeer() } returns Result.success(Unit)
         every { networkEventRepository.pushEvent(any()) } returns Unit
 
         useCase = RegisterSuperPeerUseCase(
@@ -65,16 +65,16 @@ class RegisterSuperPeerUseCaseTest {
     }
 
     @Test
-    fun `enregistrement Firebase reussi - emet Result success et log evenement`() = runTest {
+    fun `enregistrement HA reussi - emet Result success et log evenement`() = runTest {
         val result = useCase(tcpPort = 7777).first()
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 1) { signalingRepository.registerSuperPeer("203.0.113.42", 7777, any(), any()) }
+        coVerify(exactly = 1) { signalingRepository.registerAsSuperPeer("203.0.113.42", 7777, any(), any(), any()) }
         coVerify(exactly = 1) { networkEventRepository.pushEvent(match { it.contains("Super-Pair enregistré") }) }
     }
 
     @Test
-    fun `keepalive - registerSuperPeer rappele apres 30 secondes`() = runTest {
+    fun `keepalive - registerAsSuperPeer rappele apres 30 secondes`() = runTest {
         val testDispatcher = StandardTestDispatcher(testScheduler)
         val results = mutableListOf<Result<Unit>>()
 
@@ -86,12 +86,12 @@ class RegisterSuperPeerUseCaseTest {
         advanceTimeBy(1L)
 
         // Vérifier enregistrement initial
-        coVerify(exactly = 1) { signalingRepository.registerSuperPeer(any(), any(), any(), any()) }
+        coVerify(exactly = 1) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
 
         // Avancer de 30s + 1ms pour déclencher le keepalive
         advanceTimeBy(30_001L)
 
-        coVerify(exactly = 2) { signalingRepository.registerSuperPeer(any(), any(), any(), any()) }
+        coVerify(exactly = 2) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
 
         job.cancel()
     }
@@ -108,24 +108,24 @@ class RegisterSuperPeerUseCaseTest {
         advanceTimeBy(60_001L)
 
         // 1 initial + 2 keepalives = 3 appels
-        coVerify(exactly = 3) { signalingRepository.registerSuperPeer(any(), any(), any(), any()) }
+        coVerify(exactly = 3) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
 
         job.cancel()
     }
 
     @Test
-    fun `fallback gracieux si Firebase inaccessible - emet Result failure sans crash`() = runTest {
-        coEvery { signalingRepository.registerSuperPeer(any(), any(), any(), any()) } returns
-            Result.failure(Exception("Firebase unavailable"))
+    fun `fallback gracieux si Relais HA inaccessible - emet Result failure sans crash`() = runTest {
+        coEvery { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) } returns
+            Result.failure(Exception("Relais HA indisponible"))
 
         val result = useCase(tcpPort = 7777).first()
 
         assertTrue(result.isFailure)
-        assertTrue(result.exceptionOrNull()?.message?.contains("Firebase") == true)
+        assertTrue(result.exceptionOrNull()?.message?.contains("Relais") == true)
     }
 
     @Test
-    fun `abdication - unregisterSuperPeer appele lors de l annulation de la coroutine`() = runTest {
+    fun `abdication - unregisterAsSuperPeer appele lors de l annulation de la coroutine`() = runTest {
         val testDispatcher = StandardTestDispatcher(testScheduler)
 
         val job = launch(testDispatcher) {
@@ -139,7 +139,7 @@ class RegisterSuperPeerUseCaseTest {
         job.cancel()
         job.join()
 
-        coVerify(exactly = 1) { signalingRepository.unregisterSuperPeer() }
+        coVerify(exactly = 1) { signalingRepository.unregisterAsSuperPeer() }
     }
 
     @Test
@@ -149,7 +149,7 @@ class RegisterSuperPeerUseCaseTest {
         val result = useCase(tcpPort = 7777).first()
 
         assertTrue(result.isFailure)
-        coVerify(exactly = 0) { signalingRepository.registerSuperPeer(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -159,15 +159,15 @@ class RegisterSuperPeerUseCaseTest {
         val result = useCase(tcpPort = 7777).first()
 
         assertTrue(result.isFailure)
-        coVerify(exactly = 0) { signalingRepository.registerSuperPeer(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
     }
 
     @Test
-    fun `keepalive echec Firebase - log warning mais pas de crash`() = runTest {
+    fun `keepalive echec Relais HA - log warning mais pas de crash`() = runTest {
         val testDispatcher = StandardTestDispatcher(testScheduler)
 
         // Initial réussit, keepalive échoue
-        coEvery { signalingRepository.registerSuperPeer(any(), any(), any(), any()) }
+        coEvery { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
             .returnsMany(Result.success(Unit), Result.failure(Exception("Keepalive failed")))
 
         val job = launch(testDispatcher) {

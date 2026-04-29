@@ -1,137 +1,101 @@
 package com.mobicloud.data.repository
 
-import android.util.Base64
+import android.os.SystemClock
 import android.util.Log
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.mobicloud.data.p2p.websocket.RELAY_SERVER_URLS
+import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
-import com.mobicloud.domain.models.Peer
-import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.models.RelayEvent
+import com.mobicloud.domain.models.RelayPeer
+import com.mobicloud.domain.repository.NetworkEventRepository
+import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SignalingRepository
-import kotlinx.coroutines.channels.awaitClose
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import javax.inject.Inject
+import javax.inject.Singleton
 
-private const val NODES_PATH = "nodes"
-private const val SUPER_PEERS_PATH = "super-peers"
-private const val TTL_MS = 60_000L
+private const val TAG = "SignalingRepo"
+private const val RELAY_TTL_MS = 60_000L
 
+@Singleton
 class SignalingRepositoryImpl @Inject constructor(
-    private val securityRepository: SecurityRepository,
-    private val firebaseDatabase: FirebaseDatabase
+    private val relayClient: RelayWebSocketClient,
+    private val peerRepository: PeerRepository,
+    private val networkEventRepository: NetworkEventRepository
 ) : SignalingRepository {
 
-    // onDisconnect doit être enregistré une seule fois par session Firebase — évite l'accumulation de handlers
-    private var isSuperPeerDisconnectRegistered = false
+    // Scope lié au cycle de vie du processus — correct pour un @Singleton Android.
+    // En test, relayClient.connect() retourne emptyFlow() donc la coroutine init{} se termine immédiatement.
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
-    override suspend fun registerNode(ip: String, port: Int): Result<Unit> = runCatching {
-        val identity = securityRepository.getIdentity().getOrThrow()
-        val ref = firebaseDatabase.reference.child(NODES_PATH).child(identity.nodeId)
-
-        val nodeData = mapOf(
-            "nodeId"          to identity.nodeId,
-            "publicKeyBase64" to Base64.encodeToString(identity.publicKeyBytes, Base64.NO_WRAP),
-            "ip"              to ip,
-            "port"            to port,
-            "timestamp"       to System.currentTimeMillis()
-        )
-
-        // onDisconnect() AVANT setValue() — cleanup automatique à la déconnexion
-        ref.onDisconnect().removeValue().await()
-        ref.setValue(nodeData).await()
-    }
-
-    override fun observeRemoteNodes(): Flow<List<Peer>> = callbackFlow {
-        // F01: fail-fast si l'identité locale est indisponible — self-exclusion ne peut pas fonctionner sans nodeId
-        val identityResult = securityRepository.getIdentity()
-        if (identityResult.isFailure) {
-            close(identityResult.exceptionOrNull())
-            return@callbackFlow
-        }
-        val localNodeId = identityResult.getOrThrow().nodeId
-        val reference = firebaseDatabase.reference.child(NODES_PATH)
-
-        val listener = object : ValueEventListener {
-            override fun onDataChange(snapshot: DataSnapshot) {
-                val now = System.currentTimeMillis()
-                val peers = snapshot.children.mapNotNull { child ->
-                    try {
-                        val nodeId = child.child("nodeId").getValue(String::class.java)
-                            ?: return@mapNotNull null
-                        if (nodeId == localNodeId) return@mapNotNull null
-
-                        val pubKeyB64 = child.child("publicKeyBase64").getValue(String::class.java)
-                            ?: return@mapNotNull null
-                        val ip = child.child("ip").getValue(String::class.java)
-                            ?: return@mapNotNull null
-                        val port = child.child("port").getValue(Long::class.java)?.toInt()
-                            ?: return@mapNotNull null
-                        val timestamp = child.child("timestamp").getValue(Long::class.java)
-                            ?: return@mapNotNull null
-
-                        if (now - timestamp > TTL_MS) return@mapNotNull null  // Filtrage TTL 60s
-
-                        val publicKeyBytes = Base64.decode(pubKeyB64, Base64.NO_WRAP)
-                        Peer(
-                            identity = NodeIdentity(nodeId, publicKeyBytes),
-                            lastSeenTimestampMs = timestamp,
-                            source = DiscoverySource.REMOTE_FIREBASE,
-                            ipAddress = ip,
-                            port = port
-                        )
-                    } catch (e: Exception) {
-                        Log.w("SignalingRepositoryImpl", "Entrée Firebase ignorée (parsing échoué) — nodeId=${child.key}", e)
-                        null
-                    }
+    init {
+        scope.launch {
+            val url = RELAY_SERVER_URLS.firstOrNull() ?: return@launch
+            relayClient.connect(url).collect { event ->
+                when (event) {
+                    is RelayEvent.PeerList -> processPeerList(event.peers)
+                    is RelayEvent.Disconnected -> Log.w(TAG, "Relais HA déconnecté : ${event.reason}")
+                    else -> Unit
                 }
-                trySend(peers)
-            }
-
-            override fun onCancelled(error: DatabaseError) {
-                close(error.toException())
             }
         }
-
-        reference.addValueEventListener(listener)
-        awaitClose { reference.removeEventListener(listener) }
     }
 
-    override suspend fun registerSuperPeer(
+    internal suspend fun processPeerList(peers: List<RelayPeer>) {
+        val now = System.currentTimeMillis()
+        var insertedCount = 0
+        peers.forEach { peer ->
+            if (maxOf(0L, now - peer.lastSeen) > RELAY_TTL_MS) return@forEach
+            // La clé publique est un placeholder vide — elle sera résolue lors du TCP handshake direct.
+            // Le relais est une couche de découverte, pas d'authentification.
+            peerRepository.registerOrUpdatePeer(
+                identity    = NodeIdentity(peer.nodeId, ByteArray(0)),
+                timestampMs = SystemClock.elapsedRealtime(),
+                source      = DiscoverySource.RELAY_HA,
+                ipAddress   = peer.ip,
+                port        = peer.port,
+                isSuperPair = true
+            )
+            insertedCount++
+        }
+        if (insertedCount > 0) {
+            Log.d(TAG, "GET_PEERS : $insertedCount Super-Pairs insérés (source RELAY_HA)")
+        }
+    }
+
+    override suspend fun registerAsSuperPeer(
         ip: String,
         port: Int,
         reliabilityScore: Float,
-        electedAt: Long
+        electedAt: Long,
+        nodeId: String
     ): Result<Unit> = runCatching {
-        val identity = securityRepository.getIdentity().getOrThrow()
-        val ref = firebaseDatabase.reference.child(SUPER_PEERS_PATH).child(identity.nodeId)
-
-        val superPeerData = mapOf(
-            "nodeId"           to identity.nodeId,
-            "ip"               to ip,
-            "port"             to port,
-            "reliabilityScore" to reliabilityScore,
-            "electedAt"        to electedAt,
-            "lastKeepalive"    to System.currentTimeMillis(),
-            "timestamp"        to System.currentTimeMillis()
-        )
-
-        // onDisconnect enregistré une seule fois par session — les keepalives suivants n'accumulent pas de handlers
-        if (!isSuperPeerDisconnectRegistered) {
-            ref.onDisconnect().removeValue().await()
-            isSuperPeerDisconnectRegistered = true
-        }
-        ref.setValue(superPeerData).await()
+        val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt)
+        if (!sent) error("RelayWebSocketClient non connecté — REGISTER_PEER non envoyé")
+        Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore")
+        Unit
+    }.onFailure { e ->
+        Log.e(TAG, "registerAsSuperPeer échoué : ${e.message}")
+        networkEventRepository.pushEvent("Signalisation HA : enregistrement Super-Pair échoué — ${e.message}")
     }
 
-    override suspend fun unregisterSuperPeer(): Result<Unit> = runCatching {
-        isSuperPeerDisconnectRegistered = false
-        val identity = securityRepository.getIdentity().getOrThrow()
-        firebaseDatabase.reference.child(SUPER_PEERS_PATH).child(identity.nodeId)
-            .removeValue().await()
+    override suspend fun fetchActiveSuperPeers(): Result<Unit> = runCatching {
+        val sent = relayClient.sendGetPeers()
+        if (!sent) {
+            networkEventRepository.pushEvent("Signalisation HA : tous les serveurs injoignables")
+            error("RelayWebSocketClient non connecté — GET_PEERS non envoyé")
+        }
+        Log.d(TAG, "GET_PEERS envoyé — réponse attendue via Flow<RelayEvent.PeerList>")
+        Unit
+    }.onFailure { e ->
+        Log.e(TAG, "fetchActiveSuperPeers échoué : ${e.message}")
+    }
+
+    override suspend fun unregisterAsSuperPeer(): Result<Unit> = runCatching {
+        Log.d(TAG, "unregisterAsSuperPeer : TTL serveur se chargera de la purge")
     }
 }

@@ -1,6 +1,6 @@
 # Story 8.1: Serveur Relais HA Node.js — Signaling + Transport Unifiés
 
-Status: in-progress
+Status: done
 
 ## Story
 
@@ -783,3 +783,4 @@ claude-sonnet-4-6 — 2026-04-28
 - 2026-04-28 — Story 8.1 créée (ready-for-dev) : Serveur Relais HA Node.js — Signaling + Transport Unifiés. Foundation slice Epic 8 (avec Story 8.2), à implémenter avant Story 2.1. Protocole binaire WebSocket défini : AUTH/REGISTER_PEER/GET_PEERS/UPLOAD/FORWARD/PING/PONG. Zero-Knowledge, RAM-only TTL 60s, SIGTERM graceful shutdown, Docker Render/Railway.
 - 2026-04-28 — Implémentation complète (claude-sonnet-4-6) : création de relay-server/ (package.json, Dockerfile, .dockerignore, server.js, jest.config.js, server.test.js). 23/23 tests Jest verts. Statut → review.
 - 2026-04-28 — Code review (3 couches adversariales) : 1 décision requise, 17 patches, 3 différés, 2 dismissed. Statut → in-progress.
+- 2026-04-29 — Tous les patches appliqués (claude-sonnet-4-6) : maxPayload WS, auth timeout 10s, session collision, NaN bypass, hex validation nodeId, TTL closure par référence, safeSend, IP validation, relay cap 500, déduplication, process.once SIGTERM, process.exit(0) + unref(). 23/23 tests verts. Statut → done.

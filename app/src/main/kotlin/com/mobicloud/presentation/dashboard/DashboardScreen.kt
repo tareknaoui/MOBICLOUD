@@ -23,6 +23,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mobicloud.domain.models.NetworkType
 import com.mobicloud.domain.models.NodeRole
+import com.mobicloud.presentation.dashboard.components.CloudRelayBadge
 import com.mobicloud.presentation.dashboard.components.KpiDiagnosticCard
 import com.mobicloud.presentation.dashboard.components.RadarLogConsole
 import com.mobicloud.presentation.dashboard.components.ReliabilityGauge
@@ -43,6 +44,7 @@ fun DashboardScreen(
     val hasActivePeers by viewModel.hasActivePeers.collectAsStateWithLifecycle()
     val nodeRole by viewModel.nodeRole.collectAsStateWithLifecycle()
     val isNetworkUnstable by viewModel.isNetworkUnstable.collectAsStateWithLifecycle()
+    val relayState by viewModel.relayState.collectAsStateWithLifecycle()
 
     val uptimeFormatted = formatUptime(diagnostics.uptimeMs)
     val networkLabel = when (diagnostics.networkType) {
@@ -70,6 +72,12 @@ fun DashboardScreen(
             color = if (nodeRole == NodeRole.SUPER_PAIR) Color(0xFF00FF41) else Color(0xFF8BC34A),
             fontSize = 13.sp,
             fontFamily = FontFamily.Monospace,
+            modifier = Modifier.padding(bottom = 4.dp)
+        )
+
+        // AC#6 Story 8.3 — Badge canal de transfert actif (UX-DR10)
+        CloudRelayBadge(
+            state = relayState,
             modifier = Modifier.padding(bottom = 4.dp)
         )
 

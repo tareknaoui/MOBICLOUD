@@ -1,6 +1,7 @@
 package com.mobicloud.domain.repository
 
 import com.mobicloud.domain.models.HostedBlockPayload
+import kotlinx.coroutines.flow.Flow
 
 interface HostedBlockRepository {
     suspend fun saveBlock(
@@ -27,4 +28,7 @@ interface HostedBlockRepository {
 
     /** Story 7.1 — retourne tous les blockId actuellement hébergés localement. */
     suspend fun getAllBlockIds(): Result<List<String>>
+
+    /** Story 1.6 — somme en temps réel des octets hébergés (pour affichage quota settings). */
+    fun observeTotalHostedBytes(): Flow<Long>
 }

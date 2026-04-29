@@ -1,0 +1,225 @@
+package com.mobicloud.data.p2p.websocket
+
+import android.util.Log
+import com.mobicloud.domain.models.RelayEvent
+import com.mobicloud.domain.models.RelayPeer
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.*
+import okhttp3.*
+import okio.ByteString
+import okio.ByteString.Companion.toByteString
+import org.json.JSONArray
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.math.min
+
+private const val TAG = "RelayWSClient"
+
+// Nœud de configuration : liste des URLs des relais HA (hardcodée — Story 8.3 pourra rendre configurable)
+internal val RELAY_SERVER_URLS = listOf(
+    "wss://mobicloud-relay-1.onrender.com",    // Instance 1 — Render
+    "wss://mobicloud-relay-2.up.railway.app"   // Instance 2 — Railway
+)
+
+@Singleton
+class RelayWebSocketClient @Inject constructor(
+    private val authSigner: RelayAuthSigner
+) {
+    private val okHttpClient = OkHttpClient.Builder()
+        .pingInterval(30, java.util.concurrent.TimeUnit.SECONDS)
+        .build()
+
+    // Référence à la WebSocket active — thread-safe via @Volatile
+    @Volatile private var activeWebSocket: WebSocket? = null
+
+    // Channel pour les uploadBlock() en attente d'ACK — clé = blockId
+    private val pendingUploads = java.util.concurrent.ConcurrentHashMap<String, CompletableDeferred<Unit>>()
+
+    /**
+     * Ouvre une connexion WSS persistante vers relayUrl.
+     * Sur déconnexion, reconnecte avec backoff exponentiel (1s → 2s → 4s → 8s → max 30s).
+     * Après 5 tentatives consécutives, bascule sur le prochain serveur de RELAY_SERVER_URLS.
+     * Collectez ce Flow dans un CoroutineScope lié au Foreground Service.
+     */
+    fun connect(relayUrl: String): Flow<RelayEvent> = flow {
+        var serverIndex = RELAY_SERVER_URLS.indexOfFirst { it == relayUrl }
+            .takeIf { it >= 0 } ?: 0
+        var attemptsOnCurrentServer = 0
+
+        while (currentCoroutineContext().isActive) {
+            val currentUrl = RELAY_SERVER_URLS[serverIndex % RELAY_SERVER_URLS.size]
+            Log.i(TAG, "Connexion à $currentUrl (tentative ${attemptsOnCurrentServer + 1})")
+
+            try {
+                connectSingle(currentUrl).collect { event ->
+                    emit(event)
+                    if (event is RelayEvent.Connected) {
+                        attemptsOnCurrentServer = 0 // réinitialise le compteur
+                    }
+                    if (event is RelayEvent.Disconnected) {
+                        throw RelayDisconnectedException(event.reason)
+                    }
+                }
+            } catch (e: CancellationException) {
+                throw e // ne pas absorber l'annulation de coroutine
+            } catch (e: Exception) {
+                attemptsOnCurrentServer++
+                if (attemptsOnCurrentServer >= 5) {
+                    Log.w(TAG, "5 tentatives échouées sur $currentUrl — failover vers instance suivante")
+                    serverIndex++
+                    attemptsOnCurrentServer = 0
+                }
+                val delayMs = min(1L shl (attemptsOnCurrentServer.coerceAtLeast(1) - 1), 30L) * 1000L
+                Log.d(TAG, "Reconnexion dans ${delayMs}ms...")
+                delay(delayMs)
+            }
+        }
+    }.flowOn(Dispatchers.IO)
+
+    private class RelayDisconnectedException(reason: String?) : Exception(reason)
+
+    // internal pour les tests JVM (MockWebServer) — pas exposé dans le module domain
+    internal fun connectSingle(url: String): Flow<RelayEvent> = callbackFlow {
+        val request = Request.Builder().url(url).build()
+        val flowScope: CoroutineScope = this
+
+        val listener = object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                activeWebSocket = webSocket
+                flowScope.launch {
+                    try {
+                        val authPayload = authSigner.buildAuthPayload()
+                        val authFrame = RelayFraming.buildFrame(RelayMsg.AUTH, authPayload)
+                        webSocket.send(authFrame.toByteString())
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Échec envoi AUTH : ${e.message}")
+                        close(e)
+                    }
+                }
+            }
+
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                Log.w(TAG, "Frame texte inattendue ignorée (${text.length} chars)")
+            }
+
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                val frame = RelayFraming.parseFrame(bytes.toByteArray()) ?: return
+                val (type, payload) = frame
+
+                when (type) {
+                    RelayMsg.AUTH_OK -> {
+                        trySend(RelayEvent.Connected)
+                        Log.i(TAG, "AUTH_OK — connecté à $url")
+                    }
+                    RelayMsg.FORWARD -> {
+                        val parsed = RelayFraming.parseForwardPayload(payload) ?: return
+                        val (fromNodeId, blockId, data) = parsed
+                        trySend(RelayEvent.BlockReceived(fromNodeId, blockId, data))
+                    }
+                    RelayMsg.ACK -> {
+                        val blockId = runCatching {
+                            org.json.JSONObject(payload.toString(Charsets.UTF_8)).getString("blockId")
+                        }.getOrNull() ?: return
+                        pendingUploads.remove(blockId)?.complete(Unit)
+                        trySend(RelayEvent.Ack(blockId))
+                    }
+                    RelayMsg.PEERS -> {
+                        val peers = parsePeersPayload(payload)
+                        trySend(RelayEvent.PeerList(peers))
+                    }
+                    RelayMsg.PONG -> { /* keepalive applicatif — ignoré, OkHttp gère le ping natif */ }
+                    RelayMsg.ERROR -> {
+                        val msg = payload.toString(Charsets.UTF_8)
+                        Log.e(TAG, "ERROR serveur : $msg")
+                        trySend(RelayEvent.Error(msg))
+                    }
+                }
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                Log.w(TAG, "WebSocket failure : ${t.message}")
+                if (activeWebSocket === webSocket) activeWebSocket = null
+                trySend(RelayEvent.Disconnected(t.message))
+                close(t)
+            }
+
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                Log.i(TAG, "WebSocket fermée : code=$code reason=$reason")
+                if (activeWebSocket === webSocket) activeWebSocket = null
+                trySend(RelayEvent.Disconnected(reason))
+                close()
+            }
+        }
+
+        val ws = okHttpClient.newWebSocket(request, listener)
+        awaitClose {
+            ws.close(1000, "Flow cancelled")
+            if (activeWebSocket === ws) activeWebSocket = null
+        }
+    }
+
+    /**
+     * Upload un bloc chiffré vers destNodeId via le relais HA actif.
+     * Attend l'ACK du serveur (timeout 30s).
+     * Retourne Result.failure si la connexion est absente ou si l'ACK n'arrive pas.
+     */
+    suspend fun uploadBlock(destNodeId: String, blockId: String, data: ByteArray): Result<Unit> = runCatching {
+        val ws = activeWebSocket
+            ?: return Result.failure(IllegalStateException("RelayWebSocketClient : aucune connexion active"))
+
+        val deferred = CompletableDeferred<Unit>()
+        if (pendingUploads.putIfAbsent(blockId, deferred) != null) {
+            return Result.failure(IllegalStateException("Upload déjà en cours pour blockId=$blockId"))
+        }
+
+        val uploadPayload = RelayFraming.buildUploadPayload(destNodeId, blockId, data)
+        val frame = RelayFraming.buildFrame(RelayMsg.UPLOAD, uploadPayload)
+
+        val sent = ws.send(frame.toByteString())
+        if (!sent) {
+            pendingUploads.remove(blockId)
+            error("WebSocket.send() a retourné false — socket fermée")
+        }
+
+        withTimeout(30_000L) { deferred.await() }
+    }.also { result ->
+        if (result.isFailure) pendingUploads.remove(blockId)
+    }
+
+    /** Envoie GET_PEERS (0x04) — payload vide. Réponse émise via Flow<RelayEvent.PeerList>. */
+    fun sendGetPeers(): Boolean {
+        val ws = activeWebSocket ?: return false
+        return ws.send(RelayFraming.buildFrame(RelayMsg.GET_PEERS).toByteString())
+    }
+
+    /** Envoie REGISTER_PEER (0x03) avec les métadonnées du Super-Pair. */
+    fun sendRegisterPeer(nodeId: String, ip: String, port: Int, reliabilityScore: Float, electedAt: Long): Boolean {
+        val ws = activeWebSocket ?: return false
+        val json = org.json.JSONObject().apply {
+            put("nodeId",           nodeId)
+            put("ip",               ip)
+            put("port",             port)
+            put("reliabilityScore", reliabilityScore.toDouble())
+            put("electedAt",        electedAt)
+        }
+        val payload = json.toString().toByteArray(Charsets.UTF_8)
+        return ws.send(RelayFraming.buildFrame(RelayMsg.REGISTER_PEER, payload).toByteString())
+    }
+
+    private fun parsePeersPayload(payload: ByteArray): List<RelayPeer> {
+        return runCatching {
+            val arr = JSONArray(payload.toString(Charsets.UTF_8))
+            (0 until arr.length()).map { i ->
+                val obj = arr.getJSONObject(i)
+                RelayPeer(
+                    nodeId           = obj.getString("nodeId"),
+                    ip               = obj.getString("ip"),
+                    port             = obj.getInt("port"),
+                    reliabilityScore = obj.getDouble("reliabilityScore").toFloat(),
+                    lastSeen         = obj.getLong("lastSeen")
+                )
+            }
+        }.getOrDefault(emptyList())
+    }
+}

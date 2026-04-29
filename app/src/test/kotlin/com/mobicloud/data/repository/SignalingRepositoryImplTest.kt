@@ -1,251 +1,158 @@
 package com.mobicloud.data.repository
 
-import android.util.Base64
+import android.os.SystemClock
 import android.util.Log
-import com.google.firebase.database.DataSnapshot
-import com.google.firebase.database.DatabaseError
-import com.google.firebase.database.DatabaseReference
-import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ValueEventListener
+import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
-import com.mobicloud.domain.models.Peer
-import com.mobicloud.domain.repository.SecurityRepository
-import io.mockk.CapturingSlot
-import io.mockk.coEvery
+import com.mobicloud.domain.models.RelayPeer
+import com.mobicloud.domain.repository.NetworkEventRepository
+import com.mobicloud.domain.repository.PeerRepository
+import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.just
 import io.mockk.mockk
 import io.mockk.mockkStatic
-import io.mockk.Runs
-import io.mockk.slot
-import io.mockk.unmockkAll
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
-import kotlinx.coroutines.test.advanceUntilIdle
+import io.mockk.verify
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
-import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
-@OptIn(ExperimentalCoroutinesApi::class)
 class SignalingRepositoryImplTest {
 
-    private lateinit var securityRepository: SecurityRepository
-    private lateinit var firebaseDatabase: FirebaseDatabase
-    private lateinit var repository: SignalingRepositoryImpl
-
-    private val testDispatcher = UnconfinedTestDispatcher()
-    private val testScope = TestScope(testDispatcher)
-
-    private val localNodeId = "local-node-id"
-    private val localPublicKeyBytes = byteArrayOf(1, 2, 3, 4)
-    private val localIdentity = NodeIdentity(localNodeId, localPublicKeyBytes)
+    private lateinit var relayClient: RelayWebSocketClient
+    private lateinit var peerRepository: PeerRepository
+    private lateinit var networkEventRepository: NetworkEventRepository
 
     @Before
     fun setUp() {
         mockkStatic(Log::class)
+        every { Log.d(any(), any()) } returns 0
         every { Log.w(any(), any<String>()) } returns 0
-        every { Log.w(any(), any<String>(), any()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
-        every { Log.e(any(), any<String>(), any()) } returns 0
-        every { Log.d(any(), any<String>()) } returns 0
-        securityRepository = mockk()
-        firebaseDatabase = mockk()
-        repository = SignalingRepositoryImpl(securityRepository, firebaseDatabase)
+
+        mockkStatic(SystemClock::class)
+        every { SystemClock.elapsedRealtime() } returns 1000L
+
+        relayClient = mockk(relaxed = true)
+        peerRepository = mockk(relaxed = true)
+        networkEventRepository = mockk(relaxed = true)
+
+        every { relayClient.connect(any()) } returns emptyFlow()
     }
 
-    @After
-    fun tearDown() {
-        unmockkAll()
-    }
+    private fun buildRepo() = SignalingRepositoryImpl(relayClient, peerRepository, networkEventRepository)
 
     // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
-
-    /**
-     * Construit un mock DataSnapshot enfant avec tous les champs renseignés.
-     * L'ordre de filtrage dans observeRemoteNodes() est :
-     *   1. nodeId absent → null
-     *   2. nodeId == localNodeId → null   (avant Base64)
-     *   3. timestamp absent → null
-     *   4. timestamp > TTL → null         (avant Base64)
-     *   5. pubKeyB64 / ip / port absents → null
-     *   6. Base64.decode + construction Peer
-     */
-    private fun mockChildSnapshot(
-        nodeId: String,
-        pubKeyB64: String = "AQID",
-        ip: String = "1.2.3.4",
-        port: Int = 8080,
-        timestamp: Long = System.currentTimeMillis()
-    ): DataSnapshot {
-        val child = mockk<DataSnapshot>()
-        every { child.key } returns nodeId
-        every { child.child("nodeId").getValue(String::class.java) } returns nodeId
-        every { child.child("publicKeyBase64").getValue(String::class.java) } returns pubKeyB64
-        every { child.child("ip").getValue(String::class.java) } returns ip
-        every { child.child("port").getValue(Long::class.java) } returns port.toLong()
-        every { child.child("timestamp").getValue(Long::class.java) } returns timestamp
-        return child
-    }
-
-    /**
-     * Configure les mocks Firebase pour `observeRemoteNodes()` et retourne
-     * la référence "nodes/" ainsi que le slot capturant le ValueEventListener.
-     */
-    private fun buildNodesRefMock(): Pair<DatabaseReference, CapturingSlot<ValueEventListener>> {
-        val rootRef = mockk<DatabaseReference>()
-        val nodesRef = mockk<DatabaseReference>()
-        val listenerSlot = slot<ValueEventListener>()
-
-        coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
-        every { firebaseDatabase.reference } returns rootRef
-        every { rootRef.child("nodes") } returns nodesRef
-        every { nodesRef.addValueEventListener(capture(listenerSlot)) } returns mockk()
-        every { nodesRef.removeEventListener(any<ValueEventListener>()) } just Runs
-
-        return nodesRef to listenerSlot
-    }
-
-    // -------------------------------------------------------------------------
-    // Test 1 : filtrage TTL — entrées > 60 s ignorées
+    // Subtask 4.1 : registerAsSuperPeer retourne Result.success
     // -------------------------------------------------------------------------
 
     @Test
-    fun `observeRemoteNodes filtre les entrees plus vieilles que 60s`() =
-        testScope.runTest {
-            val (_, listenerSlot) = buildNodesRefMock()
+    fun `registerAsSuperPeer retourne Result_success quand sendRegisterPeer retourne true`() = runTest {
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any()) } returns true
 
-            val staleTimestamp = System.currentTimeMillis() - 70_000L
-            val parentSnapshot = mockk<DataSnapshot>()
-            val staleChild = mockChildSnapshot(
-                nodeId = "remote-node",          // ≠ localNodeId → ne sera pas exclu par ce filtre
-                timestamp = staleTimestamp        // > 60 s → doit être filtré
-            )
-            every { parentSnapshot.children } returns listOf(staleChild)
+        val repo = buildRepo()
+        val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, System.currentTimeMillis(), "test-node-id")
 
-            val results = mutableListOf<List<Peer>>()
-            val job = launch { repository.observeRemoteNodes().collect { results.add(it) } }
-
-            advanceUntilIdle()
-            assertTrue("Le ValueEventListener doit être enregistré", listenerSlot.isCaptured)
-
-            listenerSlot.captured.onDataChange(parentSnapshot)
-            advanceUntilIdle()
-            job.cancel()
-
-            assertTrue("Au moins un résultat attendu", results.isNotEmpty())
-            assertTrue(
-                "L'entrée périmée (TTL expiré) doit être filtrée → liste vide",
-                results.last().isEmpty()
-            )
-        }
+        assertTrue(result.isSuccess)
+        verify { relayClient.sendRegisterPeer(any(), "192.168.1.10", 48999, 0.87f, any()) }
+    }
 
     // -------------------------------------------------------------------------
-    // Test 2 : exclusion du nœud local
+    // Subtask 4.2 : registerAsSuperPeer retourne Result.failure
     // -------------------------------------------------------------------------
 
     @Test
-    fun `observeRemoteNodes exclut le noeud local`() =
-        testScope.runTest {
-            val (_, listenerSlot) = buildNodesRefMock()
+    fun `registerAsSuperPeer retourne Result_failure quand sendRegisterPeer retourne false`() = runTest {
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any()) } returns false
 
-            val parentSnapshot = mockk<DataSnapshot>()
-            val localChild = mockChildSnapshot(
-                nodeId = localNodeId,                    // même nodeId que le nœud local
-                timestamp = System.currentTimeMillis()   // timestamp frais
-            )
-            every { parentSnapshot.children } returns listOf(localChild)
+        val repo = buildRepo()
+        val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, System.currentTimeMillis(), "test-node-id")
 
-            val results = mutableListOf<List<Peer>>()
-            val job = launch { repository.observeRemoteNodes().collect { results.add(it) } }
-
-            advanceUntilIdle()
-            listenerSlot.captured.onDataChange(parentSnapshot)
-            advanceUntilIdle()
-            job.cancel()
-
-            assertTrue("Au moins un résultat attendu", results.isNotEmpty())
-            assertTrue(
-                "Le nœud local doit être exclu → liste vide",
-                results.last().isEmpty()
-            )
-        }
+        assertTrue(result.isFailure)
+        verify { networkEventRepository.pushEvent(match { it.contains("enregistrement Super-Pair échoué") }) }
+    }
 
     // -------------------------------------------------------------------------
-    // Test 3 : registerNode retourne Result.failure si une exception est levée
+    // Subtask 4.3a : fetchActiveSuperPeers envoie GET_PEERS avec succès
     // -------------------------------------------------------------------------
 
     @Test
-    fun `registerNode retourne Result_failure si Firebase lance une exception`() =
-        testScope.runTest {
-            coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
+    fun `fetchActiveSuperPeers retourne Result_success quand sendGetPeers retourne true`() = runTest {
+        every { relayClient.sendGetPeers() } returns true
 
-            mockkStatic(Base64::class)
-            every { Base64.encodeToString(any(), any()) } returns "AQID"
+        val repo = buildRepo()
+        val result = repo.fetchActiveSuperPeers()
 
-            // Faire lever une exception lors de l'accès à la référence Firebase
-            val rootRef = mockk<DatabaseReference>()
-            val nodesRef = mockk<DatabaseReference>()
-            every { firebaseDatabase.reference } returns rootRef
-            every { rootRef.child("nodes") } returns nodesRef
-            every { nodesRef.child(localNodeId) } throws RuntimeException("Firebase indisponible")
-
-            val result = repository.registerNode("1.2.3.4", 8080)
-
-            assertTrue("registerNode doit retourner Result.failure", result.isFailure)
-        }
+        assertTrue(result.isSuccess)
+        verify { relayClient.sendGetPeers() }
+    }
 
     // -------------------------------------------------------------------------
-    // Test 4 : construction correcte d'un Peer avec source = REMOTE_FIREBASE
+    // Subtask 4.3b : fetchActiveSuperPeers loggue quand tous les serveurs injoignables
     // -------------------------------------------------------------------------
 
     @Test
-    fun `observeRemoteNodes construit Peer avec source REMOTE_FIREBASE`() =
-        testScope.runTest {
-            val (_, listenerSlot) = buildNodesRefMock()
+    fun `fetchActiveSuperPeers loggue tous serveurs injoignables quand sendGetPeers retourne false`() = runTest {
+        every { relayClient.sendGetPeers() } returns false
 
-            val remotePublicKeyBytes = byteArrayOf(10, 20, 30)
-            mockkStatic(Base64::class)
-            every { Base64.decode("AQID", Base64.NO_WRAP) } returns remotePublicKeyBytes
+        val repo = buildRepo()
+        val result = repo.fetchActiveSuperPeers()
 
-            val freshTimestamp = System.currentTimeMillis()
-            val parentSnapshot = mockk<DataSnapshot>()
-            val remoteChild = mockChildSnapshot(
-                nodeId = "remote-node-id",
-                pubKeyB64 = "AQID",
-                ip = "5.6.7.8",
-                port = 9090,
-                timestamp = freshTimestamp
+        assertTrue(result.isFailure)
+        verify { networkEventRepository.pushEvent("Signalisation HA : tous les serveurs injoignables") }
+    }
+
+    // -------------------------------------------------------------------------
+    // Subtask 4.4 : processPeerList filtre les entrées TTL > 60s
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `processPeerList filtre les entrees TTL superieur a 60s`() = runTest {
+        val repo = buildRepo()
+
+        val stalePeer = RelayPeer(
+            nodeId = "stale-node",
+            ip = "1.2.3.4",
+            port = 9000,
+            reliabilityScore = 0.5f,
+            lastSeen = 1_000L // epoch + 1s, toujours > 60s en arrière
+        )
+
+        repo.processPeerList(listOf(stalePeer))
+
+        coVerify(exactly = 0) { peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any()) }
+    }
+
+    // -------------------------------------------------------------------------
+    // Subtask 4.5 : processPeerList insère les peers valides avec source RELAY_HA
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `processPeerList insere les peers valides avec source RELAY_HA`() = runTest {
+        val repo = buildRepo()
+        val now = System.currentTimeMillis()
+
+        val freshPeer = RelayPeer(
+            nodeId = "fresh-node",
+            ip = "5.6.7.8",
+            port = 8888,
+            reliabilityScore = 0.9f,
+            lastSeen = now
+        )
+
+        repo.processPeerList(listOf(freshPeer))
+
+        coVerify {
+            peerRepository.registerOrUpdatePeer(
+                identity    = match { it.nodeId == "fresh-node" && it.publicKeyBytes.isEmpty() },
+                timestampMs = any(),
+                source      = DiscoverySource.RELAY_HA,
+                ipAddress   = "5.6.7.8",
+                port        = 8888,
+                isSuperPair = true
             )
-            every { parentSnapshot.children } returns listOf(remoteChild)
-
-            val results = mutableListOf<List<Peer>>()
-            val job = launch { repository.observeRemoteNodes().collect { results.add(it) } }
-
-            advanceUntilIdle()
-            listenerSlot.captured.onDataChange(parentSnapshot)
-            advanceUntilIdle()
-            job.cancel()
-
-            assertTrue("Au moins un résultat attendu", results.isNotEmpty())
-            val peers = results.last()
-            assertEquals("Un seul pair attendu", 1, peers.size)
-
-            val peer = peers.first()
-            assertEquals(
-                "La source doit être REMOTE_FIREBASE",
-                DiscoverySource.REMOTE_FIREBASE,
-                peer.source
-            )
-            assertEquals("remote-node-id", peer.identity.nodeId)
-            assertEquals("5.6.7.8", peer.ipAddress)
-            assertEquals(9090, peer.port)
         }
+    }
 }

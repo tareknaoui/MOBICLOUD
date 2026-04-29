@@ -194,6 +194,7 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation("io.mockk:mockk:1.13.8")
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.test.ext)
     androidTestImplementation(libs.androidx.test.runner)
 }

@@ -1,7 +1,9 @@
 package com.mobicloud.domain.models
 
 enum class DiscoverySource {
-    REMOTE_FIREBASE
+    REMOTE_FIREBASE,
+    LAN_MULTICAST,
+    RELAY_HA
 }
 
 data class Peer(

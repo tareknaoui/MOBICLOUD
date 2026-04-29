@@ -24,4 +24,8 @@ interface HostedBlockDao {
     // Fix P9 : ORDER BY garantit un ordre stable pour la signature du payload DEPARTURE_NOTICE
     @Query("SELECT block_id FROM hosted_blocks ORDER BY block_id ASC")
     suspend fun getAllBlockIds(): List<String>
+
+    // Story 1.6 — somme des octets hébergés pour affichage quota settings
+    @Query("SELECT COALESCE(SUM(size_bytes), 0) FROM hosted_blocks")
+    fun observeTotalSizeBytes(): Flow<Long>
 }

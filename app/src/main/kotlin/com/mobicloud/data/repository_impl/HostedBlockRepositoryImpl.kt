@@ -7,6 +7,7 @@ import com.mobicloud.domain.models.HostedBlockPayload
 import com.mobicloud.domain.repository.HostedBlockRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -123,6 +124,8 @@ class HostedBlockRepositoryImpl @Inject constructor(
         withContext(Dispatchers.IO) {
             runCatching { hostedBlockDao.getAllBlockIds() }
         }
+
+    override fun observeTotalHostedBytes(): Flow<Long> = hostedBlockDao.observeTotalSizeBytes()
 
     companion object {
         // Story 6.2 — défense en profondeur identique à ReceiveAndHostBlockUseCase

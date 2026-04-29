@@ -14,9 +14,15 @@ const MSG = {
   ERROR: 0xFF
 };
 
-const TTL_MS = 60_000;            // TTL registre signaling + buffer relay
-const AUTH_WINDOW_MS = 30_000;   // fenêtre anti-replay auth
-const MAX_BLOCK_SIZE = 1_100_000; // 1.1 MB — marge sur fragments MobiCloud ~1 MB
+const TTL_MS = 60_000;               // TTL registre signaling + buffer relay
+const AUTH_WINDOW_MS = 30_000;       // fenêtre anti-replay auth
+const AUTH_TIMEOUT_MS = 10_000;      // délai max pour envoyer AUTH après connexion
+const MAX_BLOCK_SIZE = 1_100_000;    // 1.1 MB — marge sur fragments MobiCloud ~1 MB
+const MAX_RELAY_BUFFER_ENTRIES = 500; // cap total des blocs en attente en RAM
+const MAX_SIGNALING_PEERS = 100;      // cap total des Super-Pairs enregistrés
+
+// Regex IP : IPv4 ou IPv6 compacte — pas de hostname
+const IP_RE = /^[\d.:a-fA-F]{2,45}$/;
 
 // ─── Framing ────────────────────────────────────────────────────────────────
 
@@ -43,13 +49,15 @@ function sendError(ws, message) {
   }
 }
 
+// Envoyer sans risque de crash si la socket est en train de fermer
+function safeSend(ws, frame) {
+  try {
+    if (ws.readyState === WebSocket.OPEN) ws.send(frame);
+  } catch { /* socket déjà fermée */ }
+}
+
 // ─── Authentification EC P-256 ───────────────────────────────────────────────
 
-/**
- * Vérifie la signature EC P-256/SHA-256 d'un message AUTH.
- * @param {Buffer} payload — payload JSON UTF-8 du message AUTH
- * @returns {{ ok: boolean, nodeId: string, publicKey: crypto.KeyObject } | { ok: false, reason: string }}
- */
 function verifyAuth(payload) {
   let msg;
   try { msg = JSON.parse(payload.toString('utf8')); } catch { return { ok: false, reason: 'AUTH JSON invalide' }; }
@@ -58,12 +66,18 @@ function verifyAuth(payload) {
   if (!nodeId || !pubKeySpkiDer || !timestamp || !signature) {
     return { ok: false, reason: 'AUTH champs manquants' };
   }
-  if (typeof nodeId !== 'string' || nodeId.length !== 16) {
-    return { ok: false, reason: 'nodeId invalide (attendu 16 chars hex)' };
+
+  // nodeId : exactement 16 chars hex ASCII (pas de multi-octet UTF-8)
+  if (typeof nodeId !== 'string' || !/^[0-9a-fA-F]{16}$/.test(nodeId)) {
+    return { ok: false, reason: 'nodeId invalide (attendu 16 chars hex ASCII)' };
   }
 
-  // Fenêtre anti-replay 30s
-  const skew = Math.abs(Date.now() - Number(timestamp));
+  // Fenêtre anti-replay 30s — timestamp doit être un nombre fini
+  const ts = Number(timestamp);
+  if (!Number.isFinite(ts) || ts <= 0) {
+    return { ok: false, reason: 'AUTH timestamp invalide (doit être Unix ms fini)' };
+  }
+  const skew = Math.abs(Date.now() - ts);
   if (skew > AUTH_WINDOW_MS) return { ok: false, reason: `AUTH timestamp hors fenêtre (écart ${skew}ms)` };
 
   // Payload signé — doit correspondre exactement à ce que signe l'Android Keystore (Story 8.2)
@@ -78,6 +92,15 @@ function verifyAuth(payload) {
     });
   } catch (e) {
     return { ok: false, reason: `Clé publique invalide : ${e.message}` };
+  }
+
+  // Vérifier que la clé est bien EC P-256 (prime256v1)
+  if (publicKey.asymmetricKeyType !== 'ec') {
+    return { ok: false, reason: 'Clé doit être de type EC' };
+  }
+  const { namedCurve } = publicKey.asymmetricKeyDetails;
+  if (namedCurve !== 'prime256v1') {
+    return { ok: false, reason: `Courbe EC invalide : attendu prime256v1, reçu ${namedCurve}` };
   }
 
   try {
@@ -111,6 +134,12 @@ function handleRegisterPeer(nodeId, payload) {
   const { ip, port, reliabilityScore, electedAt } = entry;
   if (!ip || typeof port !== 'number' || port < 1 || port > 65535) return false;
 
+  // Valider le format IP (pas de hostname, pas de loopback non contrôlé)
+  if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) return false;
+
+  // Cap : refuser si annuaire plein et ce nœud n'est pas déjà enregistré
+  if (!signalingRegistry.has(nodeId) && signalingRegistry.size >= MAX_SIGNALING_PEERS) return false;
+
   // Annuler l'ancien timer TTL si re-registration
   const existing = signalingRegistry.get(nodeId);
   if (existing?.ttlTimer) clearTimeout(existing.ttlTimer);
@@ -143,8 +172,7 @@ function handleGetPeers(ws) {
       lastSeen: entry.lastSeen
     });
   }
-  const buf = Buffer.from(JSON.stringify(peers), 'utf8');
-  ws.send(buildFrame(MSG.PEERS, buf));
+  safeSend(ws, buildFrame(MSG.PEERS, Buffer.from(JSON.stringify(peers), 'utf8')));
 }
 
 // ─── Relay Store-and-Forward (UPLOAD / FORWARD) ──────────────────────────────
@@ -152,16 +180,21 @@ function handleGetPeers(ws) {
 function flushPendingBlocks(nodeId, ws) {
   for (const [blockId, entries] of relayBuffer.entries()) {
     const pending = entries.filter(e => e.destNodeId === nodeId);
+    if (pending.length === 0) continue;
+
+    // Annuler tous les timers des entrées à supprimer (qu'on les envoie ou non)
+    pending.forEach(e => clearTimeout(e.ttlTimer));
+
     for (const entry of pending) {
       if (ws.readyState !== WebSocket.OPEN) break;
       const forwardPayload = Buffer.allocUnsafe(16 + 64 + entry.data.length);
       Buffer.from(entry.fromNodeId.padEnd(16, '\0'), 'utf8').copy(forwardPayload, 0);
       Buffer.from(blockId.padEnd(64, '\0'), 'utf8').copy(forwardPayload, 16);
       entry.data.copy(forwardPayload, 80);
-      ws.send(buildFrame(MSG.FORWARD, forwardPayload));
-      clearTimeout(entry.ttlTimer);
+      safeSend(ws, buildFrame(MSG.FORWARD, forwardPayload));
       console.log(`[RELAY] FLUSH ${blockId.slice(0, 16)} → nodeId=${nodeId.slice(0, 8)}`);
     }
+
     const remaining = entries.filter(e => e.destNodeId !== nodeId);
     if (remaining.length === 0) relayBuffer.delete(blockId);
     else relayBuffer.set(blockId, remaining);
@@ -178,6 +211,16 @@ function handleUpload(fromNodeId, payload, senderWs) {
   const blockId = payload.slice(16, 80).toString('utf8').replace(/\0/g, '').trim();
   const data = payload.slice(80); // bloc chiffré AES-256 GCM — JAMAIS transformé (AC#4 Zero-Knowledge)
 
+  // Valider destNodeId et blockId après strip
+  if (!destNodeId || destNodeId.length > 16) {
+    sendError(senderWs, 'UPLOAD destNodeId invalide');
+    return;
+  }
+  if (!blockId || Buffer.byteLength(blockId, 'utf8') > 64) {
+    sendError(senderWs, 'UPLOAD blockId invalide');
+    return;
+  }
+
   // Tenter forward immédiat si le destinataire est connecté
   const destSession = sessions.get(destNodeId);
   if (destSession && destSession.ws.readyState === WebSocket.OPEN) {
@@ -185,29 +228,44 @@ function handleUpload(fromNodeId, payload, senderWs) {
     Buffer.from(fromNodeId.padEnd(16, '\0'), 'utf8').copy(forwardPayload, 0);
     Buffer.from(blockId.padEnd(64, '\0'), 'utf8').copy(forwardPayload, 16);
     data.copy(forwardPayload, 80);
-    destSession.ws.send(buildFrame(MSG.FORWARD, forwardPayload));
+    safeSend(destSession.ws, buildFrame(MSG.FORWARD, forwardPayload));
     console.log(`[RELAY] FORWARD immédiat ${blockId.slice(0, 16)} → nodeId=${destNodeId.slice(0, 8)}`);
   } else {
-    // Buffer en RAM avec TTL 60s
+    // Cap buffer RAM
+    if (relayBuffer.size >= MAX_RELAY_BUFFER_ENTRIES) {
+      sendError(senderWs, 'Relay buffer plein — réessayer plus tard');
+      return;
+    }
+
     const existing = relayBuffer.get(blockId) || [];
+
+    // Déduplication : si (blockId, destNodeId) existe déjà, remplacer l'entrée
+    const dupIdx = existing.findIndex(e => e.destNodeId === destNodeId);
+    if (dupIdx !== -1) {
+      clearTimeout(existing[dupIdx].ttlTimer);
+      existing.splice(dupIdx, 1);
+    }
+
+    // Capturer l'entrée par référence dans la closure TTL (évite d'évincer des entrées plus récentes)
+    const newEntry = { fromNodeId, destNodeId, data, ttlTimer: null };
     const ttlTimer = setTimeout(() => {
       const arr = relayBuffer.get(blockId);
       if (arr) {
-        const filtered = arr.filter(e => e.destNodeId !== destNodeId);
+        const filtered = arr.filter(e => e !== newEntry);
         if (filtered.length === 0) relayBuffer.delete(blockId);
         else relayBuffer.set(blockId, filtered);
       }
       console.log(`[RELAY] TTL expiré — blockId=${blockId.slice(0, 16)} destNodeId=${destNodeId.slice(0, 8)} purgé`);
     }, TTL_MS);
+    newEntry.ttlTimer = ttlTimer;
 
-    existing.push({ fromNodeId, destNodeId, data, ttlTimer });
+    existing.push(newEntry);
     relayBuffer.set(blockId, existing);
     console.log(`[RELAY] BUFFERED ${blockId.slice(0, 16)} → nodeId=${destNodeId.slice(0, 8)} (dest absent)`);
   }
 
   // ACK au sender
-  const ackBuf = Buffer.from(JSON.stringify({ blockId }), 'utf8');
-  senderWs.send(buildFrame(MSG.ACK, ackBuf));
+  safeSend(senderWs, buildFrame(MSG.ACK, Buffer.from(JSON.stringify({ blockId }), 'utf8')));
 }
 
 // ─── Serveur HTTP + WebSocketServer ─────────────────────────────────────────
@@ -228,11 +286,19 @@ const httpServer = http.createServer((req, res) => {
   }
 });
 
-const wss = new WebSocketServer({ server: httpServer });
+// maxPayload : rejeter les frames dépassant la taille max avant buffering complet
+const wss = new WebSocketServer({ server: httpServer, maxPayload: MAX_BLOCK_SIZE + 256 });
 
 wss.on('connection', (ws) => {
   // État de la connexion — non authentifié jusqu'au premier message AUTH
   let authState = null; // null = non auth ; après AUTH_OK = { nodeId, publicKey }
+
+  // Fermer les connexions non-authentifiées après AUTH_TIMEOUT_MS
+  const authTimeout = setTimeout(() => {
+    if (!authState) {
+      ws.close(1008, 'AUTH timeout');
+    }
+  }, AUTH_TIMEOUT_MS);
 
   ws.on('message', (rawData, isBinary) => {
     if (!isBinary) {
@@ -258,9 +324,17 @@ wss.on('connection', (ws) => {
         ws.close(1008, 'AUTH invalide');
         return;
       }
+
+      // Fermer l'ancienne connexion si le nodeId est déjà enregistré
+      const existingSession = sessions.get(result.nodeId);
+      if (existingSession) {
+        try { existingSession.ws.close(1008, 'Replaced by new connection'); } catch { /* déjà fermée */ }
+      }
+
+      clearTimeout(authTimeout);
       authState = { nodeId: result.nodeId, publicKey: result.publicKey };
       sessions.set(result.nodeId, { ws, publicKey: result.publicKey });
-      ws.send(buildFrame(MSG.AUTH_OK));
+      safeSend(ws, buildFrame(MSG.AUTH_OK));
       console.log(`[AUTH] nodeId=${result.nodeId.slice(0, 8)} authentifié (${sessions.size} sessions)`);
 
       // Flush des blocs en attente pour ce nœud
@@ -272,6 +346,10 @@ wss.on('connection', (ws) => {
     const { nodeId } = authState;
 
     switch (frame.type) {
+      case MSG.AUTH: {
+        sendError(ws, 'Déjà authentifié');
+        break;
+      }
       case MSG.REGISTER_PEER: {
         const ok = handleRegisterPeer(nodeId, frame.payload);
         if (!ok) sendError(ws, 'REGISTER_PEER payload invalide');
@@ -286,7 +364,7 @@ wss.on('connection', (ws) => {
         break;
       }
       case MSG.PING: {
-        ws.send(buildFrame(MSG.PONG));
+        safeSend(ws, buildFrame(MSG.PONG));
         break;
       }
       default: {
@@ -296,6 +374,7 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('close', () => {
+    clearTimeout(authTimeout);
     if (authState) {
       sessions.delete(authState.nodeId);
       // Nettoyage annuaire signaling si Super-Pair
@@ -322,7 +401,7 @@ function startServer() {
     console.log(`[SERVER] /health → http://localhost:${PORT}/health`);
   });
 
-  process.on('SIGTERM', () => {
+  process.once('SIGTERM', () => {
     console.log('[SERVER] SIGTERM reçu — fermeture gracieuse...');
     for (const [, session] of sessions.entries()) {
       if (session.ws.readyState === WebSocket.OPEN) {
@@ -333,8 +412,8 @@ function startServer() {
       console.log('[SERVER] Serveur arrêté proprement.');
       process.exit(0);
     });
-    // Forcer exit après 5s si fermeture bloquée
-    setTimeout(() => process.exit(1), 5000);
+    // Filet de sécurité 5s — unref() pour ne pas bloquer un exit propre
+    setTimeout(() => process.exit(0), 5000).unref();
   });
 }
 
@@ -344,9 +423,10 @@ if (require.main === module) {
 
 // ─── Exports pour les tests ──────────────────────────────────────────────────
 module.exports = {
-  buildFrame, parseFrame, sendError, verifyAuth,
+  buildFrame, parseFrame, sendError, safeSend, verifyAuth,
   handleRegisterPeer, handleGetPeers, handleUpload, flushPendingBlocks,
   sessions, signalingRegistry, relayBuffer,
-  MSG, TTL_MS, AUTH_WINDOW_MS, MAX_BLOCK_SIZE,
+  MSG, TTL_MS, AUTH_WINDOW_MS, AUTH_TIMEOUT_MS, MAX_BLOCK_SIZE,
+  MAX_RELAY_BUFFER_ENTRIES, MAX_SIGNALING_PEERS,
   httpServer, startServer
 };

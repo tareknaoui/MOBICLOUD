@@ -229,7 +229,7 @@ describe('handleGetPeers', () => {
   test('envoie liste vide si annuaire vide', () => {
     const { handleGetPeers, parseFrame, MSG } = mod;
     const sent = [];
-    const fakeWs = { send: (buf) => sent.push(buf) };
+    const fakeWs = { send: (buf) => sent.push(buf), readyState: 1 };
     handleGetPeers(fakeWs);
     const frame = parseFrame(sent[0]);
     const peers = JSON.parse(frame.payload.toString('utf8'));

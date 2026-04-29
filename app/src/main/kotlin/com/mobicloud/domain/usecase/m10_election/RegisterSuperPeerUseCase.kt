@@ -27,11 +27,11 @@ class RegisterSuperPeerUseCase @Inject constructor(
     private val trustScoreProvider: ITrustScoreProvider
 ) {
     /**
-     * Enregistre ce nœud comme Super-Pair sur Firebase et maintient un keepalive toutes les 30s.
-     * Annuler la coroutine déclenche l'abdication (suppression Firebase via `unregisterSuperPeer`).
+     * Enregistre ce nœud comme Super-Pair auprès des Serveurs Relais HA et maintient un keepalive toutes les 30s.
+     * Annuler la coroutine déclenche l'abdication via `unregisterAsSuperPeer`.
      *
      * @param tcpPort Port TCP en écoute, fourni par le service appelant.
-     * @param electedAt Timestamp Unix (ms) de l'élection — tracé dans Firebase.
+     * @param electedAt Timestamp Unix (ms) de l'élection.
      */
     operator fun invoke(tcpPort: Int, electedAt: Long = System.currentTimeMillis()): Flow<Result<Unit>> = flow {
         val identity = identityRepository.getIdentity().getOrElse { e ->
@@ -46,32 +46,30 @@ class RegisterSuperPeerUseCase @Inject constructor(
         }
 
         try {
-            // Enregistrement initial (AC3)
-            signalingRepository.registerSuperPeer(ip, tcpPort, reliabilityScore, electedAt)
+            // Enregistrement initial
+            signalingRepository.registerAsSuperPeer(ip, tcpPort, reliabilityScore, electedAt, identity.nodeId)
                 .getOrThrow()
 
-            // Log dans RadarLogConsole (AC9)
+            // Log dans RadarLogConsole
             networkEventRepository.pushEvent(
-                "[ELECTION] Super-Pair enregistré sur Firebase Tracker: $ip:$tcpPort"
+                "[ELECTION] Super-Pair enregistré sur Relais HA: $ip:$tcpPort"
             )
             emit(Result.success(Unit))
 
-            // Keepalive toutes les 30s pour maintenir le TTL 60s (AC4)
+            // Keepalive toutes les 30s pour maintenir le TTL 60s côté serveur
             while (currentCoroutineContext().isActive) {
                 delay(KEEPALIVE_INTERVAL_MS)
-                signalingRepository.registerSuperPeer(ip, tcpPort, reliabilityScore, electedAt)
-                    .onFailure { Log.w(TAG, "Keepalive Firebase échoué — mode P2P local actif", it) }
+                signalingRepository.registerAsSuperPeer(ip, tcpPort, reliabilityScore, electedAt, identity.nodeId)
+                    .onFailure { Log.w(TAG, "Keepalive Relais HA échoué — mode P2P local actif", it) }
             }
         } catch (e: CancellationException) {
-            // NonCancellable garantit que removeValue() s'exécute même si le parent est annulé
             withContext(NonCancellable) {
-                signalingRepository.unregisterSuperPeer()
-                    .onFailure { Log.w(TAG, "Abdication Firebase échouée — entrée persistera jusqu'au onDisconnect", it) }
+                signalingRepository.unregisterAsSuperPeer()
+                    .onFailure { Log.w(TAG, "Abdication Relais HA échouée — TTL serveur purgera l'entrée", it) }
             }
-            throw e  // Propager — NE PAS swallower CancellationException
+            throw e
         } catch (e: Exception) {
-            // Firebase inaccessible — dégradé gracieux, cluster continue en local (AC8)
-            Log.w(TAG, "Enregistrement Super-Pair Firebase échoué — mode P2P local", e)
+            Log.w(TAG, "Enregistrement Super-Pair Relais HA échoué — mode P2P local", e)
             emit(Result.failure(e))
         }
     }

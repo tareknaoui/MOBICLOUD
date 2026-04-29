@@ -2,10 +2,11 @@ package com.mobicloud.presentation.dashboard
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mobicloud.domain.models.NodeDiagnostics
 import com.mobicloud.domain.models.NetworkLogEvent
+import com.mobicloud.domain.models.NodeDiagnostics
 import com.mobicloud.domain.models.NodeRole
 import com.mobicloud.domain.models.ServiceStatus
+import com.mobicloud.domain.models.TransferChannelState
 import com.mobicloud.domain.repository.DiagnosticsRepository
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
@@ -20,6 +21,7 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+import javax.inject.Named
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
@@ -28,7 +30,8 @@ class DashboardViewModel @Inject constructor(
     networkEventRepository: NetworkEventRepository,
     private val peerRepository: PeerRepository,
     private val identityRepository: IdentityRepository,
-    circuitBreakerUseCase: CircuitBreakerUseCase
+    circuitBreakerUseCase: CircuitBreakerUseCase,
+    @Named("transfer_channel_state") transferChannelStateFlow: @JvmSuppressWildcards StateFlow<TransferChannelState>
 ) : ViewModel() {
 
     val serviceStatus: StateFlow<ServiceStatus> = networkServiceController.serviceStatus
@@ -63,4 +66,8 @@ class DashboardViewModel @Inject constructor(
     // AC#6 — Badge "Réseau instable" : vrai si le Circuit-Breaker est actif (Story 3.4)
     val isNetworkUnstable: StateFlow<Boolean> = circuitBreakerUseCase.isCircuitOpen
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
+
+    // AC#6 Story 8.3 — Canal de transfert actif (DIRECT / RELAY_HA / OFFLINE)
+    val relayState: StateFlow<TransferChannelState> = transferChannelStateFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), TransferChannelState.OFFLINE)
 }

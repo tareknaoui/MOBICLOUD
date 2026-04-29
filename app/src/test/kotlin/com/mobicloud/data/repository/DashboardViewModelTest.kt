@@ -6,6 +6,7 @@ import com.mobicloud.domain.models.NodeDiagnostics
 import com.mobicloud.domain.models.ServiceStatus
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.Peer
+import com.mobicloud.domain.models.TransferChannelState
 import com.mobicloud.domain.repository.DiagnosticsRepository
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
@@ -47,6 +48,7 @@ class DashboardViewModelTest {
     private val diagnosticsFlow = MutableStateFlow(NodeDiagnostics.DEFAULT)
     private val eventsFlow = MutableStateFlow<List<NetworkLogEvent>>(emptyList())
     private val peersFlow = MutableStateFlow<List<Peer>>(emptyList())
+    private val transferChannelStateFlow = MutableStateFlow(TransferChannelState.DIRECT)
 
     @Before
     fun setUp() {
@@ -79,7 +81,8 @@ class DashboardViewModelTest {
         networkEventRepository,
         peerRepository,
         identityRepository,
-        circuitBreakerUseCase
+        circuitBreakerUseCase,
+        transferChannelStateFlow
     )
 
     @Test

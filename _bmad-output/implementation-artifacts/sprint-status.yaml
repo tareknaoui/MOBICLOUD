@@ -1,5 +1,5 @@
 # generated: 2026-04-13T21:26:35+02:00
-# last_updated: 2026-04-28T20:00:00+02:00
+# last_updated: 2026-04-29T21:00:00+02:00
 # project: PFE
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-04-28T20:00:00+02:00
+last_updated: 2026-04-29T21:00:00+02:00
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -47,9 +47,12 @@ development_status:
   1-2-theme-oled-dark-navigation-3-onglets: done
   1-3-generation-persistance-de-lidentite-cryptographique-keystore: done
   1-4-foreground-service-reseau-permissions-au-lancement: done
+  1-6-configuration-du-quota-de-stockage-alloue-au-reseau: review
   epic-1-retrospective: optional
   epic-2: in-progress
+  2-0-decouverte-locale-par-multicast-udp: ready-for-dev
   2-1-decouverte-locale-via-udp-multicast-heartbeat: done
+  2-1-signalisation-inter-reseaux-via-serveurs-relais-ha: done
   2-2-signalisation-inter-reseaux-via-tracker-firebase: done
   2-3-calcul-du-score-de-fiabilite-local: done
   2-4-dashboard-tactique-composants-ux-de-diagnostic: done
@@ -57,6 +60,7 @@ development_status:
   epic-3: in-progress
   3-1-declenchement-protocole-delection-bully: done
   3-2-enregistrement-du-super-pair-sur-le-tracker-firebase: done
+  3-2-enregistrement-du-super-pair-aupres-des-serveurs-relais-ha: done
   3-3-abdication-automatique-buffer-durgence-electoral: done
   3-4-circuit-breaker-anti-avalanche-churn-30: done
   epic-3-retrospective: optional
@@ -85,7 +89,7 @@ development_status:
   7-3-auto-reparation-detection-de-blocs-sous-repliques: done
   epic-7-retrospective: optional
   epic-8: in-progress
-  8-1-serveur-relais-ha-nodejs-signaling-transport-unifies: in-progress
-  8-2-client-android-relaywebsocketclient-unifie: backlog
-  8-3-fallback-transparent-try-direct-then-relay-multi-instance: backlog
+  8-1-serveur-relais-ha-nodejs-signaling-transport-unifies: done
+  8-2-client-android-relaywebsocketclient-unifie: done
+  8-3-fallback-transparent-try-direct-then-relay-multi-instance: done
   epic-8-retrospective: optional

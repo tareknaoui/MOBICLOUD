@@ -1,5 +1,4 @@
-package com.mobicloud
-    .data.repository
+package com.mobicloud.data.repository
 
 import com.mobicloud.data.local.dao.PeerDao
 import com.mobicloud.data.local.entity.PeerNodeEntity

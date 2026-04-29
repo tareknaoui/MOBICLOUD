@@ -14,7 +14,6 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
 import com.mobicloud.compose.R
-import com.mobicloud.data.network.PublicIpFetcher
 import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.core.network.utils.NetworkUtils
 import com.mobicloud.domain.repository.IdentityRepository
@@ -46,7 +45,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -61,7 +59,6 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var networkUtils: NetworkUtils
     @Inject lateinit var signalingRepository: SignalingRepository
     @Inject lateinit var tcpConnectionManager: TcpConnectionManager
-    @Inject lateinit var publicIpFetcher: PublicIpFetcher
     @Inject lateinit var networkEventRepository: NetworkEventRepository
     @Inject lateinit var runBullyElectionUseCase: RunBullyElectionUseCase
     @Inject lateinit var registerSuperPeerUseCase: RegisterSuperPeerUseCase
@@ -86,7 +83,6 @@ class MobicloudP2PService : Service() {
         const val NOTIFICATION_ID = 404
         private const val PEER_TIMEOUT_MS = 15000L
         private const val EVICTION_CHECK_INTERVAL_MS = 1000L
-        private const val FIREBASE_ANNOUNCE_TIMEOUT_MS = 10_000L
         private const val RELIABILITY_SCORE_INTERVAL_MS = 30_000L
         private const val LOGTAG = "MobicloudP2PService"
         /** Durée du mandat Super-Pair avant abdication automatique (testable via overrideAbdicationDelayMs). */
@@ -170,60 +166,32 @@ class MobicloudP2PService : Service() {
                     .onFailure { Log.w(LOGTAG, "[CRDT] Purge tombstones échouée : ${it.message}") }
             }
 
-            // Firebase announce — publie l'IP publique sur Firebase pour la fédération inter-réseaux
+            // Discovery périodique via Relais HA — déclenche GET_PEERS toutes les 30s
             launch {
-                // F11: ne pas publier 127.0.0.1 sur Firebase — inutilisable par les pairs distants
-                val ipToAnnounce = publicIpFetcher.fetchPublicIp().getOrNull()
-                if (ipToAnnounce == null || ipToAnnounce == "127.0.0.1") {
-                    Log.w("MobicloudP2PService", "IP publique indisponible — announce Firebase ignorée")
-                    return@launch
-                }
-                try {
-                    withTimeout(FIREBASE_ANNOUNCE_TIMEOUT_MS) {
-                        signalingRepository.registerNode(ipToAnnounce, tcpPort)
-                            .onSuccess { networkEventRepository.pushEvent("[TRACKER] Enregistrement Firebase réussi") }
-                            .onFailure {
-                                Log.w("MobicloudP2PService", "Firebase registerNode échec", it)
-                                networkEventRepository.pushEvent("[TRACKER] Firebase indisponible")
-                            }
-                    }
-                } catch (e: Exception) {
-                    Log.w("MobicloudP2PService", "Firebase announce timeout", e)
-                    networkEventRepository.pushEvent("[TRACKER] Firebase indisponible")
+                delay(3_000L) // laisser la connexion WSS s'établir avant le premier GET_PEERS
+                while (isActive) {
+                    signalingRepository.fetchActiveSuperPeers()
+                        .onSuccess { networkEventRepository.pushEvent("[HA] GET_PEERS envoyé — réponse attendue") }
+                        .onFailure { Log.w("MobicloudP2PService", "fetchActiveSuperPeers échoué", it) }
+                    delay(30_000L)
                 }
             }
 
-            // Firebase Discovery & TCP Handshake
+            // TCP Handshake — se connecter aux Super-Pairs découverts (toutes sources)
             launch {
-                // F02: jobs indexés par nodeId — évite de spawner plusieurs coroutines TCP pour le même pair
                 val connectionJobs = mutableMapOf<String, Job>()
-                try {
-                    signalingRepository.observeRemoteNodes().collectLatest { peers ->
-                        for (peer in peers) {
-                            // P2: Normalise le timestamp Firebase vers elapsedRealtime pour cohérence avec l'éviction
-                            peerRepository.registerOrUpdatePeer(
-                                peer.identity,
-                                SystemClock.elapsedRealtime(),
-                                peer.source,
-                                peer.ipAddress,
-                                peer.port
-                            ).onSuccess {
-                                networkEventRepository.pushEvent("[FIREBASE] Pair distant découvert : ${peer.identity.nodeId.take(8)}")
-                            }.onFailure { Log.e("MobicloudP2PService", "Failed to register Firebase peer", it) }
-                            // D1: Handshake seulement si pas encore connecté et aucun job en cours pour ce nœud
-                            val nodeId = peer.identity.nodeId
-                            if (!tcpConnectionManager.isConnected(nodeId) &&
-                                connectionJobs[nodeId]?.isActive != true) {
-                                connectionJobs[nodeId] = launch {
-                                    tcpConnectionManager.connectToPeer(peer)
-                                    networkEventRepository.pushEvent("[TCP] Connexion établie avec ${nodeId.take(8)}")
-                                }
+                peerRepository.peers.collect { allPeers ->
+                    val activeSuperPeers = allPeers.filter { it.isSuperPair && it.isActive }
+                    for (peer in activeSuperPeers) {
+                        val nodeId = peer.identity.nodeId
+                        if (!tcpConnectionManager.isConnected(nodeId) &&
+                            connectionJobs[nodeId]?.isActive != true) {
+                            connectionJobs[nodeId] = launch {
+                                tcpConnectionManager.connectToPeer(peer)
+                                networkEventRepository.pushEvent("[TCP] Connexion établie avec ${nodeId.take(8)}")
                             }
                         }
                     }
-                } catch (e: Exception) {
-                    // F03: Firebase onCancelled propage une exception — le service P2P reste actif
-                    Log.w("MobicloudP2PService", "Firebase discovery interrompue", e)
                 }
             }
 
@@ -286,13 +254,13 @@ class MobicloudP2PService : Service() {
                     runBullyElectionUseCase().collect { result ->
                         result
                             .onSuccess { election ->
-                                Log.i(LOGTAG, "Élection remportée — démarrage keepalive Super-Pair Firebase")
+                                Log.i(LOGTAG, "Élection remportée — démarrage keepalive Super-Pair Relais HA")
                                 superPeerJob?.cancel()
                                 superPeerJob = launch {
                                     launch {
                                         registerSuperPeerUseCase(tcpPort, election.electedAt).collect { regResult ->
                                             regResult.onFailure {
-                                                Log.w(LOGTAG, "Enregistrement Super-Pair Firebase échoué — cluster isolé (aucun fallback de découverte)", it)
+                                                Log.w(LOGTAG, "Enregistrement Super-Pair Relais HA échoué — cluster isolé (mode P2P local)", it)
                                             }
                                         }
                                     }
@@ -304,7 +272,7 @@ class MobicloudP2PService : Service() {
                                         abdicateSuperPeerUseCase()
                                             .onFailure { Log.w(LOGTAG, "Broadcast ABDICATION échoué — abdication tout de même exécutée", it) }
                                         networkEventRepository.pushEvent("[ELECTION] Abdication automatique après ${ABDICATION_DELAY_MS / 60_000}min")
-                                        abdicate() // Annule superPeerJob (keepalive Firebase)
+                                        abdicate() // Annule superPeerJob (keepalive Relais HA)
                                     }
                                 }
                             }
