@@ -1,5 +1,18 @@
 # Deferred Work Log
 
+## Deferred from: code review of 2-0-decouverte-locale-par-multicast-udp — adversarial review (2026-04-29)
+
+- **W-A1 — `stop()` libère MulticastLock pendant que coroutines tournent encore (fenêtre 2s soTimeout)** — redesign architectural ; joinBlocking sur le socket requis. [`LocalDiscoveryRepositoryImpl.kt:76-81`]
+- **W-A2 — Exception lazy init `cachedPrivateKeyEntry` swallowée silencieusement** — contrat Keystore Android hors scope story. [`LocalDiscoveryRepositoryImpl.kt:61`]
+- **W-A3 — `timestampMs` elapsedRealtime vs wall-clock** — pattern commun dans le projet, voir deferred-work story 3-2. [`LocalDiscoveryRepositoryImpl.kt:291`]
+- **W-A4 — Double subquery TOCTOU dans `insertOrUpdatePreservingRole`** — limitation SQLite sans transaction explicite. [`PeerDao.kt:15-22`]
+- **W-A5 — `INSERT OR REPLACE` supprime+réinsère — risque cascade foreign-key** — pattern de toute la couche PeerDao. [`PeerDao.kt:13`]
+- **W-A6 — `confirmReduceQuota()` TOCTOU sur usedStorageBytes** — fenêtre étroite, amélioration UX. [`SettingsViewModel.kt:confirmReduceQuota()`]
+- **W-A7 — Pas de test pour stop-avant-start, double-start, cycle start→stop→start** — couverture cycle de vie. [`LocalDiscoveryRepositoryImplTest.kt`]
+- **W-A8 — Priorité LAN AC7 enfouie dans SQL PeerDao — non testable JVM** — nécessite test d'intégration Room. [`PeerDao.kt:15-22`]
+- **W-A9 — Échecs socket.send() sans événement networkEventRepository** — amélioration diagnostic. [`LocalDiscoveryRepositoryImpl.kt:185`]
+- **W-A10 — Pas de vérification taille avant socket.send()** — cas rare avec schéma actuel. [`LocalDiscoveryRepositoryImpl.kt:183`]
+
 ## Deferred from: code review of 3-2-enregistrement-du-super-pair-aupres-des-serveurs-relais-ha — 2e passage (2026-04-29)
 
 - **W1 — `connectionJobs` map croît sans nettoyage** — les jobs TCP terminés/annulés ne sont jamais retirés de `connectionJobs` dans `MobicloudP2PService`; pattern pré-existant depuis le code Firebase. [`MobicloudP2PService.kt:TCP Handshake loop`]

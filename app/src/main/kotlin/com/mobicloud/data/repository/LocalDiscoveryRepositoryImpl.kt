@@ -53,7 +53,9 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
 
     private var multicastLock: WifiManager.MulticastLock? = null
     @Volatile private var job: Job? = null
-    private var tcpPort: Int = 0
+    // P-A1 — @Volatile garantit la visibilité de tcpPort entre start() (thread appelant) et broadcastLoop() (coroutine)
+    @Volatile private var tcpPort: Int = 0
+    private val startStopLock = Any()
 
     // P8 — mise en cache de la PrivateKeyEntry pour éviter une IPC KeyStore toutes les 5s
     private val cachedPrivateKeyEntry: KeyStore.PrivateKeyEntry by lazy {
@@ -62,22 +64,33 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
     }
 
     // DN1 — tcpPort passé par le service après startServer()
-    // P1 — guard double-start : aucun effet si déjà actif
+    // P-A2 — synchronized(startStopLock) rend le guard check-then-act atomique
+    // P-A8 — try/catch sur acquireMulticastLock() pour éviter un état incohérent si le lock échoue
     override fun start(tcpPort: Int) {
-        if (job?.isActive == true) return
-        this.tcpPort = tcpPort
-        acquireMulticastLock()
-        job = externalScope.launch {
-            launch { broadcastLoop() }
-            launch { receiveLoop() }
+        synchronized(startStopLock) {
+            if (job?.isActive == true) return
+            this.tcpPort = tcpPort
+            try {
+                acquireMulticastLock()
+            } catch (e: Exception) {
+                Log.e(TAG, "Impossible d'acquérir le MulticastLock — découverte LAN désactivée", e)
+                multicastLock = null
+                return
+            }
+            job = externalScope.launch {
+                launch { broadcastLoop() }
+                launch { receiveLoop() }
+            }
         }
     }
 
     override fun stop() {
-        job?.cancel()
-        job = null
-        multicastLock?.release()
-        multicastLock = null
+        synchronized(startStopLock) {
+            job?.cancel()
+            job = null
+            multicastLock?.release()
+            multicastLock = null
+        }
     }
 
     private fun acquireMulticastLock() {
@@ -136,44 +149,45 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
         var lastValidHelloMs = SystemClock.elapsedRealtime()
         var fallbackLogged = false
 
-        runCatching {
-            // P7 — reuseAddress doit être positionné avant bind(), donc on construit le socket manuellement
-            val socket = MulticastSocket(null).apply {
-                reuseAddress = true
-                bind(InetSocketAddress(MULTICAST_PORT))
-                timeToLive = 1
-                joinGroup(InetAddress.getByName(MULTICAST_GROUP))
-                soTimeout = SOCKET_TIMEOUT_MS
-            }
-            // P6 — leaveGroup dans finally : exécuté même si la coroutine est annulée
-            try {
-                val buffer = ByteArray(BUFFER_SIZE)
-                while (isActive) {
-                    fallbackLogged = logFallbackIfNeeded(lastValidHelloMs, fallbackLogged)
+        // P-A3 — socket construit avant le try pour garantir sa fermeture dans le finally même si bind()/joinGroup() lève
+        // P7 — reuseAddress positionné avant bind()
+        // P-A4 — timeToLive retiré du socket de réception (no-op sur un socket non émetteur)
+        val socketGroup = InetAddress.getByName(MULTICAST_GROUP)
+        val socket = MulticastSocket(null)
+        try {
+            socket.reuseAddress = true
+            socket.bind(InetSocketAddress(MULTICAST_PORT))
+            socket.joinGroup(socketGroup)
+            socket.soTimeout = SOCKET_TIMEOUT_MS
+            val buffer = ByteArray(BUFFER_SIZE)
+            while (isActive) {
+                fallbackLogged = logFallbackIfNeeded(lastValidHelloMs, fallbackLogged)
 
-                    val packet = DatagramPacket(buffer, buffer.size)
-                    runCatching { socket.receive(packet) }.onFailure {
-                        return@onFailure
-                    }.onSuccess {
-                        val bytes = packet.data.copyOf(packet.length)
-                        // P10 — strip zone IPv6 ("%eth0") et protection null
-                        val sourceAddress = (packet.address?.hostAddress ?: "").substringBefore('%')
-                        val updated = processIncomingBytes(
-                            bytes = bytes,
-                            sourceAddress = sourceAddress,
-                            localNodeId = localNodeId
-                        )
-                        if (updated) {
-                            lastValidHelloMs = SystemClock.elapsedRealtime()
-                            fallbackLogged = false
-                        }
+                val packet = DatagramPacket(buffer, buffer.size)
+                runCatching { socket.receive(packet) }.onFailure {
+                    return@onFailure
+                }.onSuccess {
+                    val bytes = packet.data.copyOf(packet.length)
+                    // P10 — strip zone IPv6 ("%eth0") et protection null
+                    val sourceAddress = (packet.address?.hostAddress ?: "").substringBefore('%')
+                    val updated = processIncomingBytes(
+                        bytes = bytes,
+                        sourceAddress = sourceAddress,
+                        localNodeId = localNodeId
+                    )
+                    if (updated) {
+                        lastValidHelloMs = SystemClock.elapsedRealtime()
+                        fallbackLogged = false
                     }
                 }
-            } finally {
-                runCatching { socket.leaveGroup(InetAddress.getByName(MULTICAST_GROUP)) }
-                socket.close()
             }
-        }.onFailure { Log.e(TAG, "receiveLoop terminée avec erreur", it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "receiveLoop terminée avec erreur", e)
+        } finally {
+            // P6 — leaveGroup dans finally : exécuté même si la coroutine est annulée
+            runCatching { socket.leaveGroup(socketGroup) }
+            socket.close()
+        }
     }
 
     // P3 helper — extrait pour être testable sans réseau
@@ -195,6 +209,11 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
         // P9 — rejet des datagrammes vides ou surdimensionnés avant désérialisation
         if (bytes.isEmpty() || bytes.size > BUFFER_SIZE) {
             Log.w(TAG, "Datagramme invalide : taille ${bytes.size} octets — ignoré")
+            return false
+        }
+        // P-A6 — adresse source vide = packet.address était null (cas exotique Android) → ignorer
+        if (sourceAddress.isEmpty()) {
+            Log.w(TAG, "Adresse source manquante — datagramme ignoré")
             return false
         }
         return runCatching {
@@ -222,16 +241,18 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
                 publicKeyBytes = msg.payload.publicKeyBytes,
                 reliabilityScore = msg.payload.reliabilityScore
             )
-            peerRepository.registerOrUpdatePeer(
+            // P-A5 — propager le succès/échec DB : retourner false si l'insertion échoue
+            // pour ne pas réinitialiser le timer fallback sur un HELLO non persisté
+            val insertResult = peerRepository.registerOrUpdatePeer(
                 identity = peerIdentity,
                 timestampMs = SystemClock.elapsedRealtime(),
                 source = DiscoverySource.LAN_MULTICAST,
                 ipAddress = sourceAddress,
                 port = msg.payload.tcpPort,
                 isSuperPair = false
-            ).onFailure { Log.e(TAG, "Échec insertion pair LAN", it) }
-
-            true
+            )
+            insertResult.onFailure { Log.e(TAG, "Échec insertion pair LAN", it) }
+            insertResult.isSuccess
         }.getOrElse { e ->
             Log.w(TAG, "Datagramme HELLO malformé — ignoré", e)
             false

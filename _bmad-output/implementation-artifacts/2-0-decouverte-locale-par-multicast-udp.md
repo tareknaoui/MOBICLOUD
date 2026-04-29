@@ -422,8 +422,40 @@ claude-sonnet-4-6 (2026-04-29)
 - [x] [Review][Defer] **W4 — `reliabilityScore` exposé en clair dans les broadcasts réseau** [`HelloPayload.kt:9`] — deferred, pre-existing ; décision d'architecture P2P (fingerprinting potentiel), hors scope.
 - [x] [Review][Defer] **W5 — `BindException` Android 12+ non gérée avec retry** [`LocalDiscoveryRepositoryImpl.kt:125`] — deferred, pre-existing ; restriction foreground service type, nécessite investigation permissions manifest séparée.
 
+### Review Findings — Adversarial Review (2026-04-29)
+
+#### Decision Needed
+
+- [x] [Review][Decision] **DN-A1 — Re-encodage du payload pour vérification de signature — risque de bypass par canonicalisation** — Différé : kotlinx-serialization ProtoBuf est déterministe pour un même data class Kotlin dans un système fermé (même modèle des deux côtés). Risque théorique uniquement si des champs inconnus traversent le fil — non applicable ici. [`LocalDiscoveryRepositoryImpl.kt:279`]
+- [x] [Review][Decision] **DN-A2 — Colonnes ip_address et port écrasées par RELAY_HA quand source préservée LAN_MULTICAST** → Résolu : converti en patch P-A9. [`PeerDao.kt:17-21`]
+
+#### Patches
+
+- [x] [Review][Patch] **P-A1 — `tcpPort` non `@Volatile` — visibilité inter-thread entre `start()` et `broadcastLoop()`** [`LocalDiscoveryRepositoryImpl.kt:57`]
+- [x] [Review][Patch] **P-A2 — `start()` double-start TOCTOU — guard check-then-act non atomique** [`LocalDiscoveryRepositoryImpl.kt:67`]
+- [x] [Review][Patch] **P-A3 — Socket leakée si `MulticastSocket(null).apply{bind()/joinGroup()}` lève une exception** [`LocalDiscoveryRepositoryImpl.kt:141`]
+- [x] [Review][Patch] **P-A4 — `timeToLive = 1` sur le socket de réception (`MulticastSocket(null)`) est dead code — no-op trompeur** [`LocalDiscoveryRepositoryImpl.kt:144`]
+- [x] [Review][Patch] **P-A5 — `processIncomingBytes` retourne `true` quand `registerOrUpdatePeer` échoue — réinitialise le timer fallback à tort** [`LocalDiscoveryRepositoryImpl.kt:290-297`]
+- [x] [Review][Patch] **P-A6 — `sourceAddress` vide `""` stockée en DB quand `packet.address` est null** [`LocalDiscoveryRepositoryImpl.kt:225`]
+- [x] [Review][Patch] **P-A7 — `observeSettings()` exécute `dao.upsert()` dans un opérateur `Flow.map` — effet de bord dans un flux froid** [`NodeSettingsRepositoryImpl.kt:observeSettings()`]
+- [x] [Review][Patch] **P-A8 — `acquireMulticastLock()` peut lever une exception et laisser `multicastLock` partiellement construit sans `job` lancé** [`LocalDiscoveryRepositoryImpl.kt:66-73`]
+- [x] [Review][Patch] **P-A9 — Colonnes `ip_address` et `port` non préservées quand source LAN_MULTICAST est conservée dans `insertOrUpdatePreservingRole`** [`PeerDao.kt:17-21`]
+
+#### Deferred
+- [x] [Review][Defer] **W-A1 — `stop()` libère `MulticastLock` pendant que les coroutines tournent encore (fenêtre 2s `soTimeout`)** [`LocalDiscoveryRepositoryImpl.kt:76-81`] — deferred, pre-existing ; redesign architectural nécessaire (joinBlocking sur le socket).
+- [x] [Review][Defer] **W-A2 — Exception lazy init `cachedPrivateKeyEntry` swallowée silencieusement — broadcast s'arrête sans événement utilisateur** [`LocalDiscoveryRepositoryImpl.kt:61`] — deferred, pre-existing ; contrat Keystore Android hors scope story.
+- [x] [Review][Defer] **W-A3 — `timestampMs` utilise `SystemClock.elapsedRealtime()` (monotonic) — incohérence potentielle avec comparaisons wall-clock en aval** [`LocalDiscoveryRepositoryImpl.kt:291`] — deferred, pre-existing ; pattern commun dans le projet (voir deferred-work story 3-2).
+- [x] [Review][Defer] **W-A4 — Double subquery TOCTOU dans `insertOrUpdatePreservingRole` sous écritures concurrentes** [`PeerDao.kt:15-22`] — deferred, pre-existing ; limitation SQLite sans transaction explicite.
+- [x] [Review][Defer] **W-A5 — `INSERT OR REPLACE` supprime puis réinsère la ligne — risque cascade foreign-key** [`PeerDao.kt:13`] — deferred, pre-existing ; pattern de toute la couche PeerDao.
+- [x] [Review][Defer] **W-A6 — `confirmReduceQuota()` ne re-valide pas `newBytes < usedStorageBytes` au moment de la confirmation — TOCTOU** [`SettingsViewModel.kt:confirmReduceQuota()`] — deferred, fenêtre étroite, amélioration UX.
+- [x] [Review][Defer] **W-A7 — Aucun test pour `stop()` avant `start()`, démarrage double, cycle start→stop→start** [`LocalDiscoveryRepositoryImplTest.kt`] — deferred, couverture des chemins de cycle de vie.
+- [x] [Review][Defer] **W-A8 — Logique de priorité LAN (AC7) enfouie dans SQL `PeerDao` — non testable via tests JVM MockK** [`PeerDao.kt:15-22`] — deferred, nécessite test d'intégration Room.
+- [x] [Review][Defer] **W-A9 — Échecs d'émission `socket.send()` ne déclenchent aucun événement `networkEventRepository` — silencieux** [`LocalDiscoveryRepositoryImpl.kt:185`] — deferred, amélioration UX/diagnostic.
+- [x] [Review][Defer] **W-A10 — Aucune vérification de taille avant `socket.send()` — récepteur rejette silencieusement les paquets > BUFFER_SIZE** [`LocalDiscoveryRepositoryImpl.kt:183`] — deferred, cas rare avec le schéma actuel.
+
 ## Change Log
 
 - 2026-04-29 : Story 2.0 créée — Découverte Locale par Multicast UDP signé EC P-256, `LocalDiscoveryRepositoryImpl`, priorité LAN sur Relay HA.
 - 2026-04-29 : Implémentation complète — 7 tâches, 8 tests JVM, 0 régression. Statut → review.
 - 2026-04-29 : Code review — 3 DN + 12 patches appliqués. Statut → done.
+- 2026-04-29 : Review adversariale (3 agents parallèles) — 2 DN résolus + 9 patches appliqués + 10 deferred + 17 dismissed. Statut → done.

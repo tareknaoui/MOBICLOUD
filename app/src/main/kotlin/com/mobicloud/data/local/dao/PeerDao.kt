@@ -15,9 +15,16 @@ interface PeerDao {
     // Préserve is_super_pair si le nœud est déjà déclaré super-pair — évite que les heartbeats le réinitialisent à false.
     // DN2/AC7 — source LAN_MULTICAST est prioritaire : si le pair existe déjà en LAN_MULTICAST, une mise à jour
     // RELAY_HA ne dégrade pas la source (LAN direct > relais inter-réseau).
+    // P-A9 — ip_address et port également préservés quand source est maintenue à LAN_MULTICAST :
+    // évite de stocker une adresse relais sur un pair marqué LAN, ce qui rendrait la connexion TCP directe impossible.
     @Query("""INSERT OR REPLACE INTO peer_nodes
         (node_id, public_key_bytes, reliability_score, ip_address, port, last_seen_timestamp_ms, is_active, source, is_super_pair)
-        VALUES (:nodeId, :publicKeyBytes, :reliabilityScore, :ipAddress, :port, :timestampMs, 1,
+        VALUES (:nodeId, :publicKeyBytes, :reliabilityScore,
+        CASE WHEN COALESCE((SELECT source FROM peer_nodes WHERE node_id = :nodeId), '') = 'LAN_MULTICAST'
+             AND :source != 'LAN_MULTICAST' THEN (SELECT ip_address FROM peer_nodes WHERE node_id = :nodeId) ELSE :ipAddress END,
+        CASE WHEN COALESCE((SELECT source FROM peer_nodes WHERE node_id = :nodeId), '') = 'LAN_MULTICAST'
+             AND :source != 'LAN_MULTICAST' THEN (SELECT port FROM peer_nodes WHERE node_id = :nodeId) ELSE :port END,
+        :timestampMs, 1,
         CASE WHEN COALESCE((SELECT source FROM peer_nodes WHERE node_id = :nodeId), '') = 'LAN_MULTICAST'
              AND :source != 'LAN_MULTICAST' THEN 'LAN_MULTICAST' ELSE :source END,
         MAX(:isSuperPair, COALESCE((SELECT is_super_pair FROM peer_nodes WHERE node_id = :nodeId), 0)))""")

@@ -54,16 +54,11 @@ class NodeSettingsRepositoryImpl(
         dao.upsert(NodeSettingsEntity(id = 0, allocatedStorageBytes = bytes))
     }
 
-    // P6: when no row exists, upsert the default so subsequent emissions are consistent
+    // P-A7 — pas d'effet de bord (dao.upsert) dans un Flow.map : le mapping est pur.
+    // L'initialisation de la ligne par défaut est garantie par getSettings() qui est appelé au démarrage.
     override fun observeSettings(): Flow<NodeSettings> =
         dao.observeSettings().map { entity ->
-            if (entity == null) {
-                val default = NodeSettings(allocatedStorageBytes = defaultBytes())
-                dao.upsert(default.toEntity())
-                default
-            } else {
-                entity.toDomain()
-            }
+            entity?.toDomain() ?: NodeSettings(allocatedStorageBytes = defaultBytes())
         }
 
     // P3: freeSpace calculation lives in data/, not in presentation
