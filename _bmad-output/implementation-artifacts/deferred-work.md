@@ -372,3 +372,19 @@
 - **Couverture de tests manquante** [`TriggerAutoRepairUseCaseTest.kt`] — pas de test pour : (a) `findHostNodeIdsByBlockId` retournant `Failure` → dégradation gracieuse, (b) `peersFlow` mutant pendant un scan → finding StateFlow-lag, (c) round-trip signature émetteur→récepteur (aujourd'hui `Execute*Test` ne contient que des assertions structure/tag). Quand threshold passera à ≥ 2, la branche `sendReplicationPlan` sera exercée pour la première fois en prod → risque de régression.
 - **`distinct()` non borné sur `hostedBlockIds`** [`OrchestrateBlockMigrationUseCase.kt`] — une NOTICE avec une liste gigantesque de blocs déclenche O(n) hash. Pas de cap d'entrée côté récepteur. Vecteur DoS mineur, pré-existant Story 7.2.
 
+
+## Deferred from: code review of 1-6-configuration-du-quota-de-stockage-alloue-au-reseau (2026-04-29)
+
+- **Float precision loss Slider > 8 GB** [`SettingsScreen.kt`] — limitation inhérente au Slider Material3 (Float 23-bit mantissa) ; non fixable sans changer l'API du composant.
+- **`StatFs(getDataDirectory())` vs `context.filesDir`** [`NodeSettingsRepositoryImpl.kt`, `SettingsViewModel.kt`] — la spec impose ce chemin ; partitions potentiellement différentes sur adoptable storage ; revisiter si le support adoptable storage est ajouté.
+- **`NodeSettingsRepositoryImpl` sans `@Singleton` sur la classe** [`NodeSettingsRepositoryImpl.kt`] — le `@Singleton` sur le `@Binds` suffit pour Hilt ; pas de bug à l'exécution.
+- **`exportSchema = false` retire la vérification compile-time des migrations** [`CatalogDatabase.kt`] — pré-existant sur toute la base de données.
+- **Tests ne couvrent pas les bornes invalides de `updateAllocatedStorage`** [`NodeSettingsRepositoryImplTest.kt`] — gap de couverture non bloquant.
+
+## Deferred from: code review of 2-0-decouverte-locale-par-multicast-udp (2026-04-29)
+
+- **W1 — `DatagramSocket` non lié à l'interface WiFi spécifique** [`LocalDiscoveryRepositoryImpl.kt:broadcastLoop`] — sur appareils multi-home (WiFi + Hotspot actif), les HELLO peuvent sortir par la mauvaise interface ; correction nécessite `MulticastSocket.setNetworkInterface()` et détection de l'interface WiFi active.
+- **W2 — `fallbackLogged` trop facilement réinitialisé par un seul HELLO valide** [`LocalDiscoveryRepositoryImpl.kt:receiveLoop`] — un unique paquet chanceux remet à zéro le timer ; UX dégradée sur multicast instable sans que le log fallback ne soit jamais émis.
+- **W3 — `getIdentity()` appelé deux fois (broadcastLoop + receiveLoop)** [`LocalDiscoveryRepositoryImpl.kt:81,114`] — micro-optimisation : résoudre une seule fois et partager entre les deux boucles.
+- **W4 — `reliabilityScore` exposé en clair dans les broadcasts réseau** [`HelloPayload.kt:9`] — fingerprinting potentiel de la topologie ; à évaluer lors de la phase sécurité/hardening.
+- **W5 — `BindException` Android 12+ non gérée avec retry** [`LocalDiscoveryRepositoryImpl.kt:125`] — restriction `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` sur Android 12+ ; nécessite investigation manifest + retry avec backoff.

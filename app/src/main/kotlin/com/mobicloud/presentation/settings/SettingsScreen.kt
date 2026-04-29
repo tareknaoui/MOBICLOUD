@@ -42,7 +42,8 @@ fun SettingsScreen(
 
     val minBytes = HALF_GB
     val maxBytes = ((freeBytes * 0.80f).toLong()).coerceAtLeast(minBytes)
-    val steps = ((maxBytes - minBytes) / HALF_GB).toInt().coerceAtLeast(0) - 1
+    // P5: coerceAtLeast(0) applied after - 1 to prevent steps = -1 on first composition (freeBytes=0)
+    val steps = (((maxBytes - minBytes) / HALF_GB).toInt() - 1).coerceAtLeast(0)
 
     var sliderValue by remember(settings.allocatedStorageBytes) {
         mutableFloatStateOf(settings.allocatedStorageBytes.coerceIn(minBytes, maxBytes).toFloat())

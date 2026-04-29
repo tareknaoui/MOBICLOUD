@@ -32,6 +32,7 @@ import com.mobicloud.domain.usecase.m06_m07_repair_migration.OrchestrateBlockMig
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.TriggerAutoRepairUseCase
 import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
 import com.mobicloud.core.network.NetworkChangeObserver
+import com.mobicloud.domain.repository.LocalDiscoveryRepository
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
@@ -73,6 +74,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var executeMigrationPlanUseCase: ExecuteMigrationPlanUseCase
     @Inject lateinit var triggerAutoRepairUseCase: TriggerAutoRepairUseCase
     @Inject lateinit var executeReplicationPlanUseCase: ExecuteReplicationPlanUseCase
+    @Inject lateinit var localDiscoveryRepository: LocalDiscoveryRepository
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -158,6 +160,9 @@ class MobicloudP2PService : Service() {
                 return@launch
             }
             val tcpPort = tcpPortResult.getOrThrow()
+
+            // Story 2.0 — démarrer la découverte locale LAN après startServer() pour émettre le bon tcpPort
+            launch { localDiscoveryRepository.start(tcpPort) }
 
             // AC#6: purge des tombstones expirés au démarrage du service
             serviceScope.launch {
@@ -317,6 +322,7 @@ class MobicloudP2PService : Service() {
 
     override fun onDestroy() {
         loopsStarted = false
+        localDiscoveryRepository.stop()
         networkChangeObserver.unregister()
         tcpConnectionManager.stopServer()
         serviceScope.cancel()

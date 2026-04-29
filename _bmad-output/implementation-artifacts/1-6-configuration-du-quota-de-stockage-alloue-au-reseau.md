@@ -1,6 +1,6 @@
 # Story 1.6: Configuration du Quota de Stockage Alloué au Réseau
 
-Status: review
+Status: done
 
 ## Story
 
@@ -352,3 +352,28 @@ claude-sonnet-4-6
 ### Change Log
 
 - 2026-04-29 : Implémentation complète story 1.6 — quota stockage réseau, migration Room v9→v10, UI Slider Material3 avec AlertDialog avertissement, 5 tests unitaires MockK.
+
+---
+
+### Review Findings
+
+_Code review du 2026-04-29 — sources : Blind Hunter, Edge Case Hunter, Acceptance Auditor_
+
+**Patch (8)**
+
+- [x] [Review][Patch] Race condition TOCTOU sur `pendingBytes` — `var` non synchronisé écrasé entre deux appels rapides au slider, `confirmReduceQuota` valide le mauvais quota [`SettingsViewModel.kt`] ✅ fixed: MutableStateFlow<Long?>
+- [x] [Review][Patch] Dialog dismiss avant persistance — `_showWarningDialog.value = false` précède `settingsRepository.updateAllocatedStorage(pendingBytes)`, aucun rollback si la coroutine échoue [`SettingsViewModel.kt`] ✅ fixed: persist-then-dismiss
+- [x] [Review][Patch] `StatFs` dans la couche presentation — violation Clean Architecture (Dev Notes DISASTER #3) : `SettingsViewModel` appelle `StatFs(Environment.getDataDirectory().path)` dans un `map` sur le settings flow ; doit être déplacé dans `data/` [`SettingsViewModel.kt`] ✅ fixed: observeFreeSpaceBytes() ajouté au repository
+- [x] [Review][Patch] Double subscription `observeSettings()` — deux `stateIn` indépendants sur le même flow Room dans le ViewModel ; doubler les observers DB sans bénéfice [`SettingsViewModel.kt`] ✅ fixed: résolu par P3, freeSpaceBytes n'utilise plus observeSettings()
+- [x] [Review][Patch] `steps = -1` quand `freeBytes == 0` — formule `((maxBytes - minBytes) / HALF_GB).toInt().coerceAtLeast(0) - 1` produit `-1` au démarrage ; le `-1` final est hors du `coerceAtLeast(0)` interne ; crash ou slider figé [`SettingsScreen.kt`] ✅ fixed: coerceAtLeast(0) déplacé après le -1
+- [x] [Review][Patch] `observeSettings()` null-entity ne persiste pas la valeur par défaut — chaque émission null recompute `defaultBytes()` via StatFs sans upsert ; valeur instable entre collectes, divergence avec `getSettings()` [`NodeSettingsRepositoryImpl.kt`] ✅ fixed: upsert dans le map quand entity == null
+- [x] [Review][Patch] `getSettings()` TOCTOU entre null-check et upsert — deux coroutines concurrentes peuvent lire `null`, calculer des defaults différents et s'écraser mutuellement via `REPLACE` [`NodeSettingsRepositoryImpl.kt`] ✅ fixed: double-check locking avec Mutex
+- [x] [Review][Patch] `updateAllocatedStorage` sans validation des bornes — accepte tout `Long` (négatif, supérieur à la capacité disque) sans garde ; peut persister une valeur invalide [`NodeSettingsRepositoryImpl.kt`] ✅ fixed: require(bytes > 0)
+
+**Defer (5)**
+
+- [x] [Review][Defer] Float precision loss sur le Slider pour les valeurs > ~8 GB [`SettingsScreen.kt`] — deferred, limitation inhérente au composant Slider Material3 (Float 23-bit mantissa) ; non fixable sans changer l'API du composant
+- [x] [Review][Defer] `StatFs(getDataDirectory())` vs `context.filesDir` — partitions potentiellement différentes sur adoptable storage [`NodeSettingsRepositoryImpl.kt`, `SettingsViewModel.kt`] — deferred, la spec impose ce chemin ; revisiter si le support adoptable storage est ajouté
+- [x] [Review][Defer] `NodeSettingsRepositoryImpl` sans `@Singleton` sur la classe [`NodeSettingsRepositoryImpl.kt`] — deferred, pré-existant ; le `@Singleton` sur le `@Binds` suffit pour Hilt en pratique
+- [x] [Review][Defer] `exportSchema = false` retire la vérification compile-time des migrations [`CatalogDatabase.kt`] — deferred, pré-existant sur toute la base de données du projet
+- [x] [Review][Defer] Tests ne couvrent pas les bornes invalides de `updateAllocatedStorage` [`NodeSettingsRepositoryImplTest.kt`] — deferred, gap de couverture non bloquant pour la livraison

@@ -7,4 +7,5 @@ interface NodeSettingsRepository {
     suspend fun getSettings(): NodeSettings
     suspend fun updateAllocatedStorage(bytes: Long)
     fun observeSettings(): Flow<NodeSettings>
+    fun observeFreeSpaceBytes(): Flow<Long>
 }
