@@ -18,8 +18,7 @@ private const val TAG = "RelayWSClient"
 
 // Nœud de configuration : liste des URLs des relais HA (hardcodée — Story 8.3 pourra rendre configurable)
 internal val RELAY_SERVER_URLS = listOf(
-    "wss://mobicloud-relay-1.onrender.com",    // Instance 1 — Render
-    "wss://mobicloud-relay-2.up.railway.app"   // Instance 2 — Railway
+    "wss://certainty-upstage-silly.ngrok-free.app"  // PC local via ngrok (dev)
 )
 
 @Singleton
