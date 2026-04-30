@@ -131,7 +131,14 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
                         val messageBytes = MobiCloudProtoBuf.encodeToByteArray(HelloMessage.serializer(), message)
                         val packet = DatagramPacket(messageBytes, messageBytes.size, group, MULTICAST_PORT)
                         socket.send(packet)
-                    }.onFailure { Log.e(TAG, "Échec émission HELLO", it) }
+                    }.onFailure { e ->
+                        // ENETUNREACH = appareil sur 4G, multicast indisponible — attendu, pas une erreur
+                        if (e.message?.contains("ENETUNREACH") == true) {
+                            Log.d(TAG, "Broadcast HELLO ignoré — pas de réseau multicast (4G ?)")
+                        } else {
+                            Log.e(TAG, "Échec émission HELLO", e)
+                        }
+                    }
                     delay(HELLO_INTERVAL_MS)
                 }
             }

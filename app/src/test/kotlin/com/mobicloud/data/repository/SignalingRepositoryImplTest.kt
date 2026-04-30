@@ -90,14 +90,28 @@ class SignalingRepositoryImplTest {
     }
 
     // -------------------------------------------------------------------------
-    // Subtask 4.3b : fetchActiveSuperPeers loggue quand tous les serveurs injoignables
+    // Subtask 4.3b : fetchActiveSuperPeers — comportement selon l'historique de connexion
     // -------------------------------------------------------------------------
 
     @Test
-    fun `fetchActiveSuperPeers loggue tous serveurs injoignables quand sendGetPeers retourne false`() = runTest {
+    fun `fetchActiveSuperPeers ne loggue pas erreur si jamais connecte au relay`() = runTest {
+        // emptyFlow() → everConnected reste false → pas de pushEvent "injoignables"
         every { relayClient.sendGetPeers() } returns false
 
         val repo = buildRepo()
+        val result = repo.fetchActiveSuperPeers()
+
+        assertTrue(result.isFailure)
+        verify(exactly = 0) { networkEventRepository.pushEvent("Signalisation HA : tous les serveurs injoignables") }
+    }
+
+    @Test
+    fun `fetchActiveSuperPeers loggue erreur si connexion etait etablie puis perdue`() = runTest {
+        every { relayClient.sendGetPeers() } returns false
+
+        val repo = buildRepo()
+        repo.everConnected = true // simule : relay était connecté, maintenant perdu
+
         val result = repo.fetchActiveSuperPeers()
 
         assertTrue(result.isFailure)

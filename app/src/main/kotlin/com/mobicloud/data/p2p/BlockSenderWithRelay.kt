@@ -31,29 +31,12 @@ class BlockSenderWithRelay @Inject constructor(
         peer: Peer,
         timeoutMs: Long
     ): Result<BlockAckMessage> {
-        // ---- Priorité 1 : TCP direct ----
-        val tcpResult = tcpSender.sendBlock(block, peer, timeoutMs)
-        if (tcpResult.isSuccess) {
-            _transferChannelState.value = TransferChannelState.DIRECT
-            return tcpResult
-        }
-
-        // N'essayer le relay que pour des erreurs réseau (pas sécurité / NACK hash)
-        val tcpCause = tcpResult.exceptionOrNull()
-        if (tcpCause != null && tcpCause !is IOException) {
-            _transferChannelState.value = TransferChannelState.OFFLINE
-            return tcpResult
-        }
-
-        // ---- Priorité 2 : Relay HA (failover multi-instance géré par RelayWebSocketClient) ----
-        // Sérialiser le BlockTransferMessage complet (opaque pour le relay — Zero-Knowledge).
+        // ---- Priorité 1 : Relay HA ----
         val blockPayload = runCatching {
             MobiCloudProtoBuf.encodeToByteArray(BlockTransferMessage.serializer(), block)
         }.getOrElse { serErr ->
             _transferChannelState.value = TransferChannelState.OFFLINE
-            return Result.failure(IOException(
-                "Relay inaccessible — TCP: ${tcpCause?.message} ; Sérialisation: ${serErr.message}", serErr
-            ))
+            return Result.failure(IOException("Sérialisation échouée : ${serErr.message}", serErr))
         }
 
         val relayResult = relayRepository.uploadBlock(
@@ -62,24 +45,31 @@ class BlockSenderWithRelay @Inject constructor(
             data = blockPayload
         )
 
-        return if (relayResult.isSuccess) {
+        if (relayResult.isSuccess) {
             _transferChannelState.value = TransferChannelState.RELAY_HA
-            // ACK synthétique : le relay server confirme la réception (store-and-forward).
-            // signature vide = pas de signature pair (relay ACK ≠ pair ACK).
             val syntheticAck = BlockAckMessage(
                 blockId = block.blockId,
-                blockHash = block.blockId, // blockId = sha256(ciphertext) — identique
+                blockHash = block.blockId,
                 receiverNodeId = peer.identity.nodeId,
                 signature = ByteArray(0)
             )
-            Result.success(syntheticAck)
-        } else {
-            _transferChannelState.value = TransferChannelState.OFFLINE
-            Result.failure(
-                IOException(
-                    "Tous les canaux de transfert ont échoué — TCP: ${tcpCause?.message} ; Relay: ${relayResult.exceptionOrNull()?.message}"
-                )
-            )
+            return Result.success(syntheticAck)
         }
+
+        val relayCause = relayResult.exceptionOrNull()
+
+        // ---- Priorité 2 : TCP direct (fallback si relay indisponible) ----
+        val tcpResult = tcpSender.sendBlock(block, peer, timeoutMs)
+        if (tcpResult.isSuccess) {
+            _transferChannelState.value = TransferChannelState.DIRECT
+            return tcpResult
+        }
+
+        _transferChannelState.value = TransferChannelState.OFFLINE
+        return Result.failure(
+            IOException(
+                "Tous les canaux de transfert ont échoué — Relay: ${relayCause?.message} ; TCP: ${tcpResult.exceptionOrNull()?.message}"
+            )
+        )
     }
 }

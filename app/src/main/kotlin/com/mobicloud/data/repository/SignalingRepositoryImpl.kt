@@ -32,12 +32,17 @@ class SignalingRepositoryImpl @Inject constructor(
     // En test, relayClient.connect() retourne emptyFlow() donc la coroutine init{} se termine immédiatement.
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    // true dès que AUTH_OK est reçu au moins une fois — permet de distinguer
+    // "connexion en cours" (jamais connecté) de "connexion perdue" (était connecté)
+    @Volatile internal var everConnected = false
+
     init {
         scope.launch {
             val url = RELAY_SERVER_URLS.firstOrNull() ?: return@launch
             relayClient.connect(url).collect { event ->
                 when (event) {
-                    is RelayEvent.PeerList -> processPeerList(event.peers)
+                    is RelayEvent.Connected    -> everConnected = true
+                    is RelayEvent.PeerList     -> processPeerList(event.peers)
                     is RelayEvent.Disconnected -> Log.w(TAG, "Relais HA déconnecté : ${event.reason}")
                     else -> Unit
                 }
@@ -86,7 +91,13 @@ class SignalingRepositoryImpl @Inject constructor(
     override suspend fun fetchActiveSuperPeers(): Result<Unit> = runCatching {
         val sent = relayClient.sendGetPeers()
         if (!sent) {
-            networkEventRepository.pushEvent("Signalisation HA : tous les serveurs injoignables")
+            if (everConnected) {
+                // Était connecté mais plus maintenant → vraie perte de connexion
+                networkEventRepository.pushEvent("Signalisation HA : tous les serveurs injoignables")
+            } else {
+                // Jamais connecté encore → connexion en cours, pas une erreur
+                Log.d(TAG, "GET_PEERS ignoré — connexion WSS en cours d'établissement")
+            }
             error("RelayWebSocketClient non connecté — GET_PEERS non envoyé")
         }
         Log.d(TAG, "GET_PEERS envoyé — réponse attendue via Flow<RelayEvent.PeerList>")

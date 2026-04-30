@@ -63,23 +63,9 @@ class BlockSenderWithRelayTest {
         blockSenderWithRelay = BlockSenderWithRelay(tcpSender, relayRepository)
     }
 
-    // Test 1 : TCP réussit → état DIRECT, résultat = TCP ACK, relay non appelé
+    // Test 1 : Relay réussit → état RELAY_HA, ACK synthétique, TCP non appelé
     @Test
-    fun `TCP reussit - etat DIRECT - relay non appele`() = runTest {
-        coEvery { tcpSender.sendBlock(any(), any(), any()) } returns Result.success(fakeTcpAck)
-
-        val result = blockSenderWithRelay.sendBlock(fakeBlock, fakePeer, 5000L)
-
-        assertTrue(result.isSuccess)
-        assertEquals(fakeTcpAck, result.getOrThrow())
-        assertEquals(TransferChannelState.DIRECT, blockSenderWithRelay.transferChannelState.value)
-        coVerify(exactly = 0) { relayRepository.uploadBlock(any(), any(), any()) }
-    }
-
-    // Test 2 : TCP échoue IOException → relay réussit → état RELAY_HA, ACK synthétique
-    @Test
-    fun `TCP echoue IOException - relay reussit - etat RELAY_HA - ACK synthetique`() = runTest {
-        coEvery { tcpSender.sendBlock(any(), any(), any()) } returns Result.failure(IOException("NAT blocked"))
+    fun `Relay reussit - etat RELAY_HA - ACK synthetique - TCP non appele`() = runTest {
         coEvery { relayRepository.uploadBlock(any(), any(), any()) } returns Result.success(Unit)
 
         val result = blockSenderWithRelay.sendBlock(fakeBlock, fakePeer, 5000L)
@@ -91,13 +77,27 @@ class BlockSenderWithRelayTest {
         assertEquals(fakeBlock.blockId, ack.blockHash)
         assertEquals(fakePeer.identity.nodeId, ack.receiverNodeId)
         assertEquals(0, ack.signature.size)
+        coVerify(exactly = 0) { tcpSender.sendBlock(any(), any(), any()) }
     }
 
-    // Test 3 : TCP échoue + relay échoue → état OFFLINE, Result.failure
+    // Test 2 : Relay échoue → TCP réussit → état DIRECT, ACK TCP
     @Test
-    fun `TCP echoue + relay echoue - etat OFFLINE - result failure`() = runTest {
-        coEvery { tcpSender.sendBlock(any(), any(), any()) } returns Result.failure(IOException("NAT"))
+    fun `Relay echoue - TCP reussit - etat DIRECT - ACK TCP`() = runTest {
         coEvery { relayRepository.uploadBlock(any(), any(), any()) } returns Result.failure(IOException("Relay HS"))
+        coEvery { tcpSender.sendBlock(any(), any(), any()) } returns Result.success(fakeTcpAck)
+
+        val result = blockSenderWithRelay.sendBlock(fakeBlock, fakePeer, 5000L)
+
+        assertTrue(result.isSuccess)
+        assertEquals(fakeTcpAck, result.getOrThrow())
+        assertEquals(TransferChannelState.DIRECT, blockSenderWithRelay.transferChannelState.value)
+    }
+
+    // Test 3 : Relay échoue + TCP échoue → état OFFLINE, Result.failure
+    @Test
+    fun `Relay echoue + TCP echoue - etat OFFLINE - result failure`() = runTest {
+        coEvery { relayRepository.uploadBlock(any(), any(), any()) } returns Result.failure(IOException("Relay HS"))
+        coEvery { tcpSender.sendBlock(any(), any(), any()) } returns Result.failure(IOException("NAT"))
 
         val result = blockSenderWithRelay.sendBlock(fakeBlock, fakePeer, 5000L)
 
@@ -105,28 +105,27 @@ class BlockSenderWithRelayTest {
         assertEquals(TransferChannelState.OFFLINE, blockSenderWithRelay.transferChannelState.value)
     }
 
-    // Test 4 : TCP échoue SecurityException (NACK signature) → relay NON essayé
+    // Test 4 : Relay échoue + TCP échoue SecurityException → état OFFLINE, TCP non retenté
     @Test
-    fun `TCP echoue SecurityException - relay non tente - etat OFFLINE`() = runTest {
+    fun `Relay echoue + TCP echoue SecurityException - etat OFFLINE`() = runTest {
+        coEvery { relayRepository.uploadBlock(any(), any(), any()) } returns Result.failure(IOException("Relay HS"))
         coEvery { tcpSender.sendBlock(any(), any(), any()) } returns Result.failure(SecurityException("Signature ACK invalide"))
 
         val result = blockSenderWithRelay.sendBlock(fakeBlock, fakePeer, 5000L)
 
         assertTrue(result.isFailure)
         assertEquals(TransferChannelState.OFFLINE, blockSenderWithRelay.transferChannelState.value)
-        coVerify(exactly = 0) { relayRepository.uploadBlock(any(), any(), any()) }
     }
 
     // Test 5 : Transparence totale — appel via interface BlockSender, même comportement
     @Test
     fun `substitution transparente via interface BlockSender`() = runTest {
-        coEvery { tcpSender.sendBlock(any(), any(), any()) } returns Result.success(fakeTcpAck)
+        coEvery { relayRepository.uploadBlock(any(), any(), any()) } returns Result.success(Unit)
 
         val senderViaInterface: BlockSender = blockSenderWithRelay
         val result = senderViaInterface.sendBlock(fakeBlock, fakePeer, 5000L)
 
         assertTrue(result.isSuccess)
-        assertEquals(fakeTcpAck, result.getOrThrow())
-        assertEquals(TransferChannelState.DIRECT, blockSenderWithRelay.transferChannelState.value)
+        assertEquals(TransferChannelState.RELAY_HA, blockSenderWithRelay.transferChannelState.value)
     }
 }
