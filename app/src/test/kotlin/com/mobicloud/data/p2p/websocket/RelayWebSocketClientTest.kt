@@ -14,7 +14,6 @@ import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
-import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -199,8 +198,7 @@ class RelayWebSocketClientTest {
                         webSocket.send(RelayFraming.buildFrame(RelayMsg.AUTH_OK).toByteString())
                     }
                     RelayMsg.UPLOAD -> {
-                        val ackJson = JSONObject().apply { put("blockId", blockId) }
-                        val ackPayload = ackJson.toString().toByteArray(Charsets.UTF_8)
+                        val ackPayload = """{"blockId":"$blockId"}""".toByteArray(Charsets.UTF_8)
                         webSocket.send(RelayFraming.buildFrame(RelayMsg.ACK, ackPayload).toByteString())
                     }
                 }
@@ -234,6 +232,69 @@ class RelayWebSocketClientTest {
         val result = client.uploadBlock("dest1234dest1234", "f".repeat(64), ByteArray(10))
         assertTrue("Doit échouer sans connexion active", result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalStateException)
+    }
+
+    // ─── Bug fix : activeWebSocket positionné après AUTH_OK, pas à onOpen ────────
+
+    @Test
+    fun `sendRegisterPeer retourne false avant AUTH_OK (activeWebSocket non encore positionne)`() {
+        val authReceived = CountDownLatch(1)
+
+        val serverListener = object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                val frame = RelayFraming.parseFrame(bytes.toByteArray()) ?: return
+                if (frame.first == RelayMsg.AUTH) {
+                    authReceived.countDown()
+                    // Volontairement : on ne renvoie PAS AUTH_OK — simule un auth lent
+                }
+            }
+        }
+        server.enqueue(MockResponse().withWebSocketUpgrade(serverListener))
+
+        val wsUrl = server.url("/ws").toString().replace("http", "ws")
+        val connectJob = CoroutineScope(Dispatchers.IO).launch {
+            client.connectSingle(wsUrl).collect {}
+        }
+
+        // La connexion WS est ouverte et AUTH a été envoyé, mais AUTH_OK pas encore reçu
+        assertTrue("AUTH frame non reçu dans 5s", authReceived.await(5, TimeUnit.SECONDS))
+
+        // activeWebSocket doit encore être null → sendRegisterPeer retourne false
+        val result = client.sendRegisterPeer("node1", "192.168.1.1", 8080, 0.9f, 1_000L)
+        assertFalse("sendRegisterPeer doit retourner false avant AUTH_OK", result)
+
+        connectJob.cancel()
+    }
+
+    @Test
+    fun `activeWebSocket est positionne apres AUTH_OK — sendGetPeers retourne true`() {
+        // sendRegisterPeer utilise org.json.JSONObject (stub Android non dispo en JVM unit test).
+        // On vérifie la même invariant via sendGetPeers() qui ne fait qu'envoyer un frame binaire.
+        val serverListener = object : WebSocketListener() {
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                val frame = RelayFraming.parseFrame(bytes.toByteArray()) ?: return
+                if (frame.first == RelayMsg.AUTH) {
+                    webSocket.send(RelayFraming.buildFrame(RelayMsg.AUTH_OK).toByteString())
+                }
+            }
+        }
+        server.enqueue(MockResponse().withWebSocketUpgrade(serverListener))
+
+        val wsUrl = server.url("/ws").toString().replace("http", "ws")
+        val connectedLatch = CountDownLatch(1)
+        val connectJob = CoroutineScope(Dispatchers.IO).launch {
+            client.connectSingle(wsUrl).collect { event ->
+                if (event is com.mobicloud.domain.models.RelayEvent.Connected) connectedLatch.countDown()
+            }
+        }
+
+        assertTrue("Connexion non établie dans 5s", connectedLatch.await(5, TimeUnit.SECONDS))
+
+        // Après AUTH_OK : activeWebSocket est positionné → sendGetPeers retourne true
+        val result = client.sendGetPeers()
+        assertTrue("sendGetPeers doit retourner true après AUTH_OK (activeWebSocket positionné)", result)
+
+        connectJob.cancel()
     }
 
     // ─── Subtask 7.3 — Vérification calcul de délai backoff ───────────────────

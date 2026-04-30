@@ -18,6 +18,7 @@ import com.mobicloud.domain.repository.PeerRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -116,7 +117,7 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
             MulticastSocket().use { socket ->
                 socket.timeToLive = 1
                 // P5 — isActive (extension coroutine) est thread-safe, contrairement à job?.isActive
-                while (isActive) {
+                while (currentCoroutineContext().isActive) {
                     runCatching {
                         val payload = HelloPayload(
                             nodeId = identity.nodeId,
@@ -160,7 +161,7 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
             socket.joinGroup(socketGroup)
             socket.soTimeout = SOCKET_TIMEOUT_MS
             val buffer = ByteArray(BUFFER_SIZE)
-            while (isActive) {
+            while (currentCoroutineContext().isActive) {
                 fallbackLogged = logFallbackIfNeeded(lastValidHelloMs, fallbackLogged)
 
                 val packet = DatagramPacket(buffer, buffer.size)

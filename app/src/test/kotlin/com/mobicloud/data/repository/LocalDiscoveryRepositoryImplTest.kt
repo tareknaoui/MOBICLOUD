@@ -23,6 +23,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import com.mobicloud.data.repository.LocalDiscoveryRepositoryImpl.Companion.MULTICAST_TIMEOUT_MS
 import kotlinx.serialization.ExperimentalSerializationApi
 import org.junit.After
 import org.junit.Assert.assertFalse

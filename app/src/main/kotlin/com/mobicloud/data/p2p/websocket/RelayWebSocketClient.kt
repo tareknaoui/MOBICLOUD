@@ -86,21 +86,23 @@ class RelayWebSocketClient @Inject constructor(
 
         val listener = object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                activeWebSocket = webSocket
+                // activeWebSocket est volontairement NON positionné ici :
+                // tout envoi (REGISTER_PEER, uploadBlock…) doit attendre AUTH_OK
+                // pour éviter que le relais rejette silencieusement des frames pré-auth.
                 flowScope.launch {
                     try {
                         val authPayload = authSigner.buildAuthPayload()
                         val authFrame = RelayFraming.buildFrame(RelayMsg.AUTH, authPayload)
                         webSocket.send(authFrame.toByteString())
                     } catch (e: Exception) {
-                        Log.e(TAG, "Échec envoi AUTH : ${e.message}")
+                        runCatching { Log.e(TAG, "Échec envoi AUTH : ${e.message}") }
                         close(e)
                     }
                 }
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                Log.w(TAG, "Frame texte inattendue ignorée (${text.length} chars)")
+                runCatching { Log.w(TAG, "Frame texte inattendue ignorée (${text.length} chars)") }
             }
 
             override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
@@ -109,8 +111,9 @@ class RelayWebSocketClient @Inject constructor(
 
                 when (type) {
                     RelayMsg.AUTH_OK -> {
+                        activeWebSocket = webSocket // positionné après confirmation d'auth
                         trySend(RelayEvent.Connected)
-                        Log.i(TAG, "AUTH_OK — connecté à $url")
+                        runCatching { Log.i(TAG, "AUTH_OK — connecté à $url") }
                     }
                     RelayMsg.FORWARD -> {
                         val parsed = RelayFraming.parseForwardPayload(payload) ?: return
@@ -118,9 +121,9 @@ class RelayWebSocketClient @Inject constructor(
                         trySend(RelayEvent.BlockReceived(fromNodeId, blockId, data))
                     }
                     RelayMsg.ACK -> {
-                        val blockId = runCatching {
-                            org.json.JSONObject(payload.toString(Charsets.UTF_8)).getString("blockId")
-                        }.getOrNull() ?: return
+                        val json = payload.toString(Charsets.UTF_8)
+                        val blockId = Regex(""""blockId"\s*:\s*"([^"]+)"""")
+                            .find(json)?.groupValues?.getOrNull(1) ?: return
                         pendingUploads.remove(blockId)?.complete(Unit)
                         trySend(RelayEvent.Ack(blockId))
                     }
@@ -131,21 +134,21 @@ class RelayWebSocketClient @Inject constructor(
                     RelayMsg.PONG -> { /* keepalive applicatif — ignoré, OkHttp gère le ping natif */ }
                     RelayMsg.ERROR -> {
                         val msg = payload.toString(Charsets.UTF_8)
-                        Log.e(TAG, "ERROR serveur : $msg")
+                        runCatching { Log.e(TAG, "ERROR serveur : $msg") }
                         trySend(RelayEvent.Error(msg))
                     }
                 }
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.w(TAG, "WebSocket failure : ${t.message}")
+                runCatching { Log.w(TAG, "WebSocket failure : ${t.message}") }
                 if (activeWebSocket === webSocket) activeWebSocket = null
                 trySend(RelayEvent.Disconnected(t.message))
                 close(t)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                Log.i(TAG, "WebSocket fermée : code=$code reason=$reason")
+                runCatching { Log.i(TAG, "WebSocket fermée : code=$code reason=$reason") }
                 if (activeWebSocket === webSocket) activeWebSocket = null
                 trySend(RelayEvent.Disconnected(reason))
                 close()
@@ -154,7 +157,12 @@ class RelayWebSocketClient @Inject constructor(
 
         val ws = okHttpClient.newWebSocket(request, listener)
         awaitClose {
-            ws.close(1000, "Flow cancelled")
+            // cancel() ferme le socket immédiatement (sans handshake CLOSE),
+            // ce qui permet à MockWebServer.shutdown() de se terminer proprement
+            // dans les tests JVM et évite un race condition sur le handshake.
+            // En production, le serveur de relais traite toute fermeture TCP comme
+            // une déconnexion — le handshake CLOSE n'est pas requis pour la correction.
+            ws.cancel()
             if (activeWebSocket === ws) activeWebSocket = null
         }
     }

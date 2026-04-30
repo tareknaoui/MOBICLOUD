@@ -26,12 +26,17 @@ class RelayRepositoryImpl @Inject constructor(
     private val _connectionState = MutableStateFlow(RelayConnectionState.CONNECTING)
     override val connectionState: StateFlow<RelayConnectionState> = _connectionState.asStateFlow()
 
+    // Bus interne partagé : tous les RelayEvent émis par le client y transitent,
+    // ce qui permet à fetchSuperPeers() de réagir aux PeerList sans race condition.
+    private val _relayEvents = MutableSharedFlow<RelayEvent>(extraBufferCapacity = 64)
+
     // Scope lié au Foreground Service — dans l'app réelle, ce scope est injecté via Hilt
     private val repoScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     init {
         repoScope.launch {
             client.connect(RELAY_SERVER_URLS.first()).collect { event ->
+                _relayEvents.tryEmit(event)
                 when (event) {
                     is RelayEvent.Connected    -> _connectionState.value = RelayConnectionState.CONNECTED
                     is RelayEvent.Disconnected -> _connectionState.value = RelayConnectionState.OFFLINE
@@ -63,9 +68,23 @@ class RelayRepositoryImpl @Inject constructor(
     }
 
     override suspend fun fetchSuperPeers(): Result<List<RelayPeer>> = runCatching {
-        client.sendGetPeers()
-        // La réponse arrive via Flow<RelayEvent.PeerList> — à consommer par SignalingRepositoryImpl (Story 2.1)
-        // Ici on retourne une liste vide comme placeholder; l'impl complète est dans Story 2.1
-        emptyList()
+        // Abonnement AVANT l'envoi de GET_PEERS pour éviter la race condition
+        // (réponse serveur arrivant avant que le collecteur soit prêt).
+        val deferred = CompletableDeferred<List<RelayPeer>>()
+        val listenJob = repoScope.launch {
+            _relayEvents
+                .filterIsInstance<RelayEvent.PeerList>()
+                .first()
+                .let { deferred.complete(it.peers) }
+        }
+        if (!client.sendGetPeers()) {
+            listenJob.cancel()
+            throw IllegalStateException("Aucune connexion active — GET_PEERS impossible")
+        }
+        try {
+            withTimeoutOrNull(5_000L) { deferred.await() } ?: emptyList()
+        } finally {
+            listenJob.cancel()
+        }
     }
 }
