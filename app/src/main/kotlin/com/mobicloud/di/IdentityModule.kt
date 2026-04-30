@@ -39,6 +39,7 @@ object IdentityModule {
             CatalogDatabase::class.java,
             "mobicloud_database.db"
         ).addMigrations(
+            CatalogDatabase.MIGRATION_1_2,
             CatalogDatabase.MIGRATION_2_3,
             CatalogDatabase.MIGRATION_3_4,
             CatalogDatabase.MIGRATION_4_5,
@@ -47,7 +48,7 @@ object IdentityModule {
             CatalogDatabase.MIGRATION_7_8,
             CatalogDatabase.MIGRATION_8_9,
             CatalogDatabase.MIGRATION_9_10
-        ).fallbackToDestructiveMigration().build()
+        ).build()
     }
 
     @Provides

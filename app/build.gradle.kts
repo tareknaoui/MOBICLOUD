@@ -143,6 +143,10 @@ androidComponents {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // ... Core
     implementation(project(":core:ui"))

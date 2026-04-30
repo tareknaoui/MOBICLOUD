@@ -33,7 +33,7 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         NodeSettingsEntity::class
     ],
     version = 10,
-    exportSchema = false
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class CatalogDatabase : RoomDatabase() {
@@ -46,6 +46,31 @@ abstract class CatalogDatabase : RoomDatabase() {
     abstract fun nodeSettingsDao(): NodeSettingsDao
 
     companion object {
+        // Story 1-3 — premier ajout de NodeIdentityEntity + PeerNodeEntity (sans is_super_pair).
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS node_identity (
+                        node_id TEXT NOT NULL PRIMARY KEY,
+                        public_key_bytes BLOB NOT NULL,
+                        reliability_score REAL NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS peer_nodes (
+                        node_id TEXT NOT NULL PRIMARY KEY,
+                        public_key_bytes BLOB NOT NULL,
+                        reliability_score REAL NOT NULL,
+                        ip_address TEXT,
+                        port INTEGER,
+                        last_seen_timestamp_ms INTEGER NOT NULL,
+                        is_active INTEGER NOT NULL DEFAULT 1,
+                        source TEXT NOT NULL DEFAULT 'LOCAL_UDP'
+                    )
+                """.trimIndent())
+            }
+        }
+
         val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE peer_nodes ADD COLUMN is_super_pair INTEGER NOT NULL DEFAULT 0")
