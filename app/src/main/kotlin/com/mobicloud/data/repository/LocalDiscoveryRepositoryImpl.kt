@@ -94,6 +94,10 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun updateTcpPort(port: Int) {
+        this.tcpPort = port
+    }
+
     private fun acquireMulticastLock() {
         val wm = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
         multicastLock = wm.createMulticastLock("mobicloud_discovery").apply {
@@ -131,6 +135,7 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
                         val messageBytes = MobiCloudProtoBuf.encodeToByteArray(HelloMessage.serializer(), message)
                         val packet = DatagramPacket(messageBytes, messageBytes.size, group, MULTICAST_PORT)
                         socket.send(packet)
+                        Log.i(TAG, "[DIAG] HELLO émis tcpPort=$tcpPort vers $MULTICAST_GROUP:$MULTICAST_PORT")
                     }.onFailure { e ->
                         // ENETUNREACH = appareil sur 4G, multicast indisponible — attendu, pas une erreur
                         if (e.message?.contains("ENETUNREACH") == true) {
@@ -251,6 +256,7 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
             )
             // P-A5 — propager le succès/échec DB : retourner false si l'insertion échoue
             // pour ne pas réinitialiser le timer fallback sur un HELLO non persisté
+            Log.i(TAG, "[DIAG] HELLO reçu de ${msg.payload.nodeId.take(8)}@$sourceAddress:${msg.payload.tcpPort}")
             val insertResult = peerRepository.registerOrUpdatePeer(
                 identity = peerIdentity,
                 timestampMs = SystemClock.elapsedRealtime(),
@@ -260,6 +266,9 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
                 isSuperPair = false
             )
             insertResult.onFailure { Log.e(TAG, "Échec insertion pair LAN", it) }
+            if (insertResult.isSuccess) {
+                Log.i(TAG, "[DIAG] Pair ${msg.payload.nodeId.take(8)} mis à jour en DB → port=${msg.payload.tcpPort}")
+            }
             insertResult.isSuccess
         }.getOrElse { e ->
             Log.w(TAG, "Datagramme HELLO malformé — ignoré", e)

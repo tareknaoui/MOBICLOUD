@@ -191,12 +191,18 @@ class ExplorerViewModel @Inject constructor(
         resetJob?.cancel()
         _storeState.value = StoreState.InProgress.Encoding  // P7: set before launch to close TOCTOU window
         viewModelScope.launch {
-            val fileSizeBytes = withContext(Dispatchers.IO) {
-                context.contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
-                    ?.use { cursor ->
-                        if (cursor.moveToFirst()) cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE))
-                        else null
-                    }
+            val (fileSizeBytes, originalFileName) = withContext(Dispatchers.IO) {
+                context.contentResolver.query(
+                    uri,
+                    arrayOf(OpenableColumns.SIZE, OpenableColumns.DISPLAY_NAME),
+                    null, null, null
+                )?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val size = cursor.getLong(cursor.getColumnIndexOrThrow(OpenableColumns.SIZE))
+                        val name = cursor.getString(cursor.getColumnIndexOrThrow(OpenableColumns.DISPLAY_NAME)) ?: ""
+                        Pair(size, name)
+                    } else Pair(null, "")
+                } ?: Pair(null, "")
             }
             if (fileSizeBytes != null && fileSizeBytes > MAX_FILE_SIZE_BYTES) {
                 _storeState.value = StoreState.Error("Fichier trop volumineux (max ${MAX_FILE_SIZE_MB} Mo)")
@@ -253,7 +259,8 @@ class ExplorerViewModel @Inject constructor(
                 distributeEncryptedBlocksUseCase.distribute(
                     encryptedBundle = bundle,
                     fileHash = fileHash,
-                    k = params.k
+                    k = params.k,
+                    originalFileName = originalFileName
                 ) { blockIndex, success ->
                     _storeState.update { current ->
                         if (current !is StoreState.InProgress.Distributing) return@update current

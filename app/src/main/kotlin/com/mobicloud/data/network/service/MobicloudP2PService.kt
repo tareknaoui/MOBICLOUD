@@ -162,7 +162,42 @@ class MobicloudP2PService : Service() {
             val tcpPort = tcpPortResult.getOrThrow()
 
             // Story 2.0 — démarrer la découverte locale LAN après startServer() pour émettre le bon tcpPort
+            tcpConnectionManager.onServerPortChanged = { newPort ->
+                localDiscoveryRepository.updateTcpPort(newPort)
+            }
             launch { localDiscoveryRepository.start(tcpPort) }
+
+            // Inter-réseau : enregistre ce nœud comme "Super-Pair" sur le relais HA dès le démarrage,
+            // sans attendre l'élection Bully. Permet à tous les nœuds connectés au relais de se voir
+            // mutuellement via GET_PEERS, même sur des réseaux différents (pas de HELLO LAN commun).
+            // Keepalive toutes les 30s pour rester avant l'expiration du TTL serveur (60s).
+            launch {
+                delay(3_000L) // attendre AUTH_OK WebSocket
+                // L'IP réelle n'a pas d'importance pour le routage relais (qui utilise uniquement le nodeId).
+                // Le serveur stocke ce qu'on envoie, mais BlockSenderWithRelay route via destNodeId, pas par IP.
+                val placeholderIp = "0.0.0.0"
+
+                suspend fun registerAndFetch() {
+                    signalingRepository.registerAsSuperPeer(
+                        ip = placeholderIp,
+                        port = tcpPort,
+                        reliabilityScore = identity.reliabilityScore,
+                        electedAt = System.currentTimeMillis(),
+                        nodeId = identity.nodeId
+                    ).onFailure { Log.w(LOGTAG, "auto-register relais échoué", it) }
+                    signalingRepository.fetchActiveSuperPeers()
+                        .onFailure { Log.w(LOGTAG, "fetchActiveSuperPeers échoué", it) }
+                }
+
+                // Hook : sur reconnexion WebSocket, refait REGISTER + GET_PEERS immédiatement
+                (signalingRepository as? com.mobicloud.data.repository.SignalingRepositoryImpl)
+                    ?.onConnectedHook = { registerAndFetch() }
+
+                while (isActive) {
+                    registerAndFetch()
+                    delay(30_000L)
+                }
+            }
 
             // AC#6: purge des tombstones expirés au démarrage du service
             serviceScope.launch {
@@ -238,6 +273,18 @@ class MobicloudP2PService : Service() {
                             Log.w(LOGTAG, "Cycle Gossip échoué — service continue", e)
                         }
                     delay(2000L)
+                }
+            }
+
+            // Inter-réseau : interroge le relais HA toutes les 10s pour récupérer la liste des
+            // Super-Pairs enregistrés et les insérer dans peer_nodes (source RELAY_HA).
+            // Sans ça, les pairs sur des réseaux différents (pas de HELLO LAN commun) restent
+            // invisibles → distribution échoue avec "Aucun nœud actif".
+            launch {
+                while (isActive) {
+                    signalingRepository.fetchActiveSuperPeers()
+                        .onFailure { Log.w(LOGTAG, "fetchActiveSuperPeers échoué", it) }
+                    delay(10_000L)
                 }
             }
 

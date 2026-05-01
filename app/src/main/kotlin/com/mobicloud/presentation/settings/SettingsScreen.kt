@@ -77,7 +77,7 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "${usedBytes.toGb()} GB utilisés sur ${sliderValue.toLong().toGb()} GB alloués",
+            text = "${usedBytes.toReadable()} utilisés sur ${sliderValue.toLong().toGb()} GB alloués",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -103,3 +103,15 @@ fun SettingsScreen(
 }
 
 private fun Long.toGb(): String = "%.1f".format(this / (1024.0 * 1024 * 1024))
+
+private fun Long.toReadable(): String {
+    val kb = this / 1024.0
+    val mb = kb / 1024.0
+    val gb = mb / 1024.0
+    return when {
+        gb >= 1.0 -> "%.2f GB".format(gb)
+        mb >= 1.0 -> "%.2f MB".format(mb)
+        kb >= 1.0 -> "%.1f KB".format(kb)
+        else -> "$this B"
+    }
+}

@@ -18,7 +18,7 @@ private const val TAG = "RelayWSClient"
 
 // Nœud de configuration : liste des URLs des relais HA (hardcodée — Story 8.3 pourra rendre configurable)
 internal val RELAY_SERVER_URLS = listOf(
-    "wss://certainty-upstage-silly.ngrok-free.app"  // PC local via ngrok (dev)
+    "wss://certainty-upstage-silly.ngrok-free.dev"  // PC local via ngrok (dev)
 )
 
 @Singleton

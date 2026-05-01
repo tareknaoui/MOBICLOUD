@@ -8,6 +8,7 @@ import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.RelayEvent
 import com.mobicloud.domain.models.RelayPeer
+import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SignalingRepository
@@ -25,7 +26,8 @@ private const val RELAY_TTL_MS = 60_000L
 class SignalingRepositoryImpl @Inject constructor(
     private val relayClient: RelayWebSocketClient,
     private val peerRepository: PeerRepository,
-    private val networkEventRepository: NetworkEventRepository
+    private val networkEventRepository: NetworkEventRepository,
+    private val identityRepository: IdentityRepository
 ) : SignalingRepository {
 
     // Scope lié au cycle de vie du processus — correct pour un @Singleton Android.
@@ -36,12 +38,20 @@ class SignalingRepositoryImpl @Inject constructor(
     // "connexion en cours" (jamais connecté) de "connexion perdue" (était connecté)
     @Volatile internal var everConnected = false
 
+    // Déclenchement immédiat de REGISTER + GET_PEERS à chaque reconnexion WebSocket.
+    // Sans ça, après un disconnect/reconnect, l'autre pair ne nous voit plus avant ~30s.
+    @Volatile var onConnectedHook: (suspend () -> Unit)? = null
+
     init {
         scope.launch {
             val url = RELAY_SERVER_URLS.firstOrNull() ?: return@launch
             relayClient.connect(url).collect { event ->
                 when (event) {
-                    is RelayEvent.Connected    -> everConnected = true
+                    is RelayEvent.Connected    -> {
+                        everConnected = true
+                        Log.i(TAG, "[DIAG] WebSocket reconnecté — déclenchement REGISTER + GET_PEERS immédiats")
+                        onConnectedHook?.invoke()
+                    }
                     is RelayEvent.PeerList     -> processPeerList(event.peers)
                     is RelayEvent.Disconnected -> Log.w(TAG, "Relais HA déconnecté : ${event.reason}")
                     else -> Unit
@@ -52,9 +62,20 @@ class SignalingRepositoryImpl @Inject constructor(
 
     internal suspend fun processPeerList(peers: List<RelayPeer>) {
         val now = System.currentTimeMillis()
+        val localNodeId = identityRepository.getIdentity().getOrNull()?.nodeId
+        Log.i(TAG, "[DIAG] processPeerList reçu ${peers.size} pairs (self=${localNodeId?.take(8)}) : ${peers.map { "${it.nodeId.take(8)}@${it.ip}:${it.port} lastSeen=${now - it.lastSeen}ms" }}")
         var insertedCount = 0
         peers.forEach { peer ->
-            if (maxOf(0L, now - peer.lastSeen) > RELAY_TTL_MS) return@forEach
+            if (peer.nodeId == localNodeId) {
+                Log.w(TAG, "[DIAG] pair ${peer.nodeId.take(8)} ignoré : c'est moi")
+                return@forEach
+            }
+            val ageMs = maxOf(0L, now - peer.lastSeen)
+            if (ageMs > RELAY_TTL_MS) {
+                Log.w(TAG, "[DIAG] pair ${peer.nodeId.take(8)} ignoré : trop ancien ($ageMs ms > $RELAY_TTL_MS)")
+                return@forEach
+            }
+            Log.i(TAG, "[DIAG] insertion ${peer.nodeId.take(8)}@${peer.ip}:${peer.port}")
             // La clé publique est un placeholder vide — elle sera résolue lors du TCP handshake direct.
             // Le relais est une couche de découverte, pas d'authentification.
             peerRepository.registerOrUpdatePeer(
@@ -67,9 +88,7 @@ class SignalingRepositoryImpl @Inject constructor(
             )
             insertedCount++
         }
-        if (insertedCount > 0) {
-            Log.d(TAG, "GET_PEERS : $insertedCount Super-Pairs insérés (source RELAY_HA)")
-        }
+        Log.i(TAG, "[DIAG] processPeerList END — $insertedCount insérés sur ${peers.size}")
     }
 
     override suspend fun registerAsSuperPeer(

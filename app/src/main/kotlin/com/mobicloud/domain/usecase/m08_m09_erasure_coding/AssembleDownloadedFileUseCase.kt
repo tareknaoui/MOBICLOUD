@@ -229,7 +229,9 @@ class AssembleDownloadedFileUseCase @Inject constructor(
             val finalDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                 ?: context.filesDir
             if (!finalDir.exists()) finalDir.mkdirs()
-            val finalFile = File(finalDir, "mobicloud_${fileHash.take(16)}")
+            val outputName = if (catalog.originalFileName.isNotEmpty()) catalog.originalFileName
+                             else "mobicloud_${fileHash.take(16)}"
+            val finalFile = File(finalDir, outputName)
             withContext(Dispatchers.IO) {
                 if (!tempFile.renameTo(finalFile)) {
                     tempFile.copyTo(finalFile, overwrite = true)

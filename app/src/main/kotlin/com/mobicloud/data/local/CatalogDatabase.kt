@@ -32,7 +32,7 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         HostedBlockEntity::class,
         NodeSettingsEntity::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -155,6 +155,14 @@ abstract class CatalogDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE TABLE IF NOT EXISTS node_settings " +
                     "(id INTEGER NOT NULL PRIMARY KEY, allocated_storage_bytes INTEGER NOT NULL)"
+                )
+            }
+        }
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE catalog_entry ADD COLUMN original_file_name TEXT NOT NULL DEFAULT ''"
                 )
             }
         }

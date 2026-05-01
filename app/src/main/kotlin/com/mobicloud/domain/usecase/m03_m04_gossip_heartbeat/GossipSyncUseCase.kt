@@ -39,7 +39,9 @@ class GossipSyncUseCase @Inject constructor(
 
     suspend fun runGossipCycle(): Result<Unit> = withContext(Dispatchers.Default) {
         try {
-            val activePeers = peerRepository.peers.value.filter { it.isActive }
+            val allPeers = peerRepository.peers.value
+            val activePeers = allPeers.filter { it.isActive }
+            android.util.Log.i("MobiCloud:Gossip", "[DIAG] runGossipCycle — total=${allPeers.size} actifs=${activePeers.size} ${activePeers.map { "${it.identity.nodeId.take(8)}@${it.ipAddress}:${it.port}" }}")
 
             // Guard N=0 : cluster isolé, aucune action
             if (activePeers.isEmpty()) return@withContext Result.success(Unit)
@@ -66,8 +68,13 @@ class GossipSyncUseCase @Inject constructor(
             for (peer in neighbors) {
                 val ip = peer.ipAddress ?: continue
                 val port = peer.port ?: continue
+                android.util.Log.i("MobiCloud:Gossip", "[DIAG] sendBloomGossip → ${peer.identity.nodeId.take(8)}@$ip:$port")
                 gossipOutboundPort.sendBloomGossip(ip, port, gossipMsg)
+                    .onSuccess {
+                        android.util.Log.i("MobiCloud:Gossip", "[DIAG] sendBloomGossip OK → ${peer.identity.nodeId.take(8)}@$ip:$port")
+                    }
                     .onFailure { e ->
+                        android.util.Log.w("MobiCloud:Gossip", "[DIAG] sendBloomGossip FAIL → ${peer.identity.nodeId.take(8)}@$ip:$port : ${e.message}")
                         networkEventRepository.pushEvent("[GOSSIP] Envoi Bloom échoué → ${peer.identity.nodeId.take(8)}")
                         lastFailure = e
                     }

@@ -44,12 +44,18 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
         encryptedBundle: EncryptedBundle,
         fileHash: String,
         k: Int,
+        originalFileName: String = "",
         onBlockResult: ((blockIndex: Int, success: Boolean) -> Unit)? = null
     ): Result<CatalogEntry> = withContext(Dispatchers.IO) {
-        val activePeers = peerRepository.peers.value.filter {
+        android.util.Log.i("MobiCloud:Distribute", "[DIAG] distribute START fileHash=${fileHash.take(8)} fragments=${encryptedBundle.encryptedFragments.size} k=$k")
+        val allPeers = peerRepository.peers.value
+        val activePeers = allPeers.filter {
             it.isActive && it.ipAddress != null && it.port != null
         }
+        android.util.Log.i("MobiCloud:Distribute", "[DIAG] peers total=${allPeers.size} actifs+IP=${activePeers.size} ${activePeers.map { "${it.identity.nodeId.take(8)}@${it.ipAddress}:${it.port}" }}")
+        android.util.Log.i("MobiCloud:Distribute", "[DIAG] détail tous pairs : ${allPeers.map { "${it.identity.nodeId.take(8)}@${it.ipAddress}:${it.port} active=${it.isActive}" }}")
         if (activePeers.isEmpty()) {
+            android.util.Log.w("MobiCloud:Distribute", "[DIAG] ABORT — aucun pair actif avec IP/port")
             return@withContext Result.failure(
                 IllegalStateException("Aucun nœud actif disponible pour la distribution")
             )
@@ -76,7 +82,9 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
             )
 
             var confirmedPeer = primaryPeer
+            android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} parity=${frag.isParity} → ${primaryPeer.identity.nodeId.take(8)}@${primaryPeer.ipAddress}:${primaryPeer.port}")
             var result = blockSender.sendBlock(msg, primaryPeer, BASE_ACK_TIMEOUT_MS)
+            android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} result=${if (result.isSuccess) "OK" else "FAIL: ${result.exceptionOrNull()?.message}"}")
 
             if (result.isFailure) {
                 val usedIndices = mutableSetOf(primaryIndex)
@@ -128,9 +136,8 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                 )
             },
             wrappedMasterKey = encryptedBundle.wrappedFileMasterKey,
-            // Story 6.3 — propagation taille originale pour permettre le trim Erasure côté
-            // récepteur. Les fragments partagent tous originalFileSize (cf. EncodeErasureFragmentsUseCase).
-            originalFileSize = encryptedBundle.encryptedFragments.firstOrNull()?.originalFileSize ?: 0L
+            originalFileSize = encryptedBundle.encryptedFragments.firstOrNull()?.originalFileSize ?: 0L,
+            originalFileName = originalFileName
         )
 
         catalogRepository.insertOwnerEntry(catalogEntry)

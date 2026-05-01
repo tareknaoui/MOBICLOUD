@@ -24,5 +24,6 @@ data class CatalogEntry(
     @ProtoNumber(3) val versionClock: Long,
     @ProtoNumber(4) val fragmentLocations: List<FragmentLocation>,
     @ProtoNumber(5) val wrappedMasterKey: WrappedFileMasterKey? = null,
-    @ProtoNumber(6) val originalFileSize: Long = 0L
+    @ProtoNumber(6) val originalFileSize: Long = 0L,
+    @ProtoNumber(7) val originalFileName: String = ""
 )

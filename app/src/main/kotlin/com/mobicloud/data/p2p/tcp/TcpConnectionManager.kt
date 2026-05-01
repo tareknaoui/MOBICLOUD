@@ -95,6 +95,10 @@ class TcpConnectionManager @Inject constructor(
     // F-03 [Review][Patch]: Référence stockée pour permettre interrupt() dans stopServer().
     private var serverThread: Thread? = null
 
+    // Appelé quand le ServerSocket se ferme inopinément et qu'un rebind réussit sur un nouveau port.
+    // Le service branche ce callback pour propager le nouveau port dans LocalDiscoveryRepository.
+    @Volatile var onServerPortChanged: ((Int) -> Unit)? = null
+
     // [Review][Patch] Scope dédié aux handlers de connexion entrante. Chaque connexion est
     // traitée sur Dispatchers.IO pour ne plus bloquer le thread accept (anti-DoS).
     private val connectionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -111,18 +115,36 @@ class TcpConnectionManager @Inject constructor(
 
             // F-03 [Review][Patch]: Thread stocké pour permettre stopServer() de l'interrompre proprement.
             serverThread = Thread {
-                while (!Thread.currentThread().isInterrupted && serverSocket?.isClosed == false) {
+                while (!Thread.currentThread().isInterrupted) {
+                    val sock = serverSocket
+                    if (sock == null || sock.isClosed) {
+                        // Fermeture inattendue (pas un stopServer) → rebind sur nouveau port
+                        if (Thread.currentThread().isInterrupted) break
+                        try {
+                            val newSocket = ServerSocket(0)
+                            serverSocket = newSocket
+                            val newPort = newSocket.localPort
+                            Log.i("MobiCloud:TCP", "ServerSocket rebind sur port $newPort après fermeture inattendue")
+                            onServerPortChanged?.invoke(newPort)
+                        } catch (rebindEx: Exception) {
+                            Log.e("MobiCloud:TCP", "Auto-rebind échoué — thread accept terminé", rebindEx)
+                            break
+                        }
+                        continue
+                    }
                     try {
-                        val clientSocket = serverSocket!!.accept()
-                        // [Review][Patch] Dispatch sur scope IO : le thread accept n'est plus bloqué
-                        // par le traitement (DB/signature/I/O). Un pair lent ne DoS plus le serveur.
+                        val clientSocket = sock.accept()
                         connectionScope.launch { handleIncomingConnection(clientSocket) }
                     } catch (e: Exception) {
-                        if (serverSocket?.isClosed == false) {
-                            Log.e("MobiCloud:TCP", "Erreur lors de l'acceptation de la socket", e)
+                        if (sock.isClosed) {
+                            Log.w("MobiCloud:TCP", "ServerSocket fermée — tentative rebind")
+                            // isClosed sera détecté en tête de boucle
+                        } else if (!Thread.currentThread().isInterrupted) {
+                            Log.e("MobiCloud:TCP", "Erreur accept — ServerSocket toujours ouverte", e)
                         }
                     }
                 }
+                Log.w("MobiCloud:TCP", "Thread accept terminé — port $port n'est plus en écoute")
             }.also { it.start() }
 
             Result.success(port)

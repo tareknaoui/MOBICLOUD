@@ -99,10 +99,13 @@ fun ExplorerScreen(
             state = assembledState,
             onOpen = { filePath ->
                 val file = File(filePath)
+                android.util.Log.i("MobiCloud:Open", "[DIAG] tentative ouverture path=$filePath exists=${file.exists()} size=${if (file.exists()) file.length() else -1} ext='${file.extension}'")
                 try {
                     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                    android.util.Log.i("MobiCloud:Open", "[DIAG] uri=$uri")
                     val mimeType = MimeTypeMap.getSingleton()
                         .getMimeTypeFromExtension(file.extension) ?: "application/octet-stream"
+                    android.util.Log.i("MobiCloud:Open", "[DIAG] mime=$mimeType")
                     val intent = Intent(Intent.ACTION_VIEW).apply {
                         setDataAndType(uri, mimeType)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -111,10 +114,12 @@ fun ExplorerScreen(
                         context.startActivity(intent)
                         viewModel.resetDownloadState()
                     } catch (e: ActivityNotFoundException) {
-                        scope.launch { snackbarHostState.showSnackbar("Aucune application pour ouvrir ce fichier") }
+                        android.util.Log.w("MobiCloud:Open", "[DIAG] ActivityNotFound mime=$mimeType", e)
+                        scope.launch { snackbarHostState.showSnackbar("Aucune application pour ouvrir ce fichier (mime=$mimeType)") }
                     }
                 } catch (e: Exception) {
-                    scope.launch { snackbarHostState.showSnackbar("Impossible d'ouvrir le fichier") }
+                    android.util.Log.e("MobiCloud:Open", "[DIAG] FileProvider échoué path=$filePath", e)
+                    scope.launch { snackbarHostState.showSnackbar("Impossible d'ouvrir : ${e.javaClass.simpleName} — ${e.message}") }
                 }
             },
             onDismiss = { viewModel.resetDownloadState() }
