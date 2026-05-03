@@ -13,12 +13,14 @@ classification:
   domain: 'PFE Big Data / P2P Fédération Hybride'
   complexity: 'medium-high'
   projectContext: 'brownfield'
-lastEdited: '2026-04-28'
+lastEdited: '2026-05-02'
 editHistory:
   - date: '2026-04-13'
     changes: 'Refonte V5.0 — Fédération de Clusters Hybride avec Serveurs Relais HA WebSocket (Zero-Firebase, Zero-STUN, Zero-DDNS). Réintégration de la DHT, CRDT, Bully et Migration Géographique. Karma retiré.'
   - date: '2026-04-28'
     changes: 'Fix readiness — FR-01.2 scindé en signaling pur, ajout FR-05 (téléchargement concurrent K+2), ajout FR-08 (fallback Store-and-Forward), ajout NFR-04..07 (résilience churn, sécurité AES-GCM, mandat super-pair, anti-Sybil), métadonnées V5 alignées.'
+  - date: '2026-05-02'
+    changes: 'Alignement vocabulaire avec epics.md V5.0 — remplacement des occurrences résiduelles "Tracker" (V4) par "Serveurs Relais HA WebSocket" (§1.2, §2.1, UJ-01, UJ-02). FR-04.2 précisé : CRDT (LWW + Tombstones) + Filtres de Bloom (delta uniquement).'
 ---
 
 # Product Requirements Document — MobiCloud
@@ -36,7 +38,7 @@ editHistory:
 Dans des environnements éclatés où les utilisateurs mobiles accèdent à différents réseaux (4G, réseaux Wifi universitaires isolés), il est laborieux de partager des fichiers lourds de manière purement décentralisée. HDFS classique est inadapté au mobile. Les approches centralisées simplistes détruisent la nature P2P du système, tandis que le P2P pur est bloqué par les NAT et les changements de réseaux (churn). 
 
 ### 1.2 La Solution : MobiCloud "Fédération de Clusters"
-**MobiCloud** est un **Datalake Mobile** reposant sur une architecture de "Fédération de Clusters" alliant une signalisation centralisée (Tracker) pour traverser les NAT, et des modules algorithmiques distribués natifs de niveau Master pour l'orchestration interne :
+**MobiCloud** est un **Datalake Mobile** reposant sur une architecture de "Fédération de Clusters" alliant une signalisation par **Serveurs Relais HA WebSocket** (min 2 instances Zero-Knowledge) pour traverser les NAT, et des modules algorithmiques distribués natifs de niveau Master pour l'orchestration interne :
 
 1. **Topologie Fédérée (Serveurs Relais HA WebSocket)** : Un cluster de Serveurs Relais HA Node.js (min 2 instances Zero-Knowledge) agit comme annuaire de signalisation (REGISTER_PEER / GET_PEERS) pour lier des "îlots" ou régions (clusters 4G vs Wifi), permettant ainsi la découverte inter-réseaux. Aucune dépendance à Firebase, STUN, DDNS ou tout autre service tiers.
 2. **Synchronisation Décentralisée (Gossip & CRDT)** : À l'intérieur du réseau (et entre les Super-Pairs), le catalogue des fichiers redevient partagé via une DHT (Table de Hachage Distribuée) et synchronisé de manière épidémique (Gossip).
@@ -48,17 +50,17 @@ Dans des environnements éclatés où les utilisateurs mobiles accèdent à diff
 ## 2. Vision du Produit
 
 ### 2.1 Vision Long Terme
-> *"Fédérer la puissance de stockage des smartphones de différents sous-réseaux au sein d'un maillage P2P pur, en s'appuyant ponctuellement sur un tracker pour la rencontre inter-clusters, garantissant un système sans point de défaillance central (CRDT) et un téléchargement concurrent multi-sources."*
+> *"Fédérer la puissance de stockage des smartphones de différents sous-réseaux au sein d'un maillage P2P pur, en s'appuyant ponctuellement sur un cluster de Serveurs Relais HA WebSocket pour la rencontre inter-clusters, garantissant un système sans point de défaillance central (CRDT) et un téléchargement concurrent multi-sources."*
 
 ### 2.2 Parcours Utilisateurs Clés (User Journeys)
 
 1. **UJ-01 : Découverte Hybride et Fédération**
    - *Déclencheur :* L'application démarre.
-   - *Flux :* En local (Wifi), elle recherche des pairs via Multicast UDP. Si elle est isolée (4G), elle interroge le serveur Tracker fixe pour rencontrer le Super-Pair de sa région.
+   - *Flux :* En local (Wifi), elle recherche des pairs via Multicast UDP. Si elle est isolée (4G), elle interroge les Serveurs Relais HA WebSocket pour rencontrer le Super-Pair de sa région.
    
 2. **UJ-02 : Élection de Super-Pair (Bully)**
    - *Déclencheur :* Aucun Super-Pair n'est joignable sur la boucle DHT.
-   - *Flux :* Les nœuds locaux déclenchent un message d'élection `ELECTION` (Algorithme Bully). Le nœud avec le plus haut Score de Fiabilité déclare victoire et s'enregistre auprès du Tracker.
+   - *Flux :* Les nœuds locaux déclenchent un message d'élection `ELECTION` (Algorithme Bully). Le nœud avec le plus haut Score de Fiabilité déclare victoire et s'enregistre auprès des Serveurs Relais HA.
    
 3. **UJ-03 : Synchronisation CRDT / Gossip**
    - *Déclencheur :* Un pair génère ou reçoit de nouveaux blocs Erasure.
@@ -132,7 +134,7 @@ Le PFE justifie sa nature "Big Data" et "Systèmes Distribués Avancés" avec la
 | ID | Exigence | Priorité |
 |----|----------|----------|
 | FR-04.1 | **Remplacement SQLite :** L'index global des blocs redevient partagé dans un anneau **DHT** entre tous les pairs qualifiés du cluster. | P0 |
-| FR-04.2 | La synchronisation de l'arborescence (arbre de Merkle ou CRDT) repose sur un algorithme épidémique (**Gossip**). | P0 |
+| FR-04.2 | La synchronisation de l'index DHT repose sur un algorithme épidémique (**Gossip**) avec **CRDT** (LWW + Tombstones) et **Filtres de Bloom** pour limiter la bande passante (échange de delta uniquement, pas de catalogues bruts). | P0 |
 
 ### FR-05 : Téléchargement Distribué Concurrent (K+2 Multi-Sources)
 | ID | Exigence | Priorité |

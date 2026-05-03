@@ -6,6 +6,7 @@ import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.RelayPeer
+import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import io.mockk.coVerify
@@ -24,6 +25,7 @@ class SignalingRepositoryImplTest {
     private lateinit var relayClient: RelayWebSocketClient
     private lateinit var peerRepository: PeerRepository
     private lateinit var networkEventRepository: NetworkEventRepository
+    private lateinit var identityRepository: IdentityRepository
 
     @Before
     fun setUp() {
@@ -38,11 +40,12 @@ class SignalingRepositoryImplTest {
         relayClient = mockk(relaxed = true)
         peerRepository = mockk(relaxed = true)
         networkEventRepository = mockk(relaxed = true)
+        identityRepository = mockk(relaxed = true)
 
         every { relayClient.connect(any()) } returns emptyFlow()
     }
 
-    private fun buildRepo() = SignalingRepositoryImpl(relayClient, peerRepository, networkEventRepository)
+    private fun buildRepo() = SignalingRepositoryImpl(relayClient, peerRepository, networkEventRepository, identityRepository)
 
     // -------------------------------------------------------------------------
     // Subtask 4.1 : registerAsSuperPeer retourne Result.success
