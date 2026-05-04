@@ -200,6 +200,23 @@ class RelayWebSocketClient @Inject constructor(
         return ws.send(RelayFraming.buildFrame(RelayMsg.GET_PEERS).toByteString())
     }
 
+    /**
+     * Envoie JOIN (0x0B) — déclare la simple présence du nœud sur le relais, sans revendiquer
+     * le statut Super-Pair. Permet à l'élection Bully de se déclencher (sinon, tous les nœuds
+     * connectés s'auto-déclarent Super-Pair via REGISTER_PEER et l'élection ne fire jamais).
+     * ip/port sont optionnels — pertinents uniquement pour les nœuds joignables directement.
+     */
+    fun sendJoin(nodeId: String, ip: String?, port: Int?, reliabilityScore: Float): Boolean {
+        val ws = activeWebSocket ?: return false
+        val json = org.json.JSONObject().apply {
+            if (ip != null) put("ip", ip)
+            if (port != null) put("port", port)
+            put("reliabilityScore", reliabilityScore.toDouble())
+        }
+        val payload = json.toString().toByteArray(Charsets.UTF_8)
+        return ws.send(RelayFraming.buildFrame(RelayMsg.JOIN, payload).toByteString())
+    }
+
     /** Envoie REGISTER_PEER (0x03) avec les métadonnées du Super-Pair. */
     fun sendRegisterPeer(nodeId: String, ip: String, port: Int, reliabilityScore: Float, electedAt: Long): Boolean {
         val ws = activeWebSocket ?: return false
@@ -224,7 +241,9 @@ class RelayWebSocketClient @Inject constructor(
                     ip               = obj.getString("ip"),
                     port             = obj.getInt("port"),
                     reliabilityScore = obj.getDouble("reliabilityScore").toFloat(),
-                    lastSeen         = obj.getLong("lastSeen")
+                    lastSeen         = obj.getLong("lastSeen"),
+                    // Champ ajouté côté serveur Story Bully ; absent dans les anciennes réponses → false
+                    isSuperPair      = obj.optBoolean("isSuperPair", false)
                 )
             }
         }.getOrDefault(emptyList())

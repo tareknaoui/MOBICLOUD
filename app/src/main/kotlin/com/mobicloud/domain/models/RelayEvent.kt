@@ -18,5 +18,9 @@ data class RelayPeer(
     val ip: String,
     val port: Int,
     val reliabilityScore: Float,
-    val lastSeen: Long
+    val lastSeen: Long,
+    // Renvoyé par le serveur (Story Bully) — true si ce nœud a fait REGISTER_PEER (Super-Pair élu),
+    // false s'il a juste fait JOIN (simple participant). Default false pour back-compat avec
+    // d'anciennes réponses serveur qui ne contiennent pas ce champ.
+    val isSuperPair: Boolean = false
 )

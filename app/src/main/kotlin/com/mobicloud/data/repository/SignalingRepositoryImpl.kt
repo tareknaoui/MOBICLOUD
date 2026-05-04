@@ -75,20 +75,35 @@ class SignalingRepositoryImpl @Inject constructor(
                 Log.w(TAG, "[DIAG] pair ${peer.nodeId.take(8)} ignoré : trop ancien ($ageMs ms > $RELAY_TTL_MS)")
                 return@forEach
             }
-            Log.i(TAG, "[DIAG] insertion ${peer.nodeId.take(8)}@${peer.ip}:${peer.port}")
+            Log.i(TAG, "[DIAG] insertion ${peer.nodeId.take(8)}@${peer.ip}:${peer.port} isSuperPair=${peer.isSuperPair}")
             // La clé publique est un placeholder vide — elle sera résolue lors du TCP handshake direct.
             // Le relais est une couche de découverte, pas d'authentification.
+            // isSuperPair vient maintenant du serveur (Story Bully) : true si REGISTER_PEER, false si JOIN.
             peerRepository.registerOrUpdatePeer(
                 identity    = NodeIdentity(peer.nodeId, ByteArray(0)),
                 timestampMs = SystemClock.elapsedRealtime(),
                 source      = DiscoverySource.RELAY_HA,
                 ipAddress   = peer.ip,
                 port        = peer.port,
-                isSuperPair = true
+                isSuperPair = peer.isSuperPair
             )
             insertedCount++
         }
         Log.i(TAG, "[DIAG] processPeerList END — $insertedCount insérés sur ${peers.size}")
+    }
+
+    override suspend fun joinAsParticipant(
+        nodeId: String,
+        ip: String?,
+        port: Int?,
+        reliabilityScore: Float
+    ): Result<Unit> = runCatching {
+        val sent = relayClient.sendJoin(nodeId, ip, port, reliabilityScore)
+        if (!sent) error("RelayWebSocketClient non connecté — JOIN non envoyé")
+        Log.d(TAG, "JOIN envoyé : nodeId=${nodeId.take(8)} ip=$ip port=$port score=$reliabilityScore")
+        Unit
+    }.onFailure { e ->
+        Log.w(TAG, "joinAsParticipant échoué : ${e.message}")
     }
 
     override suspend fun registerAsSuperPeer(

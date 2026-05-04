@@ -1,7 +1,18 @@
 package com.mobicloud.domain.repository
 
 interface SignalingRepository {
-    /** Enregistre ce nœud comme Super-Pair auprès des Serveurs Relais HA. */
+    /**
+     * Annonce la présence du nœud sur le relais SANS revendiquer le statut Super-Pair.
+     * À utiliser au démarrage et en keepalive ; permet à Bully de se déclencher.
+     */
+    suspend fun joinAsParticipant(
+        nodeId: String,
+        ip: String? = null,
+        port: Int? = null,
+        reliabilityScore: Float
+    ): Result<Unit>
+
+    /** Enregistre ce nœud comme Super-Pair auprès des Serveurs Relais HA (post-Bully). */
     suspend fun registerAsSuperPeer(
         ip: String,
         port: Int,

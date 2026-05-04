@@ -11,5 +11,8 @@ internal object RelayMsg {
     const val ACK: Byte            = 0x08
     const val PING: Byte           = 0x09
     const val PONG: Byte           = 0x0A
+    // JOIN (0x0B) : "je suis présent" — distinct de REGISTER_PEER ("je suis Super-Pair élu").
+    // Permet à l'élection Bully de se déclencher car les nœuds JOIN ne se déclarent pas Super-Pair.
+    const val JOIN: Byte           = 0x0B
     const val ERROR: Byte          = 0xFF.toByte()
 }

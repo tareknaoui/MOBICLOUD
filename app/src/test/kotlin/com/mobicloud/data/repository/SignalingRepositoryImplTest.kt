@@ -9,6 +9,7 @@ import com.mobicloud.domain.models.RelayPeer
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -31,7 +32,9 @@ class SignalingRepositoryImplTest {
     fun setUp() {
         mockkStatic(Log::class)
         every { Log.d(any(), any()) } returns 0
+        every { Log.i(any(), any()) } returns 0
         every { Log.w(any(), any<String>()) } returns 0
+        every { Log.w(any(), any<String>(), any<Throwable>()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
 
         mockkStatic(SystemClock::class)
@@ -41,6 +44,10 @@ class SignalingRepositoryImplTest {
         peerRepository = mockk(relaxed = true)
         networkEventRepository = mockk(relaxed = true)
         identityRepository = mockk(relaxed = true)
+
+        // Stub explicite : Result<NodeIdentity> est une inline class, mockk relaxed renvoie un Object
+        // qui ne peut pas être cast → ClassCastException dès qu'on accède à .nodeId.
+        coEvery { identityRepository.getIdentity() } returns Result.success(NodeIdentity("self-node-id", ByteArray(0)))
 
         every { relayClient.connect(any()) } returns emptyFlow()
     }
@@ -156,7 +163,8 @@ class SignalingRepositoryImplTest {
             ip = "5.6.7.8",
             port = 8888,
             reliabilityScore = 0.9f,
-            lastSeen = now
+            lastSeen = now,
+            isSuperPair = true   // Story Bully — le serveur signale ici un Super-Pair élu
         )
 
         repo.processPeerList(listOf(freshPeer))
@@ -171,5 +179,63 @@ class SignalingRepositoryImplTest {
                 isSuperPair = true
             )
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Story Bully : le flag isSuperPair du serveur est respecté (un participant JOIN
+    // n'est PAS marqué comme Super-Pair localement).
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `processPeerList insere un participant JOIN avec isSuperPair=false`() = runTest {
+        val repo = buildRepo()
+        val now = System.currentTimeMillis()
+
+        val joinPeer = RelayPeer(
+            nodeId = "joined-node",
+            ip = "9.10.11.12",
+            port = 7777,
+            reliabilityScore = 0.6f,
+            lastSeen = now,
+            isSuperPair = false   // simple participant côté serveur (JOIN, pas REGISTER_PEER)
+        )
+
+        repo.processPeerList(listOf(joinPeer))
+
+        coVerify {
+            peerRepository.registerOrUpdatePeer(
+                identity    = match { it.nodeId == "joined-node" },
+                timestampMs = any(),
+                source      = DiscoverySource.RELAY_HA,
+                ipAddress   = "9.10.11.12",
+                port        = 7777,
+                isSuperPair = false
+            )
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Story Bully : joinAsParticipant délègue à RelayWebSocketClient.sendJoin
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `joinAsParticipant retourne success quand sendJoin retourne true`() = runTest {
+        every { relayClient.sendJoin(any(), any(), any(), any()) } returns true
+
+        val repo = buildRepo()
+        val result = repo.joinAsParticipant("test-node-id", "1.2.3.4", 5555, 0.7f)
+
+        assertTrue(result.isSuccess)
+        verify { relayClient.sendJoin("test-node-id", "1.2.3.4", 5555, 0.7f) }
+    }
+
+    @Test
+    fun `joinAsParticipant retourne failure quand sendJoin retourne false`() = runTest {
+        every { relayClient.sendJoin(any(), any(), any(), any()) } returns false
+
+        val repo = buildRepo()
+        val result = repo.joinAsParticipant("test-node-id", null, null, 0.5f)
+
+        assertTrue(result.isFailure)
     }
 }

@@ -11,6 +11,10 @@ const MSG = {
   REGISTER_PEER: 0x03, GET_PEERS: 0x04, PEERS: 0x05,
   UPLOAD: 0x06, FORWARD: 0x07, ACK: 0x08,
   PING: 0x09, PONG: 0x0A,
+  // JOIN (0x0B) : ajoute le nœud à l'annuaire de présence sans le déclarer Super-Pair.
+  // Story Bully — sépare la "présence dans le réseau" de l'élection formelle.
+  // Un nœud envoie JOIN au démarrage ; seul le gagnant Bully envoie ensuite REGISTER_PEER.
+  JOIN: 0x0B,
   ERROR: 0xFF
 };
 
@@ -119,7 +123,8 @@ function verifyAuth(payload) {
 // Map<nodeId, { ws, publicKey }>
 const sessions = new Map();
 
-// Map<nodeId, { ip, port, reliabilityScore, electedAt, lastSeen, ttlTimer }>
+// Map<nodeId, { ip, port, reliabilityScore, electedAt, lastSeen, ttlTimer, isSuperPair }>
+// isSuperPair=false → simple présence (JOIN), isSuperPair=true → Super-Pair élu (REGISTER_PEER).
 const signalingRegistry = new Map();
 
 // Map<blockId, [{ fromNodeId, destNodeId, data: Buffer, ttlTimer }]>
@@ -154,10 +159,55 @@ function handleRegisterPeer(nodeId, payload) {
     reliabilityScore: reliabilityScore ?? 0.5,
     electedAt: electedAt ?? Date.now(),
     lastSeen: Date.now(),
-    ttlTimer
+    ttlTimer,
+    isSuperPair: true   // REGISTER_PEER = revendication formelle de statut Super-Pair (post-Bully)
   });
 
-  console.log(`[SIGNALING] REGISTER nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port}`);
+  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port}`);
+  return true;
+}
+
+// JOIN : ajoute le nœud à l'annuaire en tant que simple participant (isSuperPair=false).
+// Si le nœud est DÉJÀ enregistré comme Super-Pair, le statut est préservé (re-JOIN ne dégrade pas).
+// ip/port sont optionnels — peuvent être omis pour les nœuds non joignables directement.
+function handleJoin(nodeId, payload) {
+  let entry;
+  try { entry = JSON.parse(payload.toString('utf8')); } catch { return false; }
+
+  const { ip, port, reliabilityScore } = entry;
+
+  // ip/port optionnels — si présents, doivent être valides
+  if (ip !== undefined && ip !== null) {
+    if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) return false;
+  }
+  if (port !== undefined && port !== null) {
+    if (typeof port !== 'number' || port < 1 || port > 65535) return false;
+  }
+
+  if (!signalingRegistry.has(nodeId) && signalingRegistry.size >= MAX_SIGNALING_PEERS) return false;
+
+  const existing = signalingRegistry.get(nodeId);
+  if (existing?.ttlTimer) clearTimeout(existing.ttlTimer);
+
+  const ttlTimer = setTimeout(() => {
+    signalingRegistry.delete(nodeId);
+    console.log(`[PRESENCE] TTL expiré — nodeId=${nodeId.slice(0, 8)} supprimé`);
+  }, TTL_MS);
+
+  // Préserver le statut Super-Pair si déjà élu — re-JOIN ne déclasse pas.
+  const wasSuperPair = existing?.isSuperPair ?? false;
+
+  signalingRegistry.set(nodeId, {
+    ip: ip ?? '0.0.0.0',
+    port: port ?? 0,
+    reliabilityScore: reliabilityScore ?? 0.5,
+    electedAt: existing?.electedAt ?? null,
+    lastSeen: Date.now(),
+    ttlTimer,
+    isSuperPair: wasSuperPair
+  });
+
+  console.log(`[PRESENCE] JOIN nodeId=${nodeId.slice(0, 8)} ip=${ip ?? '?'}:${port ?? '?'} isSuperPair=${wasSuperPair}`);
   return true;
 }
 
@@ -169,7 +219,8 @@ function handleGetPeers(ws) {
       ip: entry.ip,
       port: entry.port,
       reliabilityScore: entry.reliabilityScore,
-      lastSeen: entry.lastSeen
+      lastSeen: entry.lastSeen,
+      isSuperPair: entry.isSuperPair === true   // exposé au client pour qu'il sache qui est Super-Pair élu
     });
   }
   safeSend(ws, buildFrame(MSG.PEERS, Buffer.from(JSON.stringify(peers), 'utf8')));
@@ -272,11 +323,16 @@ function handleUpload(fromNodeId, payload, senderWs) {
 
 const httpServer = http.createServer((req, res) => {
   if (req.method === 'GET' && req.url === '/health') {
+    let superPeerCount = 0;
+    for (const entry of signalingRegistry.values()) {
+      if (entry.isSuperPair) superPeerCount++;
+    }
     const body = JSON.stringify({
       status: 'ok',
       sessions: sessions.size,
       pendingBlocks: relayBuffer.size,
-      registeredSuperPeers: signalingRegistry.size
+      participants: signalingRegistry.size,
+      registeredSuperPeers: superPeerCount
     });
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(body);
@@ -355,6 +411,11 @@ wss.on('connection', (ws) => {
         if (!ok) sendError(ws, 'REGISTER_PEER payload invalide');
         break;
       }
+      case MSG.JOIN: {
+        const ok = handleJoin(nodeId, frame.payload);
+        if (!ok) sendError(ws, 'JOIN payload invalide');
+        break;
+      }
       case MSG.GET_PEERS: {
         handleGetPeers(ws);
         break;
@@ -424,7 +485,7 @@ if (require.main === module) {
 // ─── Exports pour les tests ──────────────────────────────────────────────────
 module.exports = {
   buildFrame, parseFrame, sendError, safeSend, verifyAuth,
-  handleRegisterPeer, handleGetPeers, handleUpload, flushPendingBlocks,
+  handleRegisterPeer, handleJoin, handleGetPeers, handleUpload, flushPendingBlocks,
   sessions, signalingRegistry, relayBuffer,
   MSG, TTL_MS, AUTH_WINDOW_MS, AUTH_TIMEOUT_MS, MAX_BLOCK_SIZE,
   MAX_RELAY_BUFFER_ENTRIES, MAX_SIGNALING_PEERS,

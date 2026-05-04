@@ -56,11 +56,9 @@ class DashboardViewModel @Inject constructor(
         peerRepository.peers,
         localNodeIdFlow
     ) { peers, localNodeId ->
-        if (localNodeId != null && peers.any { p -> p.isSuperPair && p.isActive && p.identity.nodeId == localNodeId }) {
-            NodeRole.SUPER_PAIR
-        } else {
-            NodeRole.PEER
-        }
+        val match = localNodeId != null && peers.any { p -> p.isSuperPair && p.isActive && p.identity.nodeId == localNodeId }
+        android.util.Log.i("DashboardVM", "[ROLE-DIAG] localNodeId=${localNodeId?.take(8)} peersCount=${peers.size} peers=${peers.map { "${it.identity.nodeId.take(8)}:sp=${it.isSuperPair}:active=${it.isActive}" }} → ${if (match) "SUPER_PAIR" else "PEER"}")
+        if (match) NodeRole.SUPER_PAIR else NodeRole.PEER
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), NodeRole.PEER)
 
     // AC#6 — Badge "Réseau instable" : vrai si le Circuit-Breaker est actif (Story 3.4)

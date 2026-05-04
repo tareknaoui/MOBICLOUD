@@ -167,34 +167,32 @@ class MobicloudP2PService : Service() {
             }
             launch { localDiscoveryRepository.start(tcpPort) }
 
-            // Inter-réseau : enregistre ce nœud comme "Super-Pair" sur le relais HA dès le démarrage,
-            // sans attendre l'élection Bully. Permet à tous les nœuds connectés au relais de se voir
-            // mutuellement via GET_PEERS, même sur des réseaux différents (pas de HELLO LAN commun).
+            // Inter-réseau : annonce ce nœud comme PARTICIPANT (pas Super-Pair) sur le relais HA
+            // dès le démarrage. Permet la découverte cross-network (GET_PEERS) sans bloquer Bully.
+            // Le statut Super-Pair sera revendiqué via REGISTER_PEER UNIQUEMENT après victoire Bully.
             // Keepalive toutes les 30s pour rester avant l'expiration du TTL serveur (60s).
             launch {
                 delay(3_000L) // attendre AUTH_OK WebSocket
                 // L'IP réelle n'a pas d'importance pour le routage relais (qui utilise uniquement le nodeId).
-                // Le serveur stocke ce qu'on envoie, mais BlockSenderWithRelay route via destNodeId, pas par IP.
                 val placeholderIp = "0.0.0.0"
 
-                suspend fun registerAndFetch() {
-                    signalingRepository.registerAsSuperPeer(
+                suspend fun joinAndFetch() {
+                    signalingRepository.joinAsParticipant(
+                        nodeId = identity.nodeId,
                         ip = placeholderIp,
                         port = tcpPort,
-                        reliabilityScore = identity.reliabilityScore,
-                        electedAt = System.currentTimeMillis(),
-                        nodeId = identity.nodeId
-                    ).onFailure { Log.w(LOGTAG, "auto-register relais échoué", it) }
+                        reliabilityScore = identity.reliabilityScore
+                    ).onFailure { Log.w(LOGTAG, "auto-join relais échoué", it) }
                     signalingRepository.fetchActiveSuperPeers()
                         .onFailure { Log.w(LOGTAG, "fetchActiveSuperPeers échoué", it) }
                 }
 
-                // Hook : sur reconnexion WebSocket, refait REGISTER + GET_PEERS immédiatement
+                // Hook : sur reconnexion WebSocket, refait JOIN + GET_PEERS immédiatement
                 (signalingRepository as? com.mobicloud.data.repository.SignalingRepositoryImpl)
-                    ?.onConnectedHook = { registerAndFetch() }
+                    ?.onConnectedHook = { joinAndFetch() }
 
                 while (isActive) {
-                    registerAndFetch()
+                    joinAndFetch()
                     delay(30_000L)
                 }
             }
@@ -253,13 +251,22 @@ class MobicloudP2PService : Service() {
             }
 
             // Loop 6: Recalcul périodique du score de fiabilité (AC #1, #2, #3, #4)
+            // FIX dual-Keystore : on update via le nodeId d'identityRepository (DB-backed) et NON
+            // identity.nodeId (issu de securityRepository qui utilise un KEY_ALIAS différent et crée
+            // un nodeId distinct → l'UPDATE ne match aucune row → score figé à 1.0 (100%)).
             launch {
+                val dbNodeId = identityRepository.getIdentity().getOrNull()?.nodeId
+                if (dbNodeId == null) {
+                    Log.w(LOGTAG, "[SCORE-LOOP] identityRepository.getIdentity() a échoué — recalcul désactivé")
+                    return@launch
+                }
                 while (isActive) {
                     delay(RELIABILITY_SCORE_INTERVAL_MS)
                     calculateReliabilityScoreUseCase()
                         .onSuccess { newScore ->
-                            identityRepository.updateReliabilityScore(identity.nodeId, newScore)
+                            identityRepository.updateReliabilityScore(dbNodeId, newScore)
                                 .onFailure { Log.w(LOGTAG, "Persistance du score de fiabilité échouée", it) }
+                            Log.i(LOGTAG, "[SCORE-LOOP] score recalculé = $newScore pour ${dbNodeId.take(8)}")
                         }
                         .onFailure { Log.w(LOGTAG, "Recalcul du score de fiabilité échoué", it) }
                 }

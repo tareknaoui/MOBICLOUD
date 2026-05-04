@@ -179,6 +179,7 @@ describe('handleRegisterPeer', () => {
     const entry = signalingRegistry.get('a1b2c3d4e5f60708');
     expect(entry.ip).toBe('192.168.1.10');
     expect(entry.port).toBe(48999);
+    expect(entry.isSuperPair).toBe(true);   // REGISTER_PEER ⇒ statut Super-Pair formel
     clearTimeout(entry.ttlTimer);
   });
 
@@ -204,6 +205,62 @@ describe('handleRegisterPeer', () => {
     // Le timer doit avoir changé
     expect(second.ttlTimer).not.toBe(firstTimer);
     clearTimeout(second.ttlTimer);
+  });
+});
+
+// ─── Tests handleJoin ────────────────────────────────────────────────────────
+
+describe('handleJoin', () => {
+  test('JOIN insère un participant avec isSuperPair=false', () => {
+    const { handleJoin, signalingRegistry } = mod;
+    const payload = Buffer.from(JSON.stringify({ ip: '10.0.0.42', port: 7777 }));
+    const result = handleJoin('a1b2c3d4e5f60708', payload);
+    expect(result).toBe(true);
+    const entry = signalingRegistry.get('a1b2c3d4e5f60708');
+    expect(entry.isSuperPair).toBe(false);
+    expect(entry.ip).toBe('10.0.0.42');
+    expect(entry.port).toBe(7777);
+    clearTimeout(entry.ttlTimer);
+  });
+
+  test('JOIN accepte ip/port omis (nœud non joignable directement)', () => {
+    const { handleJoin, signalingRegistry } = mod;
+    const payload = Buffer.from(JSON.stringify({ reliabilityScore: 0.7 }));
+    const result = handleJoin('a1b2c3d4e5f60708', payload);
+    expect(result).toBe(true);
+    const entry = signalingRegistry.get('a1b2c3d4e5f60708');
+    expect(entry.isSuperPair).toBe(false);
+    expect(entry.ip).toBe('0.0.0.0');
+    expect(entry.port).toBe(0);
+    clearTimeout(entry.ttlTimer);
+  });
+
+  test('JOIN après REGISTER_PEER NE dégrade PAS le statut Super-Pair', () => {
+    const { handleRegisterPeer, handleJoin, signalingRegistry } = mod;
+    handleRegisterPeer('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({ ip: '10.0.0.5', port: 5000 })));
+    expect(signalingRegistry.get('a1b2c3d4e5f60708').isSuperPair).toBe(true);
+    handleJoin('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({ ip: '10.0.0.5', port: 5000 })));
+    expect(signalingRegistry.get('a1b2c3d4e5f60708').isSuperPair).toBe(true);  // préservé
+    clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
+  });
+
+  test('REGISTER_PEER après JOIN promeut au statut Super-Pair', () => {
+    const { handleJoin, handleRegisterPeer, signalingRegistry } = mod;
+    handleJoin('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({})));
+    expect(signalingRegistry.get('a1b2c3d4e5f60708').isSuperPair).toBe(false);
+    handleRegisterPeer('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({ ip: '10.0.0.5', port: 5000 })));
+    expect(signalingRegistry.get('a1b2c3d4e5f60708').isSuperPair).toBe(true);
+    clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
+  });
+
+  test('JOIN échoue si JSON invalide', () => {
+    const { handleJoin } = mod;
+    expect(handleJoin('a1b2c3d4e5f60708', Buffer.from('notjson'))).toBe(false);
+  });
+
+  test('JOIN échoue si port hors plage', () => {
+    const { handleJoin } = mod;
+    expect(handleJoin('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({ port: 99999 })))).toBe(false);
   });
 });
 
@@ -234,6 +291,21 @@ describe('handleGetPeers', () => {
     const frame = parseFrame(sent[0]);
     const peers = JSON.parse(frame.payload.toString('utf8'));
     expect(peers).toEqual([]);
+  });
+
+  test('expose le flag isSuperPair pour chaque pair (mix JOIN + REGISTER)', () => {
+    const { handleGetPeers, handleJoin, handleRegisterPeer, signalingRegistry, parseFrame } = mod;
+    handleJoin('1111111111111111', Buffer.from(JSON.stringify({})));
+    handleRegisterPeer('2222222222222222', Buffer.from(JSON.stringify({ ip: '10.0.0.2', port: 5000 })));
+    const sent = [];
+    const fakeWs = { send: (buf) => sent.push(buf), readyState: 1 };
+    handleGetPeers(fakeWs);
+    const peers = JSON.parse(parseFrame(sent[0]).payload.toString('utf8'));
+    const byId = Object.fromEntries(peers.map(p => [p.nodeId, p]));
+    expect(byId['1111111111111111'].isSuperPair).toBe(false);
+    expect(byId['2222222222222222'].isSuperPair).toBe(true);
+    clearTimeout(signalingRegistry.get('1111111111111111').ttlTimer);
+    clearTimeout(signalingRegistry.get('2222222222222222').ttlTimer);
   });
 });
 
