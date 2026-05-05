@@ -218,7 +218,15 @@ class RelayWebSocketClient @Inject constructor(
     }
 
     /** Envoie REGISTER_PEER (0x03) avec les métadonnées du Super-Pair. */
-    fun sendRegisterPeer(nodeId: String, ip: String, port: Int, reliabilityScore: Float, electedAt: Long): Boolean {
+    fun sendRegisterPeer(
+        nodeId: String,
+        ip: String,
+        port: Int,
+        reliabilityScore: Float,
+        electedAt: Long,
+        clusterId: String,
+        freeBytes: Long
+    ): Boolean {
         val ws = activeWebSocket ?: return false
         val json = org.json.JSONObject().apply {
             put("nodeId",           nodeId)
@@ -226,6 +234,10 @@ class RelayWebSocketClient @Inject constructor(
             put("port",             port)
             put("reliabilityScore", reliabilityScore.toDouble())
             put("electedAt",        electedAt)
+            put("clusterId",        clusterId)
+            // Story 9.2 — capacité libre snapshot (allocated - used, ≥ 0). JSONObject sérialise
+            // le Long en Number JSON (sûr tant que < 2^53, soit ~9 PB).
+            put("freeBytes",        freeBytes)
         }
         val payload = json.toString().toByteArray(Charsets.UTF_8)
         return ws.send(RelayFraming.buildFrame(RelayMsg.REGISTER_PEER, payload).toByteString())
@@ -243,7 +255,11 @@ class RelayWebSocketClient @Inject constructor(
                     reliabilityScore = obj.getDouble("reliabilityScore").toFloat(),
                     lastSeen         = obj.getLong("lastSeen"),
                     // Champ ajouté côté serveur Story Bully ; absent dans les anciennes réponses → false
-                    isSuperPair      = obj.optBoolean("isSuperPair", false)
+                    isSuperPair      = obj.optBoolean("isSuperPair", false),
+                    // Story 9.2 — defaults garantissent la rétrocompatibilité avec
+                    // d'anciennes réponses serveur sans ces champs.
+                    clusterId        = obj.optString("clusterId", ""),
+                    freeBytes        = obj.optLong("freeBytes", 0L)
                 )
             }
         }.getOrDefault(emptyList())

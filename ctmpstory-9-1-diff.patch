@@ -1,0 +1,476 @@
+diff --git a/_bmad-output/implementation-artifacts/sprint-status.yaml b/_bmad-output/implementation-artifacts/sprint-status.yaml
+index fa88220..8ae1db6 100644
+--- a/_bmad-output/implementation-artifacts/sprint-status.yaml
++++ b/_bmad-output/implementation-artifacts/sprint-status.yaml
+@@ -1,5 +1,5 @@
+ # generated: 2026-04-13T21:26:35+02:00
+-# last_updated: 2026-04-29T23:59:00+02:00
++# last_updated: 2026-05-05T12:00:00+02:00
+ # project: PFE
+ # project_key: NOKEY
+ # tracking_system: file-system
+@@ -35,7 +35,7 @@
+ # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+ 
+ generated: 2026-04-13T21:26:35+02:00
+-last_updated: 2026-04-29T23:59:00+02:00
++last_updated: 2026-05-05T12:00:00+02:00
+ project: PFE
+ project_key: NOKEY
+ tracking_system: file-system
+@@ -93,3 +93,9 @@ development_status:
+   8-2-client-android-relaywebsocketclient-unifie: done
+   8-3-fallback-transparent-try-direct-then-relay-multi-instance: done
+   epic-8-retrospective: optional
++  epic-9: in-progress
++  9-1-clusterid-nodesettings-et-register-peer: review
++  9-2-freebytes-et-clusterid-dans-get-peers: backlog
++  9-3-request-hosting-distribution-inter-cluster: backlog
++  9-4-request-block-recuperation-inter-cluster: backlog
++  epic-9-retrospective: optional
+diff --git a/app/src/main/kotlin/com/mobicloud/data/local/CatalogDatabase.kt b/app/src/main/kotlin/com/mobicloud/data/local/CatalogDatabase.kt
+index 9bb709f..3bad59d 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/local/CatalogDatabase.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/local/CatalogDatabase.kt
+@@ -32,7 +32,7 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
+         HostedBlockEntity::class,
+         NodeSettingsEntity::class
+     ],
+-    version = 11,
++    version = 12,
+     exportSchema = true
+ )
+ @TypeConverters(Converters::class)
+@@ -166,5 +166,14 @@ abstract class CatalogDatabase : RoomDatabase() {
+                 )
+             }
+         }
++
++        // Story 9.1 — clusterId UUID v4 pour identification de cluster inter-nœuds.
++        val MIGRATION_11_12 = object : Migration(11, 12) {
++            override fun migrate(db: SupportSQLiteDatabase) {
++                db.execSQL(
++                    "ALTER TABLE node_settings ADD COLUMN cluster_id TEXT NOT NULL DEFAULT ''"
++                )
++            }
++        }
+     }
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/data/local/entity/NodeSettingsEntity.kt b/app/src/main/kotlin/com/mobicloud/data/local/entity/NodeSettingsEntity.kt
+index c259d82..32bfbed 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/local/entity/NodeSettingsEntity.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/local/entity/NodeSettingsEntity.kt
+@@ -7,5 +7,6 @@ import androidx.room.PrimaryKey
+ @Entity(tableName = "node_settings")
+ data class NodeSettingsEntity(
+     @PrimaryKey val id: Int = 0,
+-    @ColumnInfo(name = "allocated_storage_bytes") val allocatedStorageBytes: Long
++    @ColumnInfo(name = "allocated_storage_bytes") val allocatedStorageBytes: Long,
++    @ColumnInfo(name = "cluster_id") val clusterId: String = ""
+ )
+diff --git a/app/src/main/kotlin/com/mobicloud/data/p2p/websocket/RelayWebSocketClient.kt b/app/src/main/kotlin/com/mobicloud/data/p2p/websocket/RelayWebSocketClient.kt
+index 72d42fe..e8c6c3c 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/p2p/websocket/RelayWebSocketClient.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/p2p/websocket/RelayWebSocketClient.kt
+@@ -218,7 +218,14 @@ class RelayWebSocketClient @Inject constructor(
+     }
+ 
+     /** Envoie REGISTER_PEER (0x03) avec les métadonnées du Super-Pair. */
+-    fun sendRegisterPeer(nodeId: String, ip: String, port: Int, reliabilityScore: Float, electedAt: Long): Boolean {
++    fun sendRegisterPeer(
++        nodeId: String,
++        ip: String,
++        port: Int,
++        reliabilityScore: Float,
++        electedAt: Long,
++        clusterId: String
++    ): Boolean {
+         val ws = activeWebSocket ?: return false
+         val json = org.json.JSONObject().apply {
+             put("nodeId",           nodeId)
+@@ -226,6 +233,7 @@ class RelayWebSocketClient @Inject constructor(
+             put("port",             port)
+             put("reliabilityScore", reliabilityScore.toDouble())
+             put("electedAt",        electedAt)
++            put("clusterId",        clusterId)
+         }
+         val payload = json.toString().toByteArray(Charsets.UTF_8)
+         return ws.send(RelayFraming.buildFrame(RelayMsg.REGISTER_PEER, payload).toByteString())
+diff --git a/app/src/main/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImpl.kt b/app/src/main/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImpl.kt
+index 69dc30f..c322d92 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImpl.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImpl.kt
+@@ -38,20 +38,29 @@ class NodeSettingsRepositoryImpl(
+ 
+     // P7: double-check locking to prevent concurrent default-init races
+     override suspend fun getSettings(): NodeSettings {
+-        dao.getSettings()?.let { return it.toDomain() }
+-        return initMutex.withLock {
+-            dao.getSettings()?.toDomain() ?: run {
+-                val default = NodeSettings(allocatedStorageBytes = defaultBytes())
+-                dao.upsert(default.toEntity())
+-                default
++        val settings = dao.getSettings()?.toDomain()
++            ?: initMutex.withLock {
++                dao.getSettings()?.toDomain() ?: run {
++                    val default = NodeSettings(allocatedStorageBytes = defaultBytes())
++                    dao.upsert(default.toEntity())
++                    default
++                }
+             }
++        return if (settings.clusterId.isEmpty()) {
++            val withCluster = settings.copy(clusterId = java.util.UUID.randomUUID().toString())
++            dao.upsert(withCluster.toEntity())
++            withCluster
++        } else {
++            settings
+         }
+     }
+ 
+     // P8: validate that bytes is a positive value before persisting
+     override suspend fun updateAllocatedStorage(bytes: Long) {
+         require(bytes > 0) { "allocatedStorageBytes must be positive, got $bytes" }
+-        dao.upsert(NodeSettingsEntity(id = 0, allocatedStorageBytes = bytes))
++        val existing = dao.getSettings()
++        val clusterId = existing?.clusterId ?: ""
++        dao.upsert(NodeSettingsEntity(id = 0, allocatedStorageBytes = bytes, clusterId = clusterId))
+     }
+ 
+     // P-A7 — pas d'effet de bord (dao.upsert) dans un Flow.map : le mapping est pur.
+@@ -69,10 +78,12 @@ class NodeSettingsRepositoryImpl(
+ 
+ private fun NodeSettingsEntity.toDomain() = NodeSettings(
+     allocatedStorageBytes = allocatedStorageBytes,
++    clusterId = clusterId,
+     id = id
+ )
+ 
+ private fun NodeSettings.toEntity() = NodeSettingsEntity(
+     id = id,
+-    allocatedStorageBytes = allocatedStorageBytes
++    allocatedStorageBytes = allocatedStorageBytes,
++    clusterId = clusterId
+ )
+diff --git a/app/src/main/kotlin/com/mobicloud/data/repository/SignalingRepositoryImpl.kt b/app/src/main/kotlin/com/mobicloud/data/repository/SignalingRepositoryImpl.kt
+index 7459697..6cd2421 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/repository/SignalingRepositoryImpl.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/repository/SignalingRepositoryImpl.kt
+@@ -10,6 +10,7 @@ import com.mobicloud.domain.models.RelayEvent
+ import com.mobicloud.domain.models.RelayPeer
+ import com.mobicloud.domain.repository.IdentityRepository
+ import com.mobicloud.domain.repository.NetworkEventRepository
++import com.mobicloud.domain.repository.NodeSettingsRepository
+ import com.mobicloud.domain.repository.PeerRepository
+ import com.mobicloud.domain.repository.SignalingRepository
+ import kotlinx.coroutines.CoroutineScope
+@@ -27,7 +28,8 @@ class SignalingRepositoryImpl @Inject constructor(
+     private val relayClient: RelayWebSocketClient,
+     private val peerRepository: PeerRepository,
+     private val networkEventRepository: NetworkEventRepository,
+-    private val identityRepository: IdentityRepository
++    private val identityRepository: IdentityRepository,
++    private val nodeSettingsRepository: NodeSettingsRepository
+ ) : SignalingRepository {
+ 
+     // Scope lié au cycle de vie du processus — correct pour un @Singleton Android.
+@@ -113,9 +115,10 @@ class SignalingRepositoryImpl @Inject constructor(
+         electedAt: Long,
+         nodeId: String
+     ): Result<Unit> = runCatching {
+-        val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt)
++        val clusterId = nodeSettingsRepository.getSettings().clusterId
++        val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt, clusterId)
+         if (!sent) error("RelayWebSocketClient non connecté — REGISTER_PEER non envoyé")
+-        Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore")
++        Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore clusterId=${clusterId.take(8)}")
+         Unit
+     }.onFailure { e ->
+         Log.e(TAG, "registerAsSuperPeer échoué : ${e.message}")
+diff --git a/app/src/main/kotlin/com/mobicloud/di/IdentityModule.kt b/app/src/main/kotlin/com/mobicloud/di/IdentityModule.kt
+index 1f00cb6..d73c683 100644
+--- a/app/src/main/kotlin/com/mobicloud/di/IdentityModule.kt
++++ b/app/src/main/kotlin/com/mobicloud/di/IdentityModule.kt
+@@ -48,7 +48,8 @@ object IdentityModule {
+             CatalogDatabase.MIGRATION_7_8,
+             CatalogDatabase.MIGRATION_8_9,
+             CatalogDatabase.MIGRATION_9_10,
+-            CatalogDatabase.MIGRATION_10_11
++            CatalogDatabase.MIGRATION_10_11,
++            CatalogDatabase.MIGRATION_11_12
+         ).build()
+     }
+ 
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/models/NodeSettings.kt b/app/src/main/kotlin/com/mobicloud/domain/models/NodeSettings.kt
+index 8c3bc98..2689a8b 100644
+--- a/app/src/main/kotlin/com/mobicloud/domain/models/NodeSettings.kt
++++ b/app/src/main/kotlin/com/mobicloud/domain/models/NodeSettings.kt
+@@ -2,5 +2,6 @@ package com.mobicloud.domain.models
+ 
+ data class NodeSettings(
+     val allocatedStorageBytes: Long,
++    val clusterId: String = "",
+     val id: Int = 0
+ )
+diff --git a/app/src/test/kotlin/com/mobicloud/data/p2p/websocket/RelayWebSocketClientTest.kt b/app/src/test/kotlin/com/mobicloud/data/p2p/websocket/RelayWebSocketClientTest.kt
+index 2bf136a..cafa8ac 100644
+--- a/app/src/test/kotlin/com/mobicloud/data/p2p/websocket/RelayWebSocketClientTest.kt
++++ b/app/src/test/kotlin/com/mobicloud/data/p2p/websocket/RelayWebSocketClientTest.kt
+@@ -260,7 +260,7 @@ class RelayWebSocketClientTest {
+         assertTrue("AUTH frame non reçu dans 5s", authReceived.await(5, TimeUnit.SECONDS))
+ 
+         // activeWebSocket doit encore être null → sendRegisterPeer retourne false
+-        val result = client.sendRegisterPeer("node1", "192.168.1.1", 8080, 0.9f, 1_000L)
++        val result = client.sendRegisterPeer("node1", "192.168.1.1", 8080, 0.9f, 1_000L, "test-cluster-id")
+         assertFalse("sendRegisterPeer doit retourner false avant AUTH_OK", result)
+ 
+         connectJob.cancel()
+diff --git a/app/src/test/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImplTest.kt b/app/src/test/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImplTest.kt
+index 48c10d1..bd081bc 100644
+--- a/app/src/test/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImplTest.kt
++++ b/app/src/test/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImplTest.kt
+@@ -11,11 +11,14 @@ import kotlinx.coroutines.flow.first
+ import kotlinx.coroutines.flow.flowOf
+ import kotlinx.coroutines.test.runTest
+ import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertTrue
+ import org.junit.Before
+ import org.junit.Test
+ 
+ private const val TEN_GB = 10L * 1024 * 1024 * 1024
+ private const val TWO_GB = 2L * 1024 * 1024 * 1024
++private val UUID_V4_REGEX = Regex("^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+ 
+ class NodeSettingsRepositoryImplTest {
+ 
+@@ -30,22 +33,68 @@ class NodeSettingsRepositoryImplTest {
+ 
+     @Test
+     fun `getSettings insere valeur par defaut quand table vide`() = runTest {
+-        coEvery { dao.getSettings() } returns null
+         val upsertSlot = slot<NodeSettingsEntity>()
++        coEvery { dao.getSettings() } returns null
+         coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
+ 
+         val result = repository.getSettings()
+ 
+-        // default = min(2GB, 20% de 10GB) = min(2GB, 2GB) = 2GB
+         val expected = (TEN_GB * 0.20).toLong()
+         assertEquals(minOf(TWO_GB, expected), result.allocatedStorageBytes)
+-        coVerify { dao.upsert(any()) }
++        coVerify(atLeast = 1) { dao.upsert(any()) }
+         assertEquals(0, upsertSlot.captured.id)
+     }
+ 
++    @Test
++    fun `getSettings genere clusterId UUID v4 valide au premier appel`() = runTest {
++        val upsertSlot = slot<NodeSettingsEntity>()
++        coEvery { dao.getSettings() } returns null
++        coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
++
++        val result = repository.getSettings()
++
++        assertTrue(
++            "clusterId doit être un UUID v4 valide, reçu: ${result.clusterId}",
++            UUID_V4_REGEX.matches(result.clusterId)
++        )
++    }
++
++    @Test
++    fun `getSettings genere UUID quand entity existante a clusterId vide`() = runTest {
++        val existingEntity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 1_000_000L, clusterId = "")
++        val upsertSlot = slot<NodeSettingsEntity>()
++        coEvery { dao.getSettings() } returns existingEntity
++        coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
++
++        val result = repository.getSettings()
++
++        assertTrue(
++            "clusterId doit être un UUID v4 valide, reçu: ${result.clusterId}",
++            UUID_V4_REGEX.matches(result.clusterId)
++        )
++        coVerify { dao.upsert(any()) }
++    }
++
++    @Test
++    fun `getSettings retourne meme clusterId si deja persiste`() = runTest {
++        val persistedClusterId = "550e8400-e29b-41d4-a716-446655440000"
++        val existingEntity = NodeSettingsEntity(
++            id = 0,
++            allocatedStorageBytes = 5L * 1024 * 1024 * 1024,
++            clusterId = persistedClusterId
++        )
++        coEvery { dao.getSettings() } returns existingEntity
++
++        val result = repository.getSettings()
++
++        assertEquals(persistedClusterId, result.clusterId)
++        coVerify(exactly = 0) { dao.upsert(any()) }
++    }
++
+     @Test
+     fun `updateAllocatedStorage persiste la nouvelle valeur`() = runTest {
+         val upsertSlot = slot<NodeSettingsEntity>()
++        coEvery { dao.getSettings() } returns null
+         coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
+ 
+         val newBytes = 3L * 1024 * 1024 * 1024
+@@ -56,14 +105,33 @@ class NodeSettingsRepositoryImplTest {
+         assertEquals(0, upsertSlot.captured.id)
+     }
+ 
++    @Test
++    fun `updateAllocatedStorage preserve le clusterId existant`() = runTest {
++        val existingClusterId = "550e8400-e29b-41d4-a716-446655440000"
++        val existingEntity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 1_000_000L, clusterId = existingClusterId)
++        val upsertSlot = slot<NodeSettingsEntity>()
++        coEvery { dao.getSettings() } returns existingEntity
++        coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
++
++        repository.updateAllocatedStorage(2_000_000L)
++
++        assertEquals(existingClusterId, upsertSlot.captured.clusterId)
++    }
++
+     @Test
+     fun `getSettings retourne valeur persistee sans ecraser`() = runTest {
+-        val persisted = NodeSettingsEntity(id = 0, allocatedStorageBytes = 5L * 1024 * 1024 * 1024)
++        val persistedClusterId = "550e8400-e29b-41d4-a716-446655440000"
++        val persisted = NodeSettingsEntity(
++            id = 0,
++            allocatedStorageBytes = 5L * 1024 * 1024 * 1024,
++            clusterId = persistedClusterId
++        )
+         coEvery { dao.getSettings() } returns persisted
+ 
+         val result = repository.getSettings()
+ 
+         assertEquals(persisted.allocatedStorageBytes, result.allocatedStorageBytes)
++        assertEquals(persistedClusterId, result.clusterId)
+         coVerify(exactly = 0) { dao.upsert(any()) }
+     }
+ 
+@@ -79,11 +147,13 @@ class NodeSettingsRepositoryImplTest {
+ 
+     @Test
+     fun `observeSettings emet valeur persistee depuis DAO`() = runTest {
+-        val entity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 4L * 1024 * 1024 * 1024)
++        val clusterId = "550e8400-e29b-41d4-a716-446655440000"
++        val entity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 4L * 1024 * 1024 * 1024, clusterId = clusterId)
+         every { dao.observeSettings() } returns flowOf(entity)
+ 
+         val result = repository.observeSettings().first()
+ 
+         assertEquals(entity.allocatedStorageBytes, result.allocatedStorageBytes)
++        assertEquals(clusterId, result.clusterId)
+     }
+ }
+diff --git a/app/src/test/kotlin/com/mobicloud/data/repository/SignalingRepositoryImplTest.kt b/app/src/test/kotlin/com/mobicloud/data/repository/SignalingRepositoryImplTest.kt
+index 4c5b260..54e8c06 100644
+--- a/app/src/test/kotlin/com/mobicloud/data/repository/SignalingRepositoryImplTest.kt
++++ b/app/src/test/kotlin/com/mobicloud/data/repository/SignalingRepositoryImplTest.kt
+@@ -6,8 +6,10 @@ import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
+ import com.mobicloud.domain.models.DiscoverySource
+ import com.mobicloud.domain.models.NodeIdentity
+ import com.mobicloud.domain.models.RelayPeer
++import com.mobicloud.domain.models.NodeSettings
+ import com.mobicloud.domain.repository.IdentityRepository
+ import com.mobicloud.domain.repository.NetworkEventRepository
++import com.mobicloud.domain.repository.NodeSettingsRepository
+ import com.mobicloud.domain.repository.PeerRepository
+ import io.mockk.coEvery
+ import io.mockk.coVerify
+@@ -27,6 +29,7 @@ class SignalingRepositoryImplTest {
+     private lateinit var peerRepository: PeerRepository
+     private lateinit var networkEventRepository: NetworkEventRepository
+     private lateinit var identityRepository: IdentityRepository
++    private lateinit var nodeSettingsRepository: NodeSettingsRepository
+ 
+     @Before
+     fun setUp() {
+@@ -44,15 +47,20 @@ class SignalingRepositoryImplTest {
+         peerRepository = mockk(relaxed = true)
+         networkEventRepository = mockk(relaxed = true)
+         identityRepository = mockk(relaxed = true)
++        nodeSettingsRepository = mockk(relaxed = true)
+ 
+         // Stub explicite : Result<NodeIdentity> est une inline class, mockk relaxed renvoie un Object
+         // qui ne peut pas être cast → ClassCastException dès qu'on accède à .nodeId.
+         coEvery { identityRepository.getIdentity() } returns Result.success(NodeIdentity("self-node-id", ByteArray(0)))
++        coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
++            allocatedStorageBytes = 1_000_000L,
++            clusterId = "test-cluster-id-0001"
++        )
+ 
+         every { relayClient.connect(any()) } returns emptyFlow()
+     }
+ 
+-    private fun buildRepo() = SignalingRepositoryImpl(relayClient, peerRepository, networkEventRepository, identityRepository)
++    private fun buildRepo() = SignalingRepositoryImpl(relayClient, peerRepository, networkEventRepository, identityRepository, nodeSettingsRepository)
+ 
+     // -------------------------------------------------------------------------
+     // Subtask 4.1 : registerAsSuperPeer retourne Result.success
+@@ -60,13 +68,13 @@ class SignalingRepositoryImplTest {
+ 
+     @Test
+     fun `registerAsSuperPeer retourne Result_success quand sendRegisterPeer retourne true`() = runTest {
+-        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any()) } returns true
++        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any()) } returns true
+ 
+         val repo = buildRepo()
+         val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, System.currentTimeMillis(), "test-node-id")
+ 
+         assertTrue(result.isSuccess)
+-        verify { relayClient.sendRegisterPeer(any(), "192.168.1.10", 48999, 0.87f, any()) }
++        verify { relayClient.sendRegisterPeer(any(), "192.168.1.10", 48999, 0.87f, any(), any()) }
+     }
+ 
+     // -------------------------------------------------------------------------
+@@ -75,7 +83,7 @@ class SignalingRepositoryImplTest {
+ 
+     @Test
+     fun `registerAsSuperPeer retourne Result_failure quand sendRegisterPeer retourne false`() = runTest {
+-        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any()) } returns false
++        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any()) } returns false
+ 
+         val repo = buildRepo()
+         val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, System.currentTimeMillis(), "test-node-id")
+diff --git a/relay-server/server.js b/relay-server/server.js
+index 6f2f715..3f4e4cf 100644
+--- a/relay-server/server.js
++++ b/relay-server/server.js
+@@ -136,12 +136,17 @@ function handleRegisterPeer(nodeId, payload) {
+   let entry;
+   try { entry = JSON.parse(payload.toString('utf8')); } catch { return false; }
+ 
+-  const { ip, port, reliabilityScore, electedAt } = entry;
++  const { ip, port, reliabilityScore, electedAt, clusterId } = entry;
+   if (!ip || typeof port !== 'number' || port < 1 || port > 65535) return false;
+ 
+   // Valider le format IP (pas de hostname, pas de loopback non contrôlé)
+   if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) return false;
+ 
++  // clusterId optionnel : UUID v4 (36 chars) ou "" pour nœuds legacy
++  const clusterIdStr = (typeof clusterId === 'string' && clusterId.length <= 36)
++    ? clusterId
++    : '';
++
+   // Cap : refuser si annuaire plein et ce nœud n'est pas déjà enregistré
+   if (!signalingRegistry.has(nodeId) && signalingRegistry.size >= MAX_SIGNALING_PEERS) return false;
+ 
+@@ -158,12 +163,13 @@ function handleRegisterPeer(nodeId, payload) {
+     ip, port,
+     reliabilityScore: reliabilityScore ?? 0.5,
+     electedAt: electedAt ?? Date.now(),
++    clusterId: clusterIdStr,
+     lastSeen: Date.now(),
+     ttlTimer,
+-    isSuperPair: true   // REGISTER_PEER = revendication formelle de statut Super-Pair (post-Bully)
++    isSuperPair: true
+   });
+ 
+-  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port}`);
++  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port} clusterId=${clusterIdStr.slice(0, 8) || '(legacy)'}`);
+   return true;
+ }
+ 

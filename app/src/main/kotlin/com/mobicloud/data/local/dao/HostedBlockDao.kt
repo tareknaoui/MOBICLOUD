@@ -28,4 +28,8 @@ interface HostedBlockDao {
     // Story 1.6 — somme des octets hébergés pour affichage quota settings
     @Query("SELECT COALESCE(SUM(size_bytes), 0) FROM hosted_blocks")
     fun observeTotalSizeBytes(): Flow<Long>
+
+    // Story 9.2 — lecture one-shot de la même agrégation, pour calcul `freeBytes` lors du REGISTER_PEER
+    @Query("SELECT COALESCE(SUM(size_bytes), 0) FROM hosted_blocks")
+    suspend fun getTotalSizeBytes(): Long
 }

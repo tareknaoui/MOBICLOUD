@@ -6,8 +6,11 @@ import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.RelayPeer
+import com.mobicloud.domain.models.NodeSettings
+import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -27,6 +30,8 @@ class SignalingRepositoryImplTest {
     private lateinit var peerRepository: PeerRepository
     private lateinit var networkEventRepository: NetworkEventRepository
     private lateinit var identityRepository: IdentityRepository
+    private lateinit var nodeSettingsRepository: NodeSettingsRepository
+    private lateinit var hostedBlockRepository: HostedBlockRepository
 
     @Before
     fun setUp() {
@@ -44,15 +49,25 @@ class SignalingRepositoryImplTest {
         peerRepository = mockk(relaxed = true)
         networkEventRepository = mockk(relaxed = true)
         identityRepository = mockk(relaxed = true)
+        nodeSettingsRepository = mockk(relaxed = true)
+        hostedBlockRepository = mockk(relaxed = true)
 
         // Stub explicite : Result<NodeIdentity> est une inline class, mockk relaxed renvoie un Object
         // qui ne peut pas être cast → ClassCastException dès qu'on accède à .nodeId.
         coEvery { identityRepository.getIdentity() } returns Result.success(NodeIdentity("self-node-id", ByteArray(0)))
+        coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
+            allocatedStorageBytes = 1_000_000L,
+            clusterId = "test-cluster-id-0001"
+        )
+        coEvery { hostedBlockRepository.getTotalHostedBytes() } returns 0L
 
         every { relayClient.connect(any()) } returns emptyFlow()
     }
 
-    private fun buildRepo() = SignalingRepositoryImpl(relayClient, peerRepository, networkEventRepository, identityRepository)
+    private fun buildRepo() = SignalingRepositoryImpl(
+        relayClient, peerRepository, networkEventRepository,
+        identityRepository, nodeSettingsRepository, hostedBlockRepository
+    )
 
     // -------------------------------------------------------------------------
     // Subtask 4.1 : registerAsSuperPeer retourne Result.success
@@ -60,13 +75,13 @@ class SignalingRepositoryImplTest {
 
     @Test
     fun `registerAsSuperPeer retourne Result_success quand sendRegisterPeer retourne true`() = runTest {
-        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any()) } returns true
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns true
 
         val repo = buildRepo()
         val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, System.currentTimeMillis(), "test-node-id")
 
         assertTrue(result.isSuccess)
-        verify { relayClient.sendRegisterPeer(any(), "192.168.1.10", 48999, 0.87f, any()) }
+        verify { relayClient.sendRegisterPeer(any(), "192.168.1.10", 48999, 0.87f, any(), any(), any()) }
     }
 
     // -------------------------------------------------------------------------
@@ -75,13 +90,58 @@ class SignalingRepositoryImplTest {
 
     @Test
     fun `registerAsSuperPeer retourne Result_failure quand sendRegisterPeer retourne false`() = runTest {
-        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any()) } returns false
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns false
 
         val repo = buildRepo()
         val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, System.currentTimeMillis(), "test-node-id")
 
         assertTrue(result.isFailure)
         verify { networkEventRepository.pushEvent(match { it.contains("enregistrement Super-Pair échoué") }) }
+    }
+
+    // -------------------------------------------------------------------------
+    // Story 9.2 — registerAsSuperPeer calcule et envoie freeBytes
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `Story 9_2 registerAsSuperPeer envoie freeBytes = allocated - used`() = runTest {
+        coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
+            allocatedStorageBytes = 1_000_000L,
+            clusterId = "test-cluster-id-0001"
+        )
+        coEvery { hostedBlockRepository.getTotalHostedBytes() } returns 250_000L
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns true
+
+        val repo = buildRepo()
+        repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, 1000L, "test-node-id")
+
+        verify {
+            relayClient.sendRegisterPeer(
+                "test-node-id", "192.168.1.10", 48999, 0.87f, 1000L,
+                "test-cluster-id-0001",
+                750_000L  // 1_000_000 - 250_000
+            )
+        }
+    }
+
+    @Test
+    fun `Story 9_2 registerAsSuperPeer clampe freeBytes a 0 quand used superieur a allocated`() = runTest {
+        coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
+            allocatedStorageBytes = 100_000L,
+            clusterId = "test-cluster-id-0001"
+        )
+        coEvery { hostedBlockRepository.getTotalHostedBytes() } returns 250_000L  // > allocated
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns true
+
+        val repo = buildRepo()
+        repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, 1000L, "test-node-id")
+
+        verify {
+            relayClient.sendRegisterPeer(
+                any(), any(), any(), any(), any(), any(),
+                0L  // jamais négatif
+            )
+        }
     }
 
     // -------------------------------------------------------------------------

@@ -260,7 +260,7 @@ class RelayWebSocketClientTest {
         assertTrue("AUTH frame non reçu dans 5s", authReceived.await(5, TimeUnit.SECONDS))
 
         // activeWebSocket doit encore être null → sendRegisterPeer retourne false
-        val result = client.sendRegisterPeer("node1", "192.168.1.1", 8080, 0.9f, 1_000L)
+        val result = client.sendRegisterPeer("node1", "192.168.1.1", 8080, 0.9f, 1_000L, "test-cluster-id", 4096L)
         assertFalse("sendRegisterPeer doit retourner false avant AUTH_OK", result)
 
         connectJob.cancel()

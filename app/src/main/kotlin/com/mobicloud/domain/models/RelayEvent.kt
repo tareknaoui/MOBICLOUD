@@ -22,5 +22,9 @@ data class RelayPeer(
     // Renvoyé par le serveur (Story Bully) — true si ce nœud a fait REGISTER_PEER (Super-Pair élu),
     // false s'il a juste fait JOIN (simple participant). Default false pour back-compat avec
     // d'anciennes réponses serveur qui ne contiennent pas ce champ.
-    val isSuperPair: Boolean = false
+    val isSuperPair: Boolean = false,
+    // Story 9.2 — UUID v4 du cluster du Super-Pair distant ; "" si pair legacy/JOIN.
+    val clusterId: String = "",
+    // Story 9.2 — capacité libre snapshot du Super-Pair distant (octets) ; 0 si legacy/JOIN.
+    val freeBytes: Long = 0L
 )

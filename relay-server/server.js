@@ -136,11 +136,36 @@ function handleRegisterPeer(nodeId, payload) {
   let entry;
   try { entry = JSON.parse(payload.toString('utf8')); } catch { return false; }
 
-  const { ip, port, reliabilityScore, electedAt } = entry;
+  const { ip, port, reliabilityScore, electedAt, clusterId, freeBytes } = entry;
   if (!ip || typeof port !== 'number' || port < 1 || port > 65535) return false;
 
   // Valider le format IP (pas de hostname, pas de loopback non contrôlé)
   if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) return false;
+
+  // clusterId optionnel : UUID v4 strict ou "" pour nœuds legacy.
+  // Story 9.1 review (option b) : valider format UUID v4 ; coerce en "" + warn si invalide.
+  const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  let clusterIdStr = '';
+  if (clusterId === undefined || clusterId === null || clusterId === '') {
+    clusterIdStr = '';
+  } else if (typeof clusterId === 'string' && UUID_V4_RE.test(clusterId)) {
+    clusterIdStr = clusterId;
+  } else {
+    console.warn(`[SIGNALING] clusterId invalide rejeté (coerce en "") — nodeId=${nodeId.slice(0, 8)} type=${typeof clusterId}`);
+    clusterIdStr = '';
+  }
+
+  // Story 9.2 — freeBytes optionnel : Number fini ≥ 0 ; sinon coerce en 0 + warn (même
+  // pattern que clusterId). Absent ⇒ legacy/JOIN amont, on stocke 0 sans warn.
+  let freeBytesNum = 0;
+  if (freeBytes !== undefined && freeBytes !== null) {
+    const n = Number(freeBytes);
+    if (Number.isFinite(n) && n >= 0) {
+      freeBytesNum = Math.floor(n);
+    } else {
+      console.warn(`[SIGNALING] freeBytes invalide rejeté (coerce en 0) — nodeId=${nodeId.slice(0, 8)} type=${typeof freeBytes}`);
+    }
+  }
 
   // Cap : refuser si annuaire plein et ce nœud n'est pas déjà enregistré
   if (!signalingRegistry.has(nodeId) && signalingRegistry.size >= MAX_SIGNALING_PEERS) return false;
@@ -158,12 +183,14 @@ function handleRegisterPeer(nodeId, payload) {
     ip, port,
     reliabilityScore: reliabilityScore ?? 0.5,
     electedAt: electedAt ?? Date.now(),
+    clusterId: clusterIdStr,
+    freeBytes: freeBytesNum,
     lastSeen: Date.now(),
     ttlTimer,
     isSuperPair: true   // REGISTER_PEER = revendication formelle de statut Super-Pair (post-Bully)
   });
 
-  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port}`);
+  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port} clusterId=${clusterIdStr.slice(0, 8) || '(legacy)'} freeBytes=${freeBytesNum}`);
   return true;
 }
 
@@ -220,7 +247,11 @@ function handleGetPeers(ws) {
       port: entry.port,
       reliabilityScore: entry.reliabilityScore,
       lastSeen: entry.lastSeen,
-      isSuperPair: entry.isSuperPair === true   // exposé au client pour qu'il sache qui est Super-Pair élu
+      isSuperPair: entry.isSuperPair === true,   // exposé au client pour qu'il sache qui est Super-Pair élu
+      // Story 9.2 — exposés pour le placement inter-cluster (Stories 9.3/9.4).
+      // Defaults explicites pour les entrées JOIN-only (handleJoin n'écrit jamais ces champs).
+      clusterId: entry.clusterId ?? '',
+      freeBytes: entry.freeBytes ?? 0
     });
   }
   safeSend(ws, buildFrame(MSG.PEERS, Buffer.from(JSON.stringify(peers), 'utf8')));

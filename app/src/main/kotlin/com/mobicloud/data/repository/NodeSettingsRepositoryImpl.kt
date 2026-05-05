@@ -36,22 +36,32 @@ class NodeSettingsRepositoryImpl(
         return minOf(twoGb, (freeBytes * 0.20).toLong())
     }
 
-    // P7: double-check locking to prevent concurrent default-init races
+    // P7: double-check locking + lazy clusterId backfill (Story 9.1).
     override suspend fun getSettings(): NodeSettings {
-        dao.getSettings()?.let { return it.toDomain() }
+        dao.getSettings()?.toDomain()?.let { existing ->
+            if (existing.clusterId.isNotEmpty()) return existing
+        }
         return initMutex.withLock {
-            dao.getSettings()?.toDomain() ?: run {
-                val default = NodeSettings(allocatedStorageBytes = defaultBytes())
-                dao.upsert(default.toEntity())
-                default
+            val current = dao.getSettings()?.toDomain()
+                ?: NodeSettings(allocatedStorageBytes = defaultBytes())
+            if (current.clusterId.isNotEmpty()) {
+                current
+            } else {
+                val withCluster = current.copy(clusterId = java.util.UUID.randomUUID().toString())
+                dao.upsert(withCluster.toEntity())
+                withCluster
             }
         }
     }
 
-    // P8: validate that bytes is a positive value before persisting
+    // P8: validate bytes is positive ; lock with initMutex pour préserver clusterId atomiquement (Story 9.1).
     override suspend fun updateAllocatedStorage(bytes: Long) {
         require(bytes > 0) { "allocatedStorageBytes must be positive, got $bytes" }
-        dao.upsert(NodeSettingsEntity(id = 0, allocatedStorageBytes = bytes))
+        initMutex.withLock {
+            val existing = dao.getSettings()
+            val clusterId = existing?.clusterId ?: ""
+            dao.upsert(NodeSettingsEntity(id = 0, allocatedStorageBytes = bytes, clusterId = clusterId))
+        }
     }
 
     // P-A7 — pas d'effet de bord (dao.upsert) dans un Flow.map : le mapping est pur.
@@ -69,10 +79,12 @@ class NodeSettingsRepositoryImpl(
 
 private fun NodeSettingsEntity.toDomain() = NodeSettings(
     allocatedStorageBytes = allocatedStorageBytes,
+    clusterId = clusterId,
     id = id
 )
 
 private fun NodeSettings.toEntity() = NodeSettingsEntity(
     id = id,
-    allocatedStorageBytes = allocatedStorageBytes
+    allocatedStorageBytes = allocatedStorageBytes,
+    clusterId = clusterId
 )

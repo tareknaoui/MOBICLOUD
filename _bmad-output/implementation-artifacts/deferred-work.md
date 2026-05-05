@@ -401,3 +401,13 @@
 - **W3 — `getIdentity()` appelé deux fois (broadcastLoop + receiveLoop)** [`LocalDiscoveryRepositoryImpl.kt:81,114`] — micro-optimisation : résoudre une seule fois et partager entre les deux boucles.
 - **W4 — `reliabilityScore` exposé en clair dans les broadcasts réseau** [`HelloPayload.kt:9`] — fingerprinting potentiel de la topologie ; à évaluer lors de la phase sécurité/hardening.
 - **W5 — `BindException` Android 12+ non gérée avec retry** [`LocalDiscoveryRepositoryImpl.kt:125`] — restriction `FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE` sur Android 12+ ; nécessite investigation manifest + retry avec backoff.
+
+## Deferred from: code review of 9-1-clusterid-nodesettings-et-register-peer (2026-05-05)
+
+- **W-9.1-1 — `observeSettings()` ne déclenche pas la génération UUID** — émet `clusterId=""` jusqu'au premier `getSettings()`. Hors scope explicite (Subtask 5.3). [`NodeSettingsRepositoryImpl.kt`]
+- **W-9.1-2 — `registerAsSuperPeer()` `runCatching` masque l'origine de l'erreur** (DB vs WebSocket) — pattern pré-existant. [`SignalingRepositoryImpl.kt`]
+- **W-9.1-3 — Premier `REGISTER_PEER` déclenche un write DB sur le chemin "send"** — choix architectural ; eager init au démarrage app résoudrait. [`SignalingRepositoryImpl.kt`]
+- **W-9.1-4 — `nodeId` re-register avec `clusterId` différent silencieusement écrasé** sur le relais — pertinent vu le bug `dual-keystore` (memory). Log warning à ajouter. [`relay-server/server.js`]
+- **W-9.1-5 — Pas de `fallbackToDestructiveMigrationOnDowngrade()`** — pré-existant à toutes les migrations Room du projet. [`IdentityModule.kt`]
+- **W-9.1-6 — Lacunes de tests** : (a) concurrence `getSettings()` parallèle ; (b) round-trip `getSettings()→getSettings()` même UUID ; (c) `handleRegisterPeer()` avec `clusterId` malformé ; (d) test instrumenté `MIGRATION_11_12` avec `MigrationTestHelper`. Story de hardening QA dédiée.
+- **W-9.1-7 — Vérifier `app/schemas/com.mobicloud.data.local.CatalogDatabase/12.json`** : `git add` + colonne `cluster_id` avec `notNull=true, defaultValue="''"` matchant la migration. [`app/schemas/`]

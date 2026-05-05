@@ -194,6 +194,62 @@ describe('handleRegisterPeer', () => {
     expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(false);
   });
 
+  // Story 9.2 — freeBytes
+  test('Story 9.2 — REGISTER_PEER avec freeBytes valide stocke la valeur', () => {
+    const { handleRegisterPeer, signalingRegistry } = mod;
+    const payload = Buffer.from(JSON.stringify({
+      ip: '10.0.0.1', port: 5000, freeBytes: 1234567
+    }));
+    expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(true);
+    const entry = signalingRegistry.get('a1b2c3d4e5f60708');
+    expect(entry.freeBytes).toBe(1234567);
+    clearTimeout(entry.ttlTimer);
+  });
+
+  test('Story 9.2 — REGISTER_PEER sans freeBytes (legacy) stocke 0 sans erreur', () => {
+    const { handleRegisterPeer, signalingRegistry } = mod;
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const payload = Buffer.from(JSON.stringify({ ip: '10.0.0.1', port: 5000 }));
+    expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(true);
+    const entry = signalingRegistry.get('a1b2c3d4e5f60708');
+    expect(entry.freeBytes).toBe(0);
+    // Aucun warning : champ absent = legacy, comportement attendu
+    expect(warnSpy).not.toHaveBeenCalledWith(expect.stringContaining('freeBytes'));
+    clearTimeout(entry.ttlTimer);
+    warnSpy.mockRestore();
+  });
+
+  // NB : NaN / Infinity ne sont pas testés ici car `JSON.stringify` les sérialise
+  // en `null`, qui est traité comme "champ absent" (legacy, pas de warn). On teste
+  // les seules valeurs invalides qui peuvent transiter via JSON : nombre négatif et
+  // string non-numérique.
+  test.each([
+    ['négatif', -5],
+    ['string non-numérique', 'abc']
+  ])('Story 9.2 — REGISTER_PEER avec freeBytes invalide (%s) coerce en 0 + warn', (_label, badValue) => {
+    const { handleRegisterPeer, signalingRegistry } = mod;
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const payload = Buffer.from(JSON.stringify({
+      ip: '10.0.0.1', port: 5000, freeBytes: badValue
+    }));
+    expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(true);
+    const entry = signalingRegistry.get('a1b2c3d4e5f60708');
+    expect(entry.freeBytes).toBe(0);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('freeBytes invalide'));
+    clearTimeout(entry.ttlTimer);
+    warnSpy.mockRestore();
+  });
+
+  test('Story 9.2 — REGISTER_PEER avec freeBytes décimal est tronqué via Math.floor', () => {
+    const { handleRegisterPeer, signalingRegistry } = mod;
+    const payload = Buffer.from(JSON.stringify({
+      ip: '10.0.0.1', port: 5000, freeBytes: 1024.9
+    }));
+    expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(true);
+    expect(signalingRegistry.get('a1b2c3d4e5f60708').freeBytes).toBe(1024);
+    clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
+  });
+
   test('re-registration annule l\'ancien TTL', () => {
     const { handleRegisterPeer, signalingRegistry } = mod;
     const payload = Buffer.from(JSON.stringify({ ip: '10.0.0.1', port: 5000 }));
@@ -291,6 +347,38 @@ describe('handleGetPeers', () => {
     const frame = parseFrame(sent[0]);
     const peers = JSON.parse(frame.payload.toString('utf8'));
     expect(peers).toEqual([]);
+  });
+
+  // Story 9.2 — clusterId + freeBytes dans la réponse PEERS
+  test('Story 9.2 — PEERS expose clusterId et freeBytes pour un Super-Pair enregistré', () => {
+    const { handleGetPeers, handleRegisterPeer, signalingRegistry, parseFrame, MSG } = mod;
+    const validUuid = '550e8400-e29b-41d4-a716-446655440000';
+    const payload = Buffer.from(JSON.stringify({
+      ip: '10.0.0.5', port: 48999, clusterId: validUuid, freeBytes: 1024
+    }));
+    handleRegisterPeer('a1b2c3d4e5f60708', payload);
+
+    const sent = [];
+    const fakeWs = { send: (buf) => sent.push(buf), readyState: 1 };
+    handleGetPeers(fakeWs);
+    const peers = JSON.parse(parseFrame(sent[0]).payload.toString('utf8'));
+    expect(peers.length).toBe(1);
+    expect(peers[0].clusterId).toBe(validUuid);
+    expect(peers[0].freeBytes).toBe(1024);
+    clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
+  });
+
+  test('Story 9.2 — PEERS expose clusterId="" et freeBytes=0 pour un nœud JOIN-only', () => {
+    const { handleGetPeers, handleJoin, signalingRegistry, parseFrame } = mod;
+    handleJoin('1111111111111111', Buffer.from(JSON.stringify({ ip: '10.0.0.1', port: 7777 })));
+    const sent = [];
+    const fakeWs = { send: (buf) => sent.push(buf), readyState: 1 };
+    handleGetPeers(fakeWs);
+    const peers = JSON.parse(parseFrame(sent[0]).payload.toString('utf8'));
+    expect(peers.length).toBe(1);
+    expect(peers[0].clusterId).toBe('');
+    expect(peers[0].freeBytes).toBe(0);
+    clearTimeout(signalingRegistry.get('1111111111111111').ttlTimer);
   });
 
   test('expose le flag isSuperPair pour chaque pair (mix JOIN + REGISTER)', () => {

@@ -32,7 +32,7 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         HostedBlockEntity::class,
         NodeSettingsEntity::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -163,6 +163,15 @@ abstract class CatalogDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(
                     "ALTER TABLE catalog_entry ADD COLUMN original_file_name TEXT NOT NULL DEFAULT ''"
+                )
+            }
+        }
+
+        // Story 9.1 — clusterId UUID v4 pour identification de cluster inter-nœuds.
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE node_settings ADD COLUMN cluster_id TEXT NOT NULL DEFAULT ''"
                 )
             }
         }

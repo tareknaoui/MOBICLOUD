@@ -127,6 +127,10 @@ class HostedBlockRepositoryImpl @Inject constructor(
 
     override fun observeTotalHostedBytes(): Flow<Long> = hostedBlockDao.observeTotalSizeBytes()
 
+    override suspend fun getTotalHostedBytes(): Long = withContext(Dispatchers.IO) {
+        hostedBlockDao.getTotalSizeBytes()
+    }
+
     companion object {
         // Story 6.2 — défense en profondeur identique à ReceiveAndHostBlockUseCase
         private val BLOCK_ID_REGEX = Regex("^[0-9a-f]{64}$")

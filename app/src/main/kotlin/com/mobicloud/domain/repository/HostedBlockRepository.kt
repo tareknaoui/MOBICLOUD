@@ -31,4 +31,11 @@ interface HostedBlockRepository {
 
     /** Story 1.6 — somme en temps réel des octets hébergés (pour affichage quota settings). */
     fun observeTotalHostedBytes(): Flow<Long>
+
+    /**
+     * Story 9.2 — lecture one-shot (suspend) de la somme totale des octets hébergés.
+     * Complément de [observeTotalHostedBytes] : utilisée par `SignalingRepositoryImpl.registerAsSuperPeer`
+     * pour calculer `freeBytes` au moment de l'envoi de REGISTER_PEER (snapshot best-effort, pas de Flow).
+     */
+    suspend fun getTotalHostedBytes(): Long
 }

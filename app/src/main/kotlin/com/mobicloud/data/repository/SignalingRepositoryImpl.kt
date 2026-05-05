@@ -8,8 +8,10 @@ import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.RelayEvent
 import com.mobicloud.domain.models.RelayPeer
+import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SignalingRepository
 import kotlinx.coroutines.CoroutineScope
@@ -27,7 +29,9 @@ class SignalingRepositoryImpl @Inject constructor(
     private val relayClient: RelayWebSocketClient,
     private val peerRepository: PeerRepository,
     private val networkEventRepository: NetworkEventRepository,
-    private val identityRepository: IdentityRepository
+    private val identityRepository: IdentityRepository,
+    private val nodeSettingsRepository: NodeSettingsRepository,
+    private val hostedBlockRepository: HostedBlockRepository
 ) : SignalingRepository {
 
     // Scope lié au cycle de vie du processus — correct pour un @Singleton Android.
@@ -79,6 +83,13 @@ class SignalingRepositoryImpl @Inject constructor(
             // La clé publique est un placeholder vide — elle sera résolue lors du TCP handshake direct.
             // Le relais est une couche de découverte, pas d'authentification.
             // isSuperPair vient maintenant du serveur (Story Bully) : true si REGISTER_PEER, false si JOIN.
+            //
+            // Story 9.2 — `peer.clusterId` et `peer.freeBytes` ne sont volontairement PAS
+            // persistés ici. Ces deux champs sont des *snapshots volatiles* de l'annuaire HA
+            // (TTL serveur 60s). Les persister dans la table `peers` créerait un risque de
+            // servir des données obsolètes après expiration côté serveur. Ils seront consommés
+            // en mémoire par les use-cases inter-cluster (Stories 9.3 RequestHosting,
+            // 9.4 RequestBlock) directement à partir du Flow<RelayEvent.PeerList>.
             peerRepository.registerOrUpdatePeer(
                 identity    = NodeIdentity(peer.nodeId, ByteArray(0)),
                 timestampMs = SystemClock.elapsedRealtime(),
@@ -113,9 +124,15 @@ class SignalingRepositoryImpl @Inject constructor(
         electedAt: Long,
         nodeId: String
     ): Result<Unit> = runCatching {
-        val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt)
+        val settings = nodeSettingsRepository.getSettings()
+        val clusterId = settings.clusterId
+        // Story 9.2 — snapshot best-effort de la capacité libre. Deux requêtes DB séquentielles ;
+        // une concurrence ajout-bloc/REGISTER_PEER peut donner ±1 bloc d'écart, acceptable.
+        val used = hostedBlockRepository.getTotalHostedBytes()
+        val freeBytes = (settings.allocatedStorageBytes - used).coerceAtLeast(0L)
+        val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt, clusterId, freeBytes)
         if (!sent) error("RelayWebSocketClient non connecté — REGISTER_PEER non envoyé")
-        Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore")
+        Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore clusterId=${clusterId.take(8).ifEmpty { "(legacy)" }} freeBytes=$freeBytes")
         Unit
     }.onFailure { e ->
         Log.e(TAG, "registerAsSuperPeer échoué : ${e.message}")

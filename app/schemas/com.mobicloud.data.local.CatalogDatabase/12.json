@@ -1,0 +1,398 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 12,
+    "identityHash": "67d8abd7f7f99635fe6ce85e94668958",
+    "entities": [
+      {
+        "tableName": "catalog_entry",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`file_hash` TEXT NOT NULL, `owner_pub_key_hash` TEXT NOT NULL, `version_clock` INTEGER NOT NULL, `wrapped_master_key_json` TEXT, `original_file_size` INTEGER NOT NULL DEFAULT 0, `original_file_name` TEXT NOT NULL DEFAULT '', PRIMARY KEY(`file_hash`))",
+        "fields": [
+          {
+            "fieldPath": "fileHash",
+            "columnName": "file_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerPubKeyHash",
+            "columnName": "owner_pub_key_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "versionClock",
+            "columnName": "version_clock",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "wrappedMasterKeyJson",
+            "columnName": "wrapped_master_key_json",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "originalFileSize",
+            "columnName": "original_file_size",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "originalFileName",
+            "columnName": "original_file_name",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "file_hash"
+          ]
+        }
+      },
+      {
+        "tableName": "fragment_location",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `catalog_file_hash` TEXT NOT NULL, `fragment_index` INTEGER NOT NULL, `fragment_hash` TEXT NOT NULL, `node_ids` TEXT NOT NULL, FOREIGN KEY(`catalog_file_hash`) REFERENCES `catalog_entry`(`file_hash`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "catalogFileHash",
+            "columnName": "catalog_file_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fragmentIndex",
+            "columnName": "fragment_index",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fragmentHash",
+            "columnName": "fragment_hash",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeIds",
+            "columnName": "node_ids",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_fragment_location_catalog_file_hash",
+            "unique": false,
+            "columnNames": [
+              "catalog_file_hash"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_fragment_location_catalog_file_hash` ON `${TABLE_NAME}` (`catalog_file_hash`)"
+          }
+        ],
+        "foreignKeys": [
+          {
+            "table": "catalog_entry",
+            "onDelete": "CASCADE",
+            "onUpdate": "NO ACTION",
+            "columns": [
+              "catalog_file_hash"
+            ],
+            "referencedColumns": [
+              "file_hash"
+            ]
+          }
+        ]
+      },
+      {
+        "tableName": "node_identity",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`node_id` TEXT NOT NULL, `public_key_bytes` BLOB NOT NULL, `reliability_score` REAL NOT NULL, PRIMARY KEY(`node_id`))",
+        "fields": [
+          {
+            "fieldPath": "nodeId",
+            "columnName": "node_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicKeyBytes",
+            "columnName": "public_key_bytes",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reliabilityScore",
+            "columnName": "reliability_score",
+            "affinity": "REAL",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "node_id"
+          ]
+        }
+      },
+      {
+        "tableName": "peer_nodes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`node_id` TEXT NOT NULL, `public_key_bytes` BLOB NOT NULL, `reliability_score` REAL NOT NULL, `ip_address` TEXT, `port` INTEGER, `last_seen_timestamp_ms` INTEGER NOT NULL, `is_active` INTEGER NOT NULL, `source` TEXT NOT NULL, `is_super_pair` INTEGER NOT NULL, PRIMARY KEY(`node_id`))",
+        "fields": [
+          {
+            "fieldPath": "nodeId",
+            "columnName": "node_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicKeyBytes",
+            "columnName": "public_key_bytes",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "reliabilityScore",
+            "columnName": "reliability_score",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ipAddress",
+            "columnName": "ip_address",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "port",
+            "columnName": "port",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "lastSeenTimestampMs",
+            "columnName": "last_seen_timestamp_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isActive",
+            "columnName": "is_active",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isSuperPair",
+            "columnName": "is_super_pair",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "node_id"
+          ]
+        }
+      },
+      {
+        "tableName": "dht_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`block_id` TEXT NOT NULL, `node_id` TEXT NOT NULL, `ip_address` TEXT NOT NULL, `port` INTEGER NOT NULL, `timestamp` INTEGER NOT NULL, PRIMARY KEY(`block_id`))",
+        "fields": [
+          {
+            "fieldPath": "blockId",
+            "columnName": "block_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nodeId",
+            "columnName": "node_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ipAddress",
+            "columnName": "ip_address",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "port",
+            "columnName": "port",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "block_id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_dht_entries_block_id",
+            "unique": false,
+            "columnNames": [
+              "block_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_dht_entries_block_id` ON `${TABLE_NAME}` (`block_id`)"
+          },
+          {
+            "name": "index_dht_entries_node_id",
+            "unique": false,
+            "columnNames": [
+              "node_id"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_dht_entries_node_id` ON `${TABLE_NAME}` (`node_id`)"
+          }
+        ]
+      },
+      {
+        "tableName": "tombstone_entries",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`block_id` TEXT NOT NULL, `deleted_at` INTEGER NOT NULL, PRIMARY KEY(`block_id`))",
+        "fields": [
+          {
+            "fieldPath": "blockId",
+            "columnName": "block_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "deletedAt",
+            "columnName": "deleted_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "block_id"
+          ]
+        }
+      },
+      {
+        "tableName": "hosted_blocks",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`block_id` TEXT NOT NULL, `owner_id` TEXT NOT NULL, `fragment_index` INTEGER NOT NULL, `is_parity` INTEGER NOT NULL, `file_path` TEXT NOT NULL, `size_bytes` INTEGER NOT NULL, `iv` BLOB NOT NULL, `received_at` INTEGER NOT NULL, PRIMARY KEY(`block_id`))",
+        "fields": [
+          {
+            "fieldPath": "blockId",
+            "columnName": "block_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ownerId",
+            "columnName": "owner_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fragmentIndex",
+            "columnName": "fragment_index",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isParity",
+            "columnName": "is_parity",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "filePath",
+            "columnName": "file_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "sizeBytes",
+            "columnName": "size_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "iv",
+            "columnName": "iv",
+            "affinity": "BLOB",
+            "notNull": true
+          },
+          {
+            "fieldPath": "receivedAt",
+            "columnName": "received_at",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "block_id"
+          ]
+        }
+      },
+      {
+        "tableName": "node_settings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `allocated_storage_bytes` INTEGER NOT NULL, `cluster_id` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "allocatedStorageBytes",
+            "columnName": "allocated_storage_bytes",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clusterId",
+            "columnName": "cluster_id",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '67d8abd7f7f99635fe6ce85e94668958')"
+    ]
+  }
+}
