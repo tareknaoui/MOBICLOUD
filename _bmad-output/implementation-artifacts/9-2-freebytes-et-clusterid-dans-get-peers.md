@@ -1,6 +1,6 @@
 # Story 9.2 : freeBytes & clusterId dans GET_PEERS
 
-Status: review
+Status: done
 
 ## Story
 
@@ -249,3 +249,19 @@ claude-opus-4-7[1m] (Amelia / bmad-dev-story)
 ### Change Log
 
 - 2026-05-05 — Story 9.2 implémentée : `freeBytes` ajouté au protocole `REGISTER_PEER` (snapshot best-effort) + `clusterId`/`freeBytes` exposés dans la réponse `GET_PEERS` pour préparer le placement inter-cluster (Stories 9.3/9.4). Aucune migration Room ni rupture de compat (defaults 0/"" pour les nœuds legacy).
+
+### Review Findings
+
+- [x] [Review][Decision→Patch] **DB read failures abort Super-Pair registration** → résolu en Option 1 (fallback). `runCatching` local autour du calcul `freeBytes` ; en cas d'exception DB, fallback `0L` + `Log.w` ; `REGISTER_PEER` est toujours envoyé → le Super-Pair reste découvrable, juste écarté du placement inter-cluster pour ce cycle TTL. Test `Story 9_2 D1 ... fallback=0 si getTotalHostedBytes leve une exception` ajouté. [`SignalingRepositoryImpl.kt:131-138`]
+- [x] [Review][Patch] **`handleJoin` n'efface pas `clusterId`/`freeBytes` d'un Super-Pair** → corrigé. `signalingRegistry.set` dans `handleJoin` hérite désormais `existing?.clusterId ?? ''` et `existing?.freeBytes ?? 0`. Test `Story 9.2 review (P1) — JOIN heartbeat préserve...` ajouté (vert). [`relay-server/server.js:227-241`]
+- [x] [Review][Patch] **Borne supérieure absente sur `freeBytes` serveur** → corrigé. Validation étendue : `freeBytes >= 0 && freeBytes <= Number.MAX_SAFE_INTEGER`. Test `au-delà de MAX_SAFE_INTEGER` ajouté. [`relay-server/server.js:158-172`]
+- [x] [Review][Patch] **Type guard `freeBytes` manquant côté serveur** → corrigé. `typeof freeBytes === 'number'` exigé en plus de `Number.isFinite`. Tests `string numérique`, `boolean true`, `boolean false` ajoutés (tous coercés en 0 + warn). [`relay-server/server.js:158-172`]
+- [x] [Review][Patch] **`parsePeersPayload` mal-géré sur `clusterId: null`** → corrigé. `if (obj.isNull("clusterId")) "" else obj.optString(...)` (idem `freeBytes`). [`RelayWebSocketClient.kt:259-262`]
+- [x] [Review][Patch] **Test `clampe freeBytes a 0` assertion faible** → dismissed. Combiné avec le test positif `allocated - used = 750_000L`, une inversion de formule serait détectée. Note conservée pour transparence. [`SignalingRepositoryImplTest.kt`]
+- [x] [Review][Defer] **Ambiguïté sentinelle `freeBytes==0` et `clusterId==""`** — collision entre legacy / disque plein / coerce-invalide. Refonte sentinelle (`null`/`-1`) à considérer pour 9.3. — deferred, design choice
+- [x] [Review][Defer] **`isSuperPair=true` même quand `clusterId` coercé à `""`** — un nœud peut s'enregistrer Super-Pair sans UUID valide ; brise l'invariant supposé par 9.3/9.4. Aligné avec pattern 9.1 (warn-only). — deferred, aligned with 9.1 pattern
+- [x] [Review][Defer] **Pas de debouncing sur `freeBytes`** — oscillations entre REGISTER_PEERs rapides (bloc en vol) → décisions placement non-déterministes côté consommateurs. — deferred, consumer-side concern (9.3)
+- [x] [Review][Defer] **`reliabilityScore`/`electedAt` non validés** — pré-existant, hors scope ; à durcir avec une story QA serveur dédiée. — deferred, pre-existing
+- [x] [Review][Defer] **Comment "null produit no-warn" non testé** — comment dans server.test.js sans test correspondant ; ajouter cas `null` explicite. — deferred, test gap minor
+- [x] [Review][Defer] **`clusterId === ''` traité silencieusement comme legacy** — un Super-Pair bug envoyant `""` est masqué (no warn). Pré-existant 9.1. — deferred, pre-existing from 9.1
+- [x] [Review][Defer] **`getSettings()` lazy-créé clusterId sur 1er appel dans le chemin election critique** — pré-existant 9.1, ajoute latence + point d'échec DB. — deferred, pre-existing from 9.1

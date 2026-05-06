@@ -1,7 +1,7 @@
 package com.mobicloud.di
 
+import com.mobicloud.data.p2p.BlockDownloaderWithRelay
 import com.mobicloud.data.p2p.BlockSenderWithRelay
-import com.mobicloud.data.p2p.tcp.BlockDownloadClient
 import com.mobicloud.domain.models.TransferChannelState
 import com.mobicloud.domain.repository.BlockDownloader
 import com.mobicloud.domain.repository.BlockSender
@@ -27,8 +27,10 @@ object BlockTransferModule {
     fun provideTransferChannelState(sender: BlockSenderWithRelay): StateFlow<TransferChannelState> =
         sender.transferChannelState
 
-    // Story 6.2 — bind BlockDownloader sur l'implémentation TCP.
+    // Story 9.4 — wrapper qui décide direct (intra-cluster) vs relay-pull (inter-cluster) selon
+    // la présence du nodeId dans peerRepository.peers actif. BlockDownloadClient reste le
+    // backing direct, injecté transitivement par Hilt dans BlockDownloaderWithRelay.
     @Provides
     @Singleton
-    fun provideBlockDownloader(client: BlockDownloadClient): BlockDownloader = client
+    fun provideBlockDownloader(wrapper: BlockDownloaderWithRelay): BlockDownloader = wrapper
 }

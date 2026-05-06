@@ -5,9 +5,11 @@ import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.EncryptedBundle
 import com.mobicloud.domain.models.EncryptedFragment
 import com.mobicloud.domain.models.FragmentLocation
+import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.repository.BlockSender
 import com.mobicloud.domain.repository.CatalogRepository
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
@@ -25,7 +27,9 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
     private val catalogRepository: CatalogRepository,
     private val gossipSyncUseCase: GossipSyncUseCase,
     private val securityRepository: SecurityRepository,
-    private val insertDhtEntryUseCase: InsertDhtEntryUseCase
+    private val insertDhtEntryUseCase: InsertDhtEntryUseCase,
+    private val requestInterClusterHostingUseCase: RequestInterClusterHostingUseCase,
+    private val nodeSettingsRepository: NodeSettingsRepository
 ) {
 
     private companion object {
@@ -55,21 +59,25 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
         android.util.Log.i("MobiCloud:Distribute", "[DIAG] peers total=${allPeers.size} actifs+IP=${activePeers.size} ${activePeers.map { "${it.identity.nodeId.take(8)}@${it.ipAddress}:${it.port}" }}")
         android.util.Log.i("MobiCloud:Distribute", "[DIAG] détail tous pairs : ${allPeers.map { "${it.identity.nodeId.take(8)}@${it.ipAddress}:${it.port} active=${it.isActive}" }}")
         if (activePeers.isEmpty()) {
-            android.util.Log.w("MobiCloud:Distribute", "[DIAG] ABORT — aucun pair actif avec IP/port")
-            return@withContext Result.failure(
-                IllegalStateException("Aucun nœud actif disponible pour la distribution")
-            )
+            android.util.Log.w("MobiCloud:Distribute", "[DIAG] cluster local vide — tentative directe via fallback inter-cluster (Story 9.3)")
         }
 
         val localIdentity = securityRepository.getIdentity()
             .getOrElse { return@withContext Result.failure(it) }
 
+        // Lu UNE fois (guardrail 9.3 Subtask 4.2 — éviter une lecture DB par fragment).
+        val localClusterId = nodeSettingsRepository.getSettings().clusterId
+        if (localClusterId.isBlank()) {
+            android.util.Log.w(
+                "MobiCloud:Distribute",
+                "[INTER-CLUSTER] désactivé : localClusterId blank (cluster pas encore provisionné)"
+            )
+        }
+
         val deliveries = mutableListOf<DeliveryRecord>()
 
         encryptedBundle.encryptedFragments.forEachIndexed { i, frag ->
             val blockId = sha256Hex(frag.ciphertext)
-            val primaryIndex = i % activePeers.size
-            val primaryPeer = activePeers[primaryIndex]
 
             val msg = BlockTransferMessage(
                 blockId = blockId,
@@ -81,23 +89,65 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                 originalFileSize = frag.originalFileSize
             )
 
-            var confirmedPeer = primaryPeer
-            android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} parity=${frag.isParity} → ${primaryPeer.identity.nodeId.take(8)}@${primaryPeer.ipAddress}:${primaryPeer.port}")
-            var result = blockSender.sendBlock(msg, primaryPeer, BASE_ACK_TIMEOUT_MS)
-            android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} result=${if (result.isSuccess) "OK" else "FAIL: ${result.exceptionOrNull()?.message}"}")
+            var confirmedPeer: Peer? = null
+            var result: Result<com.mobicloud.domain.models.BlockAckMessage> =
+                Result.failure(IllegalStateException("not attempted"))
+            var placedInterCluster = false
 
+            // Niveau 1 — placement local primary (si cluster local non vide).
+            if (activePeers.isNotEmpty()) {
+                val primaryIndex = i % activePeers.size
+                val primaryPeer = activePeers[primaryIndex]
+                confirmedPeer = primaryPeer
+                android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} parity=${frag.isParity} → ${primaryPeer.identity.nodeId.take(8)}@${primaryPeer.ipAddress}:${primaryPeer.port}")
+                result = blockSender.sendBlock(msg, primaryPeer, BASE_ACK_TIMEOUT_MS)
+                android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} result=${if (result.isSuccess) "OK" else "FAIL: ${result.exceptionOrNull()?.message}"}")
+
+                // Niveau 2 — fallback local (autre pair du cluster).
+                if (result.isFailure) {
+                    val fallbackIndex = activePeers.indices.firstOrNull { it != primaryIndex }
+                    if (fallbackIndex != null) {
+                        confirmedPeer = activePeers[fallbackIndex]
+                        result = blockSender.sendBlock(msg, confirmedPeer, MAX_ACK_TIMEOUT_MS)
+                    }
+                }
+            }
+
+            // Niveau 3 — fallback inter-cluster (Story 9.3) si local vide ou local échoue.
             if (result.isFailure) {
-                val usedIndices = mutableSetOf(primaryIndex)
-                val fallbackIndex = activePeers.indices.firstOrNull { it !in usedIndices }
-                if (fallbackIndex != null) {
-                    confirmedPeer = activePeers[fallbackIndex]
-                    result = blockSender.sendBlock(msg, confirmedPeer, MAX_ACK_TIMEOUT_MS)
+                val remote = requestInterClusterHostingUseCase.selectRemoteHost(
+                    msg.ciphertext.size,
+                    localClusterId
+                )
+                if (remote != null) {
+                    val remotePeer = Peer(
+                        identity = NodeIdentity(remote.nodeId, ByteArray(0)),
+                        lastSeenTimestampMs = System.currentTimeMillis(),
+                        source = com.mobicloud.domain.models.DiscoverySource.RELAY_HA,
+                        ipAddress = remote.ip,
+                        port = remote.port,
+                        isActive = true,
+                        isSuperPair = true
+                    )
+                    android.util.Log.i(
+                        "MobiCloud:Distribute",
+                        "[INTER-CLUSTER] tentative #${frag.index} → ${remote.nodeId.take(8)}@${remote.ip}:${remote.port} cluster=${remote.clusterId.take(8)} freeBytes=${remote.freeBytes}"
+                    )
+                    result = blockSender.sendBlock(msg, remotePeer, MAX_ACK_TIMEOUT_MS)
+                    if (result.isSuccess) {
+                        confirmedPeer = remotePeer
+                        placedInterCluster = true
+                    }
                 }
             }
 
             val success = result.isSuccess
             onBlockResult?.invoke(frag.index, success)
-            if (success) {
+            if (success && confirmedPeer != null) {
+                android.util.Log.i(
+                    "MobiCloud:Distribute",
+                    "[DIAG] fragment #${frag.index} placé ${if (placedInterCluster) "INTER-CLUSTER" else "LOCAL"} sur ${confirmedPeer.identity.nodeId.take(8)}"
+                )
                 deliveries.add(
                     DeliveryRecord(
                         frag = frag,

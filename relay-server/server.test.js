@@ -225,7 +225,14 @@ describe('handleRegisterPeer', () => {
   // string non-numérique.
   test.each([
     ['négatif', -5],
-    ['string non-numérique', 'abc']
+    ['string non-numérique', 'abc'],
+    // Story 9.2 review (P3) : type guard typeof === 'number' refuse strings et booléens.
+    ['string numérique', '1234'],
+    ['boolean true', true],
+    ['boolean false', false],
+    // Story 9.2 review (P2) : borne sup MAX_SAFE_INTEGER refuse les Long > 2^53 qui
+    // perdraient la précision (vecteur de biais inter-cluster).
+    ['au-delà de MAX_SAFE_INTEGER', Number.MAX_SAFE_INTEGER + 100]
   ])('Story 9.2 — REGISTER_PEER avec freeBytes invalide (%s) coerce en 0 + warn', (_label, badValue) => {
     const { handleRegisterPeer, signalingRegistry } = mod;
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -368,6 +375,27 @@ describe('handleGetPeers', () => {
     clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
   });
 
+  test('Story 9.2 review (P1) — JOIN heartbeat préserve clusterId et freeBytes d\'un Super-Pair déjà enregistré', () => {
+    const { handleGetPeers, handleRegisterPeer, handleJoin, signalingRegistry, parseFrame } = mod;
+    const validUuid = '550e8400-e29b-41d4-a716-446655440000';
+    // 1) REGISTER_PEER initial avec clusterId + freeBytes
+    handleRegisterPeer('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({
+      ip: '10.0.0.5', port: 48999, clusterId: validUuid, freeBytes: 1024
+    })));
+    // 2) Le même nœud envoie un JOIN heartbeat (sans clusterId/freeBytes dans le payload)
+    handleJoin('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({ ip: '10.0.0.5', port: 48999 })));
+    // 3) GET_PEERS doit toujours retourner clusterId + freeBytes initiaux
+    const sent = [];
+    const fakeWs = { send: (buf) => sent.push(buf), readyState: 1 };
+    handleGetPeers(fakeWs);
+    const peers = JSON.parse(parseFrame(sent[0]).payload.toString('utf8'));
+    expect(peers.length).toBe(1);
+    expect(peers[0].clusterId).toBe(validUuid);
+    expect(peers[0].freeBytes).toBe(1024);
+    expect(peers[0].isSuperPair).toBe(true);
+    clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
+  });
+
   test('Story 9.2 — PEERS expose clusterId="" et freeBytes=0 pour un nœud JOIN-only', () => {
     const { handleGetPeers, handleJoin, signalingRegistry, parseFrame } = mod;
     handleJoin('1111111111111111', Buffer.from(JSON.stringify({ ip: '10.0.0.1', port: 7777 })));
@@ -471,6 +499,140 @@ describe('handleUpload', () => {
     expect(entries.length).toBe(1);
     expect(entries[0].data).toEqual(cipherData);
     clearTimeout(entries[0].ttlTimer);
+  });
+});
+
+// ─── Tests handleRequestBlock (Story 9.4) ──────────────────────────────────
+
+describe('handleRequestBlock', () => {
+  function makeRequestBlockPayload(destNodeId, blockId) {
+    const buf = Buffer.allocUnsafe(80);
+    Buffer.from(destNodeId.padEnd(16, '\0'), 'utf8').copy(buf, 0);
+    Buffer.from(blockId.padEnd(64, '\0'), 'utf8').copy(buf, 16);
+    return buf;
+  }
+
+  test('forward immédiat si destinataire connecté', () => {
+    const { handleRequestBlock, sessions, parseFrame, MSG } = mod;
+    const destNodeId = 'dest000000000001';
+    const fromNodeId = 'sender0000000001';
+    const blockId = 'a'.repeat(64);
+
+    const destSent = [];
+    const destWs = { send: buf => destSent.push(buf), readyState: 1 };
+    sessions.set(destNodeId, { ws: destWs, publicKey: null });
+
+    const senderSent = [];
+    const senderWs = { send: buf => senderSent.push(buf), readyState: 1 };
+
+    const payload = makeRequestBlockPayload(destNodeId, blockId);
+    handleRequestBlock(fromNodeId, payload, senderWs);
+
+    // Aucun ACK au sender pour REQUEST_BLOCK (la réponse est elle-même un UPLOAD/FORWARD).
+    expect(senderSent.length).toBe(0);
+
+    // Forward envoyé au destinataire avec REQUEST_BLOCK_FORWARDED (0x0D)
+    expect(destSent.length).toBe(1);
+    const frame = parseFrame(destSent[0]);
+    expect(frame.type).toBe(MSG.REQUEST_BLOCK_FORWARDED);
+    expect(frame.payload.length).toBe(80);
+
+    // fromNodeId aux 16 premiers bytes (paddé avec \0)
+    const fwdFromNodeId = frame.payload.slice(0, 16).toString('utf8').replace(/\0/g, '');
+    expect(fwdFromNodeId).toBe(fromNodeId);
+
+    // blockId aux 64 bytes suivants
+    const fwdBlockId = frame.payload.slice(16, 80).toString('utf8').replace(/\0/g, '');
+    expect(fwdBlockId).toBe(blockId);
+  });
+
+  test('rejette si destinataire absent', () => {
+    const { handleRequestBlock, parseFrame, MSG } = mod;
+    const sent = [];
+    const senderWs = { send: buf => sent.push(buf), readyState: 1 };
+
+    const payload = makeRequestBlockPayload('absent0000000001', 'a'.repeat(64));
+    handleRequestBlock('sender0000000001', payload, senderWs);
+
+    expect(sent.length).toBe(1);
+    const frame = parseFrame(sent[0]);
+    expect(frame.type).toBe(MSG.ERROR);
+    expect(frame.payload.toString('utf8')).toMatch(/injoignable/);
+  });
+
+  test('rejette payload trop court', () => {
+    const { handleRequestBlock, parseFrame, MSG } = mod;
+    const sent = [];
+    const senderWs = { send: buf => sent.push(buf), readyState: 1 };
+
+    handleRequestBlock('sender0000000001', Buffer.alloc(50), senderWs);
+
+    expect(sent.length).toBe(1);
+    const frame = parseFrame(sent[0]);
+    expect(frame.type).toBe(MSG.ERROR);
+    expect(frame.payload.toString('utf8')).toMatch(/80 bytes/);
+  });
+
+  test('rejette payload boundary 79 bytes (juste sous 80)', () => {
+    const { handleRequestBlock, parseFrame, MSG } = mod;
+    const sent = [];
+    const senderWs = { send: buf => sent.push(buf), readyState: 1 };
+
+    handleRequestBlock('sender0000000001', Buffer.alloc(79), senderWs);
+
+    expect(sent.length).toBe(1);
+    const frame = parseFrame(sent[0]);
+    expect(frame.type).toBe(MSG.ERROR);
+    expect(frame.payload.toString('utf8')).toMatch(/80 bytes/);
+  });
+
+  test('rejette blockId malformé (pas 64 hex chars)', () => {
+    const { handleRequestBlock, parseFrame, MSG } = mod;
+    const sent = [];
+    const senderWs = { send: buf => sent.push(buf), readyState: 1 };
+
+    // blockId trop court (32 chars, et pas hex strict)
+    const payload = makeRequestBlockPayload('dest000000000001', 'XYZ' + 'a'.repeat(29));
+    handleRequestBlock('sender0000000001', payload, senderWs);
+
+    expect(sent.length).toBe(1);
+    const frame = parseFrame(sent[0]);
+    expect(frame.type).toBe(MSG.ERROR);
+    expect(frame.payload.toString('utf8')).toMatch(/blockId/);
+  });
+
+  test('rejette destNodeId == fromNodeId (anti-loop AC#10)', () => {
+    const { handleRequestBlock, sessions, parseFrame, MSG } = mod;
+    const sent = [];
+    const senderWs = { send: buf => sent.push(buf), readyState: 1 };
+    const myNodeId = 'self000000000001';
+
+    // Même si la session existe, le serveur doit refuser le self-loop.
+    sessions.set(myNodeId, { ws: senderWs, publicKey: null });
+
+    const payload = makeRequestBlockPayload(myNodeId, 'b'.repeat(64));
+    handleRequestBlock(myNodeId, payload, senderWs);
+
+    expect(sent.length).toBe(1);
+    const frame = parseFrame(sent[0]);
+    expect(frame.type).toBe(MSG.ERROR);
+    expect(frame.payload.toString('utf8')).toMatch(/interdit/);
+  });
+
+  test('rejette destNodeId vide après strip', () => {
+    const { handleRequestBlock, parseFrame, MSG } = mod;
+    const sent = [];
+    const senderWs = { send: buf => sent.push(buf), readyState: 1 };
+
+    // payload de 80 bytes mais destNodeId = uniquement des \0 → vide après strip
+    const payload = Buffer.alloc(80);
+    Buffer.from('a'.repeat(64), 'utf8').copy(payload, 16);
+    handleRequestBlock('sender0000000001', payload, senderWs);
+
+    expect(sent.length).toBe(1);
+    const frame = parseFrame(sent[0]);
+    expect(frame.type).toBe(MSG.ERROR);
+    expect(frame.payload.toString('utf8')).toMatch(/destNodeId/);
   });
 });
 

@@ -1,6 +1,17 @@
 package com.mobicloud.domain.repository
 
+import com.mobicloud.domain.models.RelayPeer
+import kotlinx.coroutines.flow.StateFlow
+
 interface SignalingRepository {
+    /**
+     * Snapshot mémoire de la dernière liste reçue via GET_PEERS.
+     * Volatile (TTL serveur 60s) — NE PAS persister, NE PAS substituer à PeerRepository.
+     * Utilisé par les use-cases inter-cluster (9.3, 9.4) pour consommer clusterId/freeBytes.
+     * Initialement emptyList() avant le premier PeerList.
+     */
+    val latestPeers: StateFlow<List<RelayPeer>>
+
     /**
      * Annonce la présence du nœud sur le relais SANS revendiquer le statut Super-Pair.
      * À utiliser au démarrage et en keepalive ; permet à Bully de se déclencher.

@@ -17,6 +17,9 @@ import com.mobicloud.domain.repository.SignalingRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -46,6 +49,13 @@ class SignalingRepositoryImpl @Inject constructor(
     // Sans ça, après un disconnect/reconnect, l'autre pair ne nous voit plus avant ~30s.
     @Volatile var onConnectedHook: (suspend () -> Unit)? = null
 
+    // Story 9.3 — Snapshot mémoire de la dernière PeerList reçue, alimenté par processPeerList.
+    // Conserve clusterId/freeBytes (non filtrés) pour usage par les use-cases inter-cluster.
+    // Auto-référence (peer.nodeId == localNodeId) retirée. Pas de filtrage TTL ici (les
+    // entrées sont déjà fraîches côté serveur via TTL 60s).
+    private val _latestPeers = MutableStateFlow<List<RelayPeer>>(emptyList())
+    override val latestPeers: StateFlow<List<RelayPeer>> = _latestPeers.asStateFlow()
+
     init {
         scope.launch {
             val url = RELAY_SERVER_URLS.firstOrNull() ?: return@launch
@@ -68,6 +78,13 @@ class SignalingRepositoryImpl @Inject constructor(
         val now = System.currentTimeMillis()
         val localNodeId = identityRepository.getIdentity().getOrNull()?.nodeId
         Log.i(TAG, "[DIAG] processPeerList reçu ${peers.size} pairs (self=${localNodeId?.take(8)}) : ${peers.map { "${it.nodeId.take(8)}@${it.ip}:${it.port} lastSeen=${now - it.lastSeen}ms" }}")
+
+        // Story 9.3 — Mise à jour du snapshot mémoire AVANT toute autre logique.
+        // Ne PAS filtrer clusterId/freeBytes/TTL ici — c'est le rôle des consommateurs.
+        // Seule l'auto-référence est retirée (un Super-Pair n'est jamais candidat de placement
+        // pour lui-même).
+        _latestPeers.value = peers.filterNot { it.nodeId == localNodeId }
+
         var insertedCount = 0
         peers.forEach { peer ->
             if (peer.nodeId == localNodeId) {
@@ -128,8 +145,17 @@ class SignalingRepositoryImpl @Inject constructor(
         val clusterId = settings.clusterId
         // Story 9.2 — snapshot best-effort de la capacité libre. Deux requêtes DB séquentielles ;
         // une concurrence ajout-bloc/REGISTER_PEER peut donner ±1 bloc d'écart, acceptable.
-        val used = hostedBlockRepository.getTotalHostedBytes()
-        val freeBytes = (settings.allocatedStorageBytes - used).coerceAtLeast(0L)
+        // Story 9.2 review (D1) : isoler le calcul DB dans un runCatching local — une panne
+        // Room (locked, IO) ne doit PAS abortir REGISTER_PEER ni démotiver le Super-Pair.
+        // Fallback freeBytes=0 (le pair sera juste écarté du placement inter-cluster pour ce
+        // cycle TTL=60s, exactement comme un nœud à disque plein).
+        val freeBytes = runCatching {
+            val used = hostedBlockRepository.getTotalHostedBytes()
+            (settings.allocatedStorageBytes - used).coerceAtLeast(0L)
+        }.getOrElse { e ->
+            Log.w(TAG, "freeBytes calc échoué (DB) → fallback=0 : ${e.message}")
+            0L
+        }
         val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt, clusterId, freeBytes)
         if (!sent) error("RelayWebSocketClient non connecté — REGISTER_PEER non envoyé")
         Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore clusterId=${clusterId.take(8).ifEmpty { "(legacy)" }} freeBytes=$freeBytes")

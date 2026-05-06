@@ -20,6 +20,7 @@ import io.mockk.mockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -140,6 +141,30 @@ class SignalingRepositoryImplTest {
             relayClient.sendRegisterPeer(
                 any(), any(), any(), any(), any(), any(),
                 0L  // jamais négatif
+            )
+        }
+    }
+
+    @Test
+    fun `Story 9_2 D1 registerAsSuperPeer envoie freeBytes=0 si getTotalHostedBytes leve une exception`() = runTest {
+        // D1 (review 9.2) : panne DB locale ne doit PAS abortir REGISTER_PEER ni démotiver
+        // le Super-Pair. Fallback freeBytes=0, registration toujours réussie.
+        coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
+            allocatedStorageBytes = 1_000_000L,
+            clusterId = "test-cluster-id-0001"
+        )
+        coEvery { hostedBlockRepository.getTotalHostedBytes() } throws RuntimeException("DB locked")
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns true
+
+        val repo = buildRepo()
+        val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, 1000L, "test-node-id")
+
+        assertTrue(result.isSuccess)
+        verify {
+            relayClient.sendRegisterPeer(
+                any(), any(), any(), any(), any(),
+                "test-cluster-id-0001",
+                0L  // fallback
             )
         }
     }
@@ -297,5 +322,99 @@ class SignalingRepositoryImplTest {
         val result = repo.joinAsParticipant("test-node-id", null, null, 0.5f)
 
         assertTrue(result.isFailure)
+    }
+
+    // -------------------------------------------------------------------------
+    // Story 9.3 — latestPeers expose la dernière PeerList reçue (memoire-seule)
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `Story 9_3 latestPeers est emptyList avant tout PeerList recu (AC#6)`() = runTest {
+        val repo = buildRepo()
+        assertEquals(emptyList<RelayPeer>(), repo.latestPeers.value)
+    }
+
+    @Test
+    fun `Story 9_3 latestPeers reflete la derniere PeerList recue avec clusterId et freeBytes preserves (AC#1)`() = runTest {
+        val repo = buildRepo()
+        val now = System.currentTimeMillis()
+
+        val remotePeer = RelayPeer(
+            nodeId = "remote-super-pair",
+            ip = "10.0.0.42",
+            port = 9000,
+            reliabilityScore = 0.9f,
+            lastSeen = now,
+            isSuperPair = true,
+            clusterId = "cluster-remote-XXXX",
+            freeBytes = 5_000_000L
+        )
+
+        repo.processPeerList(listOf(remotePeer))
+
+        val snapshot = repo.latestPeers.value
+        assertEquals(1, snapshot.size)
+        assertEquals("remote-super-pair", snapshot[0].nodeId)
+        assertEquals("cluster-remote-XXXX", snapshot[0].clusterId)
+        assertEquals(5_000_000L, snapshot[0].freeBytes)
+    }
+
+    @Test
+    fun `Story 9_3 latestPeers retire l'auto-reference (AC#1)`() = runTest {
+        val repo = buildRepo()
+        val now = System.currentTimeMillis()
+
+        val self = RelayPeer(
+            nodeId = "self-node-id",  // == identityRepository.getIdentity().nodeId
+            ip = "127.0.0.1",
+            port = 9000,
+            reliabilityScore = 0.9f,
+            lastSeen = now,
+            isSuperPair = true,
+            clusterId = "cluster-local",
+            freeBytes = 1_000L
+        )
+        val other = RelayPeer(
+            nodeId = "other-node",
+            ip = "10.0.0.43",
+            port = 9000,
+            reliabilityScore = 0.9f,
+            lastSeen = now,
+            isSuperPair = true,
+            clusterId = "cluster-remote",
+            freeBytes = 2_000L
+        )
+
+        repo.processPeerList(listOf(self, other))
+
+        val snapshot = repo.latestPeers.value
+        assertEquals(1, snapshot.size)
+        assertEquals("other-node", snapshot[0].nodeId)
+    }
+
+    @Test
+    fun `Story 9_3 latestPeers conserve les pairs sans filtrage clusterId ou freeBytes (AC#1)`() = runTest {
+        // Le filtrage est délégué aux consommateurs (RequestInterClusterHostingUseCase) ;
+        // latestPeers expose la liste brute (clusterId vide, freeBytes=0 conservés).
+        val repo = buildRepo()
+        val now = System.currentTimeMillis()
+
+        val legacy = RelayPeer(
+            nodeId = "legacy-node",
+            ip = "10.0.0.44",
+            port = 9000,
+            reliabilityScore = 0.9f,
+            lastSeen = now,
+            isSuperPair = false,
+            clusterId = "",
+            freeBytes = 0L
+        )
+
+        repo.processPeerList(listOf(legacy))
+
+        val snapshot = repo.latestPeers.value
+        assertEquals(1, snapshot.size)
+        assertEquals("", snapshot[0].clusterId)
+        assertEquals(0L, snapshot[0].freeBytes)
     }
 }

@@ -11,6 +11,15 @@ sealed class RelayEvent {
     data class PeerList(val peers: List<RelayPeer>) : RelayEvent()
     data class Error(val message: String) : RelayEvent()
     data class Disconnected(val reason: String? = null) : RelayEvent()
+    /**
+     * Story 9.4 — un pair distant a émis REQUEST_BLOCK pour un blockId que ce nœud (Super-Pair)
+     * héberge potentiellement. Le routing métier (lookup HostedBlock + réponse) est délégué au
+     * use-case RespondToBlockRequest ; le client WSS se contente d'émettre l'événement.
+     */
+    data class BlockRequestForwarded(
+        val fromNodeId: String,
+        val blockId: String
+    ) : RelayEvent()
 }
 
 data class RelayPeer(

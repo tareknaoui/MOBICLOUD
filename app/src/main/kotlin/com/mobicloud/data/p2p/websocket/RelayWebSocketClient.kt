@@ -130,6 +130,13 @@ class RelayWebSocketClient @Inject constructor(
                         val peers = parsePeersPayload(payload)
                         trySend(RelayEvent.PeerList(peers))
                     }
+                    RelayMsg.REQUEST_BLOCK_FORWARDED -> {
+                        // Story 9.4 — un pair distant me demande un bloc. On émet l'événement ;
+                        // le routing métier (lookup HostedBlock + push réponse) est délégué au use-case.
+                        val parsed = RelayFraming.parseRequestBlockForwardedPayload(payload) ?: return
+                        val (fromNodeId, blockId) = parsed
+                        trySend(RelayEvent.BlockRequestForwarded(fromNodeId, blockId))
+                    }
                     RelayMsg.PONG -> { /* keepalive applicatif — ignoré, OkHttp gère le ping natif */ }
                     RelayMsg.ERROR -> {
                         val msg = payload.toString(Charsets.UTF_8)
@@ -192,6 +199,18 @@ class RelayWebSocketClient @Inject constructor(
         withTimeout(30_000L) { deferred.await() }
     }.also { result ->
         if (result.isFailure) pendingUploads.remove(blockId)
+    }
+
+    /**
+     * Story 9.4 — envoie REQUEST_BLOCK (0x0C). Demande au Super-Pair distant [destNodeId] de
+     * me servir le bloc [blockId]. Pas d'attente d'ACK ici (c'est le use-case côté repository
+     * qui gère le `pendingBlockRequests` deferred et le timeout — la réponse arrive via FORWARD).
+     * Retourne `false` si la WebSocket n'est pas active.
+     */
+    fun sendRequestBlock(destNodeId: String, blockId: String): Boolean {
+        val ws = activeWebSocket ?: return false
+        val payload = RelayFraming.buildRequestBlockPayload(destNodeId, blockId)
+        return ws.send(RelayFraming.buildFrame(RelayMsg.REQUEST_BLOCK, payload).toByteString())
     }
 
     /** Envoie GET_PEERS (0x04) — payload vide. Réponse émise via Flow<RelayEvent.PeerList>. */
@@ -257,9 +276,10 @@ class RelayWebSocketClient @Inject constructor(
                     // Champ ajouté côté serveur Story Bully ; absent dans les anciennes réponses → false
                     isSuperPair      = obj.optBoolean("isSuperPair", false),
                     // Story 9.2 — defaults garantissent la rétrocompatibilité avec
-                    // d'anciennes réponses serveur sans ces champs.
-                    clusterId        = obj.optString("clusterId", ""),
-                    freeBytes        = obj.optLong("freeBytes", 0L)
+                    // d'anciennes réponses serveur sans ces champs. isNull() distingue
+                    // un null JSON explicite (sinon org.json renvoie le littéral "null").
+                    clusterId        = if (obj.isNull("clusterId")) "" else obj.optString("clusterId", ""),
+                    freeBytes        = if (obj.isNull("freeBytes")) 0L else obj.optLong("freeBytes", 0L)
                 )
             }
         }.getOrDefault(emptyList())

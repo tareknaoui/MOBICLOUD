@@ -1,5 +1,5 @@
 # generated: 2026-04-13T21:26:35+02:00
-# last_updated: 2026-05-05T15:00:00+02:00
+# last_updated: 2026-05-06T00:00:00+02:00
 # project: PFE
 # project_key: NOKEY
 # tracking_system: file-system
@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-05-05T18:00:00+02:00
+last_updated: 2026-05-06T23:30:00+02:00
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -95,7 +95,7 @@ development_status:
   epic-8-retrospective: optional
   epic-9: in-progress
   9-1-clusterid-nodesettings-et-register-peer: done
-  9-2-freebytes-et-clusterid-dans-get-peers: review
-  9-3-request-hosting-distribution-inter-cluster: backlog
-  9-4-request-block-recuperation-inter-cluster: backlog
+  9-2-freebytes-et-clusterid-dans-get-peers: done
+  9-3-request-hosting-distribution-inter-cluster: done
+  9-4-request-block-recuperation-inter-cluster: done
   epic-9-retrospective: optional

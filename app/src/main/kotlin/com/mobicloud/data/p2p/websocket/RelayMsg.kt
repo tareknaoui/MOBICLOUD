@@ -14,5 +14,9 @@ internal object RelayMsg {
     // JOIN (0x0B) : "je suis présent" — distinct de REGISTER_PEER ("je suis Super-Pair élu").
     // Permet à l'élection Bully de se déclencher car les nœuds JOIN ne se déclarent pas Super-Pair.
     const val JOIN: Byte           = 0x0B
+    // Story 9.4 — pull inter-cluster : un requester demande un bloc à un Super-Pair distant.
+    // La réponse revient via UPLOAD/FORWARD existant (pas de message dédié pour le retour).
+    const val REQUEST_BLOCK: Byte           = 0x0C
+    const val REQUEST_BLOCK_FORWARDED: Byte = 0x0D
     const val ERROR: Byte          = 0xFF.toByte()
 }

@@ -7,9 +7,12 @@ import com.mobicloud.domain.models.EncryptedBundle
 import com.mobicloud.domain.models.EncryptedFragment
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.Peer
+import com.mobicloud.domain.models.RelayPeer
 import com.mobicloud.domain.models.WrappedFileMasterKey
+import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.repository.BlockSender
 import com.mobicloud.domain.repository.CatalogRepository
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
@@ -18,6 +21,8 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
+import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -35,12 +40,15 @@ class DistributeEncryptedBlocksUseCaseTest {
     private lateinit var gossipSyncUseCase: GossipSyncUseCase
     private lateinit var securityRepository: SecurityRepository
     private lateinit var insertDhtEntryUseCase: InsertDhtEntryUseCase
+    private lateinit var requestInterClusterHostingUseCase: RequestInterClusterHostingUseCase
+    private lateinit var nodeSettingsRepository: NodeSettingsRepository
 
     private lateinit var useCase: DistributeEncryptedBlocksUseCase
 
     private val localNodeId = "node_local_01"
     private val localPublicKey = Random.nextBytes(65)
     private val localIdentity = NodeIdentity(localNodeId, localPublicKey)
+    private val localClusterId = "cluster-local-AAAA"
 
     @Before
     fun setUp() {
@@ -50,6 +58,8 @@ class DistributeEncryptedBlocksUseCaseTest {
         gossipSyncUseCase = mockk()
         securityRepository = mockk()
         insertDhtEntryUseCase = mockk()
+        requestInterClusterHostingUseCase = mockk()
+        nodeSettingsRepository = mockk()
 
         useCase = DistributeEncryptedBlocksUseCase(
             peerRepository = peerRepository,
@@ -57,14 +67,39 @@ class DistributeEncryptedBlocksUseCaseTest {
             catalogRepository = catalogRepository,
             gossipSyncUseCase = gossipSyncUseCase,
             securityRepository = securityRepository,
-            insertDhtEntryUseCase = insertDhtEntryUseCase
+            insertDhtEntryUseCase = insertDhtEntryUseCase,
+            requestInterClusterHostingUseCase = requestInterClusterHostingUseCase,
+            nodeSettingsRepository = nodeSettingsRepository
         )
 
         coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
         coEvery { catalogRepository.insertOwnerEntry(any()) } returns Result.success(Unit)
         coEvery { gossipSyncUseCase.runGossipCycle() } returns Result.success(Unit)
         coEvery { insertDhtEntryUseCase(any(), any(), any(), any()) } returns Result.success(Unit)
+        coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
+            allocatedStorageBytes = 1_000_000_000L,
+            clusterId = localClusterId
+        )
+        // Default — pas de candidat inter-cluster sauf override par test
+        every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns null
     }
+
+    private fun fakeRemoteRelayPeer(
+        nodeId: String = "remote-super-pair",
+        ip: String = "10.99.0.1",
+        port: Int = 9999,
+        clusterId: String = "cluster-remote-XXXX",
+        freeBytes: Long = 100_000_000L
+    ): RelayPeer = RelayPeer(
+        nodeId = nodeId,
+        ip = ip,
+        port = port,
+        reliabilityScore = 0.9f,
+        lastSeen = System.currentTimeMillis(),
+        isSuperPair = true,
+        clusterId = clusterId,
+        freeBytes = freeBytes
+    )
 
     // --- Helpers ---
 
@@ -241,5 +276,119 @@ class DistributeEncryptedBlocksUseCaseTest {
             "wrappedMasterKey doit correspondre à celui du bundle",
             entry?.wrappedMasterKey == bundle.wrappedFileMasterKey
         )
+    }
+
+    // -------------------------------------------------------------------------
+    // Story 9.3 — Fallback inter-cluster
+    // -------------------------------------------------------------------------
+
+    /**
+     * Story 9.3 Cas A (AC#3, AC#5) — cluster local vide ⇒ fallback inter-cluster invoqué ;
+     * sendBlock est appelé sur le pair distant, et insertDhtEntryUseCase reçoit
+     * remoteNodeId/remoteIp/remotePort.
+     */
+    @Test
+    fun `Story 9_3 fallback inter-cluster invoque quand cluster local est vide`() = runTest {
+        every { peerRepository.peers } returns MutableStateFlow(emptyList())
+
+        val remote = fakeRemoteRelayPeer(nodeId = "remote-A", ip = "10.99.0.7", port = 7777)
+        every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns remote
+
+        val bundle = fakeBundle(k = 4, n = 2)
+        val capturedPeers = mutableListOf<Peer>()
+        coEvery { blockSender.sendBlock(any(), capture(capturedPeers), any()) } answers {
+            val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
+            Result.success(fakeAck(msg.blockId, "remote-A"))
+        }
+
+        val ipSlot = slot<String>()
+        val portSlot = slot<Int>()
+        val nodeIdSlot = slot<String>()
+        coEvery {
+            insertDhtEntryUseCase(any(), capture(nodeIdSlot), capture(ipSlot), capture(portSlot))
+        } returns Result.success(Unit)
+
+        val result = useCase.distribute(bundle, "filehash_intercluster", k = 4)
+
+        assertTrue("distribute should succeed via inter-cluster", result.isSuccess)
+        // Tous les fragments routés vers le pair distant
+        assertTrue("tous les sendBlock doivent cibler le pair distant", capturedPeers.all { it.ipAddress == "10.99.0.7" && it.port == 7777 })
+        verify(atLeast = 1) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }
+        // insertDhtEntryUseCase reçoit l'IP/port distants
+        assertEquals("10.99.0.7", ipSlot.captured)
+        assertEquals(7777, portSlot.captured)
+        assertEquals("remote-A", nodeIdSlot.captured)
+    }
+
+    /**
+     * Story 9.3 Cas B (AC#4) — placement local primary réussit ⇒ selectRemoteHost
+     * JAMAIS appelé (régression-safe : aucun appel inter-cluster sur path heureux local).
+     */
+    @Test
+    fun `Story 9_3 selectRemoteHost jamais appele quand placement local reussit`() = runTest {
+        val peers = (1..6).map { fakePeer("node_$it", it) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val bundle = fakeBundle(k = 4, n = 2)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
+            val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
+            Result.success(fakeAck(msg.blockId, "node_receiver"))
+        }
+
+        val result = useCase.distribute(bundle, "filehash_local_only", k = 4)
+
+        assertTrue(result.isSuccess)
+        verify(exactly = 0) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }
+    }
+
+    /**
+     * Story 9.3 Cas C (AC#4) — placement local échoue ET selectRemoteHost retourne null
+     * ⇒ Result.failure (data blocks confirmés < k). Comportement actuel préservé.
+     */
+    @Test
+    fun `Story 9_3 echec total quand local echoue et inter-cluster indisponible`() = runTest {
+        val peers = (1..2).map { fakePeer("node_$it", it) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val bundle = fakeBundle(k = 4, n = 2)
+        // Tous les envois échouent (local primary + local fallback)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } returns
+            Result.failure(SocketTimeoutException("all peers down"))
+        every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns null
+
+        val result = useCase.distribute(bundle, "filehash_total_fail", k = 4)
+
+        assertTrue("distribute doit échouer si local et inter-cluster indisponibles", result.isFailure)
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
+        coVerify(exactly = 0) { catalogRepository.insertOwnerEntry(any()) }
+    }
+
+    /**
+     * Story 9.3 (AC#3) — placement local échoue (primary + fallback) puis inter-cluster
+     * réussit ⇒ succès global, fragment placé sur le pair distant.
+     */
+    @Test
+    fun `Story 9_3 fallback inter-cluster apres echec local primary et fallback`() = runTest {
+        val peers = (1..2).map { fakePeer("node_$it", it) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val remote = fakeRemoteRelayPeer(nodeId = "remote-B", ip = "10.99.0.8", port = 8888)
+        every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns remote
+
+        val bundle = fakeBundle(k = 4, n = 2)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
+            val targetPeer = secondArg<Peer>()
+            if (targetPeer.ipAddress == "10.99.0.8") {
+                val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
+                Result.success(fakeAck(msg.blockId, "remote-B"))
+            } else {
+                Result.failure(SocketTimeoutException("local peer down"))
+            }
+        }
+
+        val result = useCase.distribute(bundle, "filehash_local_to_remote", k = 4)
+
+        assertTrue(result.isSuccess)
+        verify(atLeast = 1) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }
     }
 }

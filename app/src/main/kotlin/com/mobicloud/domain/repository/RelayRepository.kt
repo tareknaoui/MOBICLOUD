@@ -1,5 +1,6 @@
 package com.mobicloud.domain.repository
 
+import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.models.RelayPeer
 import kotlinx.coroutines.flow.StateFlow
 
@@ -12,6 +13,21 @@ interface RelayRepository {
 
     /** Récupère la liste des Super-Pairs connus du relais. */
     suspend fun fetchSuperPeers(): Result<List<RelayPeer>>
+
+    /**
+     * Story 9.4 — pull inter-cluster : demande [blockId] au Super-Pair distant [remoteNodeId]
+     * via le canal REQUEST_BLOCK / FORWARD. Bloque jusqu'à réception ou timeout.
+     *
+     * @return Result.success(BlockTransferMessage) si la réponse arrive et désérialise correctement,
+     *         Result.failure(SocketTimeoutException) si pas de réponse en [timeoutMs],
+     *         Result.failure(IllegalStateException) si la connexion relais n'est pas active
+     *         ou si une requête est déjà en cours pour [blockId].
+     */
+    suspend fun requestBlock(
+        remoteNodeId: String,
+        blockId: String,
+        timeoutMs: Long
+    ): Result<BlockTransferMessage>
 }
 
 enum class RelayConnectionState { CONNECTING, CONNECTED, RELAY_HA, OFFLINE }

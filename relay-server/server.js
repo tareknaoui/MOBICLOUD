@@ -15,6 +15,11 @@ const MSG = {
   // Story Bully — sépare la "présence dans le réseau" de l'élection formelle.
   // Un nœud envoie JOIN au démarrage ; seul le gagnant Bully envoie ensuite REGISTER_PEER.
   JOIN: 0x0B,
+  // Story 9.4 — récupération inter-cluster (mode pull) : requester demande
+  // un blockId à un Super-Pair distant, le serveur pivote 80 bytes vers le destinataire.
+  // La réponse passe par le canal UPLOAD/FORWARD existant — pas de nouveau message retour.
+  REQUEST_BLOCK: 0x0C,
+  REQUEST_BLOCK_FORWARDED: 0x0D,
   ERROR: 0xFF
 };
 
@@ -155,13 +160,17 @@ function handleRegisterPeer(nodeId, payload) {
     clusterIdStr = '';
   }
 
-  // Story 9.2 — freeBytes optionnel : Number fini ≥ 0 ; sinon coerce en 0 + warn (même
-  // pattern que clusterId). Absent ⇒ legacy/JOIN amont, on stocke 0 sans warn.
+  // Story 9.2 — freeBytes optionnel : Number entier fini, 0 ≤ x ≤ MAX_SAFE_INTEGER ;
+  // sinon coerce en 0 + warn. Absent/null ⇒ legacy/JOIN amont, on stocke 0 sans warn.
+  // Story 9.2 review (P2/P3) : exiger typeof === 'number' (refuse "1234", true/false) ET
+  // borner par MAX_SAFE_INTEGER (refuse 1e18 qui passerait isFinite mais perdrait la précision).
   let freeBytesNum = 0;
   if (freeBytes !== undefined && freeBytes !== null) {
-    const n = Number(freeBytes);
-    if (Number.isFinite(n) && n >= 0) {
-      freeBytesNum = Math.floor(n);
+    if (typeof freeBytes === 'number'
+      && Number.isFinite(freeBytes)
+      && freeBytes >= 0
+      && freeBytes <= Number.MAX_SAFE_INTEGER) {
+      freeBytesNum = Math.floor(freeBytes);
     } else {
       console.warn(`[SIGNALING] freeBytes invalide rejeté (coerce en 0) — nodeId=${nodeId.slice(0, 8)} type=${typeof freeBytes}`);
     }
@@ -224,11 +233,17 @@ function handleJoin(nodeId, payload) {
   // Préserver le statut Super-Pair si déjà élu — re-JOIN ne déclasse pas.
   const wasSuperPair = existing?.isSuperPair ?? false;
 
+  // Story 9.2 review (P1) : préserver clusterId/freeBytes existants — un Super-Pair
+  // envoyant un JOIN heartbeat ne doit PAS être démotivé en "legacy" (clusterId="",
+  // freeBytes=0) jusqu'au prochain REGISTER_PEER. Le payload JOIN ne porte pas ces
+  // champs ; on les hérite de l'entrée précédente, sinon defaults legacy.
   signalingRegistry.set(nodeId, {
     ip: ip ?? '0.0.0.0',
     port: port ?? 0,
     reliabilityScore: reliabilityScore ?? 0.5,
     electedAt: existing?.electedAt ?? null,
+    clusterId: existing?.clusterId ?? '',
+    freeBytes: existing?.freeBytes ?? 0,
     lastSeen: Date.now(),
     ttlTimer,
     isSuperPair: wasSuperPair
@@ -350,6 +365,53 @@ function handleUpload(fromNodeId, payload, senderWs) {
   safeSend(senderWs, buildFrame(MSG.ACK, Buffer.from(JSON.stringify({ blockId }), 'utf8')));
 }
 
+// ─── Story 9.4 — REQUEST_BLOCK (pull inter-cluster) ─────────────────────────
+
+// Le requester envoie REQUEST_BLOCK(destNodeId, blockId) ; le serveur pivote
+// 80 bytes vers le destinataire en REQUEST_BLOCK_FORWARDED(fromNodeId, blockId).
+// PAS de buffering : si dest absent, on rejette (le requester time-out de toute façon).
+function handleRequestBlock(fromNodeId, payload, senderWs) {
+  if (payload.length !== 80) {
+    sendError(senderWs, 'REQUEST_BLOCK payload invalide (attendu 80 bytes)');
+    return;
+  }
+  // Strip uniquement le padding NUL trailing (pas tous les NUL : un \0 interior
+  // permettrait de forger une collision avec un autre nodeId via injection).
+  const destNodeId = payload.slice(0, 16).toString('utf8').replace(/\0+$/, '').trim();
+  const blockId = payload.slice(16, 80).toString('utf8').replace(/\0+$/, '').trim();
+
+  if (!destNodeId || destNodeId.length !== 16) {
+    sendError(senderWs, 'REQUEST_BLOCK destNodeId invalide (attendu 16 chars)');
+    return;
+  }
+  if (!/^[0-9a-fA-F]{64}$/.test(blockId)) {
+    sendError(senderWs, 'REQUEST_BLOCK blockId invalide (attendu 64 chars hex)');
+    return;
+  }
+  // AC#10 — anti-loop : un nœud ne peut pas se demander un bloc à lui-même.
+  // Comparaison case-insensitive pour éviter le bypass si fromNodeId=auth-canonicalisé
+  // et destNodeId arrive en case mixte.
+  if (destNodeId.toLowerCase() === String(fromNodeId).toLowerCase()) {
+    sendError(senderWs, 'REQUEST_BLOCK destNodeId == fromNodeId interdit');
+    return;
+  }
+
+  const destSession = sessions.get(destNodeId);
+  if (!destSession || destSession.ws.readyState !== WebSocket.OPEN) {
+    sendError(senderWs, 'REQUEST_BLOCK destinataire injoignable');
+    return;
+  }
+
+  // Forward : 16 bytes fromNodeId + 64 bytes blockId
+  // Buffer.alloc (zéroïsé) : `allocUnsafe` peut fuiter de la mémoire arbitraire si
+  // une copie partielle laisse des octets non-écrits.
+  const forwardPayload = Buffer.alloc(80);
+  Buffer.from(fromNodeId.padEnd(16, '\0'), 'utf8').copy(forwardPayload, 0);
+  Buffer.from(blockId.padEnd(64, '\0'), 'utf8').copy(forwardPayload, 16);
+  safeSend(destSession.ws, buildFrame(MSG.REQUEST_BLOCK_FORWARDED, forwardPayload));
+  console.log(`[RELAY] REQUEST_BLOCK ${blockId.slice(0, 16)} : ${fromNodeId.slice(0, 8)} → ${destNodeId.slice(0, 8)}`);
+}
+
 // ─── Serveur HTTP + WebSocketServer ─────────────────────────────────────────
 
 const httpServer = http.createServer((req, res) => {
@@ -455,6 +517,10 @@ wss.on('connection', (ws) => {
         handleUpload(nodeId, frame.payload, ws);
         break;
       }
+      case MSG.REQUEST_BLOCK: {
+        handleRequestBlock(nodeId, frame.payload, ws);
+        break;
+      }
       case MSG.PING: {
         safeSend(ws, buildFrame(MSG.PONG));
         break;
@@ -516,7 +582,7 @@ if (require.main === module) {
 // ─── Exports pour les tests ──────────────────────────────────────────────────
 module.exports = {
   buildFrame, parseFrame, sendError, safeSend, verifyAuth,
-  handleRegisterPeer, handleJoin, handleGetPeers, handleUpload, flushPendingBlocks,
+  handleRegisterPeer, handleJoin, handleGetPeers, handleUpload, handleRequestBlock, flushPendingBlocks,
   sessions, signalingRegistry, relayBuffer,
   MSG, TTL_MS, AUTH_WINDOW_MS, AUTH_TIMEOUT_MS, MAX_BLOCK_SIZE,
   MAX_RELAY_BUFFER_ENTRIES, MAX_SIGNALING_PEERS,
