@@ -6,6 +6,7 @@ import kotlinx.coroutines.flow.Flow
 interface NodeSettingsRepository {
     suspend fun getSettings(): NodeSettings
     suspend fun updateAllocatedStorage(bytes: Long)
+    suspend fun updateClusterId(id: String)
     fun observeSettings(): Flow<NodeSettings>
     fun observeFreeSpaceBytes(): Flow<Long>
 }

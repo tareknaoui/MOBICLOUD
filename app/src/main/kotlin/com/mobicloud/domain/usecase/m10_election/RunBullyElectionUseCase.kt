@@ -6,6 +6,7 @@ import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.SuperPairElection
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import kotlinx.coroutines.CoroutineDispatcher
@@ -34,6 +35,7 @@ class RunBullyElectionUseCase @Inject constructor(
     private val trustScoreProvider: ITrustScoreProvider,
     private val networkClient: IElectionNetworkClient,
     private val electionStateManager: ElectionStateManager,
+    private val nodeSettingsRepository: NodeSettingsRepository,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     operator fun invoke(): Flow<Result<SuperPairElection>> = flow {
@@ -70,6 +72,7 @@ class RunBullyElectionUseCase @Inject constructor(
             return@flow
         }
         val localScore = trustScoreProvider.getTrustScore(localIdentity.nodeId).toFloat()
+        val localClusterId = nodeSettingsRepository.getSettings().clusterId
 
         // Étape 2 : Broadcast de ELECTION aux pairs actifs
         val electionPayload = createPayload(localIdentity, localScore, ElectionMessageType.ELECTION)
@@ -101,7 +104,7 @@ class RunBullyElectionUseCase @Inject constructor(
             emit(Result.failure(Exception("Election lost to a higher scoring node: ${higherAliveReceived.senderNodeId}")))
         } else {
             // Victoire — aucune réponse ALIVE prioritaire reçue dans la fenêtre
-            val coordinatorPayload = createPayload(localIdentity, localScore, ElectionMessageType.COORDINATOR)
+            val coordinatorPayload = createPayload(localIdentity, localScore, ElectionMessageType.COORDINATOR, localClusterId)
                 .getOrElse { error ->
                     emit(Result.failure(error))
                     return@flow
@@ -150,9 +153,10 @@ class RunBullyElectionUseCase @Inject constructor(
     private suspend fun createPayload(
         identity: NodeIdentity,
         score: Float,
-        type: ElectionMessageType
+        type: ElectionMessageType,
+        clusterId: String = ""
     ): Result<ElectionPayload> {
-        val dataToSign = "${identity.nodeId}:${type.name}".toByteArray()
+        val dataToSign = "${identity.nodeId}:${type.name}:${clusterId}".toByteArray()
         val signature = securityRepository.signData(dataToSign).getOrElse { error ->
             return Result.failure(Exception("Failed to sign election payload of type ${type.name}", error))
         }
@@ -161,7 +165,8 @@ class RunBullyElectionUseCase @Inject constructor(
                 senderNodeId = identity.nodeId,
                 type = type,
                 reliabilityScore = score,
-                signatureBytes = signature
+                signatureBytes = signature,
+                clusterId = clusterId
             )
         )
     }

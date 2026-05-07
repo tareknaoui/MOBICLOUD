@@ -197,7 +197,7 @@ class LargeScaleNetworkSimulationTest {
             Result.success(ackFor(msg, "receiver"))
         }
 
-        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario1", ErasureParameters(4, 2))
+        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario1", ErasureParameters(4, 2), selectedPeers = nodes)
 
         assertTrue("Distribution doit réussir avec 20 nœuds", result.isSuccess)
         assertEquals("6 fragments doivent être placés", 6, result.getOrThrow().fragmentLocations.size)
@@ -232,7 +232,7 @@ class LargeScaleNetworkSimulationTest {
             }
         }
 
-        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario2", ErasureParameters(4, 2))
+        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario2", ErasureParameters(4, 2), selectedPeers = nodes)
 
         assertTrue("Distribution doit réussir via inter-cluster", result.isSuccess)
         val entry = result.getOrThrow()
@@ -272,7 +272,7 @@ class LargeScaleNetworkSimulationTest {
             }
         }
 
-        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario3", ErasureParameters(4, 2))
+        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario3", ErasureParameters(4, 2), selectedPeers = nodes)
 
         assertTrue("Distribution doit réussir sur 3 clusters", result.isSuccess)
         // Les 2 nœuds locaux prennent des fragments, inter-cluster prend le reste
@@ -300,7 +300,7 @@ class LargeScaleNetworkSimulationTest {
 
         val hashes = (1..10).map { "file-hash-$it" }
         val results = hashes.map { hash ->
-            distributeUseCase.distribute(bundle(k = 4, n = 2), hash, ErasureParameters(4, 2))
+            distributeUseCase.distribute(bundle(k = 4, n = 2), hash, ErasureParameters(4, 2), selectedPeers = nodes)
         }
 
         val successes = results.count { it.isSuccess }
@@ -338,7 +338,7 @@ class LargeScaleNetworkSimulationTest {
             }
         }
 
-        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario5", ErasureParameters(4, 2))
+        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario5", ErasureParameters(4, 2), selectedPeers = nodes)
 
         assertTrue("Distribution doit réussir malgré 2 nœuds tombés (fallback niveau 2 actif)", result.isSuccess)
     }
@@ -357,7 +357,7 @@ class LargeScaleNetworkSimulationTest {
         every { peerRepository.peers } returns MutableStateFlow(emptyList())
         peersFlow.value = emptyList() // Relay down = aucun peer distant connu
 
-        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario6", ErasureParameters(4, 2))
+        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario6", ErasureParameters(4, 2), selectedPeers = emptyList())
 
         assertTrue("Distribution doit échouer gracieusement", result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalStateException)
@@ -381,7 +381,7 @@ class LargeScaleNetworkSimulationTest {
             Result.success(ackFor(msg, "local-receiver"))
         }
 
-        val result = distributeUseCase.distribute(bundle(k = 2, n = 1), "hash-scenario6b", ErasureParameters(2, 1))
+        val result = distributeUseCase.distribute(bundle(k = 2, n = 1), "hash-scenario6b", ErasureParameters(2, 1), selectedPeers = nodes)
 
         assertTrue("Distribution locale doit réussir même si relay est down", result.isSuccess)
     }
@@ -416,7 +416,7 @@ class LargeScaleNetworkSimulationTest {
             }
         }
 
-        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario7", ErasureParameters(4, 2))
+        val result = distributeUseCase.distribute(bundle(k = 4, n = 2), "hash-scenario7", ErasureParameters(4, 2), selectedPeers = nodes)
 
         assertTrue("Distribution doit réussir via le cluster le plus libre", result.isSuccess)
         assertTrue(
@@ -443,7 +443,7 @@ class LargeScaleNetworkSimulationTest {
             Result.success(ackFor(msg, "receiver"))
         }
 
-        val result = distributeUseCase.distribute(bundle(k = 2, n = 1), "hash-scenario8", ErasureParameters(2, 1))
+        val result = distributeUseCase.distribute(bundle(k = 2, n = 1), "hash-scenario8", ErasureParameters(2, 1), selectedPeers = nodes)
 
         assertTrue("Distribution minimale k=2 n=1 doit réussir", result.isSuccess)
         assertEquals("3 fragments doivent être placés", 3, result.getOrThrow().fragmentLocations.size)
@@ -467,7 +467,7 @@ class LargeScaleNetworkSimulationTest {
         // Pas de cluster distant non plus
         peersFlow.value = emptyList()
 
-        val result = distributeUseCase.distribute(bundle(k = 2, n = 1), "hash-scenario8b", ErasureParameters(2, 1))
+        val result = distributeUseCase.distribute(bundle(k = 2, n = 1), "hash-scenario8b", ErasureParameters(2, 1), selectedPeers = nodes)
 
         assertTrue("Distribution doit échouer si < k blocs de données confirmés", result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalStateException)

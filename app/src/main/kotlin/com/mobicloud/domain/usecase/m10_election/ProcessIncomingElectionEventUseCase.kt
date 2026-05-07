@@ -7,8 +7,10 @@ import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
 import com.mobicloud.domain.repository.NetworkEventRepository
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.repository.WifiNetworkRepository
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.LocalRepairBuffer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -30,7 +32,9 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
     private val networkClient: IElectionNetworkClient,
     private val electionStateManager: ElectionStateManager,
     private val localRepairBuffer: LocalRepairBuffer,
-    private val networkEventRepository: NetworkEventRepository
+    private val networkEventRepository: NetworkEventRepository,
+    private val nodeSettingsRepository: NodeSettingsRepository,
+    private val wifiNetworkRepository: WifiNetworkRepository
 ) {
     operator fun invoke(): Flow<Result<ElectionEvent>> {
         return networkClient.incomingMessages.map { payload ->
@@ -117,7 +121,7 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
 
             ElectionMessageType.COORDINATOR -> {
                 // F-04 : Vérifier la signature avant d'enregistrer le nouveau coordinateur.
-                val dataToVerify = "${payload.senderNodeId}:${payload.type.name}".toByteArray()
+                val dataToVerify = "${payload.senderNodeId}:${payload.type.name}:${payload.clusterId}".toByteArray()
 
                 // F-03 : Récupérer la clé publique réelle depuis la PeerRegistry (A).
                 //        Le pair est déjà connu via les Heartbeats de l'Epic 2.
@@ -146,12 +150,34 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                     )
                 }
 
+                // WiFi cluster guard: reject coordinator from a different WiFi cluster
+                val localSettings = nodeSettingsRepository.getSettings()
+                val localOnWifi = wifiNetworkRepository.getCurrentSsid() != null
+                if (payload.clusterId.isNotBlank() && localSettings.clusterId.isNotBlank()
+                    && payload.clusterId != localSettings.clusterId && localOnWifi
+                ) {
+                    return Result.failure(
+                        Exception(
+                            "COORDINATOR from cluster '${payload.clusterId.take(8)}' rejected " +
+                            "— local WiFi cluster '${localSettings.clusterId.take(8)}'"
+                        )
+                    )
+                }
+
                 // Signature valide → enregistrer le nouveau Super-Pair avec son vrai NodeIdentity
                 peerRepository.registerOrUpdatePeer(
                     identity = senderPeer.identity,
                     timestampMs = System.currentTimeMillis(),
                     isSuperPair = true
                 )
+
+                // AC3 — adopter le clusterId si : payload non blank, pas le nœud local,
+                //        et nœud non connecté en WiFi (4G adopte le cluster du coordinateur)
+                // AC5 — blank = legacy node, ignorer
+                // AC6 — ne pas mettre à jour si le COORDINATOR vient du nœud local lui-même
+                if (payload.clusterId.isNotBlank() && payload.senderNodeId != localIdentity.nodeId && !localOnWifi) {
+                    nodeSettingsRepository.updateClusterId(payload.clusterId)
+                }
 
                 // AC#6 : Drainer le buffer de réparation et notifier le RadarLogConsole
                 val pendingRequests = localRepairBuffer.drain()

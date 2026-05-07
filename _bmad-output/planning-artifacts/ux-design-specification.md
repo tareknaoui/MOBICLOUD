@@ -1,11 +1,13 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15-readiness-fix]
-lastStep: 15
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15-readiness-fix, 16-topology-view]
+lastStep: 16
 inputDocuments: ["c:\\Users\\naoui\\Desktop\\Projets\\PFE\\_bmad-output\\planning-artifacts\\prd.md"]
-lastEdited: "2026-04-28"
+lastEdited: "2026-05-07"
 editHistory:
   - date: "2026-04-28"
     changes: "Alignement V5 — purge references obsoletes (Score IA -> Score de Fiabilite, BLE et Wi-Fi Direct supprimes au profit de Multicast UDP local + WSS Relais HA, permissions Bluetooth retirees) ; ajout UX-DR9 Slider Quota et UX-DR10 Cloud Relay Badge ; permissions alignees avec Story 1.4 (ACCESS_WIFI_STATE, INTERNET, ACCESS_NETWORK_STATE, CHANGE_WIFI_MULTICAST_STATE)."
+  - date: "2026-05-07"
+    changes: "Ajout UX-DR11 Vue Topologie Cluster — nouveau composant ClusterTopologyCard integre dans Onglet 3 (Reseau P2P) ; specification de la hierarchie super-pair/nœuds, des etats par nœud et de l'interaction tap-to-detail."
 ---
 
 # UX Design Specification PFE
@@ -200,6 +202,9 @@ L'écran matérialisant la "Confiance" (NFR-03).
 
 #### Onglet 3 : Réseau P2P (Statut de la Constellation)
 Permet de diagnostiquer l'état du "Datalake" sans animations coûteuses.
+- **Section "Vue Topologie Cluster" (UX-DR11) :** *(voir composant `ClusterTopologyCard` ci-dessous)*
+  - Affichage statique de la hiérarchie super-pair / nœuds du cluster actuel.
+  - Positionnée en haut de l'onglet, avant les cartes de synthèse.
 - **Cartes de Synthèse (Cards) :**
   - Pairs découverts en LAN (Multicast UDP).
   - Pairs découverts via Relais HA (inter-réseaux).
@@ -375,7 +380,45 @@ Pour implémenter avec succès l'âme du "Dashboard Tactique", nous concevrons 6
 - **States :** `OK (Vert)`, `Quasi-saturé (Ambre, > 90%)`, `Réduction confirmée (Dialog d'avertissement avant suppression de blocs hébergés)`.
 - **Placement :** Onglet "Paramètres" → section "Contribution au réseau".
 
-#### 6. CloudRelayBadge (UX-DR10 — État Canal Transfert)
+#### 6. ClusterTopologyCard (UX-DR11 — Vue Topologie Cluster)
+
+- **Purpose :** Rendre visible et immédiatement lisible la hiérarchie super-pair / nœuds du cluster local, l'état opérationnel de chaque nœud, et la position du nœud local dans cette topologie. Répond à l'exigence de défendabilité jury (montrer que l'algorithme Bully d'élection a bien produit une topologie cohérente, avec un chef élu et des membres connectés).
+- **Anti-pattern évité :** Aucun graphe SVG animé, aucune carte "étoile" avec des traits pulsants. La topologie est présentée comme une **liste hiérarchique statique**, cohérente avec l'esthétique "terminal système".
+- **Anatomy :**
+  - **En-tête de carte :** Titre `CLUSTER LOCAL` (Roboto Mono 11sp, gris technique `#9E9E9E`) + compteur `N nœuds` aligné à droite.
+  - **Ligne Super-Pair (toujours en tête) :**
+    - Badge `★ SUPER-PAIR` (Vert Terminal `#00FF41`, texte gras 10sp).
+    - NodeId tronqué : `0x4F…B2A` (Roboto Mono, blanc cassé).
+    - Si c'est le nœud local : étiquette `[MOI]` en ambre `#FFB300` collée après l'id.
+    - Indicateurs compacts à droite : icône batterie + pourcentage | score de fiabilité `94%`.
+    - Bordure gauche verticale épaisse (4dp) en Vert Terminal.
+  - **Lignes Nœuds Membres (tri décroissant par score de fiabilité) :**
+    - Badge `● NŒUD` (gris technique `#9E9E9E`, 10sp).
+    - NodeId tronqué + étiquette `[MOI]` si applicable.
+    - Indicateurs compacts : batterie | score fiabilité.
+    - Bordure gauche fine (1dp) en `#333333`.
+    - État coloré de la puce-statut à droite extrême : `ACTIF` (vert), `DÉGRADÉ` (ambre), `HORS-LIGNE` (rouge).
+  - **Cas vide :** Si aucun pair n'est encore découvert, afficher `> AUCUN CLUSTER DÉTECTÉ_` en monospace centré, identique à l'Empty State global.
+- **États par nœud :**
+
+  | État | Couleur puce | Critère |
+  |---|---|---|
+  | `ACTIF` | `#00FF41` Vert Terminal | Heartbeat reçu < 15 s |
+  | `DÉGRADÉ` | `#FFB300` Ambre | Batterie < 20 % **ou** score fiabilité < 40 % |
+  | `HORS-LIGNE` | `#FF3333` Rouge | Aucun heartbeat depuis > 15 s |
+
+- **Interaction :** Tap sur n'importe quelle ligne → `ModalBottomSheet` (non bloquant) affichant la fiche détaillée du nœud :
+  - NodeId complet (copiable long-press).
+  - Score de Fiabilité (valeur brute).
+  - Batterie (valeur brute).
+  - Rôle actuel (`Super-Pair élu` / `Nœud membre`).
+  - Canal actif (`Direct TCP` / `Relais HA` / `Inconnu`).
+  - Dernier heartbeat horodaté (`il y a 3 s`).
+- **Source de vérité :** `StateFlow<ClusterTopologyState>` exposé par le Foreground Service, lui-même alimenté par l'état interne de `RunBullyElectionUseCase` et les heartbeats des pairs connus.
+- **Recomposition :** Uniquement sur changement de `ClusterTopologyState` via `collectAsStateWithLifecycle()`. Aucun polling actif depuis l'UI.
+- **Placement :** Section supérieure de l'**Onglet 3 – Réseau P2P**, avant les cartes de synthèse LAN/Relais.
+
+#### 7. CloudRelayBadge (UX-DR10 — État Canal Transfert)
 - **Purpose :** Rendre visible et tangible le mécanisme de fallback Try-Direct-Then-Relay (FR-08.2) — l'utilisateur voit en un coup d'œil si l'app communique en P2P direct ou via les Serveurs Relais HA.
 - **Anatomy :** Pastille discrète en haut du Dashboard (à côté du `ReliabilityGauge`). Trois icônes mutuellement exclusives :
   - **✓ Direct** (Vert Terminal) : transferts en TCP P2P direct, performance maximale.
@@ -396,6 +439,9 @@ Les recompositions (raffraichissement de l'UI) ne se produiront que lorsque les 
 
 **Phase 2 (Feedback & Interactions) :**
 - Développement de l'`ErasureProgressIndicator` à inclure dans les Modales/Bottom Sheets du module Explorateur.
+- Développement du `ClusterTopologyCard` (UX-DR11) intégré en tête de l'Onglet 3 Réseau P2P.
+  - Dépendance : `StateFlow<ClusterTopologyState>` exposé par le Foreground Service (piloté par `RunBullyElectionUseCase`).
+  - Priorité : haute — composant central pour la défense PFE (preuve visuelle de l'élection Bully).
 
 **Phase 3 (Habillage & Transparence) :**
 - Développement de la `RadarLogConsole` pour remplacer les silences de l'interface lors des négociations réseau.

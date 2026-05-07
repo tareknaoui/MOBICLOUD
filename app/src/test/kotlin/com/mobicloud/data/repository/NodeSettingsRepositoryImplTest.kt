@@ -28,7 +28,11 @@ class NodeSettingsRepositoryImplTest {
     @Before
     fun setup() {
         dao = mockk()
-        repository = NodeSettingsRepositoryImpl(dao, freeSpaceProvider = { TEN_GB })
+        repository = NodeSettingsRepositoryImpl(
+            dao,
+            freeSpaceProvider = { TEN_GB },
+            clusterIdProvider = { java.util.UUID.randomUUID().toString() }
+        )
     }
 
     @Test
@@ -132,6 +136,26 @@ class NodeSettingsRepositoryImplTest {
 
         assertEquals(persisted.allocatedStorageBytes, result.allocatedStorageBytes)
         assertEquals(persistedClusterId, result.clusterId)
+        coVerify(exactly = 0) { dao.upsert(any()) }
+    }
+
+    @Test
+    fun `updateClusterId preserve allocatedStorageBytes`() = runTest {
+        val existingEntity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 5_000_000_000L, clusterId = "old-cluster-id")
+        val upsertSlot = slot<NodeSettingsEntity>()
+        coEvery { dao.getSettings() } returns existingEntity
+        coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
+
+        repository.updateClusterId("new-cluster-id")
+
+        coVerify { dao.upsert(any()) }
+        assertEquals(5_000_000_000L, upsertSlot.captured.allocatedStorageBytes)
+        assertEquals("new-cluster-id", upsertSlot.captured.clusterId)
+    }
+
+    @Test
+    fun `updateClusterId no-op si id blank`() = runTest {
+        repository.updateClusterId("   ")
         coVerify(exactly = 0) { dao.upsert(any()) }
     }
 

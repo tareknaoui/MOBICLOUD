@@ -7,26 +7,49 @@ import com.mobicloud.data.local.dao.NodeSettingsDao
 import com.mobicloud.data.local.entity.NodeSettingsEntity
 import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.repository.NodeSettingsRepository
+import com.mobicloud.domain.repository.WifiNetworkRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.security.MessageDigest
 import javax.inject.Inject
 
 class NodeSettingsRepositoryImpl(
     private val dao: NodeSettingsDao,
-    private val freeSpaceProvider: () -> Long
+    private val freeSpaceProvider: () -> Long,
+    private val clusterIdProvider: () -> String
 ) : NodeSettingsRepository {
 
     @Inject constructor(
         dao: NodeSettingsDao,
-        @ApplicationContext context: Context
-    ) : this(dao, {
-        val stat = StatFs(Environment.getDataDirectory().path)
-        stat.availableBlocksLong * stat.blockSizeLong
-    })
+        @ApplicationContext context: Context,
+        wifiNetworkRepository: WifiNetworkRepository
+    ) : this(
+        dao = dao,
+        freeSpaceProvider = {
+            val stat = StatFs(Environment.getDataDirectory().path)
+            stat.availableBlocksLong * stat.blockSizeLong
+        },
+        clusterIdProvider = {
+            wifiNetworkRepository.getCurrentSsid()
+                ?.let { ssid -> ssidToClusterId(ssid) }
+                ?: java.util.UUID.randomUUID().toString()
+        }
+    )
+
+    companion object {
+        /** Derives a deterministic UUID v4 from a WiFi SSID via SHA-256. */
+        internal fun ssidToClusterId(ssid: String): String {
+            val b = MessageDigest.getInstance("SHA-256").digest(ssid.toByteArray()).copyOf(16)
+            b[6] = ((b[6].toInt() and 0x0f) or 0x40).toByte()  // version 4
+            b[8] = ((b[8].toInt() and 0x3f) or 0x80).toByte()  // variant bits
+            val hex = b.joinToString("") { "%02x".format(it) }
+            return "${hex.substring(0, 8)}-${hex.substring(8, 12)}-${hex.substring(12, 16)}-${hex.substring(16, 20)}-${hex.substring(20, 32)}"
+        }
+    }
 
     private val initMutex = Mutex()
 
@@ -47,10 +70,21 @@ class NodeSettingsRepositoryImpl(
             if (current.clusterId.isNotEmpty()) {
                 current
             } else {
-                val withCluster = current.copy(clusterId = java.util.UUID.randomUUID().toString())
+                val withCluster = current.copy(clusterId = clusterIdProvider())
                 dao.upsert(withCluster.toEntity())
                 withCluster
             }
+        }
+    }
+
+    // AC3 — adopte le clusterId du super-pair élu ; no-op si blank (AC5 legacy compat).
+    override suspend fun updateClusterId(id: String) {
+        if (id.isBlank()) return
+        initMutex.withLock {
+            val existing = dao.getSettings()
+            val updated = existing?.copy(clusterId = id)
+                ?: NodeSettingsEntity(id = 0, allocatedStorageBytes = defaultBytes(), clusterId = id)
+            dao.upsert(updated)
         }
     }
 

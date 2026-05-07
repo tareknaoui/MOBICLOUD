@@ -6,8 +6,10 @@ import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.models.NodeSettings
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -40,6 +42,7 @@ class RunBullyElectionUseCaseTest {
     private lateinit var securityRepository: SecurityRepository
     private lateinit var trustScoreProvider: ITrustScoreProvider
     private lateinit var networkClient: IElectionNetworkClient
+    private lateinit var nodeSettingsRepository: NodeSettingsRepository
 
     private lateinit var runBullyElectionUseCase: RunBullyElectionUseCase
 
@@ -51,10 +54,15 @@ class RunBullyElectionUseCaseTest {
         securityRepository = mockk()
         trustScoreProvider = mockk()
         networkClient = mockk()
+        nodeSettingsRepository = mockk()
 
         coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
         coEvery { securityRepository.signData(any()) } returns Result.success(ByteArray(0))
         coEvery { trustScoreProvider.getTrustScore("localNodeId") } returns 1
+        coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
+            allocatedStorageBytes = 1_000_000_000L,
+            clusterId = "cluster-local-test"
+        )
     }
 
     private fun buildUseCase(testDispatcher: TestDispatcher) = RunBullyElectionUseCase(
@@ -63,7 +71,8 @@ class RunBullyElectionUseCaseTest {
         trustScoreProvider = trustScoreProvider,
         networkClient = networkClient,
         electionStateManager = ElectionStateManager(),
-        defaultDispatcher = testDispatcher          // F-07 : injection du dispatcher de test
+        nodeSettingsRepository = nodeSettingsRepository,
+        defaultDispatcher = testDispatcher
     )
 
     // ── Helpers ──────────────────────────────────────────────────────────────

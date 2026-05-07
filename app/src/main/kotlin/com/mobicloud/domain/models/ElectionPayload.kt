@@ -10,7 +10,8 @@ data class ElectionPayload(
     val senderNodeId: String,
     val type: ElectionMessageType,
     val reliabilityScore: Float,
-    val signatureBytes: ByteArray
+    val signatureBytes: ByteArray,
+    val clusterId: String = ""
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -22,6 +23,7 @@ data class ElectionPayload(
         if (type != other.type) return false
         if (reliabilityScore != other.reliabilityScore) return false
         if (!signatureBytes.contentEquals(other.signatureBytes)) return false
+        if (clusterId != other.clusterId) return false
 
         return true
     }
@@ -31,6 +33,7 @@ data class ElectionPayload(
         result = 31 * result + type.hashCode()
         result = 31 * result + reliabilityScore.hashCode()
         result = 31 * result + signatureBytes.contentHashCode()
+        result = 31 * result + clusterId.hashCode()
         return result
     }
 }

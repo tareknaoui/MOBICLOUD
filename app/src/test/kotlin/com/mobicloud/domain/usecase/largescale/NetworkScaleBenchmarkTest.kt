@@ -184,7 +184,7 @@ class NetworkScaleBenchmarkTest {
             val times = mutableListOf<Long>()
             repeat(repetitions) { run ->
                 val ms = measureTimeMillis {
-                    useCase.distribute(makeBundle(), "hash-b1-$nodeCount-$run", ErasureParameters(4, 2))
+                    useCase.distribute(makeBundle(), "hash-b1-$nodeCount-$run", ErasureParameters(4, 2), selectedPeers = nodes)
                 }
                 times.add(ms)
             }
@@ -236,7 +236,7 @@ class NetworkScaleBenchmarkTest {
                     }
                 }
 
-                val result = useCase.distribute(makeBundle(), "hash-b2-$failRate-$run", ErasureParameters(4, 2))
+                val result = useCase.distribute(makeBundle(), "hash-b2-$failRate-$run", ErasureParameters(4, 2), selectedPeers = nodes)
                 if (result.isSuccess) successCount++
             }
 
@@ -280,7 +280,7 @@ class NetworkScaleBenchmarkTest {
             val times = mutableListOf<Long>()
             repeat(repetitions) { run ->
                 val ms = measureTimeMillis {
-                    useCase.distribute(makeBundle(), "hash-b3-$clusterCount-$run", ErasureParameters(4, 2))
+                    useCase.distribute(makeBundle(), "hash-b3-$clusterCount-$run", ErasureParameters(4, 2), selectedPeers = emptyList())
                 }
                 times.add(ms)
             }
