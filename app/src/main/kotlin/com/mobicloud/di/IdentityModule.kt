@@ -49,7 +49,8 @@ object IdentityModule {
             CatalogDatabase.MIGRATION_8_9,
             CatalogDatabase.MIGRATION_9_10,
             CatalogDatabase.MIGRATION_10_11,
-            CatalogDatabase.MIGRATION_11_12
+            CatalogDatabase.MIGRATION_11_12,
+            CatalogDatabase.MIGRATION_12_13
         ).build()
     }
 

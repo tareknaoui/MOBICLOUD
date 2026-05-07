@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
+import android.provider.OpenableColumns
 import com.mobicloud.core.security.FragmentCipherUseCase
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.EncryptedBundle
@@ -20,6 +21,8 @@ import com.mobicloud.domain.models.EncryptionIdentity
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectErasureParametersUseCase
+import com.mobicloud.domain.models.ErasureParameters
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -59,10 +62,12 @@ class ErasureProgressViewModelTest {
     private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
     private lateinit var downloadFileBlocksUseCase: com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
     private lateinit var assembleDownloadedFileUseCase: AssembleDownloadedFileUseCase
+    private lateinit var selectErasureParametersUseCase: SelectErasureParametersUseCase
     private lateinit var context: Context
     private lateinit var contentResolver: ContentResolver
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
     private val fakeUri: Uri = mockk()
+    private lateinit var defaultCursor: Cursor
 
     @Before
     fun setUp() {
@@ -76,12 +81,23 @@ class ErasureProgressViewModelTest {
         localizeFileBlocksUseCase = mockk(relaxed = true)
         downloadFileBlocksUseCase = mockk(relaxed = true)
         assembleDownloadedFileUseCase = mockk(relaxed = true)
+        selectErasureParametersUseCase = mockk()
+        coEvery { selectErasureParametersUseCase() } returns ErasureParameters()
+        coEvery { catalogRepository.getEntry(any()) } returns Result.success(null)
         context = mockk()
         contentResolver = mockk()
+
+        defaultCursor = mockk()
+        every { defaultCursor.moveToFirst() } returns true
+        every { defaultCursor.getColumnIndexOrThrow(any()) } returns 0
+        every { defaultCursor.getLong(0) } returns 1024L
+        every { defaultCursor.getString(0) } returns "test_file.txt"
+        every { defaultCursor.close() } returns Unit
 
         every { catalogRepository.getAllEntriesFlow() } returns catalogFlow
         every { context.contentResolver } returns contentResolver
         every { context.cacheDir } returns File(System.getProperty("java.io.tmpdir") ?: "/tmp")
+        every { contentResolver.query(any(), any(), any(), any(), any()) } returns defaultCursor
         every { contentResolver.openInputStream(any()) } returns
             "test content".toByteArray().inputStream()
         // Story 6.3 — encrypt path consomme désormais getEncryptionIdentity() (clé EC dédiée
@@ -106,6 +122,7 @@ class ErasureProgressViewModelTest {
         localizeFileBlocksUseCase = localizeFileBlocksUseCase,
         downloadFileBlocksUseCase = downloadFileBlocksUseCase,
         assembleDownloadedFileUseCase = assembleDownloadedFileUseCase,
+        selectErasureParametersUseCase = selectErasureParametersUseCase,
         context = context
     )
 
@@ -164,9 +181,9 @@ class ErasureProgressViewModelTest {
             yield()
             Result.success(bundle)
         }
-        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any()) } coAnswers {
+        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any()) } coAnswers {
             yield()
-            val callback = arg<((Int, Boolean) -> Unit)?>(3)
+            val callback = arg<((Int, Boolean) -> Unit)?>(4)
             (0 until 6).forEach { callback?.invoke(it, true) }
             Result.success(entry)
         }
@@ -221,8 +238,8 @@ class ErasureProgressViewModelTest {
         coEvery { fragmentCipherUseCase.encrypt(any(), any()) } returns Result.success(bundle)
 
         // yield() après chaque callback pour capturer l'état intermédiaire post-échec
-        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any()) } coAnswers {
-            val callback = arg<((Int, Boolean) -> Unit)?>(3)
+        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any()) } coAnswers {
+            val callback = arg<((Int, Boolean) -> Unit)?>(4)
             yield()
             callback?.invoke(0, true)
             yield()
@@ -264,7 +281,7 @@ class ErasureProgressViewModelTest {
         coEvery { securityRepository.getIdentity() } returns
             Result.success(NodeIdentity("nodeId", Random.nextBytes(65)))
         coEvery { fragmentCipherUseCase.encrypt(any(), any()) } returns Result.success(bundle)
-        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any()) } returns
+        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any()) } returns
             Result.success(entry)
 
         // Utilise CompletableDeferred pour maintenir la coroutine en état InProgress.Encoding
@@ -304,8 +321,9 @@ class ErasureProgressViewModelTest {
         every { cursor.moveToFirst() } returns true
         every { cursor.getColumnIndexOrThrow(any()) } returns 0
         every { cursor.getLong(0) } returns 105_000_000L
+        every { cursor.getString(0) } returns "big_file.mp4"
         every { cursor.close() } returns Unit
-        every { contentResolver.query(any(), any(), null, null, null) } returns cursor
+        every { contentResolver.query(any(), any(), any(), any(), any()) } returns cursor
 
         val viewModel = createViewModel()
         viewModel.storeFile(fakeUri)

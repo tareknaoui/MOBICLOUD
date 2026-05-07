@@ -106,7 +106,7 @@ class AssembleDownloadedFileUseCase @Inject constructor(
             return@flow
         }
 
-        val params = ErasureParameters()
+        val params = ErasureParameters(k = catalog.k, n = catalog.n)
         val k = params.k
 
         // 2. Validation IV-transport (gap acquis 6.2 → résolu 6.3)

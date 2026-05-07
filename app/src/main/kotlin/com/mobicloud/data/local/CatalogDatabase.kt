@@ -32,7 +32,7 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         HostedBlockEntity::class,
         NodeSettingsEntity::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -173,6 +173,15 @@ abstract class CatalogDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE node_settings ADD COLUMN cluster_id TEXT NOT NULL DEFAULT ''"
                 )
+            }
+        }
+
+        // Paramètres Erasure Coding dynamiques — k et n varient selon la stabilité réseau
+        // au moment de l'upload. DEFAULT 4/2 = profil WiFi stable (backward compat).
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE catalog_entry ADD COLUMN k INTEGER NOT NULL DEFAULT 4")
+                db.execSQL("ALTER TABLE catalog_entry ADD COLUMN n INTEGER NOT NULL DEFAULT 2")
             }
         }
     }

@@ -19,6 +19,7 @@ import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBl
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectErasureParametersUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
@@ -48,6 +49,7 @@ class ExplorerViewModel @Inject constructor(
     private val localizeFileBlocksUseCase: LocalizeFileBlocksUseCase,
     private val downloadFileBlocksUseCase: DownloadFileBlocksUseCase,
     private val assembleDownloadedFileUseCase: AssembleDownloadedFileUseCase,
+    private val selectErasureParametersUseCase: SelectErasureParametersUseCase,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -113,15 +115,11 @@ class ExplorerViewModel @Inject constructor(
 
     /**
      * Story 6.2 — chaîne automatique après `Located` : déclenche la course K+2 et met à jour
-     * `_downloadState` à chaque progression. `k` provient de `ErasureParameters` (mêmes
-     * paramètres que l'encodage côté upload — symétrique).
+     * `_downloadState` à chaque progression. `k` est lu depuis le catalogue (persisté à l'upload).
      */
     private fun startDownload(fileHash: String, blockMap: Map<String, ResolvedBlockLocation>) {
-        // [Review][Patch] `k` est invariant dans le projet : `ErasureParameters()` renvoie la
-        // valeur par défaut utilisée à l'upload (symétrie encode/decode). Si un jour `k`
-        // devient variable par fichier, il faudra le persister dans `CatalogEntry` et le lire ici.
-        val k = ErasureParameters().k
         downloadJob = viewModelScope.launch {
+            val k = catalogRepository.getEntry(fileHash).getOrNull()?.k ?: ErasureParameters().k
             downloadFileBlocksUseCase.invoke(blockMap, k).collect { state ->
                 when (state) {
                     is DownloadProgressState.Progress -> {
@@ -224,7 +222,7 @@ class ExplorerViewModel @Inject constructor(
             try {
                 withContext(Dispatchers.IO) { tempFile.writeBytes(fileBytes) }
 
-                val params = ErasureParameters()
+                val params = selectErasureParametersUseCase()
                 val fragments = encodeErasureFragmentsUseCase(tempFile, params)
                     .getOrElse { e ->
                         _storeState.value = StoreState.Error("Échec encodage: ${e.message ?: "erreur inconnue"}")
@@ -259,7 +257,7 @@ class ExplorerViewModel @Inject constructor(
                 distributeEncryptedBlocksUseCase.distribute(
                     encryptedBundle = bundle,
                     fileHash = fileHash,
-                    k = params.k,
+                    params = params,
                     originalFileName = originalFileName
                 ) { blockIndex, success ->
                     _storeState.update { current ->

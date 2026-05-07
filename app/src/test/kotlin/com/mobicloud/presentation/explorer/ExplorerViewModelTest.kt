@@ -15,6 +15,9 @@ import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBl
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectErasureParametersUseCase
+import com.mobicloud.domain.models.ErasureParameters
+import io.mockk.coEvery
 import com.mobicloud.presentation.explorer.components.AvailabilityState
 import com.mobicloud.presentation.explorer.components.availabilityState
 import io.mockk.coEvery
@@ -55,6 +58,7 @@ class ExplorerViewModelTest {
     private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
     private lateinit var downloadFileBlocksUseCase: com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
     private lateinit var assembleDownloadedFileUseCase: com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
+    private lateinit var selectErasureParametersUseCase: SelectErasureParametersUseCase
     private lateinit var context: Context
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
 
@@ -75,6 +79,9 @@ class ExplorerViewModelTest {
         localizeFileBlocksUseCase = mockk(relaxed = true)
         downloadFileBlocksUseCase = mockk(relaxed = true)
         assembleDownloadedFileUseCase = mockk(relaxed = true)
+        selectErasureParametersUseCase = mockk()
+        coEvery { selectErasureParametersUseCase() } returns ErasureParameters()
+        coEvery { catalogRepository.getEntry(any()) } returns Result.success(null)
         context = mockk(relaxed = true)
         every { catalogRepository.getAllEntriesFlow() } returns catalogFlow
     }
@@ -95,6 +102,7 @@ class ExplorerViewModelTest {
         localizeFileBlocksUseCase = localizeFileBlocksUseCase,
         downloadFileBlocksUseCase = downloadFileBlocksUseCase,
         assembleDownloadedFileUseCase = assembleDownloadedFileUseCase,
+        selectErasureParametersUseCase = selectErasureParametersUseCase,
         context = context
     )
 

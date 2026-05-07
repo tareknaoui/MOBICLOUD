@@ -5,6 +5,7 @@ import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.EncryptedBundle
 import com.mobicloud.domain.models.EncryptedFragment
+import com.mobicloud.domain.models.ErasureParameters
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.models.RelayPeer
@@ -17,14 +18,18 @@ import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m05_dht_catalog.InsertDhtEntryUseCase
+import android.util.Log
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
 import io.mockk.slot
+import io.mockk.unmockkStatic
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -52,6 +57,9 @@ class DistributeEncryptedBlocksUseCaseTest {
 
     @Before
     fun setUp() {
+        mockkStatic(Log::class)
+        every { Log.i(any(), any()) } returns 0
+        every { Log.w(any(), any<String>()) } returns 0
         peerRepository = mockk()
         blockSender = mockk()
         catalogRepository = mockk()
@@ -82,6 +90,11 @@ class DistributeEncryptedBlocksUseCaseTest {
         )
         // Default — pas de candidat inter-cluster sauf override par test
         every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns null
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(Log::class)
     }
 
     private fun fakeRemoteRelayPeer(
@@ -161,7 +174,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.success(fakeAck(msg.blockId, "node_receiver"))
         }
 
-        val result = useCase.distribute(bundle, "filehash_abc", k = 4)
+        val result = useCase.distribute(bundle, "filehash_abc", ErasureParameters(k = 4, n = 2))
 
         assertTrue("distribute should succeed", result.isSuccess)
         val entry = result.getOrThrow()
@@ -195,7 +208,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             }
         }
 
-        val result = useCase.distribute(bundle, "filehash_retry", k = 4)
+        val result = useCase.distribute(bundle, "filehash_retry", ErasureParameters(k = 4, n = 2))
 
         assertTrue("distribute should succeed after retry", result.isSuccess)
     }
@@ -221,7 +234,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             }
         }
 
-        val result = useCase.distribute(bundle, "filehash_fail", k = 4)
+        val result = useCase.distribute(bundle, "filehash_fail", ErasureParameters(k = 4, n = 2))
 
         assertTrue("distribute should fail when < k data blocks confirmed", result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalStateException)
@@ -238,7 +251,7 @@ class DistributeEncryptedBlocksUseCaseTest {
 
         val bundle = fakeBundle(k = 4, n = 2)
 
-        val result = useCase.distribute(bundle, "filehash_nopeer", k = 4)
+        val result = useCase.distribute(bundle, "filehash_nopeer", ErasureParameters(k = 4, n = 2))
 
         assertTrue("distribute should fail with no active peers", result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalStateException)
@@ -267,7 +280,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.success(Unit)
         }
 
-        val result = useCase.distribute(bundle, "filehash_key", k = 4)
+        val result = useCase.distribute(bundle, "filehash_key", ErasureParameters(k = 4, n = 2))
 
         assertTrue(result.isSuccess)
         val entry = capturedEntry
@@ -276,6 +289,65 @@ class DistributeEncryptedBlocksUseCaseTest {
             "wrappedMasterKey doit correspondre à celui du bundle",
             entry?.wrappedMasterKey == bundle.wrappedFileMasterKey
         )
+    }
+
+    // -------------------------------------------------------------------------
+    // Story 9.3 — Fallback inter-cluster
+    // -------------------------------------------------------------------------
+
+    /**
+     * Test k/n dynamiques — profil 4G (K=3, N=3) persisté dans CatalogEntry.
+     * Garantit la symétrie encode/decode : le décodage utilisera le bon K.
+     */
+    @Test
+    fun `distribute persiste k et n du profil 4G dans CatalogEntry`() = runTest {
+        val peers = (1..6).map { fakePeer("node_$it", it) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val bundle = fakeBundle(k = 3, n = 3)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
+            val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
+            Result.success(fakeAck(msg.blockId, "node_receiver"))
+        }
+
+        var capturedEntry: CatalogEntry? = null
+        coEvery { catalogRepository.insertOwnerEntry(any()) } answers {
+            capturedEntry = firstArg()
+            Result.success(Unit)
+        }
+
+        val result = useCase.distribute(bundle, "filehash_4g", ErasureParameters(k = 3, n = 3))
+
+        assertTrue(result.isSuccess)
+        assertEquals("CatalogEntry.k doit valoir 3 (profil 4G)", 3, capturedEntry?.k)
+        assertEquals("CatalogEntry.n doit valoir 3 (profil 4G)", 3, capturedEntry?.n)
+    }
+
+    /**
+     * Test k/n dynamiques — profil fallback (K=2, N=4) persisté dans CatalogEntry.
+     */
+    @Test
+    fun `distribute persiste k et n du profil fallback dans CatalogEntry`() = runTest {
+        val peers = (1..6).map { fakePeer("node_$it", it) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val bundle = fakeBundle(k = 2, n = 4)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
+            val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
+            Result.success(fakeAck(msg.blockId, "node_receiver"))
+        }
+
+        var capturedEntry: CatalogEntry? = null
+        coEvery { catalogRepository.insertOwnerEntry(any()) } answers {
+            capturedEntry = firstArg()
+            Result.success(Unit)
+        }
+
+        val result = useCase.distribute(bundle, "filehash_fallback", ErasureParameters(k = 2, n = 4))
+
+        assertTrue(result.isSuccess)
+        assertEquals("CatalogEntry.k doit valoir 2 (profil fallback)", 2, capturedEntry?.k)
+        assertEquals("CatalogEntry.n doit valoir 4 (profil fallback)", 4, capturedEntry?.n)
     }
 
     // -------------------------------------------------------------------------
@@ -308,7 +380,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             insertDhtEntryUseCase(any(), capture(nodeIdSlot), capture(ipSlot), capture(portSlot))
         } returns Result.success(Unit)
 
-        val result = useCase.distribute(bundle, "filehash_intercluster", k = 4)
+        val result = useCase.distribute(bundle, "filehash_intercluster", ErasureParameters(k = 4, n = 2))
 
         assertTrue("distribute should succeed via inter-cluster", result.isSuccess)
         // Tous les fragments routés vers le pair distant
@@ -335,7 +407,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.success(fakeAck(msg.blockId, "node_receiver"))
         }
 
-        val result = useCase.distribute(bundle, "filehash_local_only", k = 4)
+        val result = useCase.distribute(bundle, "filehash_local_only", ErasureParameters(k = 4, n = 2))
 
         assertTrue(result.isSuccess)
         verify(exactly = 0) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }
@@ -356,7 +428,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.failure(SocketTimeoutException("all peers down"))
         every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns null
 
-        val result = useCase.distribute(bundle, "filehash_total_fail", k = 4)
+        val result = useCase.distribute(bundle, "filehash_total_fail", ErasureParameters(k = 4, n = 2))
 
         assertTrue("distribute doit échouer si local et inter-cluster indisponibles", result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalStateException)
@@ -386,7 +458,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             }
         }
 
-        val result = useCase.distribute(bundle, "filehash_local_to_remote", k = 4)
+        val result = useCase.distribute(bundle, "filehash_local_to_remote", ErasureParameters(k = 4, n = 2))
 
         assertTrue(result.isSuccess)
         verify(atLeast = 1) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }

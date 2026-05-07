@@ -44,7 +44,9 @@ class CatalogRepositoryImpl(
                 json.encodeToString(WrappedFileMasterKey.serializer(), it)
             },
             originalFileSize = originalFileSize,
-            originalFileName = originalFileName
+            originalFileName = originalFileName,
+            k = k,
+            n = n
         )
 
     private fun FragmentLocation.toEntity(catalogFileHash: String): FragmentLocationEntity =
@@ -81,7 +83,9 @@ class CatalogRepositoryImpl(
                 }
             },
             originalFileSize = catalogEntry.originalFileSize,
-            originalFileName = catalogEntry.originalFileName
+            originalFileName = catalogEntry.originalFileName,
+            k = catalogEntry.k,
+            n = catalogEntry.n
         )
 
     // --- CatalogRepository impl ---

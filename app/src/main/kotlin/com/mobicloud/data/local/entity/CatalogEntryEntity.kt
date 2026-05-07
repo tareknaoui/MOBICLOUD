@@ -26,5 +26,11 @@ data class CatalogEntryEntity(
     val originalFileSize: Long = 0L,
 
     @ColumnInfo(name = "original_file_name", defaultValue = "")
-    val originalFileName: String = ""
+    val originalFileName: String = "",
+
+    @ColumnInfo(name = "k", defaultValue = "4")
+    val k: Int = 4,
+
+    @ColumnInfo(name = "n", defaultValue = "2")
+    val n: Int = 2
 )

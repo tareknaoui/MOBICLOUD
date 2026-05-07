@@ -4,6 +4,7 @@ import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.EncryptedBundle
 import com.mobicloud.domain.models.EncryptedFragment
+import com.mobicloud.domain.models.ErasureParameters
 import com.mobicloud.domain.models.FragmentLocation
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.Peer
@@ -47,11 +48,12 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
     suspend fun distribute(
         encryptedBundle: EncryptedBundle,
         fileHash: String,
-        k: Int,
+        params: ErasureParameters,
         originalFileName: String = "",
         onBlockResult: ((blockIndex: Int, success: Boolean) -> Unit)? = null
     ): Result<CatalogEntry> = withContext(Dispatchers.IO) {
-        android.util.Log.i("MobiCloud:Distribute", "[DIAG] distribute START fileHash=${fileHash.take(8)} fragments=${encryptedBundle.encryptedFragments.size} k=$k")
+        val k = params.k
+        android.util.Log.i("MobiCloud:Distribute", "[DIAG] distribute START fileHash=${fileHash.take(8)} fragments=${encryptedBundle.encryptedFragments.size} k=$k n=${params.n}")
         val allPeers = peerRepository.peers.value
         val activePeers = allPeers.filter {
             it.isActive && it.ipAddress != null && it.port != null
@@ -187,7 +189,9 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
             },
             wrappedMasterKey = encryptedBundle.wrappedFileMasterKey,
             originalFileSize = encryptedBundle.encryptedFragments.firstOrNull()?.originalFileSize ?: 0L,
-            originalFileName = originalFileName
+            originalFileName = originalFileName,
+            k = params.k,
+            n = params.n
         )
 
         catalogRepository.insertOwnerEntry(catalogEntry)
