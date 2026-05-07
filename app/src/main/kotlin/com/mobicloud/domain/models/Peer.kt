@@ -13,5 +13,6 @@ data class Peer(
     val ipAddress: String? = null,
     val port: Int? = null,
     val isActive: Boolean = true,
-    val isSuperPair: Boolean = false
+    val isSuperPair: Boolean = false,
+    val freeStorageBytes: Long = 0L
 )

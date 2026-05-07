@@ -2,6 +2,8 @@ package com.mobicloud.data.repository
 
 import android.content.Context
 import android.net.wifi.WifiManager
+import android.os.Environment
+import android.os.StatFs
 import android.os.SystemClock
 import android.util.Log
 import com.mobicloud.core.format.MobiCloudProtoBuf
@@ -57,6 +59,23 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
     // P-A1 — @Volatile garantit la visibilité de tcpPort entre start() (thread appelant) et broadcastLoop() (coroutine)
     @Volatile private var tcpPort: Int = 0
     private val startStopLock = Any()
+
+    // Déféré 2 — StatFs mis en cache pour éviter un appel système dans la hot-loop réseau (toutes les 5 s).
+    // TTL = 30 s : le disque libre ne change pas à cette fréquence, une lecture par TTL est largement suffisante.
+    @Volatile private var cachedFreeStorageBytes: Long = 0L
+    @Volatile private var freeStorageCacheExpiresAt: Long = 0L
+    private val FREE_STORAGE_CACHE_TTL_MS = 30_000L
+
+    private fun getLocalFreeStorageBytes(): Long {
+        val now = System.currentTimeMillis()
+        if (now < freeStorageCacheExpiresAt) return cachedFreeStorageBytes
+        val freshValue = runCatching {
+            StatFs(Environment.getDataDirectory().path).availableBytes
+        }.getOrDefault(0L)
+        cachedFreeStorageBytes = freshValue
+        freeStorageCacheExpiresAt = now + FREE_STORAGE_CACHE_TTL_MS
+        return freshValue
+    }
 
     // P8 — mise en cache de la PrivateKeyEntry pour éviter une IPC KeyStore toutes les 5s
     private val cachedPrivateKeyEntry: KeyStore.PrivateKeyEntry by lazy {
@@ -127,7 +146,8 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
                             nodeId = identity.nodeId,
                             publicKeyBytes = identity.publicKeyBytes,
                             tcpPort = tcpPort,
-                            reliabilityScore = identity.reliabilityScore
+                            reliabilityScore = identity.reliabilityScore,
+                            freeStorageBytes = getLocalFreeStorageBytes()
                         )
                         val payloadBytes = MobiCloudProtoBuf.encodeToByteArray(HelloPayload.serializer(), payload)
                         val signature = signPayload(payloadBytes)
@@ -263,7 +283,8 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
                 source = DiscoverySource.LAN_MULTICAST,
                 ipAddress = sourceAddress,
                 port = msg.payload.tcpPort,
-                isSuperPair = false
+                isSuperPair = false,
+                freeStorageBytes = msg.payload.freeStorageBytes
             )
             insertResult.onFailure { Log.e(TAG, "Échec insertion pair LAN", it) }
             if (insertResult.isSuccess) {

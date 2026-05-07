@@ -174,7 +174,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.success(fakeAck(msg.blockId, "node_receiver"))
         }
 
-        val result = useCase.distribute(bundle, "filehash_abc", ErasureParameters(k = 4, n = 2))
+        val result = useCase.distribute(bundle, "filehash_abc", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
         assertTrue("distribute should succeed", result.isSuccess)
         val entry = result.getOrThrow()
@@ -208,7 +208,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             }
         }
 
-        val result = useCase.distribute(bundle, "filehash_retry", ErasureParameters(k = 4, n = 2))
+        val result = useCase.distribute(bundle, "filehash_retry", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
         assertTrue("distribute should succeed after retry", result.isSuccess)
     }
@@ -234,7 +234,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             }
         }
 
-        val result = useCase.distribute(bundle, "filehash_fail", ErasureParameters(k = 4, n = 2))
+        val result = useCase.distribute(bundle, "filehash_fail", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
         assertTrue("distribute should fail when < k data blocks confirmed", result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalStateException)
@@ -243,17 +243,17 @@ class DistributeEncryptedBlocksUseCaseTest {
     }
 
     /**
-     * Test 4 — Aucun pair actif → Result.failure immédiat.
+     * Test 4 — selectedPeers vide → aucun sendBlock local, fallback inter-cluster attendu.
+     * distribute() lui-même ne fail pas : c'est la job de SelectOptimalPeersUseCase de lever
+     * l'erreur avant. Ici on teste le comportement de distribute() avec liste vide.
      */
     @Test
     fun `distribute failure - no active peers`() = runTest {
-        every { peerRepository.peers } returns MutableStateFlow(emptyList())
-
         val bundle = fakeBundle(k = 4, n = 2)
 
-        val result = useCase.distribute(bundle, "filehash_nopeer", ErasureParameters(k = 4, n = 2))
+        val result = useCase.distribute(bundle, "filehash_nopeer", ErasureParameters(k = 4, n = 2), selectedPeers = emptyList())
 
-        assertTrue("distribute should fail with no active peers", result.isFailure)
+        assertTrue("distribute should fail when selectedPeers empty and no inter-cluster", result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalStateException)
 
         coVerify(exactly = 0) { blockSender.sendBlock(any(), any(), any()) }
@@ -280,7 +280,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.success(Unit)
         }
 
-        val result = useCase.distribute(bundle, "filehash_key", ErasureParameters(k = 4, n = 2))
+        val result = useCase.distribute(bundle, "filehash_key", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
         assertTrue(result.isSuccess)
         val entry = capturedEntry
@@ -316,7 +316,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.success(Unit)
         }
 
-        val result = useCase.distribute(bundle, "filehash_4g", ErasureParameters(k = 3, n = 3))
+        val result = useCase.distribute(bundle, "filehash_4g", ErasureParameters(k = 3, n = 3), selectedPeers = peers)
 
         assertTrue(result.isSuccess)
         assertEquals("CatalogEntry.k doit valoir 3 (profil 4G)", 3, capturedEntry?.k)
@@ -343,7 +343,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.success(Unit)
         }
 
-        val result = useCase.distribute(bundle, "filehash_fallback", ErasureParameters(k = 2, n = 4))
+        val result = useCase.distribute(bundle, "filehash_fallback", ErasureParameters(k = 2, n = 4), selectedPeers = peers)
 
         assertTrue(result.isSuccess)
         assertEquals("CatalogEntry.k doit valoir 2 (profil fallback)", 2, capturedEntry?.k)
@@ -380,7 +380,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             insertDhtEntryUseCase(any(), capture(nodeIdSlot), capture(ipSlot), capture(portSlot))
         } returns Result.success(Unit)
 
-        val result = useCase.distribute(bundle, "filehash_intercluster", ErasureParameters(k = 4, n = 2))
+        val result = useCase.distribute(bundle, "filehash_intercluster", ErasureParameters(k = 4, n = 2), selectedPeers = emptyList())
 
         assertTrue("distribute should succeed via inter-cluster", result.isSuccess)
         // Tous les fragments routés vers le pair distant
@@ -407,7 +407,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.success(fakeAck(msg.blockId, "node_receiver"))
         }
 
-        val result = useCase.distribute(bundle, "filehash_local_only", ErasureParameters(k = 4, n = 2))
+        val result = useCase.distribute(bundle, "filehash_local_only", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
         assertTrue(result.isSuccess)
         verify(exactly = 0) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }
@@ -428,7 +428,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             Result.failure(SocketTimeoutException("all peers down"))
         every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns null
 
-        val result = useCase.distribute(bundle, "filehash_total_fail", ErasureParameters(k = 4, n = 2))
+        val result = useCase.distribute(bundle, "filehash_total_fail", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
         assertTrue("distribute doit échouer si local et inter-cluster indisponibles", result.isFailure)
         assertTrue(result.exceptionOrNull() is IllegalStateException)
@@ -458,7 +458,7 @@ class DistributeEncryptedBlocksUseCaseTest {
             }
         }
 
-        val result = useCase.distribute(bundle, "filehash_local_to_remote", ErasureParameters(k = 4, n = 2))
+        val result = useCase.distribute(bundle, "filehash_local_to_remote", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
         assertTrue(result.isSuccess)
         verify(atLeast = 1) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }

@@ -14,7 +14,8 @@ interface PeerRepository {
         source: DiscoverySource = DiscoverySource.REMOTE_FIREBASE,
         ipAddress: String? = null,
         port: Int? = null,
-        isSuperPair: Boolean = false
+        isSuperPair: Boolean = false,
+        freeStorageBytes: Long = 0L
     ): Result<Unit>
 
     suspend fun evictStalePeers(

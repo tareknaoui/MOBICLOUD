@@ -19,10 +19,12 @@ import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBl
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
-import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectErasureParametersUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.PeerSelectionException
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -49,8 +51,9 @@ class ExplorerViewModel @Inject constructor(
     private val localizeFileBlocksUseCase: LocalizeFileBlocksUseCase,
     private val downloadFileBlocksUseCase: DownloadFileBlocksUseCase,
     private val assembleDownloadedFileUseCase: AssembleDownloadedFileUseCase,
-    private val selectErasureParametersUseCase: SelectErasureParametersUseCase,
-    @ApplicationContext private val context: Context
+    private val selectOptimalPeersUseCase: SelectOptimalPeersUseCase,
+    @ApplicationContext private val context: Context,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
     val catalogEntries: StateFlow<List<CatalogEntry>> = catalogRepository.getAllEntriesFlow()
@@ -189,7 +192,7 @@ class ExplorerViewModel @Inject constructor(
         resetJob?.cancel()
         _storeState.value = StoreState.InProgress.Encoding  // P7: set before launch to close TOCTOU window
         viewModelScope.launch {
-            val (fileSizeBytes, originalFileName) = withContext(Dispatchers.IO) {
+            val (fileSizeBytes, originalFileName) = withContext(ioDispatcher) {
                 context.contentResolver.query(
                     uri,
                     arrayOf(OpenableColumns.SIZE, OpenableColumns.DISPLAY_NAME),
@@ -208,7 +211,7 @@ class ExplorerViewModel @Inject constructor(
                 return@launch
             }
 
-            val fileBytes = withContext(Dispatchers.IO) {
+            val fileBytes = withContext(ioDispatcher) {
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             } ?: run {
                 _storeState.value = StoreState.Error("Impossible de lire le fichier")
@@ -220,9 +223,28 @@ class ExplorerViewModel @Inject constructor(
 
             val tempFile = File(context.cacheDir, "mobicloud_store_${System.currentTimeMillis()}.tmp")
             try {
-                withContext(Dispatchers.IO) { tempFile.writeBytes(fileBytes) }
+                withContext(ioDispatcher) { tempFile.writeBytes(fileBytes) }
 
-                val params = selectErasureParametersUseCase()
+                val optimalResult = selectOptimalPeersUseCase(fileSizeBytes ?: 0L).getOrElse { e ->
+                    val userMessage = when (e) {
+                        is PeerSelectionException.PeerFlowTimeout ->
+                            "Réseau indisponible : impossible de joindre les nœuds dans les délais."
+                        is PeerSelectionException.InsufficientCapableNodes ->
+                            "Stockage insuffisant : seulement ${e.message?.substringAfter("Disponibles : ") ?: "0"} " +
+                            "nœud(s) avec assez d'espace libre."
+                        is PeerSelectionException.InsufficientRedundancyNodes ->
+                            "Réseau trop petit : impossible d'assurer la redondance minimale."
+                        is PeerSelectionException.InvalidBaseK ->
+                            "Paramètre K invalide (${e.message})."
+                        else -> "Sélection des nœuds échouée : ${e.message ?: "erreur inconnue"}"
+                    }
+                    _storeState.value = StoreState.Error(userMessage)
+                    scheduleReset()
+                    return@launch
+                }
+                val params = optimalResult.params
+                val selectedPeers = optimalResult.selectedPeers
+
                 val fragments = encodeErasureFragmentsUseCase(tempFile, params)
                     .getOrElse { e ->
                         _storeState.value = StoreState.Error("Échec encodage: ${e.message ?: "erreur inconnue"}")
@@ -258,6 +280,7 @@ class ExplorerViewModel @Inject constructor(
                     encryptedBundle = bundle,
                     fileHash = fileHash,
                     params = params,
+                    selectedPeers = selectedPeers,
                     originalFileName = originalFileName
                 ) { blockIndex, success ->
                     _storeState.update { current ->

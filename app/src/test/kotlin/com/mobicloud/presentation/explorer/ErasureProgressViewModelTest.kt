@@ -21,7 +21,8 @@ import com.mobicloud.domain.models.EncryptionIdentity
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
-import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectErasureParametersUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.OptimalPeersResult
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
 import com.mobicloud.domain.models.ErasureParameters
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -32,10 +33,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import kotlinx.coroutines.yield
@@ -51,6 +55,9 @@ import kotlin.random.Random
 @OptIn(ExperimentalCoroutinesApi::class)
 class ErasureProgressViewModelTest {
 
+    // StandardTestDispatcher donne le contrôle précis sur l'avancement des coroutines.
+    // Les withContext(Dispatchers.IO) dans le ViewModel s'exécutent sur de vrais threads IO ;
+    // advanceWithIoFlush() utilise Thread.sleep pour les laisser terminer.
     private val testDispatcher = StandardTestDispatcher()
 
     private lateinit var catalogRepository: CatalogRepository
@@ -62,7 +69,7 @@ class ErasureProgressViewModelTest {
     private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
     private lateinit var downloadFileBlocksUseCase: com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
     private lateinit var assembleDownloadedFileUseCase: AssembleDownloadedFileUseCase
-    private lateinit var selectErasureParametersUseCase: SelectErasureParametersUseCase
+    private lateinit var selectOptimalPeersUseCase: SelectOptimalPeersUseCase
     private lateinit var context: Context
     private lateinit var contentResolver: ContentResolver
     private val catalogFlow = MutableStateFlow<List<CatalogEntry>>(emptyList())
@@ -76,13 +83,15 @@ class ErasureProgressViewModelTest {
         gossipSyncUseCase = mockk(relaxed = true)
         encodeErasureFragmentsUseCase = mockk()
         fragmentCipherUseCase = mockk()
-        distributeEncryptedBlocksUseCase = mockk()
+        distributeEncryptedBlocksUseCase = mockk(relaxed = true)
         securityRepository = mockk()
         localizeFileBlocksUseCase = mockk(relaxed = true)
         downloadFileBlocksUseCase = mockk(relaxed = true)
         assembleDownloadedFileUseCase = mockk(relaxed = true)
-        selectErasureParametersUseCase = mockk()
-        coEvery { selectErasureParametersUseCase() } returns ErasureParameters()
+        selectOptimalPeersUseCase = mockk()
+        coEvery { selectOptimalPeersUseCase(any()) } returns Result.success(
+            OptimalPeersResult(params = ErasureParameters(), selectedPeers = emptyList())
+        )
         coEvery { catalogRepository.getEntry(any()) } returns Result.success(null)
         context = mockk()
         contentResolver = mockk()
@@ -122,8 +131,9 @@ class ErasureProgressViewModelTest {
         localizeFileBlocksUseCase = localizeFileBlocksUseCase,
         downloadFileBlocksUseCase = downloadFileBlocksUseCase,
         assembleDownloadedFileUseCase = assembleDownloadedFileUseCase,
-        selectErasureParametersUseCase = selectErasureParametersUseCase,
-        context = context
+        selectOptimalPeersUseCase = selectOptimalPeersUseCase,
+        context = context,
+        ioDispatcher = Dispatchers.Unconfined  // court-circuite les vrais threads IO dans les tests
     )
 
     private fun fakeErasureFragments() =
@@ -149,14 +159,9 @@ class ErasureProgressViewModelTest {
         fragmentLocations = (0 until nodeCount).map { FragmentLocation(it, "h$it", listOf("n$it")) }
     )
 
-    // withContext(Dispatchers.IO) dispatche sur de vrais threads même avec StandardTestDispatcher.
-    // advanceUntilIdle() peut retourner avant que ces threads aient posté leurs continuations.
-    // Thread.sleep(100) laisse le temps aux threads IO de poster, puis advanceUntilIdle() les exécute.
-    // Limitation CI : le sleep réel peut être trop court sous forte charge. Fix structurel :
-    // injecter un TestDispatcher pour Dispatchers.IO dans le ViewModel (refactoring futur).
+    // Avec Dispatchers.Unconfined pour IO et StandardTestDispatcher pour Main,
+    // advanceUntilIdle() draine toutes les coroutines pendantes.
     private fun TestScope.advanceWithIoFlush() {
-        advanceUntilIdle()
-        Thread.sleep(100)
         advanceUntilIdle()
     }
 
@@ -167,23 +172,20 @@ class ErasureProgressViewModelTest {
         val entry = fakeEntry()
         val states = mutableListOf<StoreState>()
 
-        // yield() crée des points de suspension entre les changements d'état
-        // pour que le collector StateFlow puisse capturer chaque état intermédiaire
+        // yield() après chaque étape suspend ée : le StandardTestDispatcher ne peut exécuter
+        // qu'une coroutine à la fois. Sans point de suspension entre les transitions d'état,
+        // le collector StateFlow ne peut jamais s'intercaler et observe seulement la dernière valeur.
         coEvery { encodeErasureFragmentsUseCase(any(), any()) } coAnswers {
-            yield()
+            yield()  // laisse le collecteur voir Encoding avant que encode termine
             Result.success(fakeErasureFragments())
         }
-        coEvery { securityRepository.getIdentity() } coAnswers {
-            yield()
-            Result.success(NodeIdentity("nodeId", Random.nextBytes(65)))
-        }
         coEvery { fragmentCipherUseCase.encrypt(any(), any()) } coAnswers {
-            yield()
+            yield()  // laisse le collecteur voir Encrypting avant que encrypt termine
             Result.success(bundle)
         }
-        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any()) } coAnswers {
+        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any(), any()) } coAnswers {
             yield()
-            val callback = arg<((Int, Boolean) -> Unit)?>(4)
+            val callback = arg<((Int, Boolean) -> Unit)?>(5)
             (0 until 6).forEach { callback?.invoke(it, true) }
             Result.success(entry)
         }
@@ -238,8 +240,8 @@ class ErasureProgressViewModelTest {
         coEvery { fragmentCipherUseCase.encrypt(any(), any()) } returns Result.success(bundle)
 
         // yield() après chaque callback pour capturer l'état intermédiaire post-échec
-        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any()) } coAnswers {
-            val callback = arg<((Int, Boolean) -> Unit)?>(4)
+        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any(), any()) } coAnswers {
+            val callback = arg<((Int, Boolean) -> Unit)?>(5)
             yield()
             callback?.invoke(0, true)
             yield()
@@ -281,7 +283,7 @@ class ErasureProgressViewModelTest {
         coEvery { securityRepository.getIdentity() } returns
             Result.success(NodeIdentity("nodeId", Random.nextBytes(65)))
         coEvery { fragmentCipherUseCase.encrypt(any(), any()) } returns Result.success(bundle)
-        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any()) } returns
+        coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any(), any()) } returns
             Result.success(entry)
 
         // Utilise CompletableDeferred pour maintenir la coroutine en état InProgress.Encoding
@@ -327,7 +329,10 @@ class ErasureProgressViewModelTest {
 
         val viewModel = createViewModel()
         viewModel.storeFile(fakeUri)
-        advanceWithIoFlush()
+        // runCurrent() exécute uniquement les coroutines immédiatement prêtes
+        // sans avancer le temps virtuel.
+        // Ainsi scheduleReset()'s delay(5000L) n'est PAS déclenché et l'état Error est visible.
+        runCurrent()
 
         val state = viewModel.storeState.value
         assertTrue(

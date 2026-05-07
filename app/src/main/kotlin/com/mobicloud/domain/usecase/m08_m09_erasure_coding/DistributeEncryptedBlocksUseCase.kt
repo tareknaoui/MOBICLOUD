@@ -49,19 +49,14 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
         encryptedBundle: EncryptedBundle,
         fileHash: String,
         params: ErasureParameters,
+        selectedPeers: List<Peer>,
         originalFileName: String = "",
         onBlockResult: ((blockIndex: Int, success: Boolean) -> Unit)? = null
     ): Result<CatalogEntry> = withContext(Dispatchers.IO) {
         val k = params.k
         android.util.Log.i("MobiCloud:Distribute", "[DIAG] distribute START fileHash=${fileHash.take(8)} fragments=${encryptedBundle.encryptedFragments.size} k=$k n=${params.n}")
-        val allPeers = peerRepository.peers.value
-        val activePeers = allPeers.filter {
-            it.isActive && it.ipAddress != null && it.port != null
-        }
-        android.util.Log.i("MobiCloud:Distribute", "[DIAG] peers total=${allPeers.size} actifs+IP=${activePeers.size} ${activePeers.map { "${it.identity.nodeId.take(8)}@${it.ipAddress}:${it.port}" }}")
-        android.util.Log.i("MobiCloud:Distribute", "[DIAG] détail tous pairs : ${allPeers.map { "${it.identity.nodeId.take(8)}@${it.ipAddress}:${it.port} active=${it.isActive}" }}")
-        if (activePeers.isEmpty()) {
-            android.util.Log.w("MobiCloud:Distribute", "[DIAG] cluster local vide — tentative directe via fallback inter-cluster (Story 9.3)")
+        if (selectedPeers.isEmpty()) {
+            android.util.Log.w("MobiCloud:Distribute", "[DIAG] selectedPeers vide — tentative directe via fallback inter-cluster (Story 9.3)")
         }
 
         val localIdentity = securityRepository.getIdentity()
@@ -97,21 +92,19 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
             var placedInterCluster = false
 
             // Niveau 1 — placement local primary (si cluster local non vide).
-            if (activePeers.isNotEmpty()) {
-                val primaryIndex = i % activePeers.size
-                val primaryPeer = activePeers[primaryIndex]
+            if (selectedPeers.isNotEmpty()) {
+                val primaryIndex = i % selectedPeers.size
+                val primaryPeer = selectedPeers[primaryIndex]
                 confirmedPeer = primaryPeer
                 android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} parity=${frag.isParity} → ${primaryPeer.identity.nodeId.take(8)}@${primaryPeer.ipAddress}:${primaryPeer.port}")
                 result = blockSender.sendBlock(msg, primaryPeer, BASE_ACK_TIMEOUT_MS)
                 android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} result=${if (result.isSuccess) "OK" else "FAIL: ${result.exceptionOrNull()?.message}"}")
 
-                // Niveau 2 — fallback local (autre pair du cluster).
-                if (result.isFailure) {
-                    val fallbackIndex = activePeers.indices.firstOrNull { it != primaryIndex }
-                    if (fallbackIndex != null) {
-                        confirmedPeer = activePeers[fallbackIndex]
-                        result = blockSender.sendBlock(msg, confirmedPeer, MAX_ACK_TIMEOUT_MS)
-                    }
+                // Niveau 2 — fallback local (autre pair du cluster, round-robin).
+                if (result.isFailure && selectedPeers.size > 1) {
+                    val fallbackIndex = (primaryIndex + 1) % selectedPeers.size
+                    confirmedPeer = selectedPeers[fallbackIndex]
+                    result = blockSender.sendBlock(msg, confirmedPeer, MAX_ACK_TIMEOUT_MS)
                 }
             }
 
