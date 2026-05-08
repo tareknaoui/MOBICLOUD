@@ -1,9 +1,12 @@
 package com.mobicloud.domain.usecase.m10_election
 
+import com.mobicloud.domain.models.BULLY_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.ElectionEvent
 import com.mobicloud.domain.models.ElectionMessageType
 import com.mobicloud.domain.models.ElectionPayload
 import com.mobicloud.domain.models.NodeIdentity
+import com.mobicloud.domain.models.electionSignedBytes
+import kotlin.math.abs
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
 import com.mobicloud.domain.repository.NetworkEventRepository
@@ -56,6 +59,23 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
         }
         val localScore = trustScoreProvider.getTrustScore(localIdentity.nodeId).toFloat()
 
+        // Garde anti-replay : tout payload Bully doit etre dans la fenetre +/-30s.
+        // Bloque le rejeu d'un message capture d'une session precedente.
+        val skewMs = abs(System.currentTimeMillis() - payload.timestampMs)
+        if (skewMs > BULLY_TIMESTAMP_WINDOW_MS) {
+            return Result.failure(
+                Exception("Bully payload ${payload.type.name} hors fenetre (skew=${skewMs}ms) -- ignore (replay suspect).")
+            )
+        }
+
+        // Verification de signature centralisee pour TOUS les types.
+        // Auparavant ELECTION/ALIVE etaient acceptes sans verification : un attaquant
+        // pouvait forger un message avec un score gonfle et gagner l'election.
+        val verified = verifyPayloadSignature(payload)
+        if (verified.isFailure) {
+            return Result.failure(verified.exceptionOrNull() ?: Exception("Signature verification failed"))
+        }
+
         return when (payload.type) {
 
             ElectionMessageType.ELECTION -> {
@@ -85,15 +105,9 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
             }
 
             ElectionMessageType.ABDICATION -> {
-                // Vérifier la signature avant de rétrograder le Super-Pair actuel
-                val dataToVerify = "${payload.senderNodeId}:${payload.type.name}".toByteArray()
-                
                 val senderPeer = peerRepository.peers.value
                     .find { it.identity.nodeId == payload.senderNodeId }
-
-                if (senderPeer == null) {
-                    return Result.failure(Exception("Received ABDICATION from unknown peer '${payload.senderNodeId}' — ignoring."))
-                }
+                    ?: return Result.failure(Exception("Received ABDICATION from unknown peer '${payload.senderNodeId}' -- ignoring."))
 
                 // Check that the sender is actually the current Super-Peer
                 if (!senderPeer.isSuperPair) {
@@ -101,54 +115,21 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                     return Result.success(ElectionEvent.Ignored)
                 }
 
-                val isValid = securityRepository.verifySignature(
-                    data = dataToVerify,
-                    signature = payload.signatureBytes,
-                    publicKey = senderPeer.identity.publicKeyBytes
-                ).getOrElse { error ->
-                    return Result.failure(Exception("Signature verification failed for ABDICATION from '${payload.senderNodeId}'", error))
-                }
-
-                if (!isValid) {
-                    return Result.failure(Exception("Invalid signature on ABDICATION message from '${payload.senderNodeId}' — ignoring."))
-                }
-
-                // Signature valide -> Rétrograder explicitement le statut Super-Pair pour déclencher uen nouvelle élection via RunBully
+                // Signature deja verifiee en haut -- Retrograder le statut Super-Pair pour
+                // declencher une nouvelle election via RunBully.
                 peerRepository.clearSuperPairStatus(payload.senderNodeId)
 
                 Result.success(ElectionEvent.AbdicationReceived(payload.senderNodeId))
             }
 
             ElectionMessageType.COORDINATOR -> {
-                // F-04 : Vérifier la signature avant d'enregistrer le nouveau coordinateur.
-                val dataToVerify = "${payload.senderNodeId}:${payload.type.name}:${payload.clusterId}".toByteArray()
-
-                // F-03 : Récupérer la clé publique réelle depuis la PeerRegistry (A).
-                //        Le pair est déjà connu via les Heartbeats de l'Epic 2.
+                // F-03 : Recuperer la cle publique depuis la PeerRegistry (deja connu via heartbeats Epic 2).
+                // La signature a deja ete verifiee en haut de processPayload.
                 val senderPeer = peerRepository.peers.value
                     .find { it.identity.nodeId == payload.senderNodeId }
-
-                if (senderPeer == null) {
-                    // Pair inconnu — refuser silencieusement sans crasher
-                    return Result.failure(
-                        Exception("Received COORDINATOR from unknown peer '${payload.senderNodeId}' — ignoring.")
+                    ?: return Result.failure(
+                        Exception("Received COORDINATOR from unknown peer '${payload.senderNodeId}' -- ignoring.")
                     )
-                }
-
-                // F-04 : Vérification cryptographique de la signature
-                val isValid = securityRepository.verifySignature(
-                    data = dataToVerify,
-                    signature = payload.signatureBytes,
-                    publicKey = senderPeer.identity.publicKeyBytes
-                ).getOrElse { error ->
-                    return Result.failure(Exception("Signature verification failed for COORDINATOR from '${payload.senderNodeId}'", error))
-                }
-
-                if (!isValid) {
-                    return Result.failure(
-                        Exception("Invalid signature on COORDINATOR message from '${payload.senderNodeId}' — potential forgery, ignoring.")
-                    )
-                }
 
                 // WiFi cluster guard: reject coordinator from a different WiFi cluster
                 val localSettings = nodeSettingsRepository.getSettings()
@@ -218,7 +199,8 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
         score: Float,
         type: ElectionMessageType
     ): Result<ElectionPayload> {
-        val dataToSign = "${identity.nodeId}:${type.name}".toByteArray()
+        val timestampMs = System.currentTimeMillis()
+        val dataToSign = electionSignedBytes(type, identity.nodeId, score, "", timestampMs)
         val signature = securityRepository.signData(dataToSign).getOrElse { error ->
             return Result.failure(Exception("Failed to sign ${type.name} payload", error))
         }
@@ -227,8 +209,48 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                 senderNodeId = identity.nodeId,
                 type = type,
                 reliabilityScore = score,
-                signatureBytes = signature
+                signatureBytes = signature,
+                timestampMs = timestampMs
             )
+        )
+    }
+
+    /**
+     * Verifie la signature d'un payload Bully entrant.
+     * Le sender doit deja etre connu via PeerRegistry (heartbeats) -- les payloads
+     * de pairs inconnus sont rejetes avant d'arriver dans le protocole.
+     *
+     * Centralise la verif pour les 4 types de message ; auparavant ELECTION/ALIVE
+     * etaient acceptes sans signature, permettant le forge avec score gonfle.
+     */
+    private suspend fun verifyPayloadSignature(payload: ElectionPayload): Result<Unit> {
+        val senderPeer = peerRepository.peers.value
+            .find { it.identity.nodeId == payload.senderNodeId }
+            ?: return Result.failure(
+                Exception("Bully ${payload.type.name} from unknown peer '${payload.senderNodeId}' -- ignored.")
+            )
+
+        val dataToVerify = electionSignedBytes(
+            type = payload.type,
+            senderNodeId = payload.senderNodeId,
+            reliabilityScore = payload.reliabilityScore,
+            clusterId = payload.clusterId,
+            timestampMs = payload.timestampMs
+        )
+
+        val isValid = securityRepository.verifySignature(
+            data = dataToVerify,
+            signature = payload.signatureBytes,
+            publicKey = senderPeer.identity.publicKeyBytes
+        ).getOrElse { error ->
+            return Result.failure(
+                Exception("Signature verification failed for ${payload.type.name} from '${payload.senderNodeId}'", error)
+            )
+        }
+
+        return if (isValid) Result.success(Unit)
+        else Result.failure(
+            Exception("Invalid signature on ${payload.type.name} from '${payload.senderNodeId}' -- potential forgery, ignored.")
         )
     }
 }

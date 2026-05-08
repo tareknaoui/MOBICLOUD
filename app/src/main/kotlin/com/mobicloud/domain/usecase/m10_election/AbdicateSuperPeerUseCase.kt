@@ -2,6 +2,7 @@ package com.mobicloud.domain.usecase.m10_election
 
 import com.mobicloud.domain.models.ElectionMessageType
 import com.mobicloud.domain.models.ElectionPayload
+import com.mobicloud.domain.models.electionSignedBytes
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
 import com.mobicloud.domain.repository.SecurityRepository
@@ -18,8 +19,15 @@ class AbdicateSuperPeerUseCase @Inject constructor(
             return Result.failure(it)
         }
         val score = trustScoreProvider.getTrustScore(identity.nodeId).toFloat()
+        val timestampMs = System.currentTimeMillis()
 
-        val dataToSign = "${identity.nodeId}:${ElectionMessageType.ABDICATION.name}".toByteArray()
+        val dataToSign = electionSignedBytes(
+            type = ElectionMessageType.ABDICATION,
+            senderNodeId = identity.nodeId,
+            reliabilityScore = score,
+            clusterId = "",
+            timestampMs = timestampMs
+        )
         val signature = securityRepository.signData(dataToSign).getOrElse {
             return Result.failure(Exception("Failed to sign ABDICATION payload", it))
         }
@@ -28,7 +36,8 @@ class AbdicateSuperPeerUseCase @Inject constructor(
             senderNodeId = identity.nodeId,
             type = ElectionMessageType.ABDICATION,
             reliabilityScore = score,
-            signatureBytes = signature
+            signatureBytes = signature,
+            timestampMs = timestampMs
         )
 
         // 1. Diffuser l'abdication en premier

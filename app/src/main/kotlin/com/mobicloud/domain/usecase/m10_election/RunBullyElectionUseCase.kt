@@ -4,6 +4,7 @@ import com.mobicloud.domain.models.ElectionMessageType
 import com.mobicloud.domain.models.ElectionPayload
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.SuperPairElection
+import com.mobicloud.domain.models.electionSignedBytes
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
 import com.mobicloud.domain.repository.NodeSettingsRepository
@@ -156,7 +157,8 @@ class RunBullyElectionUseCase @Inject constructor(
         type: ElectionMessageType,
         clusterId: String = ""
     ): Result<ElectionPayload> {
-        val dataToSign = "${identity.nodeId}:${type.name}:${clusterId}".toByteArray()
+        val timestampMs = System.currentTimeMillis()
+        val dataToSign = electionSignedBytes(type, identity.nodeId, score, clusterId, timestampMs)
         val signature = securityRepository.signData(dataToSign).getOrElse { error ->
             return Result.failure(Exception("Failed to sign election payload of type ${type.name}", error))
         }
@@ -166,7 +168,8 @@ class RunBullyElectionUseCase @Inject constructor(
                 type = type,
                 reliabilityScore = score,
                 signatureBytes = signature,
-                clusterId = clusterId
+                clusterId = clusterId,
+                timestampMs = timestampMs
             )
         )
     }
