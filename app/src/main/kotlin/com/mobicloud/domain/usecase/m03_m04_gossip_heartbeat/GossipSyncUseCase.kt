@@ -103,6 +103,18 @@ class GossipSyncUseCase @Inject constructor(
         @Suppress("UNUSED_PARAMETER") senderPort: Int
     ): Result<Unit> = withContext(Dispatchers.Default) {
         try {
+            // Hardening anti-amplification : un Bloom forge declenche un DeltaSyncRequest
+            // sortant. Sans ce filtre, un attaquant non-pair pouvait amplifier le trafic
+            // en spammant des Bloom, forcant la victime a consulter sa DHT et a emettre.
+            val isKnownPeer = peerRepository.peers.value
+                .any { it.identity.nodeId == msg.senderNodeId && it.isActive }
+            if (!isKnownPeer) {
+                networkEventRepository.pushEvent(
+                    "[GOSSIP] Bloom rejete : sender ${msg.senderNodeId.take(8)} non-pair"
+                )
+                return@withContext Result.success(Unit)
+            }
+
             val remoteBloom = BloomFilter.fromByteArray(
                 msg.bloomFilterBytes,
                 msg.bloomFilterSize,
@@ -144,6 +156,20 @@ class GossipSyncUseCase @Inject constructor(
     suspend fun handleDeltaRequest(req: DeltaSyncRequest): Result<DeltaSyncResponse> =
         withContext(Dispatchers.Default) {
             try {
+                // Hardening anti-DoS : seuls les pairs connus peuvent demander des
+                // entrees DHT. Sans ce filtre, n'importe qui pouvait spammer des
+                // missingBlockIds pour saturer notre DB.
+                val isKnownPeer = peerRepository.peers.value
+                    .any { it.identity.nodeId == req.requesterNodeId && it.isActive }
+                if (!isKnownPeer) {
+                    networkEventRepository.pushEvent(
+                        "[GOSSIP] DeltaRequest rejete : requester ${req.requesterNodeId.take(8)} non-pair"
+                    )
+                    return@withContext Result.failure(
+                        SecurityException("DeltaRequest from unknown peer ${req.requesterNodeId}")
+                    )
+                }
+
                 val entries = req.missingBlockIds.mapNotNull { blockId ->
                     dhtRepository.findByBlockId(blockId).getOrNull()
                 }
@@ -173,6 +199,20 @@ class GossipSyncUseCase @Inject constructor(
     suspend fun handleDeltaResponse(response: DeltaSyncResponse): Result<Unit> =
         withContext(Dispatchers.Default) {
             try {
+                // Hardening anti-DHT-poisoning : seuls les pairs connus peuvent injecter
+                // des entrees DHT. Sans ce filtre, un attaquant non-pair pouvait empoisonner
+                // notre DHT avec des fausses routes (blockId X chez IP-attaquant).
+                val isKnownPeer = peerRepository.peers.value
+                    .any { it.identity.nodeId == response.responderNodeId && it.isActive }
+                if (!isKnownPeer) {
+                    networkEventRepository.pushEvent(
+                        "[GOSSIP] DeltaResponse rejete : responder ${response.responderNodeId.take(8)} non-pair"
+                    )
+                    return@withContext Result.failure(
+                        SecurityException("DeltaResponse from unknown peer ${response.responderNodeId}")
+                    )
+                }
+
                 for (dto in response.entries) {
                     val entry = DhtEntry(
                         blockId = dto.blockId,
