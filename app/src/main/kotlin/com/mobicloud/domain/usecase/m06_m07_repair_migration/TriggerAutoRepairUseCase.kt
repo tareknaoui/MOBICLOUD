@@ -173,7 +173,8 @@ class TriggerAutoRepairUseCase @Inject constructor(
                     continue
                 }
 
-                // Signature du plan — domain separation avec tag "REPAIR"
+                // Signature du plan — domain separation avec tag "REPAIR" + timestamp anti-replay
+                val planTimestampMs = System.currentTimeMillis()
                 val sigPayload = buildString {
                     append(identity.nodeId); append("|REPAIR|")
                     append(directive.blockId); append(":")
@@ -181,6 +182,7 @@ class TriggerAutoRepairUseCase @Inject constructor(
                     append(directive.destinationIp); append(":")
                     append(directive.destinationPort); append(":")
                     append(directive.destinationPublicKeyBytes.toSigHex())
+                    append("|ts="); append(planTimestampMs)
                 }.toByteArray()
                 val signature = securityRepository.signData(sigPayload).getOrNull()
                 if (signature == null) {
@@ -193,7 +195,8 @@ class TriggerAutoRepairUseCase @Inject constructor(
                 val plan = ReplicationPlanMessage(
                     superPeerNodeId = identity.nodeId,
                     directive = directive,
-                    signatureBytes = signature
+                    signatureBytes = signature,
+                    timestampMs = planTimestampMs
                 )
 
                 // AC#4 — MàJ DHT optimiste UNIQUEMENT si l'émission TCP a réussi.

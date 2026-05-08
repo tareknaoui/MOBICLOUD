@@ -2,8 +2,10 @@ package com.mobicloud.domain.usecase.m06_m07_repair_migration
 
 import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.models.NodeIdentity
+import com.mobicloud.domain.models.PLAN_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.models.ReplicationPlanMessage
+import kotlin.math.abs
 import com.mobicloud.domain.repository.BlockSender
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
@@ -31,7 +33,16 @@ class ExecuteReplicationPlanUseCase @Inject constructor(
     }
 
     override suspend fun onReplicationPlanReceived(plan: ReplicationPlanMessage) {
-        // 1) Vérifier que l'émetteur du plan est bien un Super-Pair connu
+        // 1) Anti-replay : rejeter les plans hors fenetre +/-30s.
+        val skewMs = abs(System.currentTimeMillis() - plan.timestampMs)
+        if (skewMs > PLAN_TIMESTAMP_WINDOW_MS) {
+            networkEventRepository.pushEvent(
+                "[REPAIR] Plan hors fenetre (skew=${skewMs}ms) -- replay suspect, ignore"
+            )
+            return
+        }
+
+        // 2) Vérifier que l'émetteur du plan est bien un Super-Pair connu
         val superPeer = peerRepository.peers.value
             .firstOrNull { it.identity.nodeId == plan.superPeerNodeId && it.isSuperPair }
         if (superPeer == null) {
@@ -41,7 +52,7 @@ class ExecuteReplicationPlanUseCase @Inject constructor(
             return
         }
 
-        // 2) Vérifier la signature — même format que l'émetteur (TriggerAutoRepairUseCase)
+        // 3) Vérifier la signature — même format que l'émetteur (TriggerAutoRepairUseCase) + timestamp
         val d = plan.directive
         val sigPayload = buildString {
             append(plan.superPeerNodeId); append("|REPAIR|")
@@ -50,6 +61,7 @@ class ExecuteReplicationPlanUseCase @Inject constructor(
             append(d.destinationIp); append(":")
             append(d.destinationPort); append(":")
             append(d.destinationPublicKeyBytes.toSigHex())
+            append("|ts="); append(plan.timestampMs)
         }.toByteArray()
         val valid = securityRepository.verifySignature(
             data = sigPayload,

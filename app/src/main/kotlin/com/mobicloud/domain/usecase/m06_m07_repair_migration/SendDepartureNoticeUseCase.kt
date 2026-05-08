@@ -29,13 +29,15 @@ class SendDepartureNoticeUseCase @Inject constructor(
         val identity = securityRepository.getIdentity().getOrThrow()
         val blockIds = hostedBlockRepository.getAllBlockIds().getOrThrow()
 
-        val payloadToSign = "${identity.nodeId}:${blockIds.joinToString(",")}".toByteArray()
+        val timestampMs = System.currentTimeMillis()
+        val payloadToSign = "${identity.nodeId}:${blockIds.joinToString(",")}|ts=$timestampMs".toByteArray()
         val signature = securityRepository.signData(payloadToSign).getOrThrow()
 
         val notice = DepartureNoticeMessage(
             senderNodeId = identity.nodeId,
             hostedBlockIds = blockIds,
-            signatureBytes = signature
+            signatureBytes = signature,
+            timestampMs = timestampMs
         )
 
         val superPeer = peerRepository.peers.value

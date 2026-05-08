@@ -14,7 +14,8 @@ import kotlinx.serialization.protobuf.ProtoNumber
 data class ReplicationPlanMessage(
     @ProtoNumber(1) val superPeerNodeId: String = "",
     @ProtoNumber(2) val directive: MigrateBlockDirective = MigrateBlockDirective(),
-    @ProtoNumber(3) val signatureBytes: ByteArray = byteArrayOf()
+    @ProtoNumber(3) val signatureBytes: ByteArray = byteArrayOf(),
+    @ProtoNumber(4) val timestampMs: Long = System.currentTimeMillis()
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -23,6 +24,7 @@ data class ReplicationPlanMessage(
         if (superPeerNodeId != other.superPeerNodeId) return false
         if (directive != other.directive) return false
         if (!signatureBytes.contentEquals(other.signatureBytes)) return false
+        if (timestampMs != other.timestampMs) return false
         return true
     }
 
@@ -30,6 +32,7 @@ data class ReplicationPlanMessage(
         var result = superPeerNodeId.hashCode()
         result = 31 * result + directive.hashCode()
         result = 31 * result + signatureBytes.contentHashCode()
+        result = 31 * result + timestampMs.hashCode()
         return result
     }
 }

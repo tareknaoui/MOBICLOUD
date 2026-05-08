@@ -40,7 +40,8 @@ data class MigrateBlockDirective(
 data class MigrationPlanMessage(
     @ProtoNumber(1) val superPeerNodeId: String = "",
     @ProtoNumber(2) val directives: List<MigrateBlockDirective> = emptyList(),
-    @ProtoNumber(3) val signatureBytes: ByteArray = byteArrayOf()
+    @ProtoNumber(3) val signatureBytes: ByteArray = byteArrayOf(),
+    @ProtoNumber(4) val timestampMs: Long = System.currentTimeMillis()
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -49,6 +50,7 @@ data class MigrationPlanMessage(
         if (superPeerNodeId != other.superPeerNodeId) return false
         if (directives != other.directives) return false
         if (!signatureBytes.contentEquals(other.signatureBytes)) return false
+        if (timestampMs != other.timestampMs) return false
         return true
     }
 
@@ -56,6 +58,7 @@ data class MigrationPlanMessage(
         var result = superPeerNodeId.hashCode()
         result = 31 * result + directives.hashCode()
         result = 31 * result + signatureBytes.contentHashCode()
+        result = 31 * result + timestampMs.hashCode()
         return result
     }
 }

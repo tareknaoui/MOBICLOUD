@@ -4,6 +4,8 @@ import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.models.MigrateBlockDirective
 import com.mobicloud.domain.models.MigrationPlanMessage
 import com.mobicloud.domain.models.NodeIdentity
+import com.mobicloud.domain.models.PLAN_TIMESTAMP_WINDOW_MS
+import kotlin.math.abs
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.repository.BlockSender
 import com.mobicloud.domain.repository.HostedBlockRepository
@@ -32,7 +34,16 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
     }
 
     override suspend fun onMigrationPlanReceived(plan: MigrationPlanMessage) = supervisorScope {
-        // 1) Vérification signature du plan avec la clé publique du Super-Pair annoncé
+        // 1) Anti-replay : rejeter les plans hors fenetre +/-30s.
+        val skewMs = abs(System.currentTimeMillis() - plan.timestampMs)
+        if (skewMs > PLAN_TIMESTAMP_WINDOW_MS) {
+            networkEventRepository.pushEvent(
+                "[MIGRATION] Plan hors fenetre (skew=${skewMs}ms) -- replay suspect, ignore"
+            )
+            return@supervisorScope
+        }
+
+        // 2) Vérification signature du plan avec la clé publique du Super-Pair annoncé
         val superPeer = peerRepository.peers.value
             .firstOrNull { it.identity.nodeId == plan.superPeerNodeId && it.isSuperPair }
         if (superPeer == null) {
@@ -41,10 +52,10 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
             )
             return@supervisorScope
         }
-        // Payload durci : cohérent avec OrchestrateBlockMigrationUseCase — inclut IP/port/pubkey destination
+        // Payload durci : cohérent avec OrchestrateBlockMigrationUseCase — inclut IP/port/pubkey destination + timestamp
         val planSigPayload = "${plan.superPeerNodeId}|${plan.directives.joinToString("|") {
             "${it.blockId}:${it.destinationNodeId}:${it.destinationIp}:${it.destinationPort}:${it.destinationPublicKeyBytes.toSigHex()}"
-        }}".toByteArray()
+        }}|ts=${plan.timestampMs}".toByteArray()
         val valid = securityRepository.verifySignature(
             data = planSigPayload,
             signature = plan.signatureBytes,

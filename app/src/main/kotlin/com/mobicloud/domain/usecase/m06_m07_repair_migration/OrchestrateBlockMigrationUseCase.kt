@@ -4,7 +4,9 @@ import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.domain.models.DepartureNoticeMessage
 import com.mobicloud.domain.models.MigrateBlockDirective
 import com.mobicloud.domain.models.MigrationPlanMessage
+import com.mobicloud.domain.models.PLAN_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.repository.DhtRepository
+import kotlin.math.abs
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -52,7 +54,15 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             networkEventRepository.pushEvent("[MIGRATION] Émetteur ${notice.senderNodeId.take(8)} inconnu — plan annulé")
             return
         }
-        val signedPayload = "${notice.senderNodeId}:${notice.hostedBlockIds.joinToString(",")}".toByteArray()
+        // Anti-replay : rejeter les NOTICE hors fenetre +/-30s.
+        val skewMs = abs(System.currentTimeMillis() - notice.timestampMs)
+        if (skewMs > PLAN_TIMESTAMP_WINDOW_MS) {
+            networkEventRepository.pushEvent(
+                "[MIGRATION] DEPARTURE_NOTICE hors fenetre (skew=${skewMs}ms) -- replay suspect, ignore"
+            )
+            return
+        }
+        val signedPayload = "${notice.senderNodeId}:${notice.hostedBlockIds.joinToString(",")}|ts=${notice.timestampMs}".toByteArray()
         val valid = securityRepository.verifySignature(
             data = signedPayload,
             signature = notice.signatureBytes,
@@ -105,9 +115,10 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
 
         // 5) Signature du plan (domain separation — payload durci : inclut IP/port/pubkey des destinations
         //    pour empêcher une réécriture MITM qui redirigerait le transfert opaque vers un pair contrôlé)
+        val planTimestampMs = System.currentTimeMillis()
         val planSigPayload = "${identity.nodeId}|${directives.joinToString("|") {
             "${it.blockId}:${it.destinationNodeId}:${it.destinationIp}:${it.destinationPort}:${it.destinationPublicKeyBytes.toSigHex()}"
-        }}".toByteArray()
+        }}|ts=$planTimestampMs".toByteArray()
         val planSignature = securityRepository.signData(planSigPayload).getOrElse {
             networkEventRepository.pushEvent("[MIGRATION] Signature du plan échouée — plan annulé")
             return
@@ -116,7 +127,8 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
         val plan = MigrationPlanMessage(
             superPeerNodeId = identity.nodeId,
             directives = directives,
-            signatureBytes = planSignature
+            signatureBytes = planSignature,
+            timestampMs = planTimestampMs
         )
 
         // 6) Transmission du plan au nœud partant — AC#5 budget NFR-02 5s global
