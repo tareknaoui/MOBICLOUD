@@ -183,7 +183,7 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
             wrappedMasterKey = encryptedBundle.wrappedFileMasterKey,
             originalFileSize = encryptedBundle.encryptedFragments.firstOrNull()?.originalFileSize ?: 0L,
             originalFileName = originalFileName,
-            k = params.k,
+            k = params.k, 
             n = params.n
         )
 
