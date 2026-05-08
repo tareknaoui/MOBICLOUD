@@ -78,6 +78,26 @@ class BlockTransferClient @Inject constructor(
             inp.readFully(ackBytes)
             val ack = MobiCloudProtoBuf.decodeFromByteArray(BlockAckMessage.serializer(), ackBytes)
 
+            // Liaison ACK <-> contexte d'envoi : sans ces checks, un peer malveillant
+            // peut signer un ACK avec un receiverNodeId ou blockHash arbitraires, et
+            // la signature reste valide pour SA cle -- on enregistrerait "bloc stocke
+            // chez Y" alors qu'il n'en a rien fait, ou on accepterait l'attestation
+            // d'un bloc different de celui envoye.
+            if (ack.receiverNodeId != peer.identity.nodeId) {
+                return@withContext Result.failure(
+                    SecurityException(
+                        "ACK receiverNodeId mismatch: peer=${peer.identity.nodeId} ack=${ack.receiverNodeId}"
+                    )
+                )
+            }
+            if (ack.blockHash != block.blockId) {
+                return@withContext Result.failure(
+                    SecurityException(
+                        "ACK blockHash mismatch: sent=${block.blockId} ack=${ack.blockHash}"
+                    )
+                )
+            }
+
             // [Review][Patch] Domain separation : le payload signé est
             // "$ACK_DOMAIN_PREFIX|$receiverNodeId|$blockHash".toByteArray(UTF-8)
             val signingPayload = "${com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase.ACK_DOMAIN_PREFIX}|${ack.receiverNodeId}|${ack.blockHash}"
