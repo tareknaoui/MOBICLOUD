@@ -58,7 +58,7 @@ class SendDepartureNoticeUseCaseTest {
         hostedBlockRepository = mockk()
         securityRepository = mockk()
         peerRepository = mockk()
-        tcpConnectionManager = mockk()
+        tcpConnectionManager = mockk(relaxed = true)
         networkEventRepository = mockk()
 
         peersFlow = MutableStateFlow(emptyList())

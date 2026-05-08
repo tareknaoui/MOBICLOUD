@@ -99,10 +99,12 @@ class LocalDiscoveryRepositoryImplTest {
     @Before
     fun setUp() {
         mockkStatic(Log::class)
+        every { Log.i(any(), any<String>()) } returns 0
         every { Log.w(any(), any<String>()) } returns 0
         every { Log.w(any(), any<String>(), any()) } returns 0
         every { Log.e(any(), any<String>()) } returns 0
         every { Log.e(any(), any<String>(), any()) } returns 0
+        every { Log.d(any(), any<String>()) } returns 0
 
         mockkStatic(SystemClock::class)
         every { SystemClock.elapsedRealtime() } returns 1000L
@@ -114,7 +116,7 @@ class LocalDiscoveryRepositoryImplTest {
         scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher())
 
         coEvery { identityRepository.getIdentity() } returns Result.success(localIdentity)
-        coEvery { peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any()) } returns Result.success(Unit)
+        coEvery { peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any(), any()) } returns Result.success(Unit)
 
         repository = TestableLocalDiscoveryRepositoryImpl()
     }
@@ -208,7 +210,7 @@ class LocalDiscoveryRepositoryImplTest {
 
         assertFalse("processIncomingBytes doit retourner false pour une signature invalide", updated)
         coVerify(exactly = 0) {
-            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any())
+            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -226,7 +228,7 @@ class LocalDiscoveryRepositoryImplTest {
 
         assertFalse("Les propres datagrams doivent être filtrés", updated)
         coVerify(exactly = 0) {
-            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any())
+            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any(), any())
         }
     }
 

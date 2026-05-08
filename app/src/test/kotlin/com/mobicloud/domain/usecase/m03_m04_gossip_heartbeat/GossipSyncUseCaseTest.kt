@@ -16,11 +16,14 @@ import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkStatic
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -47,6 +50,14 @@ class GossipSyncUseCaseTest {
 
     @Before
     fun setup() {
+        mockkStatic(android.util.Log::class)
+        every { android.util.Log.i(any(), any()) } returns 0
+        every { android.util.Log.w(any(), any<String>()) } returns 0
+        every { android.util.Log.w(any(), any<String>(), any()) } returns 0
+        every { android.util.Log.e(any(), any<String>()) } returns 0
+        every { android.util.Log.e(any(), any<String>(), any()) } returns 0
+        every { android.util.Log.d(any(), any<String>()) } returns 0
+
         dhtRepository = mockk()
         peerRepository = mockk()
         gossipOutboundPort = mockk()
@@ -65,6 +76,11 @@ class GossipSyncUseCaseTest {
             resolveDhtConflictUseCase,
             CoroutineScope(Dispatchers.Default)
         )
+    }
+
+    @After
+    fun tearDown() {
+        unmockkStatic(android.util.Log::class)
     }
 
     // Test 5 : guard N=0 — aucun pair → Result.success sans envoi

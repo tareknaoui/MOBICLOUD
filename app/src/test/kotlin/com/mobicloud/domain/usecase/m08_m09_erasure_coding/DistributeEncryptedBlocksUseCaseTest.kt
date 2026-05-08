@@ -60,6 +60,9 @@ class DistributeEncryptedBlocksUseCaseTest {
         mockkStatic(Log::class)
         every { Log.i(any(), any()) } returns 0
         every { Log.w(any(), any<String>()) } returns 0
+        every { Log.w(any(), any<String>(), any()) } returns 0
+        every { Log.e(any(), any<String>()) } returns 0
+        every { Log.e(any(), any<String>(), any()) } returns 0
         peerRepository = mockk()
         blockSender = mockk()
         catalogRepository = mockk()
@@ -90,6 +93,9 @@ class DistributeEncryptedBlocksUseCaseTest {
         )
         // Default — pas de candidat inter-cluster sauf override par test
         every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns null
+        every {
+            requestInterClusterHostingUseCase.selectRemoteHosts(any(), any(), any())
+        } returns emptyList()
     }
 
     @After
@@ -364,7 +370,7 @@ class DistributeEncryptedBlocksUseCaseTest {
         every { peerRepository.peers } returns MutableStateFlow(emptyList())
 
         val remote = fakeRemoteRelayPeer(nodeId = "remote-A", ip = "10.99.0.7", port = 7777)
-        every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns remote
+        every { requestInterClusterHostingUseCase.selectRemoteHosts(any(), any(), any()) } returns listOf(remote)
 
         val bundle = fakeBundle(k = 4, n = 2)
         val capturedPeers = mutableListOf<Peer>()
@@ -385,7 +391,7 @@ class DistributeEncryptedBlocksUseCaseTest {
         assertTrue("distribute should succeed via inter-cluster", result.isSuccess)
         // Tous les fragments routés vers le pair distant
         assertTrue("tous les sendBlock doivent cibler le pair distant", capturedPeers.all { it.ipAddress == "10.99.0.7" && it.port == 7777 })
-        verify(atLeast = 1) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }
+        verify(atLeast = 1) { requestInterClusterHostingUseCase.selectRemoteHosts(any(), any(), any()) }
         // insertDhtEntryUseCase reçoit l'IP/port distants
         assertEquals("10.99.0.7", ipSlot.captured)
         assertEquals(7777, portSlot.captured)
@@ -410,7 +416,7 @@ class DistributeEncryptedBlocksUseCaseTest {
         val result = useCase.distribute(bundle, "filehash_local_only", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
         assertTrue(result.isSuccess)
-        verify(exactly = 0) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }
+        verify(exactly = 0) { requestInterClusterHostingUseCase.selectRemoteHosts(any(), any(), any()) }
     }
 
     /**
@@ -426,7 +432,7 @@ class DistributeEncryptedBlocksUseCaseTest {
         // Tous les envois échouent (local primary + local fallback)
         coEvery { blockSender.sendBlock(any(), any(), any()) } returns
             Result.failure(SocketTimeoutException("all peers down"))
-        every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns null
+        every { requestInterClusterHostingUseCase.selectRemoteHosts(any(), any(), any()) } returns emptyList()
 
         val result = useCase.distribute(bundle, "filehash_total_fail", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
@@ -445,7 +451,7 @@ class DistributeEncryptedBlocksUseCaseTest {
         every { peerRepository.peers } returns MutableStateFlow(peers)
 
         val remote = fakeRemoteRelayPeer(nodeId = "remote-B", ip = "10.99.0.8", port = 8888)
-        every { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) } returns remote
+        every { requestInterClusterHostingUseCase.selectRemoteHosts(any(), any(), any()) } returns listOf(remote)
 
         val bundle = fakeBundle(k = 4, n = 2)
         coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
@@ -461,6 +467,6 @@ class DistributeEncryptedBlocksUseCaseTest {
         val result = useCase.distribute(bundle, "filehash_local_to_remote", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
 
         assertTrue(result.isSuccess)
-        verify(atLeast = 1) { requestInterClusterHostingUseCase.selectRemoteHost(any(), any()) }
+        verify(atLeast = 1) { requestInterClusterHostingUseCase.selectRemoteHosts(any(), any(), any()) }
     }
 }
