@@ -28,7 +28,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -81,6 +80,10 @@ class TcpConnectionManager @Inject constructor(
     // Story 7.3 — handler du nœud donneur qui exécute la directive de réplication reçue du Super-Pair
     @Volatile
     var replicationPlanHandler: ReplicationPlanHandler? = null
+
+    // Identité locale mise en cache au démarrage du service pour éviter runBlocking sur le thread d'acceptation.
+    @Volatile
+    var localIdentity: com.mobicloud.domain.models.NodeIdentity? = null
 
     companion object {
         // F2: taille maximale d'un message Gossip pour prévenir les allocations OOM via pairs malveillants
@@ -408,13 +411,13 @@ class TcpConnectionManager @Inject constructor(
             val input = ObjectInputStream(inp)
             val remotePublicId = input.readUTF()
 
-            val localIdentity = runBlocking { securityRepository.getIdentity() }.getOrElse { error ->
-                Log.e("MobiCloud:TCP", "Impossible de récupérer l'identité locale (handshake entrant)", error)
+            val cachedIdentity = localIdentity ?: run {
+                Log.e("MobiCloud:TCP", "Identité locale non initialisée — handshake refusé")
                 return
             }
 
             val output = ObjectOutputStream(socket.getOutputStream())
-            output.writeUTF(localIdentity.nodeId)
+            output.writeUTF(cachedIdentity.nodeId)
             output.flush()
 
             Log.i("MobiCloud:TCP", "Handshake TCP entrant réussi | pair=$remotePublicId | ip=${socket.inetAddress.hostAddress}")
@@ -589,5 +592,8 @@ class TcpConnectionManager @Inject constructor(
         // [Review][Patch] Annulation des handlers en cours pour éviter les fuites de coroutines.
         connectionScope.cancel()
         handshaked.clear()
+        // [Review][Patch] Clear de l'identité cachée — évite qu'une identité périmée survive
+        // à un redémarrage de service si la regénération échoue au prochain start.
+        localIdentity = null
     }
 }

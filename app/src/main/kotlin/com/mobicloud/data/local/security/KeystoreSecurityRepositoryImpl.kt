@@ -31,11 +31,9 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
 ) : SecurityRepository {
 
     companion object {
-        // ALIGNÉ avec KeystoreManager.KEY_ALIAS pour qu'IdentityRepository et SecurityRepository
-        // partagent la MÊME paire de clés Keystore et produisent donc le MÊME nodeId.
-        // Avant cet alignement : 2 alias différents = 2 keypairs = 2 nodeIds par device → tous les
-        // matches sur localNodeId (badge Super-Pair, score recalculé, etc.) échouaient silencieusement.
-        internal const val KEY_ALIAS = "mobicloud_node_identity_key"
+        // Source unique : KeystoreManager.KEY_ALIAS garantit qu'IdentityRepository et SecurityRepository
+        // partagent la MÊME paire de clés Keystore et produisent le MÊME nodeId.
+        internal val KEY_ALIAS get() = com.mobicloud.core.security.KeystoreManager.KEY_ALIAS
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         internal const val PREFS_FILE = "mobicloud_security_prefs"
         private const val PREF_KEY_PUBLIC = "software_public_key"

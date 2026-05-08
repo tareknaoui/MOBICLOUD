@@ -134,10 +134,11 @@ class MobicloudP2PService : Service() {
                 return@launch
             }
 
-            val identity = identityResult.getOrThrow()
+            val identity = identityResult.getOrNull() ?: return@launch
 
             // [Review][Patch] Brancher les handlers AVANT startServer() pour éliminer la race
             // window où une connexion entrante arriverait pendant que handler == null.
+            tcpConnectionManager.localIdentity = identity
             tcpConnectionManager.gossipHandler = gossipSyncUseCase
             tcpConnectionManager.blockReceiverHandler = receiveAndHostBlockUseCase
             tcpConnectionManager.dhtRelayHandler = dhtRepository

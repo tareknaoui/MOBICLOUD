@@ -14,10 +14,12 @@ class RelayAuthSigner @Inject constructor(
     /**
      * Construit le payload JSON UTF-8 du message AUTH (0x01).
      * Signe "MobiCloud-HA-AUTH:$nodeId:$timestamp" via Keystore EC P-256.
-     * @throws Exception si le Keystore est inaccessible ou l'identité absente.
+     * @throws IllegalStateException si le Keystore est inaccessible ou l'identité absente.
      */
     suspend fun buildAuthPayload(): ByteArray {
-        val identity = identityRepository.getIdentity().getOrThrow()
+        val identity = identityRepository.getIdentity().getOrElse { e ->
+            throw IllegalStateException("Identité inaccessible — AUTH relay impossible", e)
+        }
         val nodeId = identity.nodeId
         val timestamp = System.currentTimeMillis()
 
