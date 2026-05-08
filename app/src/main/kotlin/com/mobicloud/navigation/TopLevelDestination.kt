@@ -19,15 +19,18 @@ package com.mobicloud.navigation
 import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Hub
 import androidx.compose.material.icons.outlined.Radar
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mobicloud.compose.R
 import com.mobicloud.presentation.dashboard.DashboardRoute
 import com.mobicloud.presentation.explorer.ExplorerRoute
+import com.mobicloud.presentation.network.NetworkRoute
 import com.mobicloud.presentation.settings.SettingsRoute
 import kotlin.reflect.KClass
 
@@ -67,5 +70,12 @@ enum class TopLevelDestination(
         iconTextId = R.string.settings,
         titleTextId = R.string.settings,
         route = SettingsRoute::class,
+    ),
+    NETWORK(
+        selectedIcon = Icons.Filled.Hub,
+        unselectedIcon = Icons.Outlined.Hub,
+        iconTextId = R.string.network,
+        titleTextId = R.string.network,
+        route = NetworkRoute::class,
     ),
 }

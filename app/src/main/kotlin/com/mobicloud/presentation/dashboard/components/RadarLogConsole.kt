@@ -1,6 +1,6 @@
 package com.mobicloud.presentation.dashboard.components
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,25 +8,32 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.runtime.remember
 import com.mobicloud.domain.models.NetworkLogEvent
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val borderColor = Color(0xFF333333)
-private val timestampColor = Color(0xFF9E9E9E)
-private val messageColor = Color(0xFFE0E0E0)
-private val activeColor = Color(0xFF00FF41)
+private val TerminalGreen = Color(0xFF00FF41)
 
 @Composable
 fun RadarLogConsole(
@@ -34,55 +41,75 @@ fun RadarLogConsole(
     modifier: Modifier = Modifier
 ) {
     val timeFormat = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
-    Column(
-        modifier = modifier
-            .border(1.dp, borderColor)
-            .padding(8.dp)
+
+    ElevatedCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                text = "RADAR LOG",
-                color = activeColor,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace
-            )
-            Spacer(Modifier.weight(1f))
-            // Statut textuel statique — pas d'animation clignotante (économie batterie)
-            Text(
-                text = "[ACTIF]",
-                color = activeColor,
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace
-            )
-        }
-        Spacer(Modifier.height(4.dp))
-        if (events.isEmpty()) {
-            Text(
-                text = "> EN ATTENTE D'ÉVÉNEMENTS RÉSEAU_",
-                color = timestampColor,
-                fontSize = 12.sp,
-                fontFamily = FontFamily.Monospace
-            )
-        } else {
-            // Les événements sont déjà en ordre chronologique inversé (prepend dans NetworkEventRepositoryImpl)
-            // reverseLayout = false est correct : index 0 = plus récent, affiché en tête
-            LazyColumn(
-                modifier = Modifier.heightIn(max = 160.dp)
+        Column(modifier = Modifier.padding(12.dp)) {
+            // En-tête
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                items(events) { event ->
-                    Row {
-                        Text(
-                            text = timeFormat.format(Date(event.timestampMs)) + " ",
-                            color = timestampColor,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
+                Text(
+                    text = "Journal réseau",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Surface(
+                    color = TerminalGreen.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Circle,
+                            contentDescription = null,
+                            tint = TerminalGreen,
+                            modifier = Modifier.size(6.dp)
                         )
                         Text(
-                            text = event.message,
-                            color = messageColor,
-                            fontSize = 11.sp,
-                            fontFamily = FontFamily.Monospace
+                            text = "Actif",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TerminalGreen
                         )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            if (events.isEmpty()) {
+                Text(
+                    text = "En attente d'événements réseau…",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LazyColumn(modifier = Modifier.heightIn(max = 160.dp)) {
+                    items(events) { event ->
+                        Row(modifier = Modifier.padding(vertical = 2.dp)) {
+                            Text(
+                                text = timeFormat.format(Date(event.timestampMs)),
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                text = "  ${event.message}",
+                                fontSize = 11.sp,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             }

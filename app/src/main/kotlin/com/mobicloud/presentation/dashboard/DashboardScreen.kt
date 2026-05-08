@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -57,53 +58,52 @@ fun DashboardScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Score de fiabilité central (AC #1)
+        // Jauge de fiabilité centrale
         ReliabilityGauge(
             score = diagnostics.reliabilityScore,
-            modifier = Modifier.padding(vertical = 16.dp)
+            modifier = Modifier.padding(vertical = 12.dp)
         )
 
-        // Badge rôle du nœud (Story 3.2)
+        // Rôle + canal
         Text(
-            text = if (nodeRole == NodeRole.SUPER_PAIR) "★ Super-Pair" else "● Nœud Connecté",
-            color = if (nodeRole == NodeRole.SUPER_PAIR) Color(0xFF00FF41) else Color(0xFF8BC34A),
-            fontSize = 13.sp,
-            fontFamily = FontFamily.Monospace,
+            text = if (nodeRole == NodeRole.SUPER_PAIR) "★ Super-Pair" else "● Nœud connecté",
+            style = MaterialTheme.typography.labelLarge,
+            color = if (nodeRole == NodeRole.SUPER_PAIR) Color(0xFF00FF41) else MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(bottom = 4.dp)
         )
 
-        // AC#6 Story 8.3 — Badge canal de transfert actif (UX-DR10)
         CloudRelayBadge(
             state = relayState,
             modifier = Modifier.padding(bottom = 4.dp)
         )
 
-        // AC#6 — Badge "Réseau instable" rouge (Story 3.4 : Circuit-Breaker actif)
         if (isNetworkUnstable) {
             Text(
                 text = "⚠ Réseau instable",
-                color = Color(0xFFFF1744),
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.error,
                 modifier = Modifier.padding(bottom = 4.dp)
             )
         }
 
-        // Message si aucun pair détecté (AC #5)
         if (!hasActivePeers) {
             Text(
-                text = "Aucun pair détecté — scan en cours...",
+                text = "Aucun pair détecté — scan en cours…",
+                style = MaterialTheme.typography.labelMedium,
                 color = Color(0xFFFFB300),
-                fontSize = 13.sp,
-                fontFamily = FontFamily.Monospace,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
         }
 
-        // KPI Cards — grille 2×2 (AC #2)
+        Spacer(Modifier.height(16.dp))
+
+        // Section Métriques
+        SectionLabel("Métriques")
+        Spacer(Modifier.height(8.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -135,12 +135,33 @@ fun DashboardScreen(
                 modifier = Modifier.weight(1f)
             )
         }
-        Spacer(Modifier.height(16.dp))
 
-        // Console de logs réseau (AC #3)
+        Spacer(Modifier.height(20.dp))
+
+        // Section Activité
+        SectionLabel("Activité")
+        Spacer(Modifier.height(8.dp))
+
         RadarLogConsole(
             events = networkEvents,
             modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(Modifier.height(16.dp))
+    }
+}
+
+@Composable
+private fun SectionLabel(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.sp
         )
     }
 }

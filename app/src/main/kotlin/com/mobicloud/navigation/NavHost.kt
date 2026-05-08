@@ -26,6 +26,8 @@ import com.mobicloud.presentation.dashboard.DashboardRoute
 import com.mobicloud.presentation.dashboard.DashboardScreen
 import com.mobicloud.presentation.explorer.ExplorerRoute
 import com.mobicloud.presentation.explorer.ExplorerScreen
+import com.mobicloud.presentation.network.NetworkRoute
+import com.mobicloud.presentation.network.NetworkScreen
 import com.mobicloud.presentation.settings.SettingsRoute
 import com.mobicloud.presentation.settings.SettingsScreen
 
@@ -57,6 +59,9 @@ fun JetpackNavHost(
         }
         composable<SettingsRoute> {
             SettingsScreen()
+        }
+        composable<NetworkRoute> {
+            NetworkScreen()
         }
     }
 }

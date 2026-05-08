@@ -35,6 +35,7 @@ import com.mobicloud.core.network.utils.NetworkState
 import com.mobicloud.core.network.utils.NetworkUtils
 import com.mobicloud.presentation.dashboard.DashboardRoute
 import com.mobicloud.presentation.explorer.ExplorerRoute
+import com.mobicloud.presentation.network.NetworkRoute
 import com.mobicloud.presentation.settings.SettingsRoute
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -190,6 +191,7 @@ class JetpackAppState(
             TopLevelDestination.DASHBOARD -> navController.navigate(DashboardRoute, topLevelNavOptions)
             TopLevelDestination.EXPLORER -> navController.navigate(ExplorerRoute, topLevelNavOptions)
             TopLevelDestination.SETTINGS -> navController.navigate(SettingsRoute, topLevelNavOptions)
+            TopLevelDestination.NETWORK -> navController.navigate(NetworkRoute, topLevelNavOptions)
         }
     }
 }

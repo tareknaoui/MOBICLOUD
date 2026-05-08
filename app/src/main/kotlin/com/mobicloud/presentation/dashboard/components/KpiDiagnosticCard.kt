@@ -1,56 +1,68 @@
 package com.mobicloud.presentation.dashboard.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
-private val borderColor = Color(0xFF333333)
-private val labelColor = Color(0xFF9E9E9E)
-private val dataColor = Color(0xFFE0E0E0)
 
 @Composable
 fun KpiDiagnosticCard(
     label: String,
     value: String,
-    accentColor: Color = Color(0xFF00FF41),
+    accentColor: Color = MaterialTheme.colorScheme.primary,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .border(1.dp, borderColor)
-            .height(72.dp)
+    ElevatedCard(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.elevatedCardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
     ) {
-        // Liseré coloré vertical gauche (état en un coup d'œil)
-        Column(
+        Row(
             modifier = Modifier
-                .width(4.dp)
-                .fillMaxHeight()
-                .background(accentColor)
-        ) {}
-        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-            Text(
-                text = label,
-                color = labelColor,
-                fontSize = 12.sp
+                .fillMaxWidth()
+                .height(76.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(4.dp)
+                    .fillMaxHeight()
+                    .background(
+                        color = accentColor,
+                        shape = RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)
+                    )
             )
-            Text(
-                text = value,
-                color = dataColor,
-                fontSize = 24.sp,
-                fontFamily = FontFamily.Monospace
-            )
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
         }
     }
 }
