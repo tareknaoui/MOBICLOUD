@@ -256,6 +256,22 @@ function handleJoin(nodeId, payload) {
 function handleGetPeers(ws) {
   const peers = [];
   for (const [nodeId, entry] of signalingRegistry.entries()) {
+    // Story 10.1 — exporter la clé publique EC P-256 (SPKI-DER Base64) lue depuis la session
+    // active. La clé est déjà vérifiée à l'AUTH (signature EC P-256 validée) — le serveur joue
+    // le rôle de PKI TOFU. Si la session est fermée ou si l'export échoue (clé non-exportable),
+    // pubKeySpkiDerB64 vaut "" pour cette entrée (le client retombera sur ByteArray(0)).
+    let pubKeySpkiDerB64 = '';
+    try {
+      const session = sessions.get(nodeId);
+      if (session?.publicKey) {
+        pubKeySpkiDerB64 = session.publicKey
+          .export({ format: 'der', type: 'spki' })
+          .toString('base64');
+      }
+    } catch (e) {
+      console.warn(`[GET_PEERS] export clé publique échoué pour nodeId=${nodeId.slice(0, 8)} : ${e.message}`);
+    }
+
     peers.push({
       nodeId,
       ip: entry.ip,
@@ -266,7 +282,9 @@ function handleGetPeers(ws) {
       // Story 9.2 — exposés pour le placement inter-cluster (Stories 9.3/9.4).
       // Defaults explicites pour les entrées JOIN-only (handleJoin n'écrit jamais ces champs).
       clusterId: entry.clusterId ?? '',
-      freeBytes: entry.freeBytes ?? 0
+      freeBytes: entry.freeBytes ?? 0,
+      // Story 10.1 — clé publique EC P-256 SPKI-DER encodée Base64 ; "" si session absente/fermée.
+      pubKeySpkiDerB64
     });
   }
   safeSend(ws, buildFrame(MSG.PEERS, Buffer.from(JSON.stringify(peers), 'utf8')));

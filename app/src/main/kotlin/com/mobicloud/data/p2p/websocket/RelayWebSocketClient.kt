@@ -279,7 +279,11 @@ class RelayWebSocketClient @Inject constructor(
                     // d'anciennes réponses serveur sans ces champs. isNull() distingue
                     // un null JSON explicite (sinon org.json renvoie le littéral "null").
                     clusterId        = if (obj.isNull("clusterId")) "" else obj.optString("clusterId", ""),
-                    freeBytes        = if (obj.isNull("freeBytes")) 0L else obj.optLong("freeBytes", 0L)
+                    freeBytes        = if (obj.isNull("freeBytes")) 0L else obj.optLong("freeBytes", 0L),
+                    // Story 10.1 — clé publique EC P-256 SPKI-DER en Base64 ; absent/null → ""
+                    // (rétrocompatibilité serveur sans ce champ).
+                    pubKeySpkiDerB64 = if (obj.isNull("pubKeySpkiDerB64")) ""
+                                       else obj.optString("pubKeySpkiDerB64", "")
                 )
             }
         }.getOrDefault(emptyList())

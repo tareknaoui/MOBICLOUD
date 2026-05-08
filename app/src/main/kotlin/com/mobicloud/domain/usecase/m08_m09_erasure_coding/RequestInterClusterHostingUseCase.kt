@@ -32,17 +32,32 @@ class RequestInterClusterHostingUseCase @Inject constructor(
      *
      * Tri : freeBytes décroissant (capacité maximale en tête).
      */
-    fun selectRemoteHost(blockSize: Int, localClusterId: String): RelayPeer? {
-        if (blockSize <= 0) return null
-        if (localClusterId.isBlank()) return null
-        val sizeLong = blockSize.toLong()
+    fun selectRemoteHost(blockSize: Int, localClusterId: String): RelayPeer? =
+        selectRemoteHosts(blockSize.toLong(), localClusterId).firstOrNull()
+
+    /**
+     * Retourne TOUS les Super-Pairs distants éligibles, triés par freeBytes décroissant.
+     * Permet à l'appelant de **retry sur un 2nd, 3e candidat** quand le 1er ne répond pas.
+     *
+     * `excludeNodeIds` : nodeIds à écarter (ex. tentatives déjà échouées dans la même
+     * passe de distribution).
+     */
+    fun selectRemoteHosts(
+        blockSize: Long,
+        localClusterId: String,
+        excludeNodeIds: Set<String> = emptySet()
+    ): List<RelayPeer> {
+        if (blockSize <= 0L) return emptyList()
+        if (localClusterId.isBlank()) return emptyList()
         return signalingRepository.latestPeers.value
             .asSequence()
             .filter { it.isSuperPair }
             .filter { it.clusterId.isNotBlank() }
             .filter { it.clusterId != localClusterId }
-            .filter { it.freeBytes >= sizeLong }
+            .filter { it.freeBytes >= blockSize }
             .filter { it.ip.isNotBlank() && it.port > 0 }
-            .maxByOrNull { it.freeBytes }
+            .filter { it.nodeId !in excludeNodeIds }
+            .sortedByDescending { it.freeBytes }
+            .toList()
     }
 }

@@ -35,5 +35,10 @@ data class RelayPeer(
     // Story 9.2 — UUID v4 du cluster du Super-Pair distant ; "" si pair legacy/JOIN.
     val clusterId: String = "",
     // Story 9.2 — capacité libre snapshot du Super-Pair distant (octets) ; 0 si legacy/JOIN.
-    val freeBytes: Long = 0L
+    val freeBytes: Long = 0L,
+    // Story 10.1 — clé publique EC P-256 SPKI-DER encodée en Base64, telle que reçue dans GET_PEERS.
+    // Vide ("") si le serveur ne la transporte pas (ancien relais) ou si la session WebSocket
+    // du nœud est fermée au moment du GET_PEERS. Permet à BlockTransferClient de vérifier
+    // la signature ACK inter-cluster sans ByteArray(0).
+    val pubKeySpkiDerB64: String = ""
 )
