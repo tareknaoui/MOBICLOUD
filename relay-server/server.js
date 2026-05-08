@@ -29,6 +29,7 @@ const AUTH_TIMEOUT_MS = 10_000;      // délai max pour envoyer AUTH après conn
 const MAX_BLOCK_SIZE = 1_100_000;    // 1.1 MB — marge sur fragments MobiCloud ~1 MB
 const MAX_RELAY_BUFFER_ENTRIES = 500; // cap total des blocs en attente en RAM
 const MAX_SIGNALING_PEERS = 100;      // cap total des Super-Pairs enregistrés
+const HEARTBEAT_INTERVAL_MS = 30_000; // ping ws protocol-level — détecte les sockets zombies (réseau coupé sans close)
 
 // Regex IP : IPv4 ou IPv6 compacte — pas de hostname
 const IP_RE = /^[\d.:a-fA-F]{2,45}$/;
@@ -297,9 +298,10 @@ function flushPendingBlocks(nodeId, ws) {
     const pending = entries.filter(e => e.destNodeId === nodeId);
     if (pending.length === 0) continue;
 
-    // Annuler tous les timers des entrées à supprimer (qu'on les envoie ou non)
-    pending.forEach(e => clearTimeout(e.ttlTimer));
-
+    // Ne purger que les entrées effectivement délivrées : si la ws ferme
+    // mid-flush, les blocs non envoyés restent en buffer avec leur TTL armé
+    // pour une prochaine reconnexion.
+    const delivered = [];
     for (const entry of pending) {
       if (ws.readyState !== WebSocket.OPEN) break;
       const forwardPayload = Buffer.allocUnsafe(16 + 64 + entry.data.length);
@@ -307,10 +309,13 @@ function flushPendingBlocks(nodeId, ws) {
       Buffer.from(blockId.padEnd(64, '\0'), 'utf8').copy(forwardPayload, 16);
       entry.data.copy(forwardPayload, 80);
       safeSend(ws, buildFrame(MSG.FORWARD, forwardPayload));
+      clearTimeout(entry.ttlTimer);
+      delivered.push(entry);
       console.log(`[RELAY] FLUSH ${blockId.slice(0, 16)} → nodeId=${nodeId.slice(0, 8)}`);
     }
 
-    const remaining = entries.filter(e => e.destNodeId !== nodeId);
+    if (delivered.length === 0) continue;
+    const remaining = entries.filter(e => !delivered.includes(e));
     if (remaining.length === 0) relayBuffer.delete(blockId);
     else relayBuffer.set(blockId, remaining);
   }
@@ -322,17 +327,25 @@ function handleUpload(fromNodeId, payload, senderWs) {
     sendError(senderWs, 'UPLOAD payload trop court (min 80 bytes)');
     return;
   }
-  const destNodeId = payload.slice(0, 16).toString('utf8').replace(/\0/g, '').trim();
-  const blockId = payload.slice(16, 80).toString('utf8').replace(/\0/g, '').trim();
+  // Strip uniquement le padding NUL trailing (pas tous les NUL : un \0 interior
+  // permettrait de forger une collision avec un autre nodeId/blockId via injection).
+  // Aligné sur handleRequestBlock.
+  const destNodeId = payload.slice(0, 16).toString('utf8').replace(/\0+$/, '').trim();
+  const blockId = payload.slice(16, 80).toString('utf8').replace(/\0+$/, '').trim();
   const data = payload.slice(80); // bloc chiffré AES-256 GCM — JAMAIS transformé (AC#4 Zero-Knowledge)
 
-  // Valider destNodeId et blockId après strip
-  if (!destNodeId || destNodeId.length > 16) {
-    sendError(senderWs, 'UPLOAD destNodeId invalide');
+  // Valider destNodeId et blockId après strip — contraintes strictes alignées sur REQUEST_BLOCK.
+  if (!destNodeId || destNodeId.length !== 16) {
+    sendError(senderWs, 'UPLOAD destNodeId invalide (attendu 16 chars)');
     return;
   }
-  if (!blockId || Buffer.byteLength(blockId, 'utf8') > 64) {
-    sendError(senderWs, 'UPLOAD blockId invalide');
+  if (!/^[0-9a-fA-F]{64}$/.test(blockId)) {
+    sendError(senderWs, 'UPLOAD blockId invalide (attendu 64 chars hex)');
+    return;
+  }
+  // Anti-loop : un nœud ne peut pas s'uploader un bloc à lui-même.
+  if (destNodeId.toLowerCase() === String(fromNodeId).toLowerCase()) {
+    sendError(senderWs, 'UPLOAD destNodeId == fromNodeId interdit');
     return;
   }
 
@@ -457,6 +470,11 @@ const httpServer = http.createServer((req, res) => {
 const wss = new WebSocketServer({ server: httpServer, maxPayload: MAX_BLOCK_SIZE + 256 });
 
 wss.on('connection', (ws) => {
+  // Heartbeat protocol-level : détecte les sockets zombies (réseau coupé sans close TCP).
+  // Si pas de pong dans la fenêtre du heartbeat suivant, ws.terminate() force la fermeture.
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
+
   // État de la connexion — non authentifié jusqu'au premier message AUTH
   let authState = null; // null = non auth ; après AUTH_OK = { nodeId, publicKey }
 
@@ -552,15 +570,22 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     clearTimeout(authTimeout);
     if (authState) {
-      sessions.delete(authState.nodeId);
-      // Nettoyage annuaire signaling si Super-Pair
-      const entry = signalingRegistry.get(authState.nodeId);
-      if (entry) {
-        clearTimeout(entry.ttlTimer);
-        signalingRegistry.delete(authState.nodeId);
-        console.log(`[SIGNALING] nodeId=${authState.nodeId.slice(0, 8)} déconnecté — supprimé de l'annuaire`);
+      // Race-safe : si une nouvelle connexion a déjà remplacé cette session
+      // (reconnexion, NAT rebinding), ne rien supprimer — sinon on évincerait
+      // l'entrée de la connexion vivante.
+      const currentSession = sessions.get(authState.nodeId);
+      if (currentSession && currentSession.ws === ws) {
+        sessions.delete(authState.nodeId);
+        const entry = signalingRegistry.get(authState.nodeId);
+        if (entry) {
+          clearTimeout(entry.ttlTimer);
+          signalingRegistry.delete(authState.nodeId);
+          console.log(`[SIGNALING] nodeId=${authState.nodeId.slice(0, 8)} déconnecté — supprimé de l'annuaire`);
+        }
+        console.log(`[WS] nodeId=${authState.nodeId.slice(0, 8)} déconnecté (${sessions.size} sessions restantes)`);
+      } else {
+        console.log(`[WS] nodeId=${authState.nodeId.slice(0, 8)} ancienne ws fermée — session active conservée`);
       }
-      console.log(`[WS] nodeId=${authState.nodeId.slice(0, 8)} déconnecté (${sessions.size} sessions restantes)`);
     }
   });
 
@@ -577,8 +602,25 @@ function startServer() {
     console.log(`[SERVER] /health → http://localhost:${PORT}/health`);
   });
 
+  // Heartbeat global — ping toutes les ws toutes les 30s, terminate celles qui n'ont pas
+  // répondu au précédent ping (zombies). Le 'close' handler nettoiera sessions/registry.
+  const heartbeat = setInterval(() => {
+    for (const ws of wss.clients) {
+      if (ws.isAlive === false) {
+        ws.terminate();
+        continue;
+      }
+      ws.isAlive = false;
+      try { ws.ping(); } catch { /* ws en cours de fermeture */ }
+    }
+  }, HEARTBEAT_INTERVAL_MS);
+  heartbeat.unref(); // ne bloque pas l'exit du process
+
+  wss.on('close', () => clearInterval(heartbeat));
+
   process.once('SIGTERM', () => {
     console.log('[SERVER] SIGTERM reçu — fermeture gracieuse...');
+    clearInterval(heartbeat);
     for (const [, session] of sessions.entries()) {
       if (session.ws.readyState === WebSocket.OPEN) {
         session.ws.close(1001, 'Server shutting down');

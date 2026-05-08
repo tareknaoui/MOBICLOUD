@@ -44,6 +44,10 @@ class KeystoreManager() {
      * Génère une nouvelle paire de clés dans le Keystore et retourne l'identité.
      */
     fun generateIdentity(): NodeIdentity {
+        // Garde-fou : si la clé existe déjà, on la retourne plutôt que d'écraser
+        // (KeyPairGenerator avec un alias existant remplace la clé → changement de nodeId).
+        getExistingIdentity()?.let { return it }
+
         // Génération EC secp256r1 dans l'Android Keystore (hardware-backed TEE par défaut)
         val keyPairGenerator = KeyPairGenerator.getInstance(
             KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEYSTORE

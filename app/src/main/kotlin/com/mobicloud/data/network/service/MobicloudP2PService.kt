@@ -252,9 +252,9 @@ class MobicloudP2PService : Service() {
             }
 
             // Loop 6: Recalcul périodique du score de fiabilité (AC #1, #2, #3, #4)
-            // FIX dual-Keystore : on update via le nodeId d'identityRepository (DB-backed) et NON
-            // identity.nodeId (issu de securityRepository qui utilise un KEY_ALIAS différent et crée
-            // un nodeId distinct → l'UPDATE ne match aucune row → score figé à 1.0 (100%)).
+            // On update via le nodeId d'identityRepository (source DB-backed Room = source de
+            // vérité pour l'UPDATE). securityRepository partage désormais le même KEY_ALIAS donc
+            // produit le même nodeId, mais on garde ce chemin pour rester aligné sur l'entité Room.
             launch {
                 val dbNodeId = identityRepository.getIdentity().getOrNull()?.nodeId
                 if (dbNodeId == null) {
