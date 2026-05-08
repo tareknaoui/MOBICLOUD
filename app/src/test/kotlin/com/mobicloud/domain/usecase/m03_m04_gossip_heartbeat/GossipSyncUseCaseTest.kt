@@ -157,7 +157,8 @@ class GossipSyncUseCaseTest {
         val entry = DhtEntry("block-Z", "node-1", "10.0.0.1", 9090, 1000L)
         coEvery { dhtRepository.findByBlockId("block-Z") } returns Result.success(entry)
         coEvery { dhtRepository.findByBlockId("block-MISSING") } returns Result.success(null)
-        every { peerRepository.peers } returns MutableStateFlow(emptyList())
+        // Le filtre "known peer" exige que le requester soit dans peerRepository.
+        every { peerRepository.peers } returns MutableStateFlow(listOf(peer("remote-node")))
 
         val req = DeltaSyncRequest(
             requesterNodeId = "remote-node",
