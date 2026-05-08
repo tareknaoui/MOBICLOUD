@@ -16,9 +16,14 @@ import kotlin.math.min
 
 private const val TAG = "RelayWSClient"
 
-// Nœud de configuration : liste des URLs des relais HA (hardcodée — Story 8.3 pourra rendre configurable)
+// Liste des URLs des relais HA. Au moins 2 instances sur des regions distinctes
+// pour garantir la haute disponibilite : si la 1ere ne repond pas (5 tentatives
+// echouees), le client bascule automatiquement sur la suivante.
+// Render free tier : sleep apres 15min d'inactivite -- ping /health pour reveiller
+// avant la demo si necessaire.
 internal val RELAY_SERVER_URLS = listOf(
-    "wss://certainty-upstage-silly.ngrok-free.dev"  // PC local via ngrok (dev)
+    "wss://mobicloud-relay-1.onrender.com",  // Render Frankfurt (EU)
+    "wss://mobicloud-relay-2.onrender.com"   // Render region differente (HA geographique)
 )
 
 @Singleton
