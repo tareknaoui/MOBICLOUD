@@ -96,9 +96,19 @@ class SignalingRepositoryImpl @Inject constructor(
                 Log.w(TAG, "[DIAG] pair ${peer.nodeId.take(8)} ignoré : trop ancien ($ageMs ms > $RELAY_TTL_MS)")
                 return@forEach
             }
-            Log.i(TAG, "[DIAG] insertion ${peer.nodeId.take(8)}@${peer.ip}:${peer.port} isSuperPair=${peer.isSuperPair}")
-            // La clé publique est un placeholder vide — elle sera résolue lors du TCP handshake direct.
-            // Le relais est une couche de découverte, pas d'authentification.
+
+            // Story 10.1 -- decoder la cle publique transportee par le relay (SPKI-DER Base64).
+            // Sans cette cle, toutes les verifications de signature Bully (ELECTION/ALIVE/COORDINATOR/
+            // ABDICATION) echouent silencieusement -> personne ne reconnait personne comme super-peer.
+            // Si la cle est absente (relay legacy ou session WS fermee), on skip le pair pour cette
+            // iteration -- il sera retente au prochain GET_PEERS.
+            val pubKeyBytes = decodePubKeyBase64(peer.pubKeySpkiDerB64)
+            if (pubKeyBytes == null) {
+                Log.w(TAG, "[DIAG] pair ${peer.nodeId.take(8)} ignoré : cle publique absente/invalide -- relay legacy ou session WS fermee")
+                return@forEach
+            }
+
+            Log.i(TAG, "[DIAG] insertion ${peer.nodeId.take(8)}@${peer.ip}:${peer.port} isSuperPair=${peer.isSuperPair} pubKey=${pubKeyBytes.size}o")
             // isSuperPair vient maintenant du serveur (Story Bully) : true si REGISTER_PEER, false si JOIN.
             //
             // Story 9.2 — `peer.clusterId` et `peer.freeBytes` ne sont volontairement PAS
@@ -108,7 +118,7 @@ class SignalingRepositoryImpl @Inject constructor(
             // en mémoire par les use-cases inter-cluster (Stories 9.3 RequestHosting,
             // 9.4 RequestBlock) directement à partir du Flow<RelayEvent.PeerList>.
             peerRepository.registerOrUpdatePeer(
-                identity    = NodeIdentity(peer.nodeId, ByteArray(0)),
+                identity    = NodeIdentity(peer.nodeId, pubKeyBytes),
                 timestampMs = SystemClock.elapsedRealtime(),
                 source      = DiscoverySource.RELAY_HA,
                 ipAddress   = peer.ip,
@@ -118,6 +128,20 @@ class SignalingRepositoryImpl @Inject constructor(
             insertedCount++
         }
         Log.i(TAG, "[DIAG] processPeerList END — $insertedCount insérés sur ${peers.size}")
+    }
+
+    // Decode la cle SPKI-DER Base64 envoyee par le relay (champ pubKeySpkiDerB64 de Story 10.1).
+    // Retourne null si :
+    //  - la chaine est vide (relay legacy ou session WS fermee cote pair)
+    //  - le decodage Base64 echoue (charset corrompu)
+    // Le caller skip silencieusement le pair dans ce cas.
+    internal fun decodePubKeyBase64(b64: String): ByteArray? {
+        if (b64.isBlank()) return null
+        // java.util.Base64 (JVM-natif) plutot qu'android.util.Base64 pour rester testable
+        // sans Robolectric. Le serveur encode en standard Base64 (sans wrapping ni URL-safe).
+        return runCatching { java.util.Base64.getDecoder().decode(b64) }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
     }
 
     override suspend fun joinAsParticipant(

@@ -11,7 +11,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -50,7 +49,7 @@ class NodeSettingsRepositoryImplTest {
     }
 
     @Test
-    fun `getSettings genere clusterId UUID v4 valide au premier appel`() = runTest {
+    fun `getSettings ecrit clusterId UUID v4 quand provider retourne un id non vide`() = runTest {
         val upsertSlot = slot<NodeSettingsEntity>()
         coEvery { dao.getSettings() } returns null
         coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
@@ -64,7 +63,7 @@ class NodeSettingsRepositoryImplTest {
     }
 
     @Test
-    fun `getSettings genere UUID quand entity existante a clusterId vide`() = runTest {
+    fun `getSettings ecrit clusterId quand entity existante a clusterId vide et provider non vide`() = runTest {
         val existingEntity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 1_000_000L, clusterId = "")
         val upsertSlot = slot<NodeSettingsEntity>()
         coEvery { dao.getSettings() } returns existingEntity
@@ -77,6 +76,99 @@ class NodeSettingsRepositoryImplTest {
             UUID_V4_REGEX.matches(result.clusterId)
         )
         coVerify { dao.upsert(any()) }
+    }
+
+    // Si le SSID n'est pas lisible (permission refusee, hors WiFi), le provider retourne ""
+    // -- on N'ECRIT PAS un clusterId vide en DB pour permettre un retry plus tard via
+    // refreshClusterIdFromWifi(), au lieu de figer un UUID random a vie.
+    @Test
+    fun `getSettings ne persiste pas clusterId quand provider retourne vide`() = runTest {
+        val repoEmpty = NodeSettingsRepositoryImpl(
+            dao,
+            freeSpaceProvider = { TEN_GB },
+            clusterIdProvider = { "" }
+        )
+        coEvery { dao.getSettings() } returns null
+        coEvery { dao.upsert(any()) } returns Unit
+
+        val result = repoEmpty.getSettings()
+
+        assertEquals("", result.clusterId)
+        coVerify(exactly = 0) { dao.upsert(any()) }
+    }
+
+    @Test
+    fun `refreshClusterIdFromWifi ecrit nouveau clusterId quand SSID disponible et entity vide`() = runTest {
+        val newId = "11111111-2222-4333-8444-555555555555"
+        val repoFixed = NodeSettingsRepositoryImpl(
+            dao,
+            freeSpaceProvider = { TEN_GB },
+            clusterIdProvider = { newId }
+        )
+        val existingEntity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 1_000_000L, clusterId = "")
+        val upsertSlot = slot<NodeSettingsEntity>()
+        coEvery { dao.getSettings() } returns existingEntity
+        coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
+
+        val result = repoFixed.refreshClusterIdFromWifi()
+
+        assertEquals(newId, result)
+        assertEquals(newId, upsertSlot.captured.clusterId)
+        assertEquals(1_000_000L, upsertSlot.captured.allocatedStorageBytes)
+    }
+
+    @Test
+    fun `refreshClusterIdFromWifi ne touche pas DB quand SSID indisponible`() = runTest {
+        val repoEmpty = NodeSettingsRepositoryImpl(
+            dao,
+            freeSpaceProvider = { TEN_GB },
+            clusterIdProvider = { "" }
+        )
+        val existingEntity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 1_000_000L, clusterId = "abc")
+        coEvery { dao.getSettings() } returns existingEntity
+        coEvery { dao.upsert(any()) } returns Unit
+
+        val result = repoEmpty.refreshClusterIdFromWifi()
+
+        assertEquals("abc", result)
+        coVerify(exactly = 0) { dao.upsert(any()) }
+    }
+
+    @Test
+    fun `refreshClusterIdFromWifi met a jour quand SSID change`() = runTest {
+        val newId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+        val repoFixed = NodeSettingsRepositoryImpl(
+            dao,
+            freeSpaceProvider = { TEN_GB },
+            clusterIdProvider = { newId }
+        )
+        val existingEntity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 1_000_000L, clusterId = "old-cluster-id")
+        val upsertSlot = slot<NodeSettingsEntity>()
+        coEvery { dao.getSettings() } returns existingEntity
+        coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
+
+        val result = repoFixed.refreshClusterIdFromWifi()
+
+        assertEquals(newId, result)
+        assertEquals(newId, upsertSlot.captured.clusterId)
+    }
+
+    @Test
+    fun `refreshClusterIdFromWifi no-op quand SSID donne le meme clusterId`() = runTest {
+        val sameId = "550e8400-e29b-41d4-a716-446655440000"
+        val repoFixed = NodeSettingsRepositoryImpl(
+            dao,
+            freeSpaceProvider = { TEN_GB },
+            clusterIdProvider = { sameId }
+        )
+        val existingEntity = NodeSettingsEntity(id = 0, allocatedStorageBytes = 1_000_000L, clusterId = sameId)
+        coEvery { dao.getSettings() } returns existingEntity
+        coEvery { dao.upsert(any()) } returns Unit
+
+        val result = repoFixed.refreshClusterIdFromWifi()
+
+        assertEquals(sameId, result)
+        coVerify(exactly = 0) { dao.upsert(any()) }
     }
 
     @Test

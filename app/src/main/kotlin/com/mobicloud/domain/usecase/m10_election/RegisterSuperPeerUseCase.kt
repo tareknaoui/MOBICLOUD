@@ -40,9 +40,19 @@ class RegisterSuperPeerUseCase @Inject constructor(
         }
         val reliabilityScore = trustScoreProvider.getTrustScore(identity.nodeId).toFloat()
 
+        // L'IP publique n'est PAS critique : le relay route via la session WebSocket active
+        // (il connait l'origine reelle du socket). L'IP sert uniquement aux tentatives directes
+        // peer-to-peer (try-direct-then-relay). Si api.ipify.org est inaccessible (filtrage
+        // hotspot, DNS, rate-limit, etc.), on fallback sur "0.0.0.0" -- les autres pairs
+        // tomberont en mode relay-only pour ce super-peer, ce qui est l'objectif de V5.0.
+        // Bug historique : un fetch IP qui echoue bloquait tout REGISTER_PEER -> super-peer
+        // jamais visible dans l'annuaire signaling -> tous les nœuds elisaient en parallele.
         val ip = publicIpFetcher.fetchPublicIp().getOrElse { e ->
-            emit(Result.failure(e))
-            return@flow
+            Log.w(TAG, "fetchPublicIp echoue -- fallback ip=0.0.0.0 (relay-only mode)", e)
+            networkEventRepository.pushEvent(
+                "[ELECTION] IP publique indisponible -- enregistrement Super-Pair en mode relay-only"
+            )
+            "0.0.0.0"
         }
 
         try {

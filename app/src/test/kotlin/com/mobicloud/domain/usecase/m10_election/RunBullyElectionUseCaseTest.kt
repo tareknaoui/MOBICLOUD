@@ -78,9 +78,19 @@ class RunBullyElectionUseCaseTest {
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     /**
-     * Crée un StateFlow de pairs où aucun n'est Super-Pair — condition déclenchante de l'élection.
+     * Crée un StateFlow de pairs où aucun n'est Super-Pair — mais au moins un autre pair actif
+     * est présent (Garde-fou bootstrap : Bully ne démarre que si on a découvert un voisin).
      */
-    private fun noSuperPairFlow() = MutableStateFlow(emptyList<Peer>())
+    private fun noSuperPairFlow() = MutableStateFlow(
+        listOf(
+            Peer(
+                identity = NodeIdentity("witnessPeer", ByteArray(0), 0.5f),
+                lastSeenTimestampMs = System.currentTimeMillis(),
+                isActive = true,
+                isSuperPair = false
+            )
+        )
+    )
 
     /**
      * Crée un SharedFlow partagé simulant le canal réseau entrant.
@@ -111,8 +121,8 @@ class RunBullyElectionUseCaseTest {
                 finalResult = flowResult.first()
             }
 
-            // Avancer de 5s (monitoring réactif) puis 3s (timeout ALIVE) — aucun ALIVE émis
-            advanceTimeBy(5_001L)
+            // Avancer de 20s (fenêtre de monitoring) puis 3s (timeout ALIVE) — aucun ALIVE émis
+            advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS + 1L)
             advanceTimeBy(3_001L)
 
             job.join()
@@ -147,8 +157,8 @@ class RunBullyElectionUseCaseTest {
             finalResult = flowResult.first()
         }
 
-        // Avancer de 5s pour dépasser le monitoring
-        advanceTimeBy(5_001L)
+        // Avancer de 20s pour dépasser le monitoring
+        advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS + 1L)
 
         // Émettre un ALIVE de score supérieur dans la fenêtre des 3s
         incomingMessagesFlow.emit(
@@ -178,7 +188,53 @@ class RunBullyElectionUseCaseTest {
     fun `when superpair appears during monitoring window, election is aborted`() = runTest {
         val testDispatcher = UnconfinedTestDispatcher(testScheduler)
 
-        // Commence sans Super-Pair, puis un Super-Pair apparaît après 2s (avant les 5s)
+        // Commence avec 1 pair non-super (pour passer le garde-fou bootstrap),
+        // puis un Super-Pair apparaît avant la fin de la fenêtre de monitoring.
+        val peersFlow = noSuperPairFlow()
+        every { peerRepository.peers } returns peersFlow
+
+        val incomingMessagesFlow = incomingFlow()
+        every { networkClient.incomingMessages } returns incomingMessagesFlow
+        coEvery { networkClient.broadcastElectionMessage(any()) } returns Result.success(Unit)
+
+        val flowResult = buildUseCase(testDispatcher)()
+
+        var finalResult: Result<*>? = null
+        val job = launch(testDispatcher) {
+            finalResult = flowResult.first()
+        }
+
+        // Au milieu de la fenêtre : un Super-Pair apparaît → la condition redevient false → timer reset
+        advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS / 2)
+        val superPeer = Peer(
+            identity = NodeIdentity("superPeer", ByteArray(0), 5.0f),
+            lastSeenTimestampMs = System.currentTimeMillis(),
+            isActive = true,
+            isSuperPair = true
+        )
+        peersFlow.value = peersFlow.value + superPeer
+
+        // Avancer encore une fenêtre complète — l'élection ne doit jamais être déclenchée
+        advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS + 1L)
+
+        // Flow bloqué (jamais d'émission) → le job tourne encore
+        assertTrue(job.isActive)
+
+        job.cancel()
+
+        // Aucun broadcast ne doit avoir été envoyé
+        coVerify(exactly = 0) {
+            networkClient.broadcastElectionMessage(any())
+        }
+    }
+
+    // Garde-fou bootstrap : si peerRepository ne contient AUCUN autre pair actif,
+    // l'élection ne doit jamais démarrer (évite la course de bootstrap où plusieurs
+    // nœuds simultanés s'élisent en parallèle car chacun se croit seul).
+    @Test
+    fun `does not start election when no other active peer in registry`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+
         val peersFlow = MutableStateFlow(emptyList<Peer>())
         every { peerRepository.peers } returns peersFlow
 
@@ -193,27 +249,64 @@ class RunBullyElectionUseCaseTest {
             finalResult = flowResult.first()
         }
 
-        // Après 2s : un Super-Pair apparaît → le timer de 5s est réinitialisé
-        advanceTimeBy(2_000L)
-        val superPeer = Peer(
-            identity = NodeIdentity("superPeer", ByteArray(0), 5.0f),
-            lastSeenTimestampMs = System.currentTimeMillis(),
-            isActive = true,
-            isSuperPair = true
-        )
-        peersFlow.value = listOf(superPeer)
+        // Avancer largement au-delà de la fenêtre de monitoring sans peupler peerRepository
+        advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS * 3)
 
-        // Avancer encore 10s — l'élection ne doit jamais être déclenchée car un Super-Pair est présent
-        advanceTimeBy(10_000L)
-
-        // Flow bloqué (jamais d'émission) → le job tourne encore
+        // Le flow doit toujours attendre — aucun broadcast envoyé
         assertTrue(job.isActive)
-
         job.cancel()
 
-        // Aucun broadcast ne doit avoir été envoyé
         coVerify(exactly = 0) {
             networkClient.broadcastElectionMessage(any())
+        }
+    }
+
+    // Garde-fou bootstrap (suite) : si un pair apparaît tardivement dans peerRepository,
+    // la fenêtre de monitoring démarre à ce moment-là — pas avant.
+    @Test
+    fun `election starts only after first active peer appears`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+
+        val peersFlow = MutableStateFlow(emptyList<Peer>())
+        every { peerRepository.peers } returns peersFlow
+        coEvery {
+            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any())
+        } returns Result.success(Unit)
+
+        val incomingMessagesFlow = incomingFlow()
+        every { networkClient.incomingMessages } returns incomingMessagesFlow
+        coEvery { networkClient.broadcastElectionMessage(any()) } returns Result.success(Unit)
+
+        val flowResult = buildUseCase(testDispatcher)()
+
+        var finalResult: Result<*>? = null
+        val job = launch(testDispatcher) {
+            finalResult = flowResult.first()
+        }
+
+        // Pendant 10s, peerRepository est vide → garde-fou actif, pas d'élection
+        advanceTimeBy(10_000L)
+        coVerify(exactly = 0) { networkClient.broadcastElectionMessage(any()) }
+
+        // Un voisin apparaît → la fenêtre de monitoring peut commencer
+        peersFlow.value = listOf(
+            Peer(
+                identity = NodeIdentity("lateNeighbor", ByteArray(0), 0.5f),
+                lastSeenTimestampMs = System.currentTimeMillis(),
+                isActive = true,
+                isSuperPair = false
+            )
+        )
+
+        // 20s + 3s pour victoire complète
+        advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS + 1L)
+        advanceTimeBy(3_001L)
+
+        job.join()
+
+        assertTrue(finalResult?.isSuccess == true)
+        coVerify(exactly = 1) {
+            networkClient.broadcastElectionMessage(match { it.type == ElectionMessageType.ELECTION })
         }
     }
 }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -39,37 +40,76 @@ class RunBullyElectionUseCase @Inject constructor(
     private val nodeSettingsRepository: NodeSettingsRepository,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
+    companion object {
+        // Fenêtre de stabilisation Bully : la condition d'élection (aucun super-peer +
+        // au moins un autre pair actif) doit tenir 20s d'affilée pour éviter les courses
+        // de bootstrap où plusieurs nœuds s'élisent en parallèle avant échange complet
+        // des heartbeats/peer-list. Laisse 3-4 cycles GET_PEERS pour que la registry
+        // se peuple. Configurable via constante pour les tests (qui peuvent avancer
+        // l'horloge virtuelle sans attendre 20s réelles).
+        const val MONITORING_WINDOW_MS = 20_000L
+    }
+
     operator fun invoke(): Flow<Result<SuperPairElection>> = flow {
 
-        // Étape 1 (AC1) : Monitoring réactif de l'absence de Super-Pair
-        // On observe le StateFlow des pairs et on attend que la condition
-        // "aucun Super-Pair actif" persiste pendant exactement 5 secondes CONSÉCUTIVES.
-        // Si un Super-Pair réapparaît pendant la fenêtre, le timer est réinitialisé.
+        // Étape 1 (AC1) : Monitoring réactif avec deux garde-fous bootstrap.
+        //
+        // Bug historique : si N nœuds démarraient simultanément (ex. 4 phones lancés ensemble),
+        // chacun voyait `peerRepository.peers` vide ou non-encore-peuplé, déclenchait Bully en
+        // parallèle, et "gagnait" tous car les ELECTION étaient rejetées par les voisins (sender
+        // pas encore dans leur PeerRegistry, signature non vérifiable). Résultat : N super-peers.
+        //
+        // Garde-fou 1 : on n'élit pas tant qu'on n'a pas découvert AU MOINS UN autre pair actif.
+        //               Si on est vraiment seul, attendre — un pair finira par apparaître ou bien
+        //               on est isolé légitimement (cluster solo, OK de devenir super-peer).
+        //               Pour distinguer "seul vraiment" vs "seul temporairement (bootstrap)",
+        //               on combine avec le délai du garde-fou 2.
+        //
+        // Garde-fou 2 : la condition (pas de super-peer ET au moins un autre pair) doit être
+        //               stable pendant 20s consécutives. Laisse 3-4 cycles GET_PEERS pour que la
+        //               registry se peuple, et la signature des pairs distants soit échangée.
         if (electionStateManager.isInCooldown()) {
             emit(Result.failure(Exception("Election aborted: Node is in cooldown.")))
             return@flow
         }
 
+        val localIdentity = securityRepository.getIdentity().getOrElse { error ->
+            emit(Result.failure(error))
+            return@flow
+        }
+
         peerRepository.peers
-            .map { peers -> peers.none { it.isActive && it.isSuperPair } }
-            .transformLatest { hasNoSuperPair ->
-                if (hasNoSuperPair) {
-                    delay(5_000L)
+            .map { peers ->
+                val noSuperPeer = peers.none { it.isActive && it.isSuperPair }
+                // Garde-fou bootstrap : on a deja decouvert AU MOINS UN autre pair dans le
+                // registre (peu importe son etat isActive courant). On ne verifie PAS isActive
+                // ici car la boucle d'eviction (15s) flicker les pairs entre actif/inactif vs
+                // GET_PEERS (30s), ce qui ferait flop la condition et annulerait le timer
+                // de monitoring en boucle. La presence dans le registre suffit a prouver qu'on
+                // n'est pas en bootstrap solo.
+                val hasOtherKnownPeer = peers.any { it.identity.nodeId != localIdentity.nodeId }
+                noSuperPeer && hasOtherKnownPeer
+            }
+            // CRITIQUE : distinctUntilChanged() ESSENTIEL avant transformLatest.
+            // Sans ca, peerRepository.peers (StateFlow alimente par DAO) re-emet a chaque
+            // GET_PEERS (10s) / JOIN (30s) / eviction (1s) -- meme si shouldElect reste true,
+            // transformLatest annule le delay 20s et le redemarre, et les 20s consecutives
+            // ne s'accumulent JAMAIS -> Bully ne fire jamais -> aucun super-peer elu.
+            .distinctUntilChanged()
+            .transformLatest { shouldElect ->
+                if (shouldElect) {
+                    delay(MONITORING_WINDOW_MS)
                     emit(Unit)
                 }
-                // Si hasNoSuperPair = false, rien n'est émis et le delay est annulé via transformLatest
+                // Si la condition redevient false (super-peer apparu OU plus de pair actif),
+                // transformLatest annule le delay en cours -> timer reset.
             }
-            .firstOrNull() // Attend la première fois que 5s s'écoulent sans Super-Pair
+            .firstOrNull()
 
         // Re-vérification de sécurité après la fenêtre de monitoring
         val activeSuperPair = peerRepository.peers.value.any { it.isActive && it.isSuperPair }
         if (activeSuperPair) {
             emit(Result.failure(Exception("Election aborted: An active Super-Pair appeared during the monitoring window.")))
-            return@flow
-        }
-
-        val localIdentity = securityRepository.getIdentity().getOrElse { error ->
-            emit(Result.failure(error))
             return@flow
         }
         val localScore = trustScoreProvider.getTrustScore(localIdentity.nodeId).toFloat()

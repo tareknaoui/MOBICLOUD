@@ -152,14 +152,24 @@ class RegisterSuperPeerUseCaseTest {
         coVerify(exactly = 0) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
     }
 
+    // Comportement post-fix : si fetchPublicIp echoue (api.ipify.org bloque, no internet,
+    // rate-limit, etc.), on N'AVORTE PAS l'enregistrement -- on fallback sur "0.0.0.0"
+    // (le relay route via la session WebSocket, l'IP n'est utile que pour try-direct-then-relay).
+    // Bug historique : bloquer REGISTER_PEER ici causait des super-peers fantomes au niveau cluster,
+    // visibles que localement, jamais propages dans l'annuaire signaling.
     @Test
-    fun `echec recuperation IP publique - emet Result failure`() = runTest {
+    fun `echec recuperation IP publique - fallback 0_0_0_0 et REGISTER_PEER envoye`() = runTest {
         coEvery { publicIpFetcher.fetchPublicIp() } returns Result.failure(Exception("Network error"))
 
         val result = useCase(tcpPort = 7777).first()
 
-        assertTrue(result.isFailure)
-        coVerify(exactly = 0) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
+        assertTrue(result.isSuccess)
+        coVerify(exactly = 1) {
+            signalingRepository.registerAsSuperPeer("0.0.0.0", 7777, any(), any(), any())
+        }
+        coVerify(exactly = 1) {
+            networkEventRepository.pushEvent(match { it.contains("relay-only") })
+        }
     }
 
     @Test

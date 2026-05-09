@@ -17,6 +17,7 @@ import com.mobicloud.compose.R
 import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.core.network.utils.NetworkUtils
 import com.mobicloud.domain.repository.IdentityRepository
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SignalingRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -75,6 +76,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var triggerAutoRepairUseCase: TriggerAutoRepairUseCase
     @Inject lateinit var executeReplicationPlanUseCase: ExecuteReplicationPlanUseCase
     @Inject lateinit var localDiscoveryRepository: LocalDiscoveryRepository
+    @Inject lateinit var nodeSettingsRepository: NodeSettingsRepository
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -150,7 +152,31 @@ class MobicloudP2PService : Service() {
             tcpConnectionManager.replicationPlanHandler = executeReplicationPlanUseCase
 
             // Story 7.1 — démarrer l'observation des changements réseau WiFi → 4G
+            // Hook : a chaque WiFi disponible, recalculer le clusterId depuis le SSID.
+            // Couvre le cas ou l'app demarre avant la connexion WiFi (clusterId vide
+            // jusqu'au callback) ou la permission ACCESS_FINE_LOCATION est accordee
+            // apres le 1er getSettings().
+            networkChangeObserver.onWifiAvailable = {
+                serviceScope.launch {
+                    runCatching { nodeSettingsRepository.refreshClusterIdFromWifi() }
+                        .onSuccess { id ->
+                            Log.i(LOGTAG, "[CLUSTER] refresh apres WiFi available: clusterId=${id.take(8).ifEmpty { "(vide -- SSID indisponible)" }}")
+                        }
+                        .onFailure { Log.w(LOGTAG, "[CLUSTER] refresh apres WiFi available echoue", it) }
+                }
+            }
             networkChangeObserver.register()
+
+            // Refresh initial best-effort : si le WiFi est deja connecte au demarrage du service
+            // (cas frequent : on relance l'app sans changer de reseau), onAvailable ne se redeclenche
+            // pas forcement -- on force un refresh maintenant.
+            serviceScope.launch {
+                runCatching { nodeSettingsRepository.refreshClusterIdFromWifi() }
+                    .onSuccess { id ->
+                        Log.i(LOGTAG, "[CLUSTER] refresh initial: clusterId=${id.take(8).ifEmpty { "(vide -- SSID indisponible)" }}")
+                    }
+                    .onFailure { Log.w(LOGTAG, "[CLUSTER] refresh initial echoue", it) }
+            }
 
             // Démarrer le TCP server EN PREMIER pour obtenir le port avant d'annoncer sur Firebase
             val tcpPortResult = tcpConnectionManager.startServer()

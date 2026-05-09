@@ -33,10 +33,14 @@ class NodeSettingsRepositoryImpl(
             val stat = StatFs(Environment.getDataDirectory().path)
             stat.availableBlocksLong * stat.blockSizeLong
         },
+        // Pas de fallback UUID random : si SSID indisponible (permission
+        // localisation refusee, hors WiFi, etc.) on retourne "" -- le clusterId
+        // sera recalcule au prochain refreshClusterIdFromWifi() (declenche par
+        // les changements reseau dans le service P2P).
         clusterIdProvider = {
             wifiNetworkRepository.getCurrentSsid()
                 ?.let { ssid -> ssidToClusterId(ssid) }
-                ?: java.util.UUID.randomUUID().toString()
+                ?: ""
         }
     )
 
@@ -60,6 +64,9 @@ class NodeSettingsRepositoryImpl(
     }
 
     // P7: double-check locking + lazy clusterId backfill (Story 9.1).
+    // Si clusterIdProvider() retourne "" (SSID indisponible), on N'ÉCRIT PAS
+    // un clusterId vide en DB -- on retourne juste un NodeSettings avec clusterId="".
+    // refreshClusterIdFromWifi() reessayera quand le SSID deviendra disponible.
     override suspend fun getSettings(): NodeSettings {
         dao.getSettings()?.toDomain()?.let { existing ->
             if (existing.clusterId.isNotEmpty()) return existing
@@ -68,13 +75,40 @@ class NodeSettingsRepositoryImpl(
             val current = dao.getSettings()?.toDomain()
                 ?: NodeSettings(allocatedStorageBytes = defaultBytes())
             if (current.clusterId.isNotEmpty()) {
-                current
-            } else {
-                val withCluster = current.copy(clusterId = clusterIdProvider())
-                dao.upsert(withCluster.toEntity())
-                withCluster
+                return@withLock current
             }
+            val newId = clusterIdProvider()
+            if (newId.isEmpty()) {
+                // SSID indisponible : ne pas geler "" en DB pour permettre un retry
+                // au prochain getSettings() / refreshClusterIdFromWifi().
+                return@withLock current
+            }
+            val withCluster = current.copy(clusterId = newId)
+            dao.upsert(withCluster.toEntity())
+            withCluster
         }
+    }
+
+    // Recalcule le clusterId depuis le SSID courant. Appele a chaque changement
+    // reseau (cf MobicloudP2PService) pour rattraper les cas ou :
+    //  - L'app a demarre avant la connexion WiFi (SSID indisponible au boot)
+    //  - La permission ACCESS_FINE_LOCATION a ete accordee apres le 1er getSettings()
+    //  - Le WiFi a change (autre cluster)
+    override suspend fun refreshClusterIdFromWifi(): String = initMutex.withLock {
+        val newId = clusterIdProvider()
+        val existing = dao.getSettings()
+        val currentId = existing?.clusterId ?: ""
+        if (newId.isEmpty()) {
+            // Pas de SSID lisible -- conserver l'existant tel quel.
+            return@withLock currentId
+        }
+        if (newId == currentId) {
+            return@withLock currentId
+        }
+        val updated = existing?.copy(clusterId = newId)
+            ?: NodeSettingsEntity(id = 0, allocatedStorageBytes = defaultBytes(), clusterId = newId)
+        dao.upsert(updated)
+        newId
     }
 
     // AC3 — adopte le clusterId du super-pair élu ; no-op si blank (AC5 legacy compat).

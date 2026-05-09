@@ -27,6 +27,11 @@ import org.junit.Test
 
 class SignalingRepositoryImplTest {
 
+    // Cle publique factice (valide en Base64 standard) -- depuis Story 10.1, processPeerList
+    // skip les pairs dont pubKeySpkiDerB64 est vide ; on en injecte une fake pour les tests
+    // d'insertion. Pour les tests qui ne testent que latestPeers (snapshot memoire), peut etre omise.
+    private val FAKE_PUBKEY_B64 = "ZmFrZS1wdWJsaWMta2V5LWZvci10ZXN0cw==" // "fake-public-key-for-tests"
+
     private lateinit var relayClient: RelayWebSocketClient
     private lateinit var peerRepository: PeerRepository
     private lateinit var networkEventRepository: NetworkEventRepository
@@ -249,20 +254,46 @@ class SignalingRepositoryImplTest {
             port = 8888,
             reliabilityScore = 0.9f,
             lastSeen = now,
-            isSuperPair = true   // Story Bully — le serveur signale ici un Super-Pair élu
+            isSuperPair = true,   // Story Bully — le serveur signale ici un Super-Pair élu
+            pubKeySpkiDerB64 = FAKE_PUBKEY_B64
         )
 
         repo.processPeerList(listOf(freshPeer))
 
         coVerify {
             peerRepository.registerOrUpdatePeer(
-                identity    = match { it.nodeId == "fresh-node" && it.publicKeyBytes.isEmpty() },
+                identity    = match { it.nodeId == "fresh-node" && it.publicKeyBytes.isNotEmpty() },
                 timestampMs = any(),
                 source      = DiscoverySource.RELAY_HA,
                 ipAddress   = "5.6.7.8",
                 port        = 8888,
                 isSuperPair = true
             )
+        }
+    }
+
+    // Story 10.1 : un pair sans cle publique (relay legacy ou session WS fermee) est skip.
+    // Sans ce filtre, les signatures Bully echouent silencieusement et personne ne reconnait
+    // les COORDINATOR/ELECTION/ALIVE -- multi super-peers garanti.
+    @Test
+    fun `processPeerList skip un pair sans pubKey (relay legacy ou session WS fermee)`() = runTest {
+        val repo = buildRepo()
+        val now = System.currentTimeMillis()
+
+        val noPubKey = RelayPeer(
+            nodeId = "no-pubkey-node",
+            ip = "1.2.3.4",
+            port = 8888,
+            reliabilityScore = 0.9f,
+            lastSeen = now,
+            isSuperPair = true,
+            pubKeySpkiDerB64 = ""   // legacy/WS fermee
+        )
+
+        repo.processPeerList(listOf(noPubKey))
+
+        coVerify(exactly = 0) {
+            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -282,7 +313,8 @@ class SignalingRepositoryImplTest {
             port = 7777,
             reliabilityScore = 0.6f,
             lastSeen = now,
-            isSuperPair = false   // simple participant côté serveur (JOIN, pas REGISTER_PEER)
+            isSuperPair = false,   // simple participant côté serveur (JOIN, pas REGISTER_PEER)
+            pubKeySpkiDerB64 = FAKE_PUBKEY_B64
         )
 
         repo.processPeerList(listOf(joinPeer))

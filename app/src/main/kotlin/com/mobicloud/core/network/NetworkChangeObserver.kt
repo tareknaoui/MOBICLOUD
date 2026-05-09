@@ -30,7 +30,22 @@ class NetworkChangeObserver @Inject constructor(
     private val isDeparturePending = AtomicBoolean(false)
     @Volatile private var departureScope: CoroutineScope? = null
 
+    /**
+     * Hook optionnel declenche a chaque WiFi disponible. Utilise par le service P2P
+     * pour rafraichir le clusterId via refreshClusterIdFromWifi() -- couvre le cas
+     * ou l'app a demarre avant d'etre connectee au WiFi (clusterId reste vide
+     * jusqu'au callback) ou quand l'utilisateur change de reseau.
+     */
+    @Volatile var onWifiAvailable: (() -> Unit)? = null
+
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            // SSID disponible (avec permission FINE_LOCATION + service localisation actif).
+            // Le hook est best-effort -- toute exception cote consumer est avalee
+            // pour ne pas casser le NetworkCallback systeme.
+            runCatching { onWifiAvailable?.invoke() }
+        }
+
         override fun onLost(network: Network) {
             // Fix P2 : NetworkRequest.addTransportType(TRANSPORT_WIFI) garantit déjà
             // que ce callback ne se déclenche que pour la perte du WiFi —

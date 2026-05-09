@@ -49,8 +49,11 @@ class SelectOptimalPeersUseCase @Inject constructor(
 
     suspend operator fun invoke(
         fileSizeBytes: Long,
-        baseK: Int = 4
+        baseK: Int = 2
     ): Result<OptimalPeersResult> = runCatching {
+        // baseK = 2 (au lieu de 4) pour permettre des tests avec un petit nombre de pairs
+        // (3 phones suffisent : K=2 data + N=1 parite). Reed-Solomon RS(2,1) tolere la perte
+        // de 1 nœud sur 3. A reaugmenter (K=4) pour des deploiements en production avec >=5 nœuds.
         // Déféré 3 : guard baseK <= 0 → division par zéro évitée
         if (baseK <= 0) throw PeerSelectionException.InvalidBaseK(baseK)
 
