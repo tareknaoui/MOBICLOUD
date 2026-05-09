@@ -17,13 +17,25 @@ interface PeerDao {
     // RELAY_HA ne dégrade pas la source (LAN direct > relais inter-réseau).
     // P-A9 — ip_address et port également préservés quand source est maintenue à LAN_MULTICAST :
     // évite de stocker une adresse relais sur un pair marqué LAN, ce qui rendrait la connexion TCP directe impossible.
+    // BUG-FIX 2026-05-09 — IP/port également préservés si l'appelant passe NULL (ex: ProcessIncomingElectionEventUseCase
+    // lors d'un COORDINATOR Bully ne connaît pas l'IP/port du sender, il ne fait que mettre à jour isSuperPair).
+    // Sans cette protection, le DAO écrasait l'IP/port à NULL → le super-pair devenait injoignable pour
+    // BlockSender → fragments perdus en upload.
     @Query("""INSERT OR REPLACE INTO peer_nodes
         (node_id, public_key_bytes, reliability_score, ip_address, port, last_seen_timestamp_ms, is_active, source, is_super_pair, free_storage_bytes)
         VALUES (:nodeId, :publicKeyBytes, :reliabilityScore,
-        CASE WHEN COALESCE((SELECT source FROM peer_nodes WHERE node_id = :nodeId), '') = 'LAN_MULTICAST'
-             AND :source != 'LAN_MULTICAST' THEN (SELECT ip_address FROM peer_nodes WHERE node_id = :nodeId) ELSE :ipAddress END,
-        CASE WHEN COALESCE((SELECT source FROM peer_nodes WHERE node_id = :nodeId), '') = 'LAN_MULTICAST'
-             AND :source != 'LAN_MULTICAST' THEN (SELECT port FROM peer_nodes WHERE node_id = :nodeId) ELSE :port END,
+        CASE
+            WHEN :ipAddress IS NULL THEN (SELECT ip_address FROM peer_nodes WHERE node_id = :nodeId)
+            WHEN COALESCE((SELECT source FROM peer_nodes WHERE node_id = :nodeId), '') = 'LAN_MULTICAST'
+                 AND :source != 'LAN_MULTICAST' THEN (SELECT ip_address FROM peer_nodes WHERE node_id = :nodeId)
+            ELSE :ipAddress
+        END,
+        CASE
+            WHEN :port IS NULL THEN (SELECT port FROM peer_nodes WHERE node_id = :nodeId)
+            WHEN COALESCE((SELECT source FROM peer_nodes WHERE node_id = :nodeId), '') = 'LAN_MULTICAST'
+                 AND :source != 'LAN_MULTICAST' THEN (SELECT port FROM peer_nodes WHERE node_id = :nodeId)
+            ELSE :port
+        END,
         :timestampMs, 1,
         CASE WHEN COALESCE((SELECT source FROM peer_nodes WHERE node_id = :nodeId), '') = 'LAN_MULTICAST'
              AND :source != 'LAN_MULTICAST' THEN 'LAN_MULTICAST' ELSE :source END,

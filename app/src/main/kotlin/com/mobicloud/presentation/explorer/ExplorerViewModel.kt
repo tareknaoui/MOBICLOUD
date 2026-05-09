@@ -225,7 +225,14 @@ class ExplorerViewModel @Inject constructor(
             try {
                 withContext(ioDispatcher) { tempFile.writeBytes(fileBytes) }
 
-                val optimalResult = selectOptimalPeersUseCase(fileSizeBytes ?: 0L).getOrElse { e ->
+                // MODE TEST : allowDuplicatePeers=true permet la redistribution round-robin
+                // sur les pairs disponibles si le reseau a moins de K+N pairs distincts.
+                // Casse la garantie de redondance Reed-Solomon (un pair peut detenir plusieurs
+                // fragments) -- a desactiver en production. Voir SelectOptimalPeersUseCase.
+                val optimalResult = selectOptimalPeersUseCase(
+                    fileSizeBytes = fileSizeBytes ?: 0L,
+                    allowDuplicatePeers = true
+                ).getOrElse { e ->
                     val userMessage = when (e) {
                         is PeerSelectionException.PeerFlowTimeout ->
                             "Réseau indisponible : impossible de joindre les nœuds dans les délais."

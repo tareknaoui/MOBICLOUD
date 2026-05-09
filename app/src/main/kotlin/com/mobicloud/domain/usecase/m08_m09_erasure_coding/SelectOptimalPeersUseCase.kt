@@ -49,7 +49,12 @@ class SelectOptimalPeersUseCase @Inject constructor(
 
     suspend operator fun invoke(
         fileSizeBytes: Long,
-        baseK: Int = 2
+        baseK: Int = 2,
+        // MODE TEST UNIQUEMENT : autorise un meme pair a recevoir plusieurs fragments
+        // (round-robin) si le nombre de pairs est insuffisant pour une distribution 1:1.
+        // CASSE la garantie de redondance Reed-Solomon -- si un pair a 2 fragments et meurt,
+        // 2 fragments perdus, reconstruction impossible. Default false = production stricte.
+        allowDuplicatePeers: Boolean = false
     ): Result<OptimalPeersResult> = runCatching {
         // baseK = 2 (au lieu de 4) pour permettre des tests avec un petit nombre de pairs
         // (3 phones suffisent : K=2 data + N=1 parite). Reed-Solomon RS(2,1) tolere la perte
@@ -65,10 +70,19 @@ class SelectOptimalPeersUseCase @Inject constructor(
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
             throw PeerSelectionException.PeerFlowTimeout()
         }
-        
+
+        // BUG-FIX 2026-05-09 : Bully peut ajouter le nœud LOCAL dans peerRepository (pour
+        // marquer isSuperPair=true localement) avec ipAddress=null/port=null car ces champs
+        // ne sont pas connus du use-case Bully. De meme, un COORDINATOR recu d'un pair distant
+        // ne mettait pas a jour son IP. Resultat : des pairs sans IP/port se retrouvaient dans
+        // peerRepository et SelectOptimalPeers les choisissait pour la distribution -> sendBlock
+        // tentait de se connecter a "null:null" et le fragment restait coince.
+        // Filtrage defensif ici : un pair sans IP ou port n'est pas distribuable, on l'exclut.
+        val reachablePeers = activePeers.filter { it.ipAddress != null && it.port != null }
+
         // Taille approximative d'un fragment
         val fragmentSize = (fileSizeBytes + baseK - 1) / baseK
-        
+
         // Filtrer selon la capacité :
         // - Les pairs avec freeStorageBytes > 0 sont filtrés normalement (Marge 100 Mo + taille fragment).
         // - Les pairs avec freeStorageBytes == 0 ont une capacité INCONNUE (anciens peers sans le champ)
@@ -76,14 +90,16 @@ class SelectOptimalPeersUseCase @Inject constructor(
         val MIN_FREE_BYTES = 100L * 1024 * 1024
         val requiredSpace = fragmentSize + MIN_FREE_BYTES
 
-        val capablePeers = activePeers.filter {
+        val capablePeers = reachablePeers.filter {
             it.freeStorageBytes == 0L || it.freeStorageBytes >= requiredSpace
         }
         
         // Déféré 4 : exception typée au lieu d'IllegalStateException générique
-        if (capablePeers.size < baseK) {
+        // En mode allowDuplicatePeers, on accepte des qu'on a >= 1 pair (round-robin compense).
+        val minRequired = if (allowDuplicatePeers) 1 else baseK
+        if (capablePeers.size < minRequired) {
             throw PeerSelectionException.InsufficientCapableNodes(
-                required = baseK,
+                required = minRequired,
                 available = capablePeers.size
             )
         }
@@ -109,16 +125,25 @@ class SelectOptimalPeersUseCase @Inject constructor(
         val finalN = when {
             availableNodes >= totalRequiredNodes -> dynamicN
             availableNodes > baseK -> availableNodes - baseK // Réduire la redondance au maximum physiquement possible
+            allowDuplicatePeers -> dynamicN // Mode test : on garde dynamicN, le round-robin compense
             else -> throw PeerSelectionException.InsufficientRedundancyNodes(
                 available = availableNodes,
                 baseK = baseK
             )
         }
-        
+
         // Sélection finale
-        val finalSelectedPeers = sortedPeers.take(baseK + finalN)
+        val totalFragments = baseK + finalN
+        val finalSelectedPeers = if (allowDuplicatePeers && sortedPeers.size < totalFragments) {
+            // Mode test : round-robin sur les pairs disponibles pour produire `totalFragments` slots.
+            // Les fragments seront distribues 1, 2, 3, ... vers peer[0], peer[1], peer[2], peer[0], ...
+            // ATTENTION : 2 fragments sur le meme pair = perte simultanee si ce pair tombe.
+            List(totalFragments) { i -> sortedPeers[i % sortedPeers.size] }
+        } else {
+            sortedPeers.take(totalFragments)
+        }
         val finalParams = ErasureParameters(k = baseK, n = finalN)
-        
+
         OptimalPeersResult(params = finalParams, selectedPeers = finalSelectedPeers)
     }
 }
