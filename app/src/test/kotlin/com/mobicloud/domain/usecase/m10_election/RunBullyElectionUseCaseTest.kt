@@ -63,6 +63,7 @@ class RunBullyElectionUseCaseTest {
             allocatedStorageBytes = 1_000_000_000L,
             clusterId = "cluster-local-test"
         )
+        coEvery { nodeSettingsRepository.getCurrentWifiClusterId() } returns "cluster-local-test"
     }
 
     private fun buildUseCase(testDispatcher: TestDispatcher) = RunBullyElectionUseCase(

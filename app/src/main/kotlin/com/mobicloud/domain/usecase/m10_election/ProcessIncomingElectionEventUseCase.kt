@@ -131,16 +131,18 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                         Exception("Received COORDINATOR from unknown peer '${payload.senderNodeId}' -- ignoring.")
                     )
 
-                // WiFi cluster guard: reject coordinator from a different WiFi cluster
-                val localSettings = nodeSettingsRepository.getSettings()
-                val localOnWifi = wifiNetworkRepository.getCurrentSsid() != null
-                if (payload.clusterId.isNotBlank() && localSettings.clusterId.isNotBlank()
-                    && payload.clusterId != localSettings.clusterId && localOnWifi
+                // FIX SPLIT-CLUSTER : evaluer WG1 sur le clusterId LIVE du SSID,
+                // pas sur la DB. Sinon un stale en DB (ex : ancien WiFi domestique)
+                // ferait rejeter a tort un COORDINATOR legitime du WiFi actuel.
+                val localWifiClusterId = nodeSettingsRepository.getCurrentWifiClusterId()
+                val localOnWifi = localWifiClusterId.isNotEmpty()
+                if (payload.clusterId.isNotBlank() && localWifiClusterId.isNotBlank()
+                    && payload.clusterId != localWifiClusterId && localOnWifi
                 ) {
                     return Result.failure(
                         Exception(
                             "COORDINATOR from cluster '${payload.clusterId.take(8)}' rejected " +
-                            "— local WiFi cluster '${localSettings.clusterId.take(8)}'"
+                            "— local WiFi cluster '${localWifiClusterId.take(8)}'"
                         )
                     )
                 }

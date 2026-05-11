@@ -1,0 +1,25 @@
+# Simulation Bully Election MobiCloud
+# 100 noeuds, fully connected (chacun voit tous les autres) -- equivalent d'un cluster unique
+
+random.seed 1234567890
+
+network.size 100
+simulation.cycles 30
+
+# Linkable : tous les noeuds connaissent tous les autres
+protocol.linkable peersim.core.IdleProtocol
+
+# Notre protocole Bully
+protocol.bully mobicloud.MobiCloudBullyElection
+protocol.bully.linkable linkable
+
+# Wire : chaque noeud connait 10 voisins aleatoires (= cluster local)
+init.wire WireKOut
+init.wire.k 10
+init.wire.protocol linkable
+
+include.init wire
+
+# Observer
+control.observer mobicloud.BullyObserver
+control.observer.protocol bully

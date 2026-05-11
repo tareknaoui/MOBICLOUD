@@ -63,31 +63,43 @@ class NodeSettingsRepositoryImpl(
         return minOf(twoGb, (freeBytes * 0.20).toLong())
     }
 
-    // P7: double-check locking + lazy clusterId backfill (Story 9.1).
-    // Si clusterIdProvider() retourne "" (SSID indisponible), on N'ÉCRIT PAS
-    // un clusterId vide en DB -- on retourne juste un NodeSettings avec clusterId="".
-    // refreshClusterIdFromWifi() reessayera quand le SSID deviendra disponible.
-    override suspend fun getSettings(): NodeSettings {
-        dao.getSettings()?.toDomain()?.let { existing ->
-            if (existing.clusterId.isNotEmpty()) return existing
-        }
-        return initMutex.withLock {
-            val current = dao.getSettings()?.toDomain()
-                ?: NodeSettings(allocatedStorageBytes = defaultBytes())
-            if (current.clusterId.isNotEmpty()) {
-                return@withLock current
+    // FIX SPLIT-CLUSTER : self-healing du clusterId contre le SSID courant.
+    //
+    // Sans ce self-healing, un clusterId persiste depuis une session WiFi
+    // precedente (ex : WiFi domestique) survit en DB et est utilise tel quel
+    // au boot suivant -- meme si le telephone est maintenant sur un autre
+    // WiFi. Resultat IRL observe : deux telephones sur le MEME WiFi peuvent
+    // chacun garder un clusterId different (hash de leur ancien SSID), le
+    // garde WG1 les rejette mutuellement, chacun s'auto-elit super-pair dans
+    // son propre cluster -> split-cluster confirme par WifiClusterGuardTest.
+    //
+    // Sémantique :
+    //  - WiFi disponible (clusterIdProvider() != "") : ECRASE le clusterId
+    //    persiste si different. Le SSID actuel fait foi.
+    //  - SSID indisponible (clusterIdProvider() == "") : conserve la valeur
+    //    persistee. Ne pas geler "" en DB. La 4G adopte le clusterId via
+    //    updateClusterId() a la reception d'un COORDINATOR.
+    override suspend fun getSettings(): NodeSettings = initMutex.withLock {
+        val current = dao.getSettings()?.toDomain()
+            ?: NodeSettings(allocatedStorageBytes = defaultBytes())
+        val derivedFromWifi = clusterIdProvider()
+
+        return@withLock when {
+            // En WiFi avec SSID lisible : le clusterId persiste DOIT correspondre.
+            derivedFromWifi.isNotEmpty() && current.clusterId != derivedFromWifi -> {
+                val updated = current.copy(clusterId = derivedFromWifi)
+                dao.upsert(updated.toEntity())
+                updated
             }
-            val newId = clusterIdProvider()
-            if (newId.isEmpty()) {
-                // SSID indisponible : ne pas geler "" en DB pour permettre un retry
-                // au prochain getSettings() / refreshClusterIdFromWifi().
-                return@withLock current
-            }
-            val withCluster = current.copy(clusterId = newId)
-            dao.upsert(withCluster.toEntity())
-            withCluster
+            // Aligne (en WiFi) ou hors WiFi (SSID indisponible) : no-op.
+            else -> current
         }
     }
+
+    // FIX SPLIT-CLUSTER : retourne le clusterId du SSID LIVE, sans toucher la DB.
+    // A utiliser par Bully et le garde WG1 : la decision de clustering repose
+    // sur le WiFi actuel, jamais sur un clusterId stale en DB.
+    override suspend fun getCurrentWifiClusterId(): String = clusterIdProvider()
 
     // Recalcule le clusterId depuis le SSID courant. Appele a chaque changement
     // reseau (cf MobicloudP2PService) pour rattraper les cas ou :

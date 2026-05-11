@@ -83,6 +83,7 @@ class BullyHardeningTest {
             allocatedStorageBytes = 2_000_000_000L,
             clusterId = ""
         )
+        coEvery { nodeSettingsRepository.getCurrentWifiClusterId() } returns ""
     }
 
     private fun buildUseCase(esm: ElectionStateManager = ElectionStateManager()) =

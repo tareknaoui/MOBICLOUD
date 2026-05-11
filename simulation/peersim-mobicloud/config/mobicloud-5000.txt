@@ -1,0 +1,46 @@
+# Simulation MobiCloud DHT replique + gossip CRDT LWW
+# Reseau : 100 noeuds, 100 blocs, 50 cycles (= 100 secondes simulees)
+#
+# Lancement :
+#   java -cp lib\peersim-1.0.5.jar;lib\jep-2.3.0.jar;lib\djep-1.0.0.jar;build mobicloud.Main config\mobicloud-100.txt > results-100.csv
+
+# Reproductibilite
+random.seed 1234567890
+
+# Taille du reseau
+network.size 5000
+
+# Nombre de cycles a simuler (chaque cycle = 1 round de gossip = 2 secondes)
+simulation.cycles 120
+
+# ==================== Protocoles ====================
+
+# Linkable : graphe de voisinage K-out (chaque noeud connait K voisins aleatoires)
+protocol.linkable peersim.core.IdleProtocol
+
+# Notre protocole DHT MobiCloud
+protocol.dht mobicloud.MobiCloudGossipDht
+protocol.dht.linkable linkable
+protocol.dht.fanout 2
+
+# ==================== Initialisation ====================
+
+# Wire : connecter chaque noeud a 5 voisins aleatoires (Erdos-Renyi)
+init.wire WireKOut
+init.wire.k 5
+init.wire.protocol linkable
+
+# Seed : injecter 100 blocs dans le noeud 0
+init.seed mobicloud.InitialDhtSeeder
+init.seed.protocol dht
+init.seed.initialBlocks 100
+
+# Order : init.wire AVANT init.seed
+include.init wire seed
+
+# ==================== Mesures ====================
+
+# Observer : log la convergence a chaque cycle
+control.observer mobicloud.ConvergenceObserver
+control.observer.protocol dht
+control.observer.targetSize 100

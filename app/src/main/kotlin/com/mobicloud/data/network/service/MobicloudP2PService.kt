@@ -77,6 +77,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var executeReplicationPlanUseCase: ExecuteReplicationPlanUseCase
     @Inject lateinit var localDiscoveryRepository: LocalDiscoveryRepository
     @Inject lateinit var nodeSettingsRepository: NodeSettingsRepository
+    @Inject lateinit var wifiNetworkRepository: com.mobicloud.domain.repository.WifiNetworkRepository
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -200,13 +201,17 @@ class MobicloudP2PService : Service() {
             // Keepalive toutes les 30s pour rester avant l'expiration du TTL serveur (60s).
             launch {
                 delay(3_000L) // attendre AUTH_OK WebSocket
-                // L'IP réelle n'a pas d'importance pour le routage relais (qui utilise uniquement le nodeId).
-                val placeholderIp = "0.0.0.0"
-
+                // FIX GOSSIP TCP : annoncer l'IP LAN reelle (WiFi/hotspot) au lieu
+                // de "0.0.0.0". Sinon les pairs sur le meme LAN ne peuvent pas se
+                // joindre directement (resolution localhost -> ECONNREFUSED en boucle).
+                // Si pas d'IP LAN (4G pur derriere CGNAT), fallback "0.0.0.0" :
+                // les pairs WAN passeront par le relay, le Gossip TCP direct sera
+                // skip cote GossipChannel.
                 suspend fun joinAndFetch() {
+                    val announcedIp = wifiNetworkRepository.getLocalIpAddress() ?: "0.0.0.0"
                     signalingRepository.joinAsParticipant(
                         nodeId = identity.nodeId,
-                        ip = placeholderIp,
+                        ip = announcedIp,
                         port = tcpPort,
                         reliabilityScore = identity.reliabilityScore
                     ).onFailure { Log.w(LOGTAG, "auto-join relais échoué", it) }

@@ -26,6 +26,11 @@ class GossipChannel @Inject constructor() : GossipOutboundPort {
         private const val CONNECT_TIMEOUT_MS = 3000
         private const val READ_TIMEOUT_MS = 3000  // F11: timeout de lecture pour éviter blocage indéfini
         private const val LOGTAG = "MobiCloud:Gossip"
+
+        // FIX GOSSIP TCP : detection des IPs non joignables (placeholder / loopback).
+        // Une connexion TCP vers 0.0.0.0 resout sur localhost et echoue en boucle.
+        internal fun isUnreachableIp(ip: String): Boolean =
+            ip == "0.0.0.0" || ip.startsWith("127.")
     }
 
     @OptIn(ExperimentalSerializationApi::class)
@@ -34,6 +39,15 @@ class GossipChannel @Inject constructor() : GossipOutboundPort {
         targetPort: Int,
         msg: BloomFilterGossip
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        // FIX GOSSIP TCP : skip si l'IP cible est un placeholder (0.0.0.0) ou
+        // loopback (127.x.x.x). Resolution Android : 0.0.0.0 -> localhost ->
+        // ECONNREFUSED en boucle. Le pair est joignable uniquement via le relay
+        // dans ce cas (typiquement 4G sans IP LAN exploitable).
+        if (isUnreachableIp(targetIp)) {
+            return@withContext Result.failure(
+                IllegalArgumentException("Skipped Gossip direct to placeholder IP $targetIp — peer reachable only via relay")
+            )
+        }
         var socket: Socket? = null
         try {
             socket = Socket()
@@ -60,6 +74,11 @@ class GossipChannel @Inject constructor() : GossipOutboundPort {
         targetPort: Int,
         req: DeltaSyncRequest
     ): Result<DeltaSyncResponse> = withContext(Dispatchers.IO) {
+        if (isUnreachableIp(targetIp)) {
+            return@withContext Result.failure(
+                IllegalArgumentException("Skipped DeltaSync direct to placeholder IP $targetIp — peer reachable only via relay")
+            )
+        }
         var socket: Socket? = null
         try {
             socket = Socket()

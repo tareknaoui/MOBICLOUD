@@ -107,6 +107,7 @@ class WifiClusterGuardTest {
     fun `WG1 - noeud WiFi rejette COORDINATOR d un cluster different`() = runTest {
         every { peerRepository.peers } returns MutableStateFlow(listOf(superPeer()))
         every { wifiNetworkRepository.getCurrentSsid() } returns "HomeWifi"
+        coEvery { nodeSettingsRepository.getCurrentWifiClusterId() } returns localWifiClusterId
         coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
             allocatedStorageBytes = 2_000_000_000L,
             clusterId = localWifiClusterId
@@ -141,6 +142,7 @@ class WifiClusterGuardTest {
     fun `WG2 - noeud WiFi accepte COORDINATOR du meme cluster sans updateClusterId`() = runTest {
         every { peerRepository.peers } returns MutableStateFlow(listOf(superPeer()))
         every { wifiNetworkRepository.getCurrentSsid() } returns "HomeWifi"
+        coEvery { nodeSettingsRepository.getCurrentWifiClusterId() } returns localWifiClusterId
         coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
             allocatedStorageBytes = 2_000_000_000L,
             clusterId = localWifiClusterId
@@ -176,6 +178,7 @@ class WifiClusterGuardTest {
     fun `WG3 - noeud 4G adopte clusterId du COORDINATOR`() = runTest {
         every { peerRepository.peers } returns MutableStateFlow(listOf(superPeer()))
         every { wifiNetworkRepository.getCurrentSsid() } returns null  // 4G
+        coEvery { nodeSettingsRepository.getCurrentWifiClusterId() } returns ""  // SSID indispo
         coEvery { nodeSettingsRepository.getSettings() } returns NodeSettings(
             allocatedStorageBytes = 2_000_000_000L,
             clusterId = "some-random-uuid-1234"

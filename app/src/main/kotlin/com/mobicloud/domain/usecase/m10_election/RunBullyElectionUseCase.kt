@@ -113,7 +113,11 @@ class RunBullyElectionUseCase @Inject constructor(
             return@flow
         }
         val localScore = trustScoreProvider.getTrustScore(localIdentity.nodeId).toFloat()
-        val localClusterId = nodeSettingsRepository.getSettings().clusterId
+        // FIX SPLIT-CLUSTER : derive le clusterId du SSID LIVE, JAMAIS du persiste.
+        // Si SSID indispo (permission location refusee, hotspot AP, 4G), broadcast
+        // un clusterId vide -> branche legacy/4G -> garde WG1 ne s'active pas chez
+        // les recepteurs -> convergence au lieu de split.
+        val localClusterId = nodeSettingsRepository.getCurrentWifiClusterId()
 
         // Étape 2 : Broadcast de ELECTION aux pairs actifs
         val electionPayload = createPayload(localIdentity, localScore, ElectionMessageType.ELECTION)

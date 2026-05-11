@@ -171,9 +171,15 @@ class NodeSettingsRepositoryImplTest {
         coVerify(exactly = 0) { dao.upsert(any()) }
     }
 
+    // Hors WiFi (clusterIdProvider == "") : getSettings conserve le clusterId persiste.
     @Test
-    fun `getSettings retourne meme clusterId si deja persiste`() = runTest {
+    fun `getSettings retourne meme clusterId si deja persiste hors WiFi`() = runTest {
         val persistedClusterId = "550e8400-e29b-41d4-a716-446655440000"
+        val repoOffWifi = NodeSettingsRepositoryImpl(
+            dao,
+            freeSpaceProvider = { TEN_GB },
+            clusterIdProvider = { "" }
+        )
         val existingEntity = NodeSettingsEntity(
             id = 0,
             allocatedStorageBytes = 5L * 1024 * 1024 * 1024,
@@ -181,7 +187,7 @@ class NodeSettingsRepositoryImplTest {
         )
         coEvery { dao.getSettings() } returns existingEntity
 
-        val result = repository.getSettings()
+        val result = repoOffWifi.getSettings()
 
         assertEquals(persistedClusterId, result.clusterId)
         coVerify(exactly = 0) { dao.upsert(any()) }
@@ -214,9 +220,15 @@ class NodeSettingsRepositoryImplTest {
         assertEquals(existingClusterId, upsertSlot.captured.clusterId)
     }
 
+    // En WiFi avec clusterId persiste deja aligne sur le SSID : pas d'upsert.
     @Test
-    fun `getSettings retourne valeur persistee sans ecraser`() = runTest {
+    fun `getSettings retourne valeur persistee sans ecraser quand alignee au SSID`() = runTest {
         val persistedClusterId = "550e8400-e29b-41d4-a716-446655440000"
+        val repoAligned = NodeSettingsRepositoryImpl(
+            dao,
+            freeSpaceProvider = { TEN_GB },
+            clusterIdProvider = { persistedClusterId }
+        )
         val persisted = NodeSettingsEntity(
             id = 0,
             allocatedStorageBytes = 5L * 1024 * 1024 * 1024,
@@ -224,11 +236,41 @@ class NodeSettingsRepositoryImplTest {
         )
         coEvery { dao.getSettings() } returns persisted
 
-        val result = repository.getSettings()
+        val result = repoAligned.getSettings()
 
         assertEquals(persisted.allocatedStorageBytes, result.allocatedStorageBytes)
         assertEquals(persistedClusterId, result.clusterId)
         coVerify(exactly = 0) { dao.upsert(any()) }
+    }
+
+    // FIX SPLIT-CLUSTER (regression guard) : si la DB contient un clusterId d'une
+    // session WiFi precedente et que le SSID courant en derive un different,
+    // getSettings ECRASE la valeur stale. Sans ce comportement, deux telephones
+    // sur le meme WiFi peuvent finir avec des clusterIds divergents -> split.
+    @Test
+    fun `getSettings ecrase clusterId stale en DB quand SSID actuel different`() = runTest {
+        val staleClusterId = "11111111-2222-4333-8444-555555555555"
+        val currentSsidClusterId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
+        val repoOnNewWifi = NodeSettingsRepositoryImpl(
+            dao,
+            freeSpaceProvider = { TEN_GB },
+            clusterIdProvider = { currentSsidClusterId }
+        )
+        val staleEntity = NodeSettingsEntity(
+            id = 0,
+            allocatedStorageBytes = 5L * 1024 * 1024 * 1024,
+            clusterId = staleClusterId
+        )
+        val upsertSlot = slot<NodeSettingsEntity>()
+        coEvery { dao.getSettings() } returns staleEntity
+        coEvery { dao.upsert(capture(upsertSlot)) } returns Unit
+
+        val result = repoOnNewWifi.getSettings()
+
+        assertEquals(currentSsidClusterId, result.clusterId)
+        assertEquals(currentSsidClusterId, upsertSlot.captured.clusterId)
+        assertEquals(5L * 1024 * 1024 * 1024, upsertSlot.captured.allocatedStorageBytes)
+        coVerify(exactly = 1) { dao.upsert(any()) }
     }
 
     @Test
