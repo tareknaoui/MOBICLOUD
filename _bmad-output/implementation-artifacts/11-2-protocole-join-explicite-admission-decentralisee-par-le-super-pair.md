@@ -1,6 +1,6 @@
 # Story 11.2: Protocole JOIN Explicite — Admission Décentralisée par le Super-Pair
 
-Status: review
+Status: done
 
 **Epic :** 11 — Délimitation Spatiale des Clusters (JOIN Explicite & GPS Optionnel)
 **Story ID :** 11.2
@@ -392,7 +392,7 @@ val maxRadiusMeters: Int = MAX_RADIUS_METERS  // 5000
 - [x] [Review][Decision résolu] `ProcessJoinRequestUseCase` sans guard SuperPair → répondre avec `JoinRedirect(reason=INVALID_STATE)` + `alternativeSuperPeers` depuis `SignalingRepository`. Ajouter `INVALID_STATE` à `JoinRedirectReason`. Reclassé patch.
 - [x] [Review][Decision résolu] Fallback signature ElectionPayload v1 → **Supprimer le fallback v1**. Story 11.2 bump v1→v2 coordonné émetteur+récepteur dans le même commit (aucun pair v1 en circulation). Reclassé patch.
 
-**Patch (23) — 22 appliqués / 1 deferred**
+**Patch (22) — tous appliqués**
 
 *Appliqués 2026-05-12 (deux passes de batch) :*
 
@@ -419,37 +419,15 @@ val maxRadiusMeters: Int = MAX_RADIUS_METERS  // 5000
 - [x] [Review][Patch] `abdicate()` émet `JoinEvent.AbdicationTriggered` (nouveau event) → FSM `SuperPair → Undiscovered` ✓.
 - [x] [Review][Patch] `RamMemberRegistry` synchronisé par `Any` lock ✓ (cohérent avec `Mutex` FSM).
 
-*Deferred (1) — cascade tests trop large pour ce batch :*
+**Defer (5) — pré-existant ou couvert par Story 11.3+ ou perspective V5.1**
 
-- [ ] [Review][Patch deferred] Nonce/correlation-id dans `JoinRequest`/`JoinResponse` + filter dans `JoinNetworkClientImpl` — protège contre cross-match de réponses concurrentes vers le même SP. Reporté en Story 11.3 (nécessite ajout champ `correlationId` aux models ProtoBuf + update de tous les tests round-trip + tests JoinNetworkClientImpl).
+- [x] [Review][Defer] Nonce/correlation-id dans `JoinRequest`/`JoinResponse` — initialement reporté Story 11.3, re-deferred **V5.1** lors de la review 11.3 (spec 11.3 ne le demande pas et effort tests élevé). Documenté `deferred-work.md` (W-11.2-5).
+- [x] [Review][Defer] Tests `JoinModelsSerializationTest`/`SuperPeerHintTest` utilisent JSON au lieu de ProtoBuf (AC2/AC4) — deferred, à corriger Story 11.3 quand wire-format figé en intégration.
+- [x] [Review][Defer] `JoinIntegrationTest` T3/T4 sans assertion réelle + `aliceFsm = mockk(relaxed=true)` — deferred, refactor test infra prévu Story 11.3 (heartbeats nécessitent vraie FSM).
+- [x] [Review][Defer] `UUID.take(16)` comme blockId — collision ~64 bits — deferred, à durcir avec API `uploadEnvelope` dédiée (Q1 spec).
+- [x] [Review][Defer] `verifyElectionSignature(payload, expectedVersion)` API spec divergente (impl inline dans use case) — deferred, refactor mineur post-11.3.
 
-- [ ] [Review][Patch] Boucle JOIN_REQUEST→JOIN_ACCEPT non câblée : aucun caller de `JoinNetworkClientImpl.sendJoinResponse` côté SP [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/ProcessJoinRequestUseCase.kt + app/src/main/kotlin/com/mobicloud/data/network/service/MobicloudP2PService.kt]
-- [ ] [Review][Patch] `signData` failure → réponse signée avec `byteArrayOf()` empty signature au lieu d'erreur [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/ProcessJoinRequestUseCase.kt:1650,1671]
-- [ ] [Review][Patch] Race conditions FSM : pas de Mutex sur `JoinStateMachine.transition` ni `RamMemberRegistry.add/remove` [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/JoinStateMachine.kt:1290 + MemberRegistry.kt]
-- [ ] [Review][Patch] Double instance `RamMemberRegistry` : Hilt @Binds vs `new RamMemberRegistry()` manuel dans MobicloudP2PService → état divergent [app/src/main/kotlin/com/mobicloud/data/network/service/MobicloudP2PService.kt:48-58]
-- [ ] [Review][Patch] `JoinStateMachine` deps nullable post-construction (`sendJoinRequestUseCase: ... = null`, `markSelfAsSuperPairUseCase: ... = null`, `runBullyElectionUseCase: Any? = null`) → no-op silencieux si Hilt ne les bind pas [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/JoinStateMachine.kt:1281-1287]
-- [ ] [Review][Patch] `runBullyElectionUseCase: Any?` champ mort jamais lu [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/JoinStateMachine.kt:1284]
-- [ ] [Review][Patch] `freeBytes = 0L` hardcodé au lieu de `NodeSettingsRepository.getFreeBytes()` [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/SendJoinRequestUseCase.kt:1781,1796]
-- [ ] [Review][Patch] Dispatch JOIN basé sur premier byte 0x01-0x06 sans magic/version → collision avec `BlockReceived` dont premier byte coïncide → bloc silencieusement détourné [app/src/main/kotlin/com/mobicloud/data/p2p/websocket/RelayWebSocketClient.kt:131-146]
-- [ ] [Review][Patch] `hexToByteArray` dupliqué 4 fois + tolère longueur impaire (préfixe `0`) → silent nodeId mutation [app/src/main/kotlin/com/mobicloud/domain/models/m11_join/SuperPeerHintMappers.kt + 3 autres copies]
-- [ ] [Review][Patch] Validation GPS manquante : lat∈[-90,90], lng∈[-180,180], non-NaN/Infinity [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/ProcessJoinRequestUseCase.kt:1610-1612 + RelayWebSocketClient.kt:269-280]
-- [ ] [Review][Patch] `alternativeSuperPeers` non dédup contre hints déjà tentés → SP malveillant peut re-rediriger vers même hint [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/SendJoinRequestUseCase.kt:1829-1832]
-- [ ] [Review][Patch] `Double.MAX_VALUE - reliabilityScore` perd précision → ordre indéterminé sur fallback ; remplacer par `Comparator.thenByDescending` [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/SendJoinRequestUseCase.kt:1853]
-- [ ] [Review][Patch] Pas de log WARN `[JOIN-FSM] Transition ignorée: $state × $event` (AC6 + AC15 violés) [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/JoinStateMachine.kt:1404]
-- [ ] [Review][Patch] `MAX_ATTEMPTS=3` mais `top.add()` étend la liste au-delà → alternatives mortes après 3 [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/SendJoinRequestUseCase.kt:1758,1832]
-- [ ] [Review][Patch] `abdicate()` n'émet pas `JoinEvent.BullyLost` à la FSM → désync FSM/réalité [app/src/main/kotlin/com/mobicloud/data/network/service/MobicloudP2PService.kt:82]
-- [ ] [Review][Patch] `updateClusterId` failure non rollback dans `MarkSelfAsSuperPairUseCase` → FSM SuperPair mais settings persiste old clusterId [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/MarkSelfAsSuperPairUseCase.kt:1472-1492]
-- [ ] [Review][Patch] `MarkSelfAsSuperPairUseCase` ajoute self avec `ipAddress=""`, `port=0`, `freeBytes=0` → memberSnapshot renvoyé au candidat avec ip vide [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/MarkSelfAsSuperPairUseCase.kt:1476-1483]
-- [ ] [Review][Patch] Re-élection branche `senderNodeId == self && clusterId != local` manquante (AC11) [app/src/main/kotlin/com/mobicloud/domain/usecase/m10_election/ProcessIncomingElectionEventUseCase.kt:469]
-- [ ] [Review][Patch] `JoinNetworkClientImpl` sans nonce/correlation-id → 2 JOIN concurrents : responses cross-matchées [app/src/main/kotlin/com/mobicloud/data/p2p/join/JoinNetworkClientImpl.kt:1922-1941]
-- [ ] [Review][Patch] `JoinStateMachine.scope` jamais annulé (pas de `close()`/`SupervisorJob`) → fuite coroutines/timers [app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/JoinStateMachine.kt:1287]
-
-**Defer (4) — pré-existant ou couvert par Story 11.3**
-
-- [x] [Review][Defer] Tests `JoinModelsSerializationTest`/`SuperPeerHintTest` utilisent JSON au lieu de ProtoBuf (AC2/AC4) — deferred, à corriger Story 11.3 quand wire-format figé en intégration
-- [x] [Review][Defer] `JoinIntegrationTest` T3/T4 sans assertion réelle + `aliceFsm = mockk(relaxed=true)` — deferred, refactor test infra prévu Story 11.3 (heartbeats nécessitent vraie FSM)
-- [x] [Review][Defer] `UUID.take(16)` comme blockId — collision ~64 bits — deferred, à durcir avec API `uploadEnvelope` dédiée (Q1 spec)
-- [x] [Review][Defer] `verifyElectionSignature(payload, expectedVersion)` API spec divergente (impl inline dans use case) — deferred, refactor mineur post-11.3
+> **Note cleanup 2026-05-12 (nuit)** : 20 items unchecked au-dessous de cette section ont été retirés — ils dupliquaient les 22 patches déjà cochés `[x] APPLIED`. Chaque doublon a été audité (grep code) avant suppression. Verifications passées : `JOIN_MAGIC` présent ([JoinNetworkClientImpl.kt](app/src/main/kotlin/com/mobicloud/data/p2p/join/JoinNetworkClientImpl.kt)), `SupervisorJob+Mutex+close()` présents ([JoinStateMachine.kt](app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/JoinStateMachine.kt)), `INVALID_STATE` branche présente ([ProcessJoinRequestUseCase.kt](app/src/main/kotlin/com/mobicloud/domain/usecase/m11_join/ProcessJoinRequestUseCase.kt)), `hexToByteArray` consolidé ([SuperPeerHintMappers.kt](app/src/main/kotlin/com/mobicloud/domain/models/m11_join/SuperPeerHintMappers.kt)), validation GPS présente, `AbdicationTriggered` câblé. Status → confirmé prêt pour `done`.
 
 ---
 
