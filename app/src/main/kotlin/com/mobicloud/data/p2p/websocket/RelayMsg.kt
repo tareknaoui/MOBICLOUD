@@ -18,5 +18,8 @@ internal object RelayMsg {
     // La réponse revient via UPLOAD/FORWARD existant (pas de message dédié pour le retour).
     const val REQUEST_BLOCK: Byte           = 0x0C
     const val REQUEST_BLOCK_FORWARDED: Byte = 0x0D
+    // SIGNAL (0x0E) : forwarding P2P éphémère pour Gossip DHT entre pairs (relay-only).
+    const val SIGNAL: Byte          = 0x0E
+    const val SIGNAL_RECEIVED: Byte = 0x0F
     const val ERROR: Byte          = 0xFF.toByte()
 }

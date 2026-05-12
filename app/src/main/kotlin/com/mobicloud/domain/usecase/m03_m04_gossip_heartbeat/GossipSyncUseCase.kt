@@ -66,16 +66,15 @@ class GossipSyncUseCase @Inject constructor(
             val neighbors = selectRandomNeighbors(activePeers, FAN_OUT)
             var lastFailure: Throwable? = null
             for (peer in neighbors) {
-                val ip = peer.ipAddress ?: continue
-                val port = peer.port ?: continue
-                android.util.Log.i("MobiCloud:Gossip", "[DIAG] sendBloomGossip → ${peer.identity.nodeId.take(8)}@$ip:$port")
-                gossipOutboundPort.sendBloomGossip(ip, port, gossipMsg)
+                val nodeId = peer.identity.nodeId
+                android.util.Log.i("MobiCloud:Gossip", "[DIAG] sendBloomGossip → ${nodeId.take(8)}")
+                gossipOutboundPort.sendBloomGossip(nodeId, gossipMsg)
                     .onSuccess {
-                        android.util.Log.i("MobiCloud:Gossip", "[DIAG] sendBloomGossip OK → ${peer.identity.nodeId.take(8)}@$ip:$port")
+                        android.util.Log.i("MobiCloud:Gossip", "[DIAG] sendBloomGossip OK → ${nodeId.take(8)}")
                     }
                     .onFailure { e ->
-                        android.util.Log.w("MobiCloud:Gossip", "[DIAG] sendBloomGossip FAIL → ${peer.identity.nodeId.take(8)}@$ip:$port : ${e.message}")
-                        networkEventRepository.pushEvent("[GOSSIP] Envoi Bloom échoué → ${peer.identity.nodeId.take(8)}")
+                        android.util.Log.w("MobiCloud:Gossip", "[DIAG] sendBloomGossip FAIL → ${nodeId.take(8)} : ${e.message}")
+                        networkEventRepository.pushEvent("[GOSSIP] Envoi Bloom échoué → ${nodeId.take(8)}")
                         lastFailure = e
                     }
             }
@@ -85,12 +84,10 @@ class GossipSyncUseCase @Inject constructor(
         }
     }
 
-    // F1: fire-and-forget via ApplicationScope — ne bloque plus le thread accept TCP
-    override fun onBloomGossipReceived(msg: BloomFilterGossip, senderIp: String, senderPort: Int) {
-        scope.launch { handleIncomingBloom(msg, senderIp, senderPort) }
+    override fun onBloomGossipReceived(msg: BloomFilterGossip) {
+        scope.launch { handleIncomingBloom(msg) }
     }
 
-    // F1: timeout 3s pour éviter un blocage indéfini du thread accept TCP
     override fun onDeltaSyncRequestReceived(req: DeltaSyncRequest): DeltaSyncResponse? {
         return runBlocking {
             withTimeout(DELTA_REQUEST_TIMEOUT_MS) { handleDeltaRequest(req).getOrNull() }
@@ -98,9 +95,7 @@ class GossipSyncUseCase @Inject constructor(
     }
 
     suspend fun handleIncomingBloom(
-        msg: BloomFilterGossip,
-        senderIp: String,
-        @Suppress("UNUSED_PARAMETER") senderPort: Int
+        msg: BloomFilterGossip
     ): Result<Unit> = withContext(Dispatchers.Default) {
         try {
             // Hardening anti-amplification : un Bloom forge declenche un DeltaSyncRequest
@@ -127,24 +122,16 @@ class GossipSyncUseCase @Inject constructor(
                 networkEventRepository.pushEvent(
                     "[GOSSIP] Delta détecté : ${potentiallyMissing.size} entrées manquantes chez ${msg.senderNodeId.take(8)}"
                 )
-                // F5: requesterNodeId = nœud LOCAL (celui qui demande), pas l'émetteur distant
                 val localNodeId = securityRepository.getIdentity().getOrNull()?.nodeId ?: "local"
-                // F6: port serveur du pair résolu depuis peerRepository (pas le port éphémère client)
-                val targetPort = peerRepository.peers.value
-                    .firstOrNull { it.identity.nodeId == msg.senderNodeId }?.port
-                if (targetPort == null) {
-                    networkEventRepository.pushEvent("[GOSSIP] Port serveur inconnu pour ${msg.senderNodeId.take(8)} — DeltaSync ignoré")
-                    return@withContext Result.success(Unit)
-                }
                 val req = DeltaSyncRequest(
                     requesterNodeId = localNodeId,
                     missingBlockIds = potentiallyMissing,
                     timestamp = System.currentTimeMillis()
                 )
-                gossipOutboundPort.sendDeltaSyncRequest(senderIp, targetPort, req)
+                gossipOutboundPort.sendDeltaSyncRequest(msg.senderNodeId, req)
                     .onSuccess { response -> handleDeltaResponse(response) }
                     .onFailure {
-                        networkEventRepository.pushEvent("[GOSSIP] DeltaSync échoué vers $senderIp")
+                        networkEventRepository.pushEvent("[GOSSIP] DeltaSync échoué vers ${msg.senderNodeId.take(8)}")
                     }
             }
             Result.success(Unit)

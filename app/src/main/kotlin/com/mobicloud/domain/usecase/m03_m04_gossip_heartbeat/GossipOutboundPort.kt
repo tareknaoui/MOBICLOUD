@@ -5,6 +5,6 @@ import com.mobicloud.domain.models.gossip.DeltaSyncRequest
 import com.mobicloud.domain.models.gossip.DeltaSyncResponse
 
 interface GossipOutboundPort {
-    suspend fun sendBloomGossip(targetIp: String, targetPort: Int, msg: BloomFilterGossip): Result<Unit>
-    suspend fun sendDeltaSyncRequest(targetIp: String, targetPort: Int, req: DeltaSyncRequest): Result<DeltaSyncResponse>
+    suspend fun sendBloomGossip(targetNodeId: String, msg: BloomFilterGossip): Result<Unit>
+    suspend fun sendDeltaSyncRequest(targetNodeId: String, req: DeltaSyncRequest): Result<DeltaSyncResponse>
 }

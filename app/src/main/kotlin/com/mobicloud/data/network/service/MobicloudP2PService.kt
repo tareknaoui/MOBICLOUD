@@ -45,6 +45,10 @@ import com.mobicloud.domain.models.m11_join.memberUpdateSignedBytes
 import com.mobicloud.domain.models.m11_join.toHexShort
 import com.mobicloud.domain.models.m11_join.hexToByteArray
 import com.mobicloud.domain.models.m11_join.toHexString
+import com.mobicloud.domain.models.m11_join.JoinEvent
+import com.mobicloud.domain.models.m11_join.NodeJoinState
+import com.mobicloud.domain.models.m11_join.toSuperPeerHint
+import com.mobicloud.data.p2p.relay.GossipRelayChannel
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
@@ -90,6 +94,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var runBullyElectionUseCase: RunBullyElectionUseCase
     @Inject lateinit var registerSuperPeerUseCase: RegisterSuperPeerUseCase
     @Inject lateinit var abdicateSuperPeerUseCase: AbdicateSuperPeerUseCase
+    @Inject lateinit var gossipRelayChannel: GossipRelayChannel
     @Inject lateinit var gossipSyncUseCase: GossipSyncUseCase
     @Inject lateinit var resolveDhtConflictUseCase: ResolveDhtConflictUseCase
     @Inject lateinit var receiveAndHostBlockUseCase: ReceiveAndHostBlockUseCase
@@ -198,11 +203,9 @@ class MobicloudP2PService : Service() {
 
             val identity = identityResult.getOrNull() ?: return@launch
 
-            // [Review][Patch] Brancher les handlers AVANT startServer() pour éliminer la race
-            // window où une connexion entrante arriverait pendant que handler == null.
-            tcpConnectionManager.localIdentity = identity
-            tcpConnectionManager.gossipHandler = gossipSyncUseCase
-            tcpConnectionManager.blockReceiverHandler = receiveAndHostBlockUseCase
+            // Architecture relay-only : handler Gossip câblé sur le canal relay (plus de TCP).
+            gossipRelayChannel.gossipHandler = gossipSyncUseCase
+            gossipRelayChannel.startIncomingDispatch()
 
             // Epic 11 — Les use cases JOIN sont injectés par Hilt via dagger.Lazy dans
             // JoinStateMachine (cycle de dépendances résolu côté DI). Aucune construction
@@ -267,33 +270,14 @@ class MobicloudP2PService : Service() {
             // soit effectivement subscribed au SharedFlow. `subscriptionCount.first { it > 0 }`
             // ne suspend que jusqu'à la première subscription (typiquement < 1 ms).
             relayWebSocketClient.joinIncomingFlow.subscriptionCount.first { it > 0 }
-            tcpConnectionManager.dhtRelayHandler = dhtRepository
-            tcpConnectionManager.hostedBlockProvider = hostedBlockRepository
-            // Story 7.2 — câblage des handlers de migration proactive
-            tcpConnectionManager.departureHandler = orchestrateBlockMigrationUseCase
-            tcpConnectionManager.migrationPlanHandler = executeMigrationPlanUseCase
-            // Story 7.3 — handler du donneur qui exécute une directive de réplication reçue
-            tcpConnectionManager.replicationPlanHandler = executeReplicationPlanUseCase
-
             // Story 7.1 — observation des changements réseau (4G ↔ WiFi) toujours utile pour
             // les évènements applicatifs en aval. Story 12.1 : plus de dérivation clusterId depuis
             // le SSID — le clusterId vient désormais de BullySolo (élection) ou JOIN_ACCEPT (admission).
             networkChangeObserver.register()
 
-            // Démarrer le TCP server EN PREMIER pour obtenir le port avant d'annoncer sur Firebase
-            val tcpPortResult = tcpConnectionManager.startServer()
-            // P1: Si le TCP server échoue, on ne publie pas un port 0 inutilisable
-            if (tcpPortResult.isFailure) {
-                Log.e("MobicloudP2PService", "TCP server failed to start — aborting P2P loops", tcpPortResult.exceptionOrNull())
-                stopSelf()
-                return@launch
-            }
-            val tcpPort = tcpPortResult.getOrThrow()
-
-            // Story 2.0 — démarrer la découverte locale LAN après startServer() pour émettre le bon tcpPort
-            tcpConnectionManager.onServerPortChanged = { newPort ->
-                localDiscoveryRepository.updateTcpPort(newPort)
-            }
+            // Architecture relay-only : pas de serveur TCP local.
+            // Port 0 dans les annonces (HELLO, relay) — non-connectable, ignoré par les pairs.
+            val tcpPort = 0
             launch { localDiscoveryRepository.start(tcpPort) }
 
             // Inter-réseau : annonce ce nœud comme PARTICIPANT (pas Super-Pair) sur le relais HA
@@ -348,19 +332,52 @@ class MobicloudP2PService : Service() {
                 }
             }
 
-            // TCP Handshake — se connecter aux Super-Pairs découverts (toutes sources)
+            // Fix SP conflict cross-réseau : quand deux SPs se découvrent via relay,
+            // celui dont le nodeId est inférieur abdique et rejoint l'autre cluster.
+            // Pour Undiscovered/Isolated : émet simplement NewCandidateDetected.
             launch {
-                val connectionJobs = mutableMapOf<String, Job>()
-                peerRepository.peers.collect { allPeers ->
-                    val activeSuperPeers = allPeers.filter { it.isSuperPair && it.isActive }
-                    for (peer in activeSuperPeers) {
-                        val nodeId = peer.identity.nodeId
-                        if (!tcpConnectionManager.isConnected(nodeId) &&
-                            connectionJobs[nodeId]?.isActive != true) {
-                            connectionJobs[nodeId] = launch {
-                                tcpConnectionManager.connectToPeer(peer)
-                                networkEventRepository.pushEvent("[TCP] Connexion établie avec ${nodeId.take(8)}")
+                var seenSuperPairIds = emptySet<String>()
+                signalingRepository.latestPeers.collect { peers ->
+                    val currentSuperPeers = peers.filter { it.isSuperPair }
+                    val currentIds = currentSuperPeers.map { it.nodeId }.toSet()
+                    currentSuperPeers.filter { it.nodeId !in seenSuperPairIds }.forEach { peer ->
+                        val hint = peer.toSuperPeerHint()
+                        when (val fsmState = joinStateMachine.currentState.value) {
+                            is NodeJoinState.Undiscovered, is NodeJoinState.Isolated -> {
+                                joinStateMachine.transition(JoinEvent.NewCandidateDetected(hint))
+                                Log.i(LOGTAG, "[JOIN] NewCandidateDetected → SP ${peer.nodeId.take(8)} (state=${fsmState::class.simpleName})")
+                                seenSuperPairIds = seenSuperPairIds + peer.nodeId
                             }
+                            is NodeJoinState.SuperPair -> {
+                                if (peer.nodeId > identity.nodeId) {
+                                    // Peer has higher priority → local SP yields
+                                    Log.i(LOGTAG, "[JOIN] SP conflict: yield to ${peer.nodeId.take(8)} (higher nodeId)")
+                                    abdicate()
+                                    launch { abdicateSuperPeerUseCase() }
+                                    // Do NOT add to seenSuperPairIds — will be re-processed after abdication
+                                } else {
+                                    // Local SP has higher priority → remote peer should yield eventually
+                                    Log.i(LOGTAG, "[JOIN] SP conflict: keeping local SP (lower nodeId wins ${peer.nodeId.take(8)})")
+                                    seenSuperPairIds = seenSuperPairIds + peer.nodeId
+                                }
+                            }
+                            else -> { /* Joining/Member/Rejoining — ignore */ }
+                        }
+                    }
+                    seenSuperPairIds = seenSuperPairIds intersect currentIds
+                }
+            }
+
+            // Après abdication, la FSM passe en Undiscovered — scanner immédiatement
+            // les SPs connus dans latestPeers pour ne pas attendre le prochain GET_PEERS.
+            launch {
+                joinStateMachine.currentState.collect { state ->
+                    if (state is NodeJoinState.Undiscovered) {
+                        delay(300)
+                        val availableSPs = signalingRepository.latestPeers.value.filter { it.isSuperPair }
+                        availableSPs.firstOrNull()?.let { sp ->
+                            Log.i(LOGTAG, "[JOIN] Post-abdication → NewCandidateDetected ${sp.nodeId.take(8)}")
+                            joinStateMachine.transition(JoinEvent.NewCandidateDetected(sp.toSuperPeerHint()))
                         }
                     }
                 }

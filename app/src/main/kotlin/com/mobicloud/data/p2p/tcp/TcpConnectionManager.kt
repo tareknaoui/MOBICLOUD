@@ -212,7 +212,7 @@ class TcpConnectionManager @Inject constructor(
             val bytes = ByteArray(len)
             data.readFully(bytes)
             val msg = MobiCloudProtoBuf.decodeFromByteArray(BloomFilterGossip.serializer(), bytes)
-            gossipHandler?.onBloomGossipReceived(msg, senderIp, senderPort)
+            gossipHandler?.onBloomGossipReceived(msg)
                 ?: Log.w("MobiCloud:TCP", "Bloom gossip reçu mais aucun handler configuré")
         } catch (e: Exception) {
             Log.e("MobiCloud:TCP", "Erreur lecture GOSSIP_BLOOM", e)

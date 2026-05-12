@@ -45,6 +45,9 @@ class RelayWebSocketClient @Inject constructor(
     // Channel pour les uploadBlock() en attente d'ACK — clé = blockId
     private val pendingUploads = java.util.concurrent.ConcurrentHashMap<String, CompletableDeferred<Unit>>()
 
+    // Dispatch SIGNAL_RECEIVED (0x0F) : Pair<fromNodeId, data> — utilisé par GossipRelayChannel.
+    internal val incomingSignals = MutableSharedFlow<Pair<String, ByteArray>>(replay = 0, extraBufferCapacity = 64)
+
     // Dispatch JOIN (Epic 11) : SharedFlow vers JoinNetworkClientImpl.
     // Exposé internal pour que JoinNetworkClientImpl puisse s'y abonner.
     // P12/D2 (review R2) : `replay = 0` (retour à la valeur initiale) — le replay=16 ouvrait une
@@ -165,6 +168,11 @@ class RelayWebSocketClient @Inject constructor(
                         val (fromNodeId, blockId) = parsed
                         trySend(RelayEvent.BlockRequestForwarded(fromNodeId, blockId))
                     }
+                    RelayMsg.SIGNAL_RECEIVED -> {
+                        val parsed = RelayFraming.parseSignalReceivedPayload(payload) ?: return
+                        val (fromNodeId, data) = parsed
+                        flowScope.launch { incomingSignals.emit(Pair(fromNodeId, data)) }
+                    }
                     RelayMsg.PONG -> { /* keepalive applicatif — ignoré, OkHttp gère le ping natif */ }
                     RelayMsg.ERROR -> {
                         val msg = payload.toString(Charsets.UTF_8)
@@ -227,6 +235,21 @@ class RelayWebSocketClient @Inject constructor(
         withTimeout(30_000L) { deferred.await() }
     }.also { result ->
         if (result.isFailure) pendingUploads.remove(blockId)
+    }
+
+    /**
+     * Envoie SIGNAL (0x0E) — forwarding P2P éphémère vers destNodeId (Gossip DHT, etc.).
+     * Fire-and-forget : pas d'ACK attendu du serveur.
+     */
+    fun sendSignal(destNodeId: String, data: ByteArray): Result<Unit> {
+        val ws = activeWebSocket
+            ?: return Result.failure(IllegalStateException("No active relay connection"))
+        val payload = RelayFraming.buildSignalPayload(destNodeId, data)
+        return if (ws.send(RelayFraming.buildFrame(RelayMsg.SIGNAL, payload).toByteString())) {
+            Result.success(Unit)
+        } else {
+            Result.failure(IllegalStateException("WebSocket.send() retourné false"))
+        }
     }
 
     /**

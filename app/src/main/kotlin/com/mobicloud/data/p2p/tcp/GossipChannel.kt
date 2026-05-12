@@ -35,10 +35,11 @@ class GossipChannel @Inject constructor() : GossipOutboundPort {
 
     @OptIn(ExperimentalSerializationApi::class)
     override suspend fun sendBloomGossip(
-        targetIp: String,
-        targetPort: Int,
+        targetNodeId: String,
         msg: BloomFilterGossip
     ): Result<Unit> = withContext(Dispatchers.IO) {
+        val targetIp = targetNodeId  // kept for compat — dead code, GossipRelayChannel is used instead
+        val targetPort = 0
         // FIX GOSSIP TCP : skip si l'IP cible est un placeholder (0.0.0.0) ou
         // loopback (127.x.x.x). Resolution Android : 0.0.0.0 -> localhost ->
         // ECONNREFUSED en boucle. Le pair est joignable uniquement via le relay
@@ -70,10 +71,11 @@ class GossipChannel @Inject constructor() : GossipOutboundPort {
 
     @OptIn(ExperimentalSerializationApi::class)
     override suspend fun sendDeltaSyncRequest(
-        targetIp: String,
-        targetPort: Int,
+        targetNodeId: String,
         req: DeltaSyncRequest
     ): Result<DeltaSyncResponse> = withContext(Dispatchers.IO) {
+        val targetIp = targetNodeId  // kept for compat — not used in relay-only mode
+        val targetPort = 0
         if (isUnreachableIp(targetIp)) {
             return@withContext Result.failure(
                 IllegalArgumentException("Skipped DeltaSync direct to placeholder IP $targetIp — peer reachable only via relay")

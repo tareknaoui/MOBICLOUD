@@ -92,7 +92,7 @@ class GossipSyncUseCaseTest {
         val result = useCase.runGossipCycle()
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 0) { gossipOutboundPort.sendBloomGossip(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipOutboundPort.sendBloomGossip(any(), any()) }
     }
 
     // Test 6 : fan-out = 2 — exactement 2 pairs sélectionnés parmi 3
@@ -101,11 +101,11 @@ class GossipSyncUseCaseTest {
         val peers = listOf(peer("1"), peer("2"), peer("3"))
         every { peerRepository.peers } returns MutableStateFlow(peers)
         coEvery { dhtRepository.observeAllEntries() } returns flowOf(emptyList())
-        coEvery { gossipOutboundPort.sendBloomGossip(any(), any(), any()) } returns Result.success(Unit)
+        coEvery { gossipOutboundPort.sendBloomGossip(any(), any()) } returns Result.success(Unit)
 
         useCase.runGossipCycle()
 
-        coVerify(exactly = 2) { gossipOutboundPort.sendBloomGossip(any(), any(), any()) }
+        coVerify(exactly = 2) { gossipOutboundPort.sendBloomGossip(any(), any()) }
     }
 
     // Test 7 : Bloom distant vide → toutes les entrées locales sont dans potentiallyMissing
@@ -115,7 +115,6 @@ class GossipSyncUseCaseTest {
             DhtEntry("block-A", "node-1", "10.0.0.1", 9090, System.currentTimeMillis()),
             DhtEntry("block-B", "node-1", "10.0.0.1", 9090, System.currentTimeMillis())
         )
-        // F6 fix: le pair distant doit être dans peerRepository pour que son port serveur soit résolu
         val remotePeer = peer("remote-node", ip = "10.0.0.2", port = 9090)
         every { peerRepository.peers } returns MutableStateFlow(listOf(remotePeer))
         coEvery { dhtRepository.observeAllEntries() } returns flowOf(localEntries)
@@ -129,14 +128,13 @@ class GossipSyncUseCaseTest {
             partitionIds = emptyList(),
             timestamp = System.currentTimeMillis()
         )
-        coEvery { gossipOutboundPort.sendDeltaSyncRequest(any(), any(), any()) } returns Result.failure(Exception("no response needed"))
+        coEvery { gossipOutboundPort.sendDeltaSyncRequest(any(), any()) } returns Result.failure(Exception("no response needed"))
 
-        useCase.handleIncomingBloom(msg, "10.0.0.2", 9090)
+        useCase.handleIncomingBloom(msg)
 
         coVerify(exactly = 1) {
             gossipOutboundPort.sendDeltaSyncRequest(
-                "10.0.0.2",
-                9090,
+                "remote-node",
                 match { it.missingBlockIds.containsAll(listOf("block-A", "block-B")) }
             )
         }
@@ -162,9 +160,9 @@ class GossipSyncUseCaseTest {
             timestamp = System.currentTimeMillis()
         )
 
-        useCase.handleIncomingBloom(msg, "10.0.0.2", 9090)
+        useCase.handleIncomingBloom(msg)
 
-        coVerify(exactly = 0) { gossipOutboundPort.sendDeltaSyncRequest(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipOutboundPort.sendDeltaSyncRequest(any(), any()) }
     }
 
     // Test 9 : handleDeltaRequest → DeltaSyncResponse contient les entrées demandées
@@ -173,7 +171,6 @@ class GossipSyncUseCaseTest {
         val entry = DhtEntry("block-Z", "node-1", "10.0.0.1", 9090, 1000L)
         coEvery { dhtRepository.findByBlockId("block-Z") } returns Result.success(entry)
         coEvery { dhtRepository.findByBlockId("block-MISSING") } returns Result.success(null)
-        // Le filtre "known peer" exige que le requester soit dans peerRepository.
         every { peerRepository.peers } returns MutableStateFlow(listOf(peer("remote-node")))
 
         val req = DeltaSyncRequest(
@@ -196,8 +193,8 @@ class GossipSyncUseCaseTest {
         val peers = listOf(peer("1"), peer("2"))
         every { peerRepository.peers } returns MutableStateFlow(peers)
         coEvery { dhtRepository.observeAllEntries() } returns flowOf(emptyList())
-        val sendError = RuntimeException("TCP timeout")
-        coEvery { gossipOutboundPort.sendBloomGossip(any(), any(), any()) } returns Result.failure(sendError)
+        val sendError = RuntimeException("relay timeout")
+        coEvery { gossipOutboundPort.sendBloomGossip(any(), any()) } returns Result.failure(sendError)
 
         val result = useCase.runGossipCycle()
 

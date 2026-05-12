@@ -89,10 +89,6 @@ class GossipKnownPeerFilterTest {
 
     @Test
     fun `G1 - Bloom d'un sender non-pair declenche un early-return (pas d'acces DHT)`() = runTest {
-        // Le fix doit court-circuiter AVANT toute lecture de la DHT locale. C'est
-        // observable : si le filtre est en place, dhtRepository.observeAllEntries()
-        // n'est jamais appele pour ce Bloom forge. Sans le fix, la branche de
-        // calcul delta s'execute (amplification + DoS DB).
         val attackerBloom = BloomFilterGossip(
             senderNodeId = unknownNodeId,
             bloomFilterBytes = ByteArray(128),
@@ -102,13 +98,10 @@ class GossipKnownPeerFilterTest {
             timestamp = System.currentTimeMillis()
         )
 
-        val result = useCase.handleIncomingBloom(attackerBloom, "1.2.3.4", 9999)
+        val result = useCase.handleIncomingBloom(attackerBloom)
 
-        // observable du fix : la DHT locale n'est PAS consultee pour un sender non-pair
         io.mockk.verify(exactly = 0) { dhtRepository.observeAllEntries() }
-        coVerify(exactly = 0) {
-            gossipOutboundPort.sendDeltaSyncRequest(any(), any(), any())
-        }
+        coVerify(exactly = 0) { gossipOutboundPort.sendDeltaSyncRequest(any(), any()) }
         assertTrue("Doit retourner success silencieux (rejet)", result.isSuccess)
     }
 
@@ -124,7 +117,6 @@ class GossipKnownPeerFilterTest {
 
         val result = useCase.handleDeltaRequest(attackerRequest)
 
-        // Pas d'appel DB pour les blockIds demandes
         coVerify(exactly = 0) { dhtRepository.findByBlockId(any()) }
         assertTrue("DeltaRequest non-pair doit etre rejete", result.isFailure)
     }
@@ -139,7 +131,7 @@ class GossipKnownPeerFilterTest {
                 DhtEntryDto(
                     blockId = "a".repeat(64),
                     nodeId = "victim-node",
-                    ipAddress = "1.2.3.4", // route forgee
+                    ipAddress = "1.2.3.4",
                     port = 666,
                     timestamp = System.currentTimeMillis()
                 )
@@ -149,7 +141,6 @@ class GossipKnownPeerFilterTest {
 
         val result = useCase.handleDeltaResponse(attackerResponse)
 
-        // ResolveDhtConflict ne doit JAMAIS etre appele -> pas de pollution DHT
         coVerify(exactly = 0) { resolveDhtConflictUseCase.resolve(any()) }
         assertTrue("DeltaResponse non-pair doit etre rejete", result.isFailure)
     }
@@ -174,7 +165,6 @@ class GossipKnownPeerFilterTest {
 
         val result = useCase.handleDeltaResponse(validResponse)
 
-        // ResolveDhtConflict appele exactement 1 fois (l'entree est inseree)
         coVerify(exactly = 1) { resolveDhtConflictUseCase.resolve(any()) }
         assertTrue("DeltaResponse pair connu doit passer", result.isSuccess)
     }

@@ -5,6 +5,6 @@ import com.mobicloud.domain.models.gossip.DeltaSyncRequest
 import com.mobicloud.domain.models.gossip.DeltaSyncResponse
 
 interface GossipIncomingHandler {
-    fun onBloomGossipReceived(msg: BloomFilterGossip, senderIp: String, senderPort: Int)
+    fun onBloomGossipReceived(msg: BloomFilterGossip)
     fun onDeltaSyncRequestReceived(req: DeltaSyncRequest): DeltaSyncResponse?
 }
