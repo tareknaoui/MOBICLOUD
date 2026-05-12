@@ -28,7 +28,7 @@ private const val JOIN_MAGIC: Byte = 0xFF.toByte()
 // du reseau, declenchant des elections Bully en parallele et plusieurs super-pairs dans
 // le meme cluster. HA reel = chantier separe (store partage requis).
 internal val RELAY_SERVER_URLS = listOf(
-    "wss://mobicloud-relay-1.onrender.com"  // Render Frankfurt (EU)
+    "wss://mobicloud-relay-3.onrender.com"  // Render Frankfurt (EU)
 )
 
 @Singleton
