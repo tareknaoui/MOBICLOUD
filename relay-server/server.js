@@ -20,6 +20,10 @@ const MSG = {
   // La réponse passe par le canal UPLOAD/FORWARD existant — pas de nouveau message retour.
   REQUEST_BLOCK: 0x0C,
   REQUEST_BLOCK_FORWARDED: 0x0D,
+  // SIGNAL (0x0E) : forwarding P2P éphémère — utilisé pour Gossip DHT entre pairs.
+  // Pas de buffering : si le destinataire est absent le signal est droppé.
+  SIGNAL: 0x0E,
+  SIGNAL_RECEIVED: 0x0F,
   ERROR: 0xFF
 };
 
@@ -460,6 +464,24 @@ function handleRequestBlock(fromNodeId, payload, senderWs) {
   console.log(`[RELAY] REQUEST_BLOCK ${blockId.slice(0, 16)} : ${fromNodeId.slice(0, 8)} → ${destNodeId.slice(0, 8)}`);
 }
 
+// ─── SIGNAL — forwarding P2P éphémère (Gossip DHT, etc.) ────────────────────
+// Payload : 16 bytes destNodeId (UTF-8, NUL-paddé) + data arbitraire.
+// Pas de buffering — le signal est droppé si le destinataire est absent.
+function handleSignal(fromNodeId, payload) {
+  if (payload.length < 16) return;
+  const destNodeId = payload.slice(0, 16).toString('utf8').replace(/\0+$/, '').trim();
+  const data = payload.slice(16);
+  if (!destNodeId || destNodeId.length < 4) return;
+  const destSession = sessions.get(destNodeId);
+  if (destSession && destSession.ws.readyState === WebSocket.OPEN) {
+    const out = Buffer.allocUnsafe(16 + data.length);
+    Buffer.from(fromNodeId.padEnd(16, '\0'), 'utf8').copy(out, 0);
+    data.copy(out, 16);
+    safeSend(destSession.ws, buildFrame(MSG.SIGNAL_RECEIVED, out));
+  }
+  // dest absent → signal droppé silencieusement
+}
+
 // ─── Serveur HTTP + WebSocketServer ─────────────────────────────────────────
 
 const httpServer = http.createServer((req, res) => {
@@ -572,6 +594,10 @@ wss.on('connection', (ws) => {
       }
       case MSG.REQUEST_BLOCK: {
         handleRequestBlock(nodeId, frame.payload, ws);
+        break;
+      }
+      case MSG.SIGNAL: {
+        handleSignal(nodeId, frame.payload);
         break;
       }
       case MSG.PING: {
