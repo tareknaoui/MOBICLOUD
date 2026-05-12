@@ -240,7 +240,7 @@ function handleJoin(nodeId, payload) {
     if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) return false;
   }
   if (port !== undefined && port !== null) {
-    if (typeof port !== 'number' || port < 1 || port > 65535) return false;
+    if (typeof port !== 'number' || port < 0 || port > 65535) return false;
   }
 
   if (!signalingRegistry.has(nodeId) && signalingRegistry.size >= MAX_SIGNALING_PEERS) return false;
