@@ -30,7 +30,9 @@ import kotlinx.serialization.protobuf.ProtoBuf
 @OptIn(ExperimentalSerializationApi::class)
 val MobiCloudProtoBuf: ProtoBuf = ProtoBuf {
     // ProtoBuf binaire ignore les champs de numéro inconnu par défaut (spécification wire format).
-    // Ce bloc de configuration est intentionnellement minimal : toute option future sera
-    // ajoutée ici pour centraliser les décisions de sérialisation.
-    encodeDefaults = true
+    // encodeDefaults = false (défaut) est crucial pour les champs nullable avec défaut null
+    // (Story 11.1 : gpsLatitude/gpsLongitude). Encoder explicitement un null casserait la
+    // sérialisation (ProtoBuf wire format n'a pas de représentation "null" native — les champs
+    // absents sont décodés via le défaut Kotlin côté receiver).
+    encodeDefaults = false
 }

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-05-06T23:30:00+02:00
+last_updated: 2026-05-12T00:00:00+02:00
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -99,3 +99,11 @@ development_status:
   9-3-request-hosting-distribution-inter-cluster: done
   9-4-request-block-recuperation-inter-cluster: done
   epic-9-retrospective: optional
+  epic-10: in-progress
+  10-1-public-key-propagation-inter-cluster: done
+  epic-10-retrospective: optional
+  epic-11: in-progress
+  11-1-infrastructure-gps-locationprovider-gpscoordinate-haversine: done
+  11-2-protocole-join-explicite-admission-decentralisee-par-le-super-pair: review
+  11-3-heartbeat-member-registry-cohesion-et-continuite-du-cluster: backlog
+  epic-11-retrospective: optional

@@ -15,6 +15,7 @@ import com.mobicloud.domain.models.HelloPayload
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.LocalDiscoveryRepository
+import com.mobicloud.domain.repository.LocationRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -40,6 +41,7 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
     private val identityRepository: IdentityRepository,
     private val peerRepository: PeerRepository,
     private val networkEventRepository: NetworkEventRepository,
+    private val locationRepository: LocationRepository,
     @ApplicationContext private val context: Context,
     @ApplicationScope private val externalScope: CoroutineScope
 ) : LocalDiscoveryRepository {
@@ -59,6 +61,9 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
     // P-A1 — @Volatile garantit la visibilité de tcpPort entre start() (thread appelant) et broadcastLoop() (coroutine)
     @Volatile private var tcpPort: Int = 0
     private val startStopLock = Any()
+
+    // Statut Super-Pair courant, mis à jour par MobicloudP2PService via updateSuperPairStatus().
+    @Volatile private var isLocalNodeSuperPair: Boolean = false
 
     // Déféré 2 — StatFs mis en cache pour éviter un appel système dans la hot-loop réseau (toutes les 5 s).
     // TTL = 30 s : le disque libre ne change pas à cette fréquence, une lecture par TTL est largement suffisante.
@@ -117,6 +122,10 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
         this.tcpPort = port
     }
 
+    override fun updateSuperPairStatus(isSuperPair: Boolean) {
+        isLocalNodeSuperPair = isSuperPair
+    }
+
     private fun acquireMulticastLock() {
         val wm = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
         multicastLock = wm.createMulticastLock("mobicloud_discovery").apply {
@@ -142,12 +151,16 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
                 // P5 — isActive (extension coroutine) est thread-safe, contrairement à job?.isActive
                 while (currentCoroutineContext().isActive) {
                     runCatching {
+                        val gps = locationRepository.currentLocation.value
                         val payload = HelloPayload(
                             nodeId = identity.nodeId,
                             publicKeyBytes = identity.publicKeyBytes,
                             tcpPort = tcpPort,
                             reliabilityScore = identity.reliabilityScore,
-                            freeStorageBytes = getLocalFreeStorageBytes()
+                            freeStorageBytes = getLocalFreeStorageBytes(),
+                            gpsLatitude = gps?.latitude,
+                            gpsLongitude = gps?.longitude,
+                            superPair = isLocalNodeSuperPair
                         )
                         val payloadBytes = MobiCloudProtoBuf.encodeToByteArray(HelloPayload.serializer(), payload)
                         val signature = signPayload(payloadBytes)
@@ -276,14 +289,14 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
             )
             // P-A5 — propager le succès/échec DB : retourner false si l'insertion échoue
             // pour ne pas réinitialiser le timer fallback sur un HELLO non persisté
-            Log.i(TAG, "[DIAG] HELLO reçu de ${msg.payload.nodeId.take(8)}@$sourceAddress:${msg.payload.tcpPort}")
+            Log.i(TAG, "[DIAG] HELLO reçu de ${msg.payload.nodeId.take(8)}@$sourceAddress:${msg.payload.tcpPort} superPair=${msg.payload.superPair}")
             val insertResult = peerRepository.registerOrUpdatePeer(
                 identity = peerIdentity,
                 timestampMs = SystemClock.elapsedRealtime(),
                 source = DiscoverySource.LAN_MULTICAST,
                 ipAddress = sourceAddress,
                 port = msg.payload.tcpPort,
-                isSuperPair = false,
+                isSuperPair = msg.payload.superPair,
                 freeStorageBytes = msg.payload.freeStorageBytes
             )
             insertResult.onFailure { Log.e(TAG, "Échec insertion pair LAN", it) }

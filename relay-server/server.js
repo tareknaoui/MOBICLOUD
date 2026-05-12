@@ -142,7 +142,7 @@ function handleRegisterPeer(nodeId, payload) {
   let entry;
   try { entry = JSON.parse(payload.toString('utf8')); } catch { return false; }
 
-  const { ip, port, reliabilityScore, electedAt, clusterId, freeBytes } = entry;
+  const { ip, port, reliabilityScore, electedAt, clusterId, freeBytes, gpsLatitude, gpsLongitude } = entry;
   if (!ip || typeof port !== 'number' || port < 1 || port > 65535) return false;
 
   // Valider le format IP (pas de hostname, pas de loopback non contrôlé)
@@ -177,6 +177,20 @@ function handleRegisterPeer(nodeId, payload) {
     }
   }
 
+  // Story 11.1 — gpsLatitude / gpsLongitude optionnels : Number fini dans les bornes géodésiques ;
+  // sinon coerce en null + warn (même pattern que clusterId/freeBytes).
+  // Review F5 : validés et stockés comme paire — si l'un est invalide, les deux sont null
+  // (une coordonnée GPS n'a pas de sens avec un seul axe).
+  let gpsLatNum = null;
+  let gpsLngNum = null;
+  const latPresent = gpsLatitude !== undefined && gpsLatitude !== null;
+  const lngPresent = gpsLongitude !== undefined && gpsLongitude !== null;
+  const latValid = latPresent && typeof gpsLatitude === 'number' && Number.isFinite(gpsLatitude) && gpsLatitude >= -90 && gpsLatitude <= 90;
+  const lngValid = lngPresent && typeof gpsLongitude === 'number' && Number.isFinite(gpsLongitude) && gpsLongitude >= -180 && gpsLongitude <= 180;
+  if (latPresent && !latValid) console.warn(`[SIGNALING] gpsLatitude invalide rejeté (coerce en null) — nodeId=${nodeId.slice(0, 8)} val=${gpsLatitude}`);
+  if (lngPresent && !lngValid) console.warn(`[SIGNALING] gpsLongitude invalide rejeté (coerce en null) — nodeId=${nodeId.slice(0, 8)} val=${gpsLongitude}`);
+  if (latValid && lngValid) { gpsLatNum = gpsLatitude; gpsLngNum = gpsLongitude; }
+
   // Cap : refuser si annuaire plein et ce nœud n'est pas déjà enregistré
   if (!signalingRegistry.has(nodeId) && signalingRegistry.size >= MAX_SIGNALING_PEERS) return false;
 
@@ -195,12 +209,14 @@ function handleRegisterPeer(nodeId, payload) {
     electedAt: electedAt ?? Date.now(),
     clusterId: clusterIdStr,
     freeBytes: freeBytesNum,
+    gpsLatitude: gpsLatNum,
+    gpsLongitude: gpsLngNum,
     lastSeen: Date.now(),
     ttlTimer,
     isSuperPair: true   // REGISTER_PEER = revendication formelle de statut Super-Pair (post-Bully)
   });
 
-  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port} clusterId=${clusterIdStr.slice(0, 8) || '(legacy)'} freeBytes=${freeBytesNum}`);
+  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port} clusterId=${clusterIdStr.slice(0, 8) || '(legacy)'} freeBytes=${freeBytesNum} gps=${gpsLatNum !== null ? `${gpsLatNum},${gpsLngNum}` : 'absent'}`);
   return true;
 }
 
@@ -238,6 +254,7 @@ function handleJoin(nodeId, payload) {
   // envoyant un JOIN heartbeat ne doit PAS être démotivé en "legacy" (clusterId="",
   // freeBytes=0) jusqu'au prochain REGISTER_PEER. Le payload JOIN ne porte pas ces
   // champs ; on les hérite de l'entrée précédente, sinon defaults legacy.
+  // Story 11.1 review (F2) : même logique pour gpsLatitude/gpsLongitude.
   signalingRegistry.set(nodeId, {
     ip: ip ?? '0.0.0.0',
     port: port ?? 0,
@@ -245,6 +262,8 @@ function handleJoin(nodeId, payload) {
     electedAt: existing?.electedAt ?? null,
     clusterId: existing?.clusterId ?? '',
     freeBytes: existing?.freeBytes ?? 0,
+    gpsLatitude: existing?.gpsLatitude ?? null,
+    gpsLongitude: existing?.gpsLongitude ?? null,
     lastSeen: Date.now(),
     ttlTimer,
     isSuperPair: wasSuperPair
@@ -285,7 +304,10 @@ function handleGetPeers(ws) {
       clusterId: entry.clusterId ?? '',
       freeBytes: entry.freeBytes ?? 0,
       // Story 10.1 — clé publique EC P-256 SPKI-DER encodée Base64 ; "" si session absente/fermée.
-      pubKeySpkiDerB64
+      pubKeySpkiDerB64,
+      // Story 11.1 — coordonnées GPS snapshot ; null si le Super-Pair n'a pas de fix ou legacy.
+      gpsLatitude: entry.gpsLatitude ?? null,
+      gpsLongitude: entry.gpsLongitude ?? null
     });
   }
   safeSend(ws, buildFrame(MSG.PEERS, Buffer.from(JSON.stringify(peers), 'utf8')));

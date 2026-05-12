@@ -4,4 +4,6 @@ interface LocalDiscoveryRepository {
     fun start(tcpPort: Int)
     fun stop()
     fun updateTcpPort(port: Int)
+    /** Appelé par MobicloudP2PService lors de la victoire/perte d'une élection Bully. */
+    fun updateSuperPairStatus(isSuperPair: Boolean)
 }

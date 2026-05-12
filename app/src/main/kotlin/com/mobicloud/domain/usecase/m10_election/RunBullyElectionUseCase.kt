@@ -7,9 +7,11 @@ import com.mobicloud.domain.models.SuperPairElection
 import com.mobicloud.domain.models.electionSignedBytes
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
+import com.mobicloud.domain.repository.LocationRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.usecase.m11_join.MarkSelfAsSuperPairUseCase
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -38,6 +40,8 @@ class RunBullyElectionUseCase @Inject constructor(
     private val networkClient: IElectionNetworkClient,
     private val electionStateManager: ElectionStateManager,
     private val nodeSettingsRepository: NodeSettingsRepository,
+    private val locationRepository: LocationRepository? = null,
+    private val markSelfAsSuperPairUseCase: MarkSelfAsSuperPairUseCase? = null,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     companion object {
@@ -149,7 +153,11 @@ class RunBullyElectionUseCase @Inject constructor(
             emit(Result.failure(Exception("Election lost to a higher scoring node: ${higherAliveReceived.senderNodeId}")))
         } else {
             // Victoire — aucune réponse ALIVE prioritaire reçue dans la fenêtre
-            val coordinatorPayload = createPayload(localIdentity, localScore, ElectionMessageType.COORDINATOR, localClusterId)
+            val selfGps = locationRepository?.currentLocation?.value
+            val coordinatorPayload = createPayload(
+                localIdentity, localScore, ElectionMessageType.COORDINATOR, localClusterId,
+                gpsLatitude = selfGps?.latitude, gpsLongitude = selfGps?.longitude
+            )
                 .getOrElse { error ->
                     emit(Result.failure(error))
                     return@flow
@@ -168,6 +176,10 @@ class RunBullyElectionUseCase @Inject constructor(
                 timestampMs = System.currentTimeMillis(),
                 isSuperPair = true
             )
+
+            // Epic 11 câblage AC11 : notifier la state machine JOIN de la victoire Bully.
+            // Inséré avant emit() pour que l'état SuperPair soit positionné avant la propagation UI.
+            markSelfAsSuperPairUseCase?.invoke(localClusterId)
 
             emit(Result.success(SuperPairElection(localIdentity)))
         }
@@ -199,10 +211,15 @@ class RunBullyElectionUseCase @Inject constructor(
         identity: NodeIdentity,
         score: Float,
         type: ElectionMessageType,
-        clusterId: String = ""
+        clusterId: String = "",
+        gpsLatitude: Double? = null,
+        gpsLongitude: Double? = null
     ): Result<ElectionPayload> {
         val timestampMs = System.currentTimeMillis()
-        val dataToSign = electionSignedBytes(type, identity.nodeId, score, clusterId, timestampMs)
+        // Champs GPS renseignés uniquement pour COORDINATOR (AC12)
+        val lat = if (type == ElectionMessageType.COORDINATOR) gpsLatitude else null
+        val lng = if (type == ElectionMessageType.COORDINATOR) gpsLongitude else null
+        val dataToSign = electionSignedBytes(type, identity.nodeId, score, clusterId, timestampMs, lat, lng)
         val signature = securityRepository.signData(dataToSign).getOrElse { error ->
             return Result.failure(Exception("Failed to sign election payload of type ${type.name}", error))
         }
@@ -213,7 +230,9 @@ class RunBullyElectionUseCase @Inject constructor(
                 reliabilityScore = score,
                 signatureBytes = signature,
                 clusterId = clusterId,
-                timestampMs = timestampMs
+                timestampMs = timestampMs,
+                gpsLatitude = lat,
+                gpsLongitude = lng
             )
         )
     }

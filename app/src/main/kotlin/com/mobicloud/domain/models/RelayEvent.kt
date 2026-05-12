@@ -40,5 +40,10 @@ data class RelayPeer(
     // Vide ("") si le serveur ne la transporte pas (ancien relais) ou si la session WebSocket
     // du nœud est fermée au moment du GET_PEERS. Permet à BlockTransferClient de vérifier
     // la signature ACK inter-cluster sans ByteArray(0).
-    val pubKeySpkiDerB64: String = ""
+    val pubKeySpkiDerB64: String = "",
+    // Story 11.1 — coordonnées GPS snapshot du Super-Pair distant ; null si absent ou legacy.
+    // Volatile (snapshot session WebSocket) — non persisté en Room, consommé en mémoire par Story 11.2.
+    // null interdit "0.0,0.0" comme sentinelle (coordonnée valide au large du Ghana).
+    val gpsLatitude: Double? = null,
+    val gpsLongitude: Double? = null
 )

@@ -3,9 +3,15 @@ package com.mobicloud.data.p2p.websocket
 import android.util.Log
 import com.mobicloud.domain.models.RelayEvent
 import com.mobicloud.domain.models.RelayPeer
+import com.mobicloud.domain.models.m11_join.JoinSubType
+import com.mobicloud.domain.models.m11_join.toJoinSubType
+import com.mobicloud.domain.repository.IJoinNetworkClient
+import com.mobicloud.domain.repository.JoinIncomingMessage
+import com.mobicloud.domain.repository.LocationRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.MutableSharedFlow
 import okhttp3.*
 import okio.ByteString
 import okio.ByteString.Companion.toByteString
@@ -15,6 +21,8 @@ import javax.inject.Singleton
 import kotlin.math.min
 
 private const val TAG = "RelayWSClient"
+// Magic byte préfixant un payload FORWARD JOIN — voir JoinNetworkClientImpl.JOIN_MAGIC.
+private const val JOIN_MAGIC: Byte = 0xFF.toByte()
 
 // Instance unique : le multi-instance sans store partage (Redis/pub-sub) fragmente
 // l'annuaire des pairs entre les instances -- chaque device ne voit qu'un sous-ensemble
@@ -26,7 +34,8 @@ internal val RELAY_SERVER_URLS = listOf(
 
 @Singleton
 class RelayWebSocketClient @Inject constructor(
-    private val authSigner: RelayAuthSigner
+    private val authSigner: RelayAuthSigner,
+    private val locationRepository: LocationRepository
 ) {
     private val okHttpClient = OkHttpClient.Builder()
         .pingInterval(30, java.util.concurrent.TimeUnit.SECONDS)
@@ -37,6 +46,10 @@ class RelayWebSocketClient @Inject constructor(
 
     // Channel pour les uploadBlock() en attente d'ACK — clé = blockId
     private val pendingUploads = java.util.concurrent.ConcurrentHashMap<String, CompletableDeferred<Unit>>()
+
+    // Dispatch JOIN (Epic 11) : SharedFlow vers JoinNetworkClientImpl.
+    // Exposé internal pour que JoinNetworkClientImpl puisse s'y abonner.
+    internal val joinIncomingFlow = MutableSharedFlow<JoinIncomingMessage>(replay = 0, extraBufferCapacity = 64)
 
     /**
      * Ouvre une connexion WSS persistante vers relayUrl.
@@ -120,6 +133,15 @@ class RelayWebSocketClient @Inject constructor(
                     RelayMsg.FORWARD -> {
                         val parsed = RelayFraming.parseForwardPayload(payload) ?: return
                         val (fromNodeId, blockId, data) = parsed
+                        // Early-dispatch Epic 11 : préfixe magic 0xFF + JoinSubType (2 bytes) pour
+                        // éliminer la collision avec BlockReceived dont data[0] peut accidentellement
+                        // tomber dans 0x01-0x06.
+                        if (data.size >= 2 && data[0] == JOIN_MAGIC && data[1] in JoinSubType.bytes) {
+                            flowScope.launch {
+                                joinIncomingFlow.emit(JoinIncomingMessage(fromNodeId, data[1], data.drop(2).toByteArray()))
+                            }
+                            return
+                        }
                         trySend(RelayEvent.BlockReceived(fromNodeId, blockId, data))
                     }
                     RelayMsg.ACK -> {
@@ -250,6 +272,7 @@ class RelayWebSocketClient @Inject constructor(
         freeBytes: Long
     ): Boolean {
         val ws = activeWebSocket ?: return false
+        val gps = locationRepository.currentLocation.value
         val json = org.json.JSONObject().apply {
             put("nodeId",           nodeId)
             put("ip",               ip)
@@ -260,6 +283,14 @@ class RelayWebSocketClient @Inject constructor(
             // Story 9.2 — capacité libre snapshot (allocated - used, ≥ 0). JSONObject sérialise
             // le Long en Number JSON (sûr tant que < 2^53, soit ~9 PB).
             put("freeBytes",        freeBytes)
+            // Story 11.1 — coordonnées GPS optionnelles ; absents si permission refusée ou pas de fix.
+            // NaN/Infinity rejetés : JSONObject sérialise NaN sans guillemets → JSON invalide
+            // côté serveur ; mieux vaut omettre les champs que de propager des bytes corrompus.
+            if (gps != null && gps.latitude.isFinite() && gps.longitude.isFinite() &&
+                gps.latitude in -90.0..90.0 && gps.longitude in -180.0..180.0) {
+                put("gpsLatitude",  gps.latitude)
+                put("gpsLongitude", gps.longitude)
+            }
         }
         val payload = json.toString().toByteArray(Charsets.UTF_8)
         return ws.send(RelayFraming.buildFrame(RelayMsg.REGISTER_PEER, payload).toByteString())
@@ -286,7 +317,11 @@ class RelayWebSocketClient @Inject constructor(
                     // Story 10.1 — clé publique EC P-256 SPKI-DER en Base64 ; absent/null → ""
                     // (rétrocompatibilité serveur sans ce champ).
                     pubKeySpkiDerB64 = if (obj.isNull("pubKeySpkiDerB64")) ""
-                                       else obj.optString("pubKeySpkiDerB64", "")
+                                       else obj.optString("pubKeySpkiDerB64", ""),
+                    // Story 11.1 — coordonnées GPS ; absent/null → null (rétrocompatibilité).
+                    // Review F7 : !has() couvre le cas clé absente (isNull() ne le fait pas).
+                    gpsLatitude  = if (!obj.has("gpsLatitude")  || obj.isNull("gpsLatitude"))  null else obj.optDouble("gpsLatitude",  Double.NaN).takeUnless { it.isNaN() },
+                    gpsLongitude = if (!obj.has("gpsLongitude") || obj.isNull("gpsLongitude")) null else obj.optDouble("gpsLongitude", Double.NaN).takeUnless { it.isNaN() }
                 )
             }
         }.getOrDefault(emptyList())

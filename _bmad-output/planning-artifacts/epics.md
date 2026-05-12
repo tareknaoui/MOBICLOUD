@@ -1,6 +1,6 @@
 ---
-stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-create-stories', 'step-04-final-validation', 'step-05-add-relay-epic', 'step-06-zero-firebase-pivot', 'step-07-readiness-fix']
-inputDocuments: ['prd.md', 'architecture.md', 'architecture-connectivity-and-clustering.md', 'ux-design-specification.md', 'technical-serveur-relais-research.md', 'sprint-change-proposal-2026-04-28.md']
+stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-create-stories', 'step-04-final-validation', 'step-05-add-relay-epic', 'step-06-zero-firebase-pivot', 'step-07-readiness-fix', 'step-08-approche-join-gps']
+inputDocuments: ['prd.md', 'architecture.md', 'architecture-connectivity-and-clustering.md', 'ux-design-specification.md', 'technical-serveur-relais-research.md', 'sprint-change-proposal-2026-04-28.md', 'cluster-delimitation-gps-multicast.md', 'comparaison-approches-cluster.md', 'exemple-concret-approche-join.md', 'plan-tests-soutenance.md']
 ---
 
 # MobiCloud - Epic Breakdown
@@ -45,6 +45,17 @@ Bien que les Epics soient numérotés 1 → 8 par cohérence fonctionnelle, **l'
 - FR-06.1: Migration proactive des blocs d'un nœud quittant un cluster (basculement réseau) vers le cluster local avant déconnexion. (P1)
 - FR-08.1: Serveurs Relais HA WebSocket Zero-Knowledge agissant comme **fallback de transport** (UPLOAD/FORWARD store-and-forward 60s RAM) pour les blocs chiffrés inter-réseaux quand le P2P direct échoue (NAT symétrique). (P0)
 - FR-08.2: **Fallback transparent Try-Direct-Then-Relay** — TCP direct (P1), Relais HA (P2), failover séquentiel inter-instances HA (P3) ; UseCase appelant agnostique du canal. (P0)
+- FR-11.1: **Infrastructure GPS optionnelle** — `LocationProvider` Android (FusedLocationProvider) avec gestion permission `ACCESS_FINE_LOCATION` ; fournit une `GpsCoordinate` (latitude/longitude) ou `null` si permission refusée/GPS indisponible. Calcul Haversine de distance entre 2 coordonnées GPS. (P0)
+- FR-11.2: **Protocole JOIN Explicite** — Tout pair candidat à rejoindre un cluster envoie un `JOIN_REQUEST` signé EC P-256 (avec `nodeId`, `gpsLocation`, `freeBytes`, `reliabilityScore`) au Super-Pair élu. Le Super-Pair retourne `JOIN_ACCEPT` (avec `memberSnapshot` complet) ou `JOIN_REDIRECT` (avec `reason` et `alternativeSuperPeers`). Le relai HA fait du forwarding pass-through, sans logique d'admission. (P0)
+- FR-11.3: **Filtre GPS d'admission (optionnel et gracieux)** — Le Super-Pair refuse un `JOIN_REQUEST` si `Haversine(self.gps, candidate.gps) > MAX_RADIUS` (défaut 5 km). Si l'une des deux positions est `null`, le filtre GPS est **ignoré** (dégradation gracieuse), seul `MAX_CLUSTER_SIZE` s'applique. (P0)
+- FR-11.4: **Plafond de taille de cluster** — Le Super-Pair refuse un `JOIN_REQUEST` si `clusterSize >= MAX_CLUSTER_SIZE` (défaut 50). Réponse `JOIN_REDIRECT` avec la liste des Super-Pairs alternatifs connus pour permettre une seconde tentative. (P0)
+- FR-11.5: **Retry orphelin & auto-élection** — Un candidat qui reçoit `JOIN_REDIRECT` essaie séquentiellement les Super-Pairs alternatifs. Si tous refusent ou aucun n'est joignable, il déclenche un **Bully solo** et devient lui-même Super-Pair d'un nouveau cluster. (P0)
+- FR-11.6: **Heartbeat de membre** — Chaque membre régulier envoie un `HEARTBEAT` signé toutes les 30 secondes au Super-Pair (avec `freeBytes` mis à jour). Le Super-Pair maintient un registre `MemberRegistry` en Room DB (`members` : `nodeId`, `gps`, `freeBytes`, `lastSeen`, `role`). (P0)
+- FR-11.7: **Détection de mort & MEMBER_UPDATE** — Si le Super-Pair ne reçoit aucun `HEARTBEAT` d'un membre pendant 90 s, il diffuse `MEMBER_UPDATE { event: LEFT }` aux autres membres. Réciproquement, si un membre ne reçoit aucun signal du SP pendant 90 s, il déclenche une élection Bully (Story 3.1). (P0)
+- FR-11.8: **Snapshot de membres pour continuité post-Bully** — Chaque `JOIN_ACCEPT` inclut le `memberSnapshot` complet à l'instant de l'admission. Le snapshot est mis à jour côté membre via les `MEMBER_UPDATE` reçus, persisté en table Room `member_snapshot` côté chaque membre régulier, et réutilisé lors d'une élection Bully post-mort SP. (P0)
+- FR-11.9: **Annonce GPS du Super-Pair** — Le Super-Pair publie sa position GPS dans 3 canaux : (a) `HelloPayload` multicast UDP avec flag `superPair=true` (Story 2.0 étendue), (b) `REGISTER_PEER` envoyé au relai HA (Story 3.2 + `relay-server/server.js` étendus), (c) `ElectionPayload` du message `COORDINATOR` (Story 3.1 étendue). Tous les champs GPS sont optionnels — si `null`, les nœuds reçus tolèrent l'absence. (P0)
+- FR-11.10: **Départ volontaire `LEAVE`** — Un membre quittant gracieusement (fermeture app, désinscription UI) envoie un `LEAVE` signé au SP. Le SP supprime immédiatement l'entrée de `MemberDao` et diffuse `MEMBER_UPDATE { event: LEFT }`. Permet une transition propre sans attendre le timeout 90 s. (P1)
+- FR-11.11: **Sélection candidat par proximité GPS** — `SendJoinRequestUseCase` trie les `SuperPeerHint` candidats par distance GPS croissante (Haversine) avant tentative séquentielle. Si GPS local ou cible indisponible, fallback sur `reliabilityScore` descendant. (P1)
 
 ### NonFunctional Requirements
 
@@ -55,6 +66,10 @@ Bien que les Epics soient numérotés 1 → 8 par cohérence fonctionnelle, **l'
 - NFR-05 (Sécurité Zero-Knowledge bout-en-bout): AES-256 GCM avec clés éphémères dérivées par bloc (HKDF) ; clé maître protégée par ECIES. Aucun nœud ni Relais ne peut déchiffrer.
 - NFR-06 (Mandat Super-Pair Limité): Abdication automatique après 30 min ; cooldown 5 min hors élection.
 - NFR-07 (Anti-Sybil — Identité Hardware-Backed): EC P-256 stockée dans Android Keystore TEE ; clé privée non exportable (`isInsideSecureHardware`).
+- NFR-08 (Latence admission cluster): Le délai entre l'envoi d'un `JOIN_REQUEST` et la réception de `JOIN_ACCEPT`/`JOIN_REDIRECT` doit être ≤ 2 secondes en Wi-Fi LAN et ≤ 5 secondes via relai HA (4G), **par tentative individuelle** (timeout par candidat = `JOIN_REQUEST_TIMEOUT_MS = 5_000` ms). En cas d'épuisement de 3 candidats puis transition vers `Isolated`, la latence totale jusqu'à `BullySoloElectionUseCase` est plafonnée à `3 × 5 s + 20 s backoff = 35 s` worst-case — admissible car événement rare (réseau saturé OU zone géographique sans aucun SP).
+- NFR-09 (Overhead heartbeat): La consommation CPU agrégée du `MemberHeartbeatUseCase` (envoi côté membre) + `ProcessHeartbeatUseCase` (réception côté SP avec 50 membres max) doit rester ≤ 1% en moyenne sur 30 minutes de service.
+- NFR-10 (Dégradation gracieuse GPS): Le protocole d'admission doit rester fonctionnel si `LocationProvider` retourne `null` (permission refusée, GPS indoor non lockable). Aucun blocage utilisateur, le filtre GPS est simplement ignoré au profit du seul plafond `MAX_CLUSTER_SIZE`.
+- NFR-11 (Plafond cluster défendable): `MAX_CLUSTER_SIZE = 50` et `MAX_RADIUS = 5 km` sont des constantes configurables documentées dans le rapport avec leur justification empirique (zone urbaine dense, charge SP soutenable).
 
 ### Additional Requirements
 
@@ -118,6 +133,21 @@ Bien que les Epics soient numérotés 1 → 8 par cohérence fonctionnelle, **l'
 | UX-DR8 (Permissions silencieuses) | Epic 1 | 1.4 |
 | UX-DR9 (Slider Quota Stockage) | Epic 1 | 1.6 |
 | UX-DR10 (Cloud Relay Badge) | Epic 8 | 8.3 |
+| FR-11.1 (Infrastructure GPS optionnelle) | Epic 11 | 11.1 |
+| FR-11.2 (Protocole JOIN explicite) | Epic 11 | 11.2 |
+| FR-11.3 (Filtre GPS d'admission) | Epic 11 | 11.2 |
+| FR-11.4 (Plafond MAX_CLUSTER_SIZE) | Epic 11 | 11.2 |
+| FR-11.5 (Retry orphelin & auto-élection) | Epic 11 | 11.2 |
+| FR-11.6 (Heartbeat de membre) | Epic 11 | 11.3 |
+| FR-11.7 (Détection mort & MEMBER_UPDATE) | Epic 11 | 11.3 |
+| FR-11.8 (Snapshot membres post-Bully) | Epic 11 | 11.3 |
+| NFR-08 (Latence admission ≤ 2s/5s) | Epic 11 | 11.2 |
+| NFR-09 (Overhead heartbeat ≤ 1%) | Epic 11 | 11.3 |
+| NFR-10 (Dégradation gracieuse GPS) | Epic 11 | 11.1 / 11.2 |
+| NFR-11 (Constantes défendables) | Epic 11 | 11.2 |
+| FR-11.9 (Annonce GPS SP — Hello/Register/Coordinator) | Epic 11 + Epics 2/3 | 11.1 (étend Stories 2.0, 3.1, 3.2) |
+| FR-11.10 (Départ volontaire LEAVE) | Epic 11 | 11.3 |
+| FR-11.11 (Sélection candidat par proximité GPS) | Epic 11 | 11.2 |
 
 ## Epic List
 
@@ -153,6 +183,12 @@ Bien que les Epics soient numérotés 1 → 8 par cohérence fonctionnelle, **l'
 **Objectif (user-outcome):** L'utilisateur peut joindre des nœuds derrière NAT symétrique (4G ↔ Wi-Fi) **sans perception de coupure** grâce à un canal de fallback transparent — l'app choisit automatiquement le meilleur chemin (P2P direct prioritaire, Relais HA en fallback). Le cluster de **serveurs relais WebSocket Zero-Knowledge** (min 2 instances HA Render/Railway) assure à la fois **signaling** (annuaire Super-Pairs) et **transport** (Store-and-Forward 60s RAM). Zero-Firebase complet.
 **FRs covered:** FR-01.2, FR-08.1, FR-08.2, NFR-05, UX-DR10, Architecture V5.0: Signalisation HA + Relay Fallback.
 **Sequencing:** Stories 8.1 + 8.2 = **foundation slice** (à implémenter avant Story 2.1). Story 8.3 = **fallback slice** (à implémenter après Stories 5.3 et 7.2).
+
+### Epic 11: Délimitation Spatiale des Clusters — JOIN Explicite & GPS Optionnel
+**Objectif (user-outcome):** L'utilisateur rejoint un cluster MobiCloud dont la frontière est décidée **par le Super-Pair élu** (décentralisé) selon deux critères locaux : proximité GPS (≤ 5 km si disponible) et capacité (≤ 50 membres). Si refusé, il tente d'autres Super-Pairs connus ; en dernier recours, il devient lui-même Super-Pair d'un nouveau cluster. Le protocole JOIN, les heartbeats et le registre des membres garantissent la cohésion du cluster et sa résilience à la mort du Super-Pair (snapshot transmis à l'admission).
+**FRs covered:** FR-11.1, FR-11.2, FR-11.3, FR-11.4, FR-11.5, FR-11.6, FR-11.7, FR-11.8, NFR-08, NFR-09, NFR-10, NFR-11.
+**Sequencing:** Stories 11.1 → 11.2 → 11.3 séquentiel strict. Story 11.2 dépend de 11.1 (besoin du GPS et de Haversine). Story 11.3 dépend de 11.2 (besoin du registre initial transmis par `JOIN_ACCEPT`).
+**Dépendances externes :** Epic 3 (Bully + COORDINATOR), Epic 2 (Signaling HA + Multicast), Epic 8 (RelayWebSocketClient pour le forwarding pass-through).
 
 ---
 
@@ -745,3 +781,209 @@ Afin que l'expérience de stockage reste fluide quel que soit mon environnement 
 **And** le composant `CloudRelayBadge` (UX-DR10) affiche cet état dans le Dashboard avec 3 icônes distinctes (✓ direct / ☁ relay / ⚠ offline)
 
 ---
+
+## Epic 11: Délimitation Spatiale des Clusters — JOIN Explicite & GPS Optionnel
+
+**Objectif :** L'utilisateur rejoint un cluster MobiCloud dont la frontière est décidée **par le Super-Pair élu** (décentralisé) selon deux critères locaux : proximité GPS (≤ 5 km si disponible) et capacité (≤ 50 membres). Si refusé, il tente d'autres Super-Pairs connus ; en dernier recours, il devient lui-même Super-Pair d'un nouveau cluster.
+
+**Justification architecturale :** L'approche par JOIN explicite est l'alternative retenue à l'approche XOR-prefix par split/merge piloté par le relai (voir `docs/comparaison-approches-cluster.md`). Elle préserve trois principes thèse :
+1. **Décentralisation maximale** — le relai reste un transport stateless, jamais une autorité d'admission.
+2. **Super-Pair sacré et promotable** — le SP élu décide localement de l'admission ; tout membre peut le remplacer par Bully.
+3. **Dégradation gracieuse** — le filtre GPS est ignoré si la permission est refusée ou le fix indisponible (NFR-10).
+
+**Prérequis d'implémentation :**
+- Epic 3 terminé (Bully + COORDINATOR signalent un `clusterId`).
+- Epic 2 terminé (`SignalingRepository` pour découvrir les Super-Pairs via Multicast + tracker HA).
+- Epic 8 terminé (`RelayWebSocketClient` pour le forwarding pass-through des messages JOIN inter-réseaux).
+
+**Référence design :** `docs/cluster-delimitation-gps-multicast.md`, `docs/exemple-concret-approche-join.md`, `docs/plan-tests-soutenance.md`.
+
+**📋 Divergences assumées vs `docs/cluster-delimitation-gps-multicast.md` (justifications pour le rapport) :**
+
+| Paramètre | Doc design | Epic 11 retenu | Justification |
+|---|---|---|---|
+| `HEARTBEAT_INTERVAL` | 5 s | **30 s** | Compromis batterie : à 50 membres, 5 s = 10 msg/s côté SP (4× plus de réveils CPU). 30 s suffit à détecter une mort en ≤ 2 min (3 heartbeats manqués), acceptable pour P2P storage non temps-réel. |
+| `SP_TIMEOUT` | > 5 s (déclenchement REJOINING) | **90 s** | Anti-flap réseau mobile : 5 s déclenche des Bully inutiles sur transition 4G→Wi-Fi. 90 s = 3 heartbeats manqués, valide la mort réelle. |
+| `MEMBER_UPDATE` format | Delta (`deltaAdded`, `deltaRemoved`) | **Atomique** (1 event par message) | Simplicité d'implémentation et de debug. Le delta gagne <1 % de bande passante pour une complexité 2× supérieure. |
+| `MAX_RADIUS` recommandé | 200 m / 1 km / 10 km selon contexte | **5 km configurable** | Valeur urbaine dense calibrée pour Bab Ezzouar (zone PFE) avec tolérance imprécision GPS indoor. Constante reste configurable via `ClusterConstants.kt` pour le rapport. |
+
+> Ces divergences sont **assumées et défendables** : elles ne contredisent pas le design, elles l'ajustent à la contrainte batterie d'un téléphone Android moderne en usage continu.
+
+**⚠️ Stories antérieures à étendre (modifications mineures, intégrées comme AC dans les stories 11.1/11.2) :**
+
+| Story d'origine | Modification demandée | Stockée dans |
+|---|---|---|
+| Story 1.4 (Foreground Service & permissions) | Ajouter la demande runtime `ACCESS_FINE_LOCATION` au flux d'onboarding | AC Story 11.1 |
+| Story 2.0 (Découverte Multicast) | Étendre `HelloPayload` avec `gpsLatitude?`, `gpsLongitude?`, `superPair: Boolean` | AC Story 11.1 |
+| Story 2.1 (Signaling HA) | `SignalingRepository.fetchActiveSuperPeers()` retourne `List<SuperPeerHint>` avec GPS ; `RelayPeer` étendu | AC Story 11.1 + 11.2 |
+| Story 3.1 (Bully Election) | Étendre `ElectionPayload` avec `gpsLatitude?`, `gpsLongitude?`, `maxRadiusMeters` (émis uniquement dans `COORDINATOR`) | AC Story 11.2 |
+| Story 3.2 (REGISTER_PEER) | Étendre payload binaire avec `gpsLatitude`/`gpsLongitude` optionnels côté Android + `relay-server/server.js` (signalingRegistry + GET_PEERS) | AC Story 11.1 |
+| Story 8.1 (Relay HA) | **Aucune modification** — `FORWARD` (0x07) existant transporte tous les messages d'admission (JOIN_REQUEST/ACCEPT/REDIRECT) ET de cohésion (HEARTBEAT/MEMBER_UPDATE/LEAVE) via préfixes de sous-type 1 octet | — |
+
+### Story 11.1: Infrastructure GPS — LocationProvider, GpsCoordinate, Haversine
+
+En tant que nœud MobiCloud,
+Je veux disposer d'un service de localisation GPS optionnel et d'un calcul de distance Haversine,
+Afin de pouvoir publier ma position dans les messages JOIN et permettre au Super-Pair de filtrer les candidats par proximité géographique.
+
+**Acceptance Criteria:**
+
+**Given** le projet Android dispose de la permission `ACCESS_FINE_LOCATION` déjà déclarée au `AndroidManifest.xml`
+**When** le `LocationProvider` est instancié et démarré au boot du Foreground Service
+**Then** une data class `GpsCoordinate(latitude: Double, longitude: Double, accuracyMeters: Float, timestampMs: Long)` est définie dans `domain/model/GpsCoordinate.kt` (interface pure Kotlin)
+**And** un object `Haversine` expose `fun distanceMeters(a: GpsCoordinate, b: GpsCoordinate): Double` calculant la distance grand-cercle en mètres (formule Haversine standard, rayon terrestre = 6 371 000 m)
+**And** un test unitaire JVM valide Haversine sur 3 cas connus : Alger↔Oran ≈ 398 km, Bab Ezzouar↔Centre Alger ≈ 13 km, point↔lui-même = 0 m (tolérance ±1 %)
+**And** `domain/repository/LocationRepository.kt` (interface) expose `fun currentLocation(): StateFlow<GpsCoordinate?>` — le `?` est obligatoire (NFR-10 dégradation gracieuse)
+**And** `data/repository/LocationRepositoryImpl.kt` implémente la repo via `FusedLocationProviderClient` (Google Play Services) avec `LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY`, intervalle 5 min, smallest displacement 100 m
+**And** si la permission est refusée à runtime, `currentLocation()` émet `null` en permanence, **aucune exception ne remonte** et un log INFO est écrit dans `RadarLogConsole` : "GPS indisponible — admission cluster basée sur capacité seule"
+**And** si le GPS n'est pas lockable (indoor, cold start) après 60 s, le repo émet `null` jusqu'au premier fix réussi
+**And** la valeur émise est mise en cache RAM 5 minutes pour éviter les requêtes GPS répétées entre `JOIN_REQUEST`
+**And** module Hilt `LocationModule` injecte le repo (binding `@Binds`)
+**And** AUCUN import Google Play Services dans la couche `domain/` (Clean Architecture stricte)
+**And** **Permission runtime** — la permission `ACCESS_FINE_LOCATION` est demandée à l'utilisateur au démarrage du `MainActivity` (extension de Story 1.4) ; si refusée, l'app continue de fonctionner et `LocationRepository.currentLocation()` émet `null` en permanence (NFR-10)
+**And** **Mode dev / tests** — un binding Hilt alternatif `MockLocationRepositoryImpl` est défini dans le source set `androidTest` et `debug` ; il permet d'injecter des coordonnées arbitraires via `MockLocationRepositoryImpl.setMockLocation(GpsCoordinate)` pour les tests d'intégration (Test 4 migration de nœud, Test 5 simulation 1000) ; le binding production reste `LocationRepositoryImpl` réel
+**And** **Extension de `HelloPayload` (Story 2.0)** — la data class `HelloPayload.kt` est étendue avec deux champs optionnels : `gpsLatitude: Double? = null`, `gpsLongitude: Double? = null`, et un champ booléen `superPair: Boolean = false` (signale que l'émetteur est Super-Pair actuel) ; ces champs sont sérialisés Protobuf avec compatibilité forward (`ignoreUnknownKeys=true`) ; les pairs reçus en `LOCAL_MULTICAST` propagent ces champs jusqu'à `PeerRegistry` et `RelayPeer` côté reader
+**And** **Extension de `REGISTER_PEER` (Story 3.2 + relay-server)** — le payload binaire `REGISTER_PEER` est étendu côté `relay-server/server.js` pour accepter `gpsLatitude` et `gpsLongitude` optionnels ; le `signalingRegistry` les stocke ; `GET_PEERS` les retourne aux clients ; côté Android, `RelayPeer.kt` et `RelayWebSocketClient.parsePeersPayload()` (Story 8.2) gèrent ces champs optionnels — toléreront leur absence pour compatibilité avec les Super-Pairs n'ayant pas encore le GPS activé
+**And** un test d'intégration valide qu'un Super-Pair annonçant un GPS via `REGISTER_PEER` est récupéré par un autre nœud via `GET_PEERS` avec le GPS intact
+
+### Story 11.2: Protocole JOIN Explicite — Admission Décentralisée par le Super-Pair
+
+En tant que nœud MobiCloud,
+Je veux envoyer un `JOIN_REQUEST` signé au Super-Pair candidat et recevoir une décision `JOIN_ACCEPT` ou `JOIN_REDIRECT`,
+Afin que la frontière de mon cluster soit décidée localement par le Super-Pair élu selon des critères de proximité GPS et de capacité, sans implication du relai HA.
+
+**Prérequis :** Story 11.1 terminée (besoin de `GpsCoordinate` et `Haversine`).
+
+**Acceptance Criteria:**
+
+**Given** un nœud a découvert au moins un Super-Pair candidat via `SignalingRepository.fetchActiveSuperPeers()` (Story 2.1) ou `LocalDiscoveryRepository` (Story 2.0)
+**When** le nœud souhaite rejoindre un cluster
+**Then** une `data class JoinRequest(senderNodeId, candidatePublicKey, gpsLocation: GpsCoordinate?, freeBytes: Long, reliabilityScore: Float, timestampMs: Long, signature: ByteArray)` est définie dans `domain/model/m11_join/JoinRequest.kt` avec sérialisation Protobuf
+**And** une `sealed class JoinResponse` est définie avec deux sous-types : `JoinAccept(clusterId, superPairNodeId, memberSnapshot: List<MemberInfo>, signature)` et `JoinRedirect(reason: JoinRedirectReason, distanceMeters: Double?, alternativeSuperPeers: List<SuperPeerHint>, signature)`
+**And** **`MemberInfo` data class définie** dans `domain/model/m11_join/MemberInfo.kt` (Protobuf-sérialisable) avec champs : `nodeId: ByteArray`, `publicKey: ByteArray`, `ipAddress: String`, `port: Int`, `gpsLatitude: Double?`, `gpsLongitude: Double?`, `freeBytes: Long`, `role: MemberRole` (enum `SUPER_PAIR / MEMBER`) ; cette classe est utilisée dans `JoinAccept.memberSnapshot`, `MEMBER_UPDATE.member`, et le cache RAM `inMemoryRegistry: StateFlow<List<MemberInfo>>` ; mapping bijectif avec `MemberEntity` Room (Story 11.3) via `MemberMapper.kt`
+**And** l'enum `JoinRedirectReason` contient au moins : `OUT_OF_RADIUS`, `CLUSTER_FULL`, `INVALID_SIGNATURE`, `BLACKLISTED`
+**And** le `SendJoinRequestUseCase` (couche `domain/usecase/m11_join/`) :
+  - récupère le GPS courant via `LocationRepository.currentLocation().value` (peut être `null`)
+  - signe la requête EC P-256 via `SecurityRepository.signData()`
+  - envoie via `RelayWebSocketClient` (Story 8.2) ou socket TCP direct en LAN
+  - attend la réponse avec timeout 5 s (NFR-08)
+  - sur `JoinAccept` : persiste `clusterId` dans `NodeSettings`, persiste `memberSnapshot` dans Room DB (table `cluster_members`, voir Story 11.3), transite vers `NodeJoinState.Member`, démarre `MemberHeartbeatUseCase`
+  - sur `JoinRedirect` : itère sur `alternativeSuperPeers` (max 3 tentatives) ; si toutes échouent, **transite vers `NodeJoinState.Isolated`** (le déclenchement éventuel de `BullySoloElectionUseCase` est orchestré par `JoinStateMachine` après le délai `ISOLATION_BACKOFF_MS = 20_000` ms — voir AC plus bas, FR-11.5)
+**And** le `ProcessJoinRequestUseCase` (côté Super-Pair) applique dans cet ordre strict :
+  1. **Vérification signature** EC P-256 — sinon `JoinRedirect(INVALID_SIGNATURE)`
+  2. **Filtre GPS optionnel** — si `self.gps != null && request.gps != null`, calcule `Haversine`. Si `distance > MAX_RADIUS (5 km)` → `JoinRedirect(OUT_OF_RADIUS, distance, alternatives)`. Si l'une des deux est `null`, le filtre est ignoré (NFR-10).
+  3. **Filtre capacité** — si `memberRegistry.size >= MAX_CLUSTER_SIZE (50)` → `JoinRedirect(CLUSTER_FULL, null, alternatives)`
+  4. Sinon → `JoinAccept` avec `memberSnapshot` complet (FR-11.8) et insertion du candidat dans `memberRegistry`
+**And** les `alternativeSuperPeers: List<SuperPeerHint>` dans `JoinRedirect` sont peuplées depuis `SignalingRepository.fetchActiveSuperPeers()` filtré par proximité GPS (top 3 plus proches du candidat, hors self)
+**And** la sérialisation Protobuf de tous les messages JOIN utilise `ignoreUnknownKeys=true` (Architecture) pour compatibilité forward
+**And** **Wire format unifié — encapsulation dans `FORWARD` (0x07)** — TOUS les messages de l'approche JOIN (JOIN_REQUEST, JOIN_ACCEPT, JOIN_REDIRECT) sont encapsulés dans le message relai existant `FORWARD` (0x07) de Story 8.1, avec un préfixe de 1 octet en tête de payload identifiant le sous-type : `0x01 = HEARTBEAT`, `0x02 = MEMBER_UPDATE`, `0x03 = LEAVE`, `0x04 = JOIN_REQUEST`, `0x05 = JOIN_ACCEPT`, `0x06 = JOIN_REDIRECT` ; **AUCUNE modification de `relay-server/server.js`** (la transparence du forwarding est totale, le relai reste stateless) ; côté client, `RelayWebSocketClient.uploadBlock(destNodeId, payload)` est réutilisé avec le préfixe ajouté côté `domain/usecase/m11_join/`
+**And** un test d'intégration valide les 4 scénarios canoniques (réf. `docs/exemple-concret-approche-join.md`) :
+  - T=1 Bob (3 km) → `JoinAccept` → `NodeJoinState.Member`
+  - T=2 Carol (800 m, multicast) → `JoinAccept` → `NodeJoinState.Member`
+  - T=3 Dave (398 km) → `JoinRedirect(OUT_OF_RADIUS)` → `NodeJoinState.Isolated` → attente `ISOLATION_BACKOFF_MS = 20_000` ms → `BullySoloElectionUseCase` → `NodeJoinState.SuperPair(nouveau clusterId)` → nouveau cluster créé dans le tracker
+  - GPS null (permission refusée) → `JoinAccept` si capacité OK (dégradation gracieuse) → `NodeJoinState.Member`
+**And** **NFR-08 mesurable** : `SendJoinRequestUseCase` instrumente `joinLatencyMs` (envoi → réception) et l'expose via `Flow<JoinMetrics>` ; un test valide `joinLatencyMs ≤ 2000ms` en LAN et `≤ 5000ms` via relai HA (p95)
+**And** AUCUN import OkHttp/WebSocket dans la couche `domain/` (Clean Architecture)
+**And** **`SuperPeerHint` data class définie** dans `domain/model/m11_join/SuperPeerHint.kt` (Protobuf-sérialisable) avec champs : `nodeId: ByteArray`, `gpsLatitude: Double?`, `gpsLongitude: Double?`, `clusterId: String`, `ipAddress: String`, `port: Int`, `reliabilityScore: Float` ; cette classe est réutilisée par `JoinRedirect.alternativeSuperPeers` ET par `SignalingRepository.fetchActiveSuperPeers()` qui en retourne `List<SuperPeerHint>` (extension de Story 2.1 — le mapping `RelayPeer → SuperPeerHint` est explicite)
+**And** **Tri par proximité côté candidat** — `SendJoinRequestUseCase` reçoit en entrée une `List<SuperPeerHint>` (toutes sources confondues : multicast LAN + tracker HA), et **trie cette liste par distance GPS croissante** via `Haversine` quand `self.gps != null && hint.gps != null` ; sinon ordre conservé (fallback `reliabilityScore` descendant) ; itère séquentiellement (max 3 tentatives) avec timeout 5 s par candidat
+**And** **Extension de `ElectionPayload.kt` (Story 3.1)** — la data class `ElectionPayload.kt` est étendue avec trois champs optionnels : `gpsLatitude: Double? = null`, `gpsLongitude: Double? = null`, `maxRadiusMeters: Int = 5000` ; ces champs sont **uniquement** émis dans le message `COORDINATOR` (pas dans `ELECTION` ou `ALIVE`) afin que les futurs membres connaissent le centre géographique et la contrainte de rayon du SP avant d'envoyer leur `JOIN_REQUEST` ; sérialisation Protobuf forward-compatible
+**And** **Constantes centralisées** — un fichier `domain/model/m11_join/ClusterConstants.kt` définit les 6 constantes : `const val MAX_RADIUS_METERS = 5_000`, `const val MAX_CLUSTER_SIZE = 50`, `const val HEARTBEAT_INTERVAL_MS = 30_000L`, `const val SP_TIMEOUT_MS = 90_000L`, `const val JOIN_REQUEST_TIMEOUT_MS = 5_000L`, `const val ISOLATION_BACKOFF_MS = 20_000L` ; toutes les références hardcodées dans `ProcessJoinRequestUseCase`, `MemberHeartbeatUseCase`, `MonitorMemberLivenessUseCase`, `SendJoinRequestUseCase` lisent ces constantes (pas de magic number) ; valeurs documentées en commentaire avec leur justification empirique (NFR-11)
+**And** **Câblage du flux trigger (intégration Epic 3 → Epic 11)** — le `RunBullyElectionUseCase` (Story 3.1) doit, après émission de `COORDINATOR` (cas victoire), invoquer immédiatement `MarkSelfAsSuperPairUseCase` ; le `ProcessIncomingElectionEventUseCase` (Story 3.1) doit, après réception d'un `COORDINATOR` avec `clusterId != localClusterId` **OU** `clusterId == localClusterId && senderNodeId != self` (cas re-élection après timeout SP), invoquer immédiatement `SendJoinRequestUseCase` avec le `COORDINATOR.senderNodeId` comme premier candidat ; le cas `clusterId == localClusterId && senderNodeId == self` (nous-mêmes en sortie de victoire) n'enclenche PAS `SendJoinRequestUseCase` mais bien `MarkSelfAsSuperPairUseCase` ; ces câblages sont des modifications de Story 3.1 intégrées comme AC ici, pas une story séparée
+**And** **Nouveaux use cases d'Epic 11 (à créer)** — Epic 11 introduit 3 nouveaux use cases dans `domain/usecase/m11_join/` au-delà de `SendJoinRequestUseCase` / `ProcessJoinRequestUseCase` / `MemberHeartbeatUseCase` / `ProcessHeartbeatUseCase` / `MonitorMemberLivenessUseCase` / `SendLeaveUseCase` :
+  - **`MarkSelfAsSuperPairUseCase`** — appelé après victoire Bully : initialise `cluster_members` à `{self}` avec `role=SUPER_PAIR`, persiste `clusterId` généré dans `NodeSettings`, transite `NodeJoinState` vers un nouvel état `SuperPair(clusterId)` (à ajouter à la sealed class), démarre les jobs `MonitorMemberLivenessUseCase`
+  - **`BullySoloElectionUseCase`** — variante de `RunBullyElectionUseCase` qui **court-circuite** la phase d'émission `ELECTION` (puisqu'aucun pair n'est joignable, par définition) et se déclare immédiatement vainqueur ; génère un nouveau `clusterId`, émet un `COORDINATOR` autoréférent dans `PeerRegistry`, puis chaîne vers `MarkSelfAsSuperPairUseCase` ; utilisé uniquement depuis l'état `Isolated` après `ISOLATION_BACKOFF_MS`
+  - **`JoinStateMachine`** — orchestrateur central des transitions `NodeJoinState` ; expose `transition(event: JoinEvent): NodeJoinState` et `currentState: StateFlow<NodeJoinState>` ; déclenche `BullySoloElectionUseCase` après le timer 20 s en état `Isolated` sans nouveau candidat détecté
+**And** **State machine `NodeJoinState`** définie comme `sealed class` dans `domain/model/m11_join/NodeJoinState.kt` avec **6 états** :
+  - `Undiscovered` — état initial, aucun pair connu
+  - `Joining(targetSuperPair: SuperPeerHint)` — `JOIN_REQUEST` émis, en attente de réponse
+  - `Member(clusterId: String, superPairNodeId: ByteArray)` — admis dans un cluster, heartbeats actifs
+  - `SuperPair(clusterId: String)` — auto-élu chef d'un cluster (après victoire Bully ou Bully solo)
+  - `Rejoining(reason: RejoinReason)` — SP silencieux 90 s, déclenche un Bully ; `RejoinReason` enum : `SP_TIMEOUT`, `SP_ABDICATION`
+  - `Isolated(rejectionCount: Int, lastRejectionTime: Long)` — tous les SP candidats ont refusé OU aucun candidat trouvé
+
+**And** **Sealed class `JoinEvent`** (events qui déclenchent les transitions, dans `domain/model/m11_join/JoinEvent.kt`) :
+  - `CoordinatorReceived(senderNodeId, clusterId, gpsLocation?, maxRadiusMeters)` — un `COORDINATOR` reçu via multicast ou relai
+  - `JoinAcceptReceived(clusterId, superPairNodeId, memberSnapshot)` — `JOIN_ACCEPT` reçu
+  - `JoinRedirectReceived(reason, alternatives)` — `JOIN_REDIRECT` reçu, retry possible
+  - `AllCandidatesExhausted` — les 3 tentatives `JOIN_REQUEST` ont échoué
+  - `IsolationBackoffElapsed` — timer 20 s écoulé en état `Isolated` sans nouveau candidat
+  - `NewCandidateDetected(hint: SuperPeerHint)` — nouveau Super-Pair découvert pendant `Isolated` ou `Undiscovered`
+  - `SpTimeoutDetected` — pas de signal du SP depuis 90 s (déclenché par `MonitorMemberLivenessUseCase` côté membre)
+  - `BullyVictory(newClusterId)` — l'élection Bully gagnée
+  - `BullyLost(winnerNodeId)` — l'élection Bully perdue par un autre
+
+**And** **Table de transitions `JoinStateMachine`** documentée explicitement (pas implicite) :
+
+| État courant | Event | État cible | Action déclenchée |
+|---|---|---|---|
+| `Undiscovered` | `CoordinatorReceived` | `Joining` | `SendJoinRequestUseCase` |
+| `Undiscovered` | `NewCandidateDetected` | `Joining` | `SendJoinRequestUseCase` |
+| `Joining` | `JoinAcceptReceived` | `Member` | démarrer `MemberHeartbeatUseCase` |
+| `Joining` | `JoinRedirectReceived` | `Joining` (next candidate) OU `Isolated` si épuisé | retry ou transition |
+| `Joining` | `AllCandidatesExhausted` | `Isolated` | démarrer timer 20 s |
+| `Isolated` | `NewCandidateDetected` | `Joining` | `SendJoinRequestUseCase` |
+| `Isolated` | `IsolationBackoffElapsed` | `SuperPair` | `BullySoloElectionUseCase` |
+| `Member` | `SpTimeoutDetected` | `Rejoining(SP_TIMEOUT)` | `RunBullyElectionUseCase` |
+| `Member` | reçoit `ABDICATION` du SP | `Rejoining(SP_ABDICATION)` | `RunBullyElectionUseCase` |
+| `Rejoining` | `BullyVictory` | `SuperPair` | `MarkSelfAsSuperPairUseCase` |
+| `Rejoining` | `BullyLost` (autre membre gagne) | `Member` | reprise heartbeats vers nouveau SP |
+| `SuperPair` | (abdication 30 min, Story 3.3) | `Undiscovered` | nouvelle élection |
+
+les transitions sont gérées par un `JoinStateMachine` exposé via `StateFlow<NodeJoinState>` consommable par le Dashboard (badge "État cluster" : Découverte / En cours d'adhésion / Membre / Super-Pair / Reconnexion / Isolé) ; l'état est persisté en RAM seule (re-calculé au démarrage à partir de `cluster_members` Room et `member_snapshot` Room)
+**And** **Comportement de l'état `Isolated`** — quand `SendJoinRequestUseCase` épuise tous les candidats (max 3 tentatives) sans `JOIN_ACCEPT`, le nœud entre dans `Isolated(rejectionCount=3, lastRejectionTime=now)` ; il **attend `ISOLATION_BACKOFF_MS = 20_000` ms** avant de retenter ; durant ce délai, il continue à écouter en multicast et tracker pour de nouveaux Super-Pairs (s'il en détecte un nouveau, il quitte `Isolated` et envoie un `JOIN_REQUEST` ciblé) ; si après 20 s aucun nouveau candidat n'apparaît, il déclenche `BullySoloElectionUseCase` et devient lui-même Super-Pair d'un nouveau cluster ; ce délai évite la cascade d'auto-élections en cas de flap réseau transitoire
+
+### Story 11.3: Heartbeat & Member Registry — Cohésion et Continuité du Cluster
+
+En tant que Super-Pair,
+Je veux maintenir un registre persisté des membres de mon cluster mis à jour par heartbeats et diffuser les changements d'appartenance,
+Afin que la composition du cluster reste cohérente et qu'une mort du Super-Pair n'entraîne ni perte de membre ni nécessité de re-JOIN.
+
+**Prérequis :** Story 11.2 terminée (besoin du `JoinAccept` qui amorce le registre).
+
+**Acceptance Criteria:**
+
+**Given** un cluster est formé suite à des `JoinAccept` (Story 11.2) et le Super-Pair maintient un `memberRegistry`
+**When** le service P2P tourne
+**Then** une table Room `cluster_members` est définie dans `data/local/m11_join/MemberEntity.kt` avec colonnes : `nodeId` (PK), `clusterId`, `publicKey` (ByteArray), `ipAddress` (String, dernière connue), `port` (Int), `gpsLatitude` (Double?), `gpsLongitude` (Double?), `freeBytes` (Long), `lastSeen` (epoch ms), `role` (`SUPER_PAIR` / `MEMBER`), `status` (`ACTIVE` / `EVICTED`)
+**And** le `MemberDao` expose : `insertOrReplace`, `findByNodeId`, `listByClusterId(clusterId): Flow<List<MemberEntity>>` (filtré status=ACTIVE par défaut), `markEvicted(nodeId)`, `deleteByNodeId`, `purgeOlderThan(ttlMs)`
+**And** la colonne `status` est utilisée pour distinguer un membre **récemment perdu mais récupérable** (EVICTED, gardé 1 h pour évent. retour) versus un membre **présent** (ACTIVE) ; les requêtes de routing intra-cluster ne consultent que les ACTIVE
+**And** `ipAddress` et `port` sont indispensables au SP pour envoyer les `MEMBER_UPDATE` ciblés et pour permettre aux membres entre eux de communiquer en P2P direct (intra-cluster) ; ils sont fournis dans le `JOIN_REQUEST` initial et mis à jour par chaque `HEARTBEAT`
+**And** côté membre régulier, le `MemberHeartbeatUseCase` envoie un message `HEARTBEAT(nodeId, freeBytes, timestampMs, signature)` au Super-Pair toutes les 30 secondes (configurable via `HEARTBEAT_INTERVAL_MS` dans `ClusterConstants.kt`)
+**And** **Position GPS figée au JOIN (décision V5 assumée)** — le `HEARTBEAT` n'inclut **pas** `gpsLocation` ; la colonne `cluster_members.gpsLatitude/gpsLongitude` reste figée à la valeur fournie dans le `JOIN_REQUEST` initial ; le SP ne re-évalue jamais la proximité GPS d'un membre admis — la mobilité utilisateur (déplacement du téléphone après admission) est **explicitement Out-of-Scope V5** (perspective `EvaluateClusterFitUseCase` reportée) ; ce choix évite d'ajouter 16 octets × 50 membres × 2 880 heartbeats/jour (~2.3 MB/jour/cluster) de trafic GPS sans bénéfice fonctionnel V5
+**And** côté Super-Pair, le `ProcessHeartbeatUseCase` valide la signature, met à jour `lastSeen` et `freeBytes` dans `MemberDao`
+**And** côté Super-Pair, un job de surveillance lit `listByClusterId` toutes les 15 secondes ; pour chaque membre avec `now - lastSeen > 90s`, il :
+  1. Supprime l'entrée du registre (`deleteByNodeId`)
+  2. Diffuse `MEMBER_UPDATE { event: LEFT, nodeId, timestampMs, signature }` à tous les autres membres
+**And** côté membre régulier, si aucun signal du SP n'est reçu pendant 90 s (heartbeat de réponse OU `MEMBER_UPDATE`), il émet `JoinEvent.SpTimeoutDetected` ; le `JoinStateMachine` transite vers `NodeJoinState.Rejoining(SP_TIMEOUT)` et déclenche `RunBullyElectionUseCase` (Epic 3 Story 3.1) ; le résultat du Bully est canalisé comme `JoinEvent.BullyVictory` (→ `MarkSelfAsSuperPairUseCase`) ou `JoinEvent.BullyLost` (→ retour `NodeJoinState.Member` avec le nouveau `superPairNodeId` issu du `COORDINATOR` reçu)
+**And** **Post-Bully — câblage explicite** : si le membre **perd** l'élection Bully, il **n'émet PAS de nouveau `JOIN_REQUEST`** — il met simplement à jour son `Member.superPairNodeId` avec le winner ; le membership est préservé grâce au `inMemoryRegistry` partagé (FR-11.8) ; si le membre **gagne**, `MarkSelfAsSuperPairUseCase` repeuple `cluster_members` depuis son snapshot (voir AC plus bas)
+**And** lors d'un `JOIN_ACCEPT` (Story 11.2), le SP diffuse `MEMBER_UPDATE { event: JOINED, member: MemberInfo }` aux membres existants
+**And** chaque membre maintient un cache RAM `inMemoryRegistry: StateFlow<List<MemberInfo>>` mis à jour par :
+  - le `memberSnapshot` reçu dans `JoinAccept`
+  - les `MEMBER_UPDATE` (JOINED/LEFT) reçus ensuite
+**And** lorsque le membre est élu nouveau SP via Bully (mort de l'ancien SP), il **réutilise** son `inMemoryRegistry` pour repeupler la table Room `cluster_members` — **aucun re-JOIN n'est demandé aux autres membres** (FR-11.8, continuité post-Bully)
+**And** un test d'intégration valide le scénario T=6 de `exemple-concret-approche-join.md` :
+  - Cluster {Alice SP, Bob, Carol} stable
+  - `am force-stop` Alice
+  - Après 90 s, Bob et Carol détectent l'absence
+  - Bully entre {Bob, Carol} → Bob gagne
+  - Bob lit son `inMemoryRegistry` (qui contient Alice+Carol) et insère Carol dans son `MemberDao` Room
+  - Carol reste membre sans réémission de JOIN_REQUEST
+**And** **NFR-09 mesurable** : sur un cluster de 50 membres simulés (50 corégions sur l'émulateur ou 50 acteurs in-process), la consommation CPU côté SP de l'agrégat `ProcessHeartbeatUseCase` + surveillance + diffusion `MEMBER_UPDATE` reste ≤ 1% en moyenne sur 30 minutes (Android Studio Profiler)
+**And** le `MemberHeartbeatUseCase` (envoi côté membre) consomme ≤ 0.5% CPU
+**And** la table `cluster_members` est purgée au démarrage du service via `purgeOlderThan(ttlMs = 24h)` pour éviter les fuites d'entrées orphelines
+**And** la logique côté membre est dans `domain/usecase/m11_join/MemberHeartbeatUseCase.kt` ; côté SP dans `domain/usecase/m11_join/ProcessHeartbeatUseCase.kt` + `MonitorMemberLivenessUseCase.kt`
+**And** **Message `LEAVE` volontaire** — un membre qui quitte gracieusement (utilisateur ferme l'app, désactivation manuelle du service) envoie un `LEAVE(nodeId, timestampMs, signature)` signé EC P-256 au SP avant déconnexion ; le SP traite ce message comme un timeout heartbeat **immédiat** (suppression de `MemberDao` + diffusion `MEMBER_UPDATE { event: LEFT }` sous 1 s, sans attendre les 90 s) ; le `LEAVE` est envoyé via `SendLeaveUseCase` côté membre, déclenché depuis `MobicloudP2PService.onDestroy()` et toute action UI explicite de désinscription ; si l'envoi échoue (réseau coupé brutalement), le SP retombera sur le mécanisme timeout 90 s
+**And** **Snapshot persisté côté membre (continuité post-Bully)** — chaque membre régulier persiste son dernier `memberSnapshot` reçu (initial dans `JoinAccept`, incrémenté par les `MEMBER_UPDATE` JOINED/LEFT) dans une table Room dédiée `member_snapshot` (colonnes : `clusterId` PK, `superPairNodeId`, `lastUpdatedMs`, `membersJson` sérialisé en JSON/Protobuf) ; au démarrage du service après crash/redémarrage, le membre relit ce snapshot pour reprendre la conscience du cluster ; lorsqu'un membre devient SP via Bully, il **insère** chaque membre du snapshot dans la table `cluster_members` autoritaire et reprend la diffusion `MEMBER_UPDATE` sans demander de re-JOIN
+**And** **Wire format inter-réseaux pour HEARTBEAT, MEMBER_UPDATE, LEAVE** — en LAN (membre et SP joignables directement), ces messages sont envoyés en UDP signé sur le port multicast/unicast du SP ; en inter-réseaux (membre 4G ↔ SP Wi-Fi distant), ils sont encapsulés dans le message relai existant `FORWARD` (0x07) de Story 8.1, en cohérence avec l'encapsulation JOIN définie en Story 11.2 — sous-types `0x01 = HEARTBEAT`, `0x02 = MEMBER_UPDATE`, `0x03 = LEAVE` (sous-types JOIN_* en `0x04..0x06` voir Story 11.2) ; envoi via `RelayWebSocketClient.uploadBlock(destNodeId, payload)` avec préfixe ajouté côté `domain/usecase/m11_join/` ; le SP désencapsule à la réception ; **aucune modification de `relay-server/server.js`** requise
+
+---
+
+## Out of Scope V5 (Perspectives Rapport)
+
+Les éléments suivants sont **explicitement reportés** au-delà de V5 et documentés en chapitre "Perspectives" du mémoire PFE :
+
+- **Migration de nœud entre clusters** (`EvaluateClusterFitUseCase`) : un membre dont le GPS sort du rayon ne change pas automatiquement de cluster. Logique à concevoir si la mobilité utilisateur s'avère un cas réel.
+- **Re-réplication des blocs sur `LEFT`** : quand un membre quitte le cluster, les blocs qu'il hébergeait deviennent partiellement orphelins. La re-réplication automatique côté SP nécessite une orchestration similaire à Story 7.2 et est reportée.
+- **Défense Sybil GPS spoofing** : un attaquant peut falsifier sa position GPS via Mock Location (Magisk, Android Developer Options). Une attestation device hardware-backed (Play Integrity API, RemoteAttestation TEE) serait nécessaire.
+- **Super-Pair byzantin (refus arbitraire)** : un SP malveillant peut rejeter des candidats légitimes. Modèle d'attaque honest-but-curious assumé pour V5.
+- **Découverte inter-cluster scalable** : à 10 000+ clusters, le tracker HA devient un goulot. Sharding géographique (geohash, S2 cells) ou DHT entre Super-Pairs (Kademlia overlay style IPFS) à étudier.

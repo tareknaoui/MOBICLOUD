@@ -1,5 +1,6 @@
 package com.mobicloud.data.p2p.websocket
 
+import com.mobicloud.domain.repository.LocationRepository
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.*
@@ -39,7 +40,7 @@ class RelayWebSocketClientTest {
         server.start()
         authSigner = mockk()
         coEvery { authSigner.buildAuthPayload() } returns fakeAuthPayload
-        client = RelayWebSocketClient(authSigner)
+        client = RelayWebSocketClient(authSigner, mockk(relaxed = true))
     }
 
     @After

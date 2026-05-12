@@ -8,6 +8,8 @@ import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.RelayEvent
 import com.mobicloud.domain.models.RelayPeer
+import com.mobicloud.domain.models.m11_join.SuperPeerHint
+import com.mobicloud.domain.models.m11_join.toSuperPeerHint
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
@@ -209,5 +211,11 @@ class SignalingRepositoryImpl @Inject constructor(
 
     override suspend fun unregisterAsSuperPeer(): Result<Unit> = runCatching {
         Log.d(TAG, "unregisterAsSuperPeer : TTL serveur se chargera de la purge")
+    }
+
+    override suspend fun fetchActiveSuperPeerHints(): Result<List<SuperPeerHint>> = runCatching {
+        _latestPeers.value
+            .filter { it.isSuperPair }
+            .map { it.toSuperPeerHint() }
     }
 }

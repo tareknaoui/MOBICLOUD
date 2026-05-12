@@ -9,6 +9,7 @@ import com.mobicloud.domain.models.HelloMessage
 import com.mobicloud.domain.models.HelloPayload
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.repository.IdentityRepository
+import com.mobicloud.domain.repository.LocationRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import io.mockk.coEvery
@@ -49,6 +50,7 @@ class LocalDiscoveryRepositoryImplTest {
     private lateinit var identityRepository: IdentityRepository
     private lateinit var peerRepository: PeerRepository
     private lateinit var networkEventRepository: NetworkEventRepository
+    private lateinit var locationRepository: LocationRepository
     private lateinit var context: Context
     private lateinit var scope: CoroutineScope
 
@@ -81,7 +83,7 @@ class LocalDiscoveryRepositoryImplTest {
     )
 
     private inner class TestableLocalDiscoveryRepositoryImpl : LocalDiscoveryRepositoryImpl(
-        identityRepository, peerRepository, networkEventRepository, context, scope
+        identityRepository, peerRepository, networkEventRepository, locationRepository, context, scope
     ) {
         var lastPayloadSigned: ByteArray? = null
 
@@ -112,6 +114,7 @@ class LocalDiscoveryRepositoryImplTest {
         identityRepository = mockk()
         peerRepository = mockk(relaxed = true)
         networkEventRepository = mockk(relaxed = true)
+        locationRepository = mockk(relaxed = true)
         context = mockk(relaxed = true)
         scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher())
 

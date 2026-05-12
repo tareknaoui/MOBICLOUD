@@ -1,6 +1,7 @@
 package com.mobicloud.domain.repository
 
 import com.mobicloud.domain.models.RelayPeer
+import com.mobicloud.domain.models.m11_join.SuperPeerHint
 import kotlinx.coroutines.flow.StateFlow
 
 interface SignalingRepository {
@@ -34,6 +35,13 @@ interface SignalingRepository {
 
     /** Déclenche GET_PEERS et insère les Super-Pairs reçus dans PeerRepository (source = RELAY_HA). */
     suspend fun fetchActiveSuperPeers(): Result<Unit>
+
+    /**
+     * Retourne les Super-Pairs connus du snapshot mémoire sous forme de [SuperPeerHint],
+     * triés pour usage par [SendJoinRequestUseCase].
+     * Additive — ne modifie PAS la signature de [fetchActiveSuperPeers].
+     */
+    suspend fun fetchActiveSuperPeerHints(): Result<List<SuperPeerHint>>
 
     /** Abdication explicite — le TTL 60s côté serveur purgera l'entrée automatiquement. */
     suspend fun unregisterAsSuperPeer(): Result<Unit>

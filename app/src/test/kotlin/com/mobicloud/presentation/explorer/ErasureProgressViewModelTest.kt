@@ -89,7 +89,7 @@ class ErasureProgressViewModelTest {
         downloadFileBlocksUseCase = mockk(relaxed = true)
         assembleDownloadedFileUseCase = mockk(relaxed = true)
         selectOptimalPeersUseCase = mockk()
-        coEvery { selectOptimalPeersUseCase(any()) } returns Result.success(
+        coEvery { selectOptimalPeersUseCase(any(), any(), any()) } returns Result.success(
             OptimalPeersResult(params = ErasureParameters(), selectedPeers = emptyList())
         )
         coEvery { catalogRepository.getEntry(any()) } returns Result.success(null)

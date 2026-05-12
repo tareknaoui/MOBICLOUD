@@ -257,6 +257,92 @@ describe('handleRegisterPeer', () => {
     clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
   });
 
+  // Story 11.1 — GPS
+  test('Story 11.1 — REGISTER_PEER avec gpsLatitude/gpsLongitude valides → stockés et retournés par GET_PEERS', () => {
+    const { handleRegisterPeer, handleGetPeers, signalingRegistry, parseFrame } = mod;
+    const payload = Buffer.from(JSON.stringify({
+      ip: '10.0.0.1', port: 5000, gpsLatitude: 36.7538, gpsLongitude: 3.0588
+    }));
+    expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(true);
+    const entry = signalingRegistry.get('a1b2c3d4e5f60708');
+    expect(entry.gpsLatitude).toBe(36.7538);
+    expect(entry.gpsLongitude).toBe(3.0588);
+
+    const sent = [];
+    const fakeWs = { send: buf => sent.push(buf), readyState: 1 };
+    handleGetPeers(fakeWs);
+    const peers = JSON.parse(parseFrame(sent[0]).payload.toString('utf8'));
+    expect(peers[0].gpsLatitude).toBeCloseTo(36.7538, 6);
+    expect(peers[0].gpsLongitude).toBeCloseTo(3.0588, 6);
+    clearTimeout(entry.ttlTimer);
+  });
+
+  test('Story 11.1 — REGISTER_PEER avec GPS invalide (lat=200) → les deux coercés en null (fix F5 : paire atomique)', () => {
+    const { handleRegisterPeer, signalingRegistry } = mod;
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const payload = Buffer.from(JSON.stringify({
+      ip: '10.0.0.1', port: 5000, gpsLatitude: 200, gpsLongitude: 3.0588
+    }));
+    expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(true);
+    const entry = signalingRegistry.get('a1b2c3d4e5f60708');
+    expect(entry.gpsLatitude).toBeNull();
+    expect(entry.gpsLongitude).toBeNull();   // fix F5 : paire atomique — lat invalide → lng aussi null
+    expect(entry.ip).toBe('10.0.0.1');                    // autres champs préservés
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('gpsLatitude invalide'));
+    clearTimeout(entry.ttlTimer);
+    warnSpy.mockRestore();
+  });
+
+  test('Story 11.1 — REGISTER_PEER sans GPS (legacy) → GET_PEERS retourne gpsLatitude=null', () => {
+    const { handleRegisterPeer, handleGetPeers, signalingRegistry, parseFrame } = mod;
+    const payload = Buffer.from(JSON.stringify({ ip: '10.0.0.1', port: 5000 }));
+    expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(true);
+    const sent = [];
+    const fakeWs = { send: buf => sent.push(buf), readyState: 1 };
+    handleGetPeers(fakeWs);
+    const peers = JSON.parse(parseFrame(sent[0]).payload.toString('utf8'));
+    expect(peers[0].gpsLatitude).toBeNull();
+    expect(peers[0].gpsLongitude).toBeNull();
+    clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
+  });
+
+  test('Review F2 — handleJoin préserve gpsLatitude/gpsLongitude du REGISTER_PEER précédent', () => {
+    const { handleRegisterPeer, handleJoin, handleGetPeers, signalingRegistry, parseFrame } = mod;
+    // 1. REGISTER_PEER avec GPS
+    const regPayload = Buffer.from(JSON.stringify({
+      ip: '10.0.0.1', port: 5000, gpsLatitude: 36.7538, gpsLongitude: 3.0588
+    }));
+    expect(handleRegisterPeer('a1b2c3d4e5f60708', regPayload)).toBe(true);
+
+    // 2. JOIN heartbeat (sans GPS dans le payload — normal)
+    const joinPayload = Buffer.from(JSON.stringify({ ip: '10.0.0.1', port: 5000 }));
+    expect(handleJoin('a1b2c3d4e5f60708', joinPayload)).toBe(true);
+
+    // 3. GET_PEERS doit toujours retourner le GPS du REGISTER_PEER
+    const sent = [];
+    const fakeWs = { send: buf => sent.push(buf), readyState: 1 };
+    handleGetPeers(fakeWs);
+    const peers = JSON.parse(parseFrame(sent[0]).payload.toString('utf8'));
+    expect(peers[0].gpsLatitude).toBeCloseTo(36.7538, 6);
+    expect(peers[0].gpsLongitude).toBeCloseTo(3.0588, 6);
+    clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
+  });
+
+  test('Review F5 — REGISTER_PEER avec lat valide et lng invalide → les deux coercés en null', () => {
+    const { handleRegisterPeer, signalingRegistry } = mod;
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const payload = Buffer.from(JSON.stringify({
+      ip: '10.0.0.1', port: 5000, gpsLatitude: 36.7538, gpsLongitude: 999
+    }));
+    expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(true);
+    const entry = signalingRegistry.get('a1b2c3d4e5f60708');
+    expect(entry.gpsLatitude).toBeNull();   // lat valide mais lng invalide → les deux null
+    expect(entry.gpsLongitude).toBeNull();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('gpsLongitude invalide'));
+    clearTimeout(entry.ttlTimer);
+    warnSpy.mockRestore();
+  });
+
   test('re-registration annule l\'ancien TTL', () => {
     const { handleRegisterPeer, signalingRegistry } = mod;
     const payload = Buffer.from(JSON.stringify({ ip: '10.0.0.1', port: 5000 }));

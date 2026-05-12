@@ -6,6 +6,7 @@ import com.mobicloud.data.repository.LocalDiscoveryRepositoryImpl
 import com.mobicloud.data.repository.PeerRepositoryImpl
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.LocalDiscoveryRepository
+import com.mobicloud.domain.repository.LocationRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import dagger.Module
@@ -33,9 +34,10 @@ object P2PModule {
         identityRepository: IdentityRepository,
         peerRepository: PeerRepository,
         networkEventRepository: NetworkEventRepository,
+        locationRepository: LocationRepository,
         @ApplicationContext context: Context,
         @ApplicationScope scope: CoroutineScope
     ): LocalDiscoveryRepository = LocalDiscoveryRepositoryImpl(
-        identityRepository, peerRepository, networkEventRepository, context, scope
+        identityRepository, peerRepository, networkEventRepository, locationRepository, context, scope
     )
 }

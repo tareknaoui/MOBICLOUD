@@ -34,9 +34,14 @@ import com.mobicloud.domain.usecase.m06_m07_repair_migration.TriggerAutoRepairUs
 import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
 import com.mobicloud.core.network.NetworkChangeObserver
 import com.mobicloud.domain.repository.LocalDiscoveryRepository
+import com.mobicloud.domain.repository.LocationRepository
+import com.mobicloud.data.p2p.join.JoinNetworkClientImpl
+import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
+import com.mobicloud.domain.usecase.m11_join.JoinStateMachine
+import com.mobicloud.domain.usecase.m11_join.ProcessJoinRequestUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +54,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
 @AndroidEntryPoint
 class MobicloudP2PService : Service() {
 
@@ -76,8 +82,13 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var triggerAutoRepairUseCase: TriggerAutoRepairUseCase
     @Inject lateinit var executeReplicationPlanUseCase: ExecuteReplicationPlanUseCase
     @Inject lateinit var localDiscoveryRepository: LocalDiscoveryRepository
+    @Inject lateinit var locationRepository: LocationRepository
     @Inject lateinit var nodeSettingsRepository: NodeSettingsRepository
     @Inject lateinit var wifiNetworkRepository: com.mobicloud.domain.repository.WifiNetworkRepository
+    @Inject lateinit var joinStateMachine: JoinStateMachine
+    @Inject lateinit var joinNetworkClientImpl: JoinNetworkClientImpl
+    @Inject lateinit var processJoinRequestUseCase: ProcessJoinRequestUseCase
+    @Inject lateinit var relayWebSocketClient: RelayWebSocketClient
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -122,6 +133,7 @@ class MobicloudP2PService : Service() {
         // P3: Évite de lancer plusieurs boucles P2P si START_STICKY redémarre le service
         if (!loopsStarted) {
             loopsStarted = true
+            locationRepository.start()
             startP2PNetworkLoops()
         }
 
@@ -144,6 +156,31 @@ class MobicloudP2PService : Service() {
             tcpConnectionManager.localIdentity = identity
             tcpConnectionManager.gossipHandler = gossipSyncUseCase
             tcpConnectionManager.blockReceiverHandler = receiveAndHostBlockUseCase
+
+            // Epic 11 — Les use cases JOIN sont injectés par Hilt via dagger.Lazy dans
+            // JoinStateMachine (cycle de dépendances résolu côté DI). Aucune construction
+            // manuelle ici : un new RamMemberRegistry() créerait un registre orphelin
+            // distinct du @Singleton bound dans JoinModule.
+
+            // Collecter joinIncomingFlow du relai et dispatcher vers JoinNetworkClientImpl.
+            // Côté SP : pour un JOIN_REQUEST, on délègue à ProcessJoinRequestUseCase puis on
+            // renvoie la JoinResponse via sendJoinResponse (boucle SP→candidat).
+            launch {
+                relayWebSocketClient.joinIncomingFlow.collect { msg ->
+                    joinNetworkClientImpl.onRelayMessage(msg)
+                    if (msg.subTypeByte == com.mobicloud.domain.models.m11_join.JoinSubType.JOIN_REQUEST.byte) {
+                        runCatching {
+                            val request = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(
+                                com.mobicloud.domain.models.m11_join.JoinRequest.serializer(),
+                                msg.payload
+                            )
+                            val response = processJoinRequestUseCase(request)
+                            joinNetworkClientImpl.sendJoinResponse(msg.fromNodeId, response)
+                                .onFailure { Log.w(LOGTAG, "[JOIN-SP] sendJoinResponse échoué", it) }
+                        }.onFailure { Log.w(LOGTAG, "[JOIN-SP] JOIN_REQUEST decode/process échoué", it) }
+                    }
+                }
+            }
             tcpConnectionManager.dhtRelayHandler = dhtRepository
             tcpConnectionManager.hostedBlockProvider = hostedBlockRepository
             // Story 7.2 — câblage des handlers de migration proactive
@@ -346,6 +383,7 @@ class MobicloudP2PService : Service() {
                         result
                             .onSuccess { election ->
                                 Log.i(LOGTAG, "Élection remportée — démarrage keepalive Super-Pair Relais HA")
+                                localDiscoveryRepository.updateSuperPairStatus(true)
                                 superPeerJob?.cancel()
                                 superPeerJob = launch {
                                     launch {
@@ -378,8 +416,14 @@ class MobicloudP2PService : Service() {
 
     /** Arrête le keepalive Super-Pair (utilisé par Story 3.3 — abdication). */
     fun abdicate() {
+        localDiscoveryRepository.updateSuperPairStatus(false)
         superPeerJob?.cancel()
         superPeerJob = null
+        // Notifier la FSM JOIN : sans ça, JoinStateMachine reste en SuperPair alors
+        // que côté réseau on a abdiqué → désync FSM/réalité.
+        serviceScope.launch {
+            joinStateMachine.transition(com.mobicloud.domain.models.m11_join.JoinEvent.AbdicationTriggered)
+        }
     }
 
     private fun createNotificationChannel() {
@@ -408,9 +452,11 @@ class MobicloudP2PService : Service() {
 
     override fun onDestroy() {
         loopsStarted = false
+        locationRepository.stop()
         localDiscoveryRepository.stop()
         networkChangeObserver.unregister()
         tcpConnectionManager.stopServer()
+        joinStateMachine.close()
         serviceScope.cancel()
         super.onDestroy()
     }

@@ -6,6 +6,7 @@ import com.mobicloud.domain.models.ElectionMessageType
 import com.mobicloud.domain.models.ElectionPayload
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.electionSignedBytes
+import com.mobicloud.domain.models.m11_join.hexToByteArray
 import kotlin.math.abs
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
@@ -14,7 +15,10 @@ import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.repository.WifiNetworkRepository
+import com.mobicloud.domain.models.m11_join.JoinEvent
+import com.mobicloud.domain.models.m11_join.MAX_RADIUS_METERS
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.LocalRepairBuffer
+import com.mobicloud.domain.usecase.m11_join.JoinStateMachine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
@@ -37,7 +41,8 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
     private val localRepairBuffer: LocalRepairBuffer,
     private val networkEventRepository: NetworkEventRepository,
     private val nodeSettingsRepository: NodeSettingsRepository,
-    private val wifiNetworkRepository: WifiNetworkRepository
+    private val wifiNetworkRepository: WifiNetworkRepository,
+    private val joinStateMachine: JoinStateMachine? = null
 ) {
     operator fun invoke(): Flow<Result<ElectionEvent>> {
         return networkClient.incomingMessages.map { payload ->
@@ -172,6 +177,27 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                 // Future (Epic 7): Retransmettre ces requêtes au nouveau Super-Pair
                 // pendingRequests.forEach { request -> ... }
 
+                // AC11 — déclencher le protocole JOIN si :
+                //   (a) le clusterId reçu diffère du nôtre (un cluster voisin annonce son SP), OU
+                //   (b) c'est le même cluster mais un autre nœud que self (changement de SP intra-cluster).
+                // Le cas (senderNodeId == self) avec même clusterId est exclu (auto-victoire,
+                // câblage déjà géré par RunBullyElectionUseCase).
+                val localClusterId = runCatching { nodeSettingsRepository.getSettings().clusterId }.getOrDefault("")
+                val differentCluster = payload.clusterId != localClusterId
+                val differentSenderSameCluster =
+                    payload.clusterId == localClusterId && payload.senderNodeId != localIdentity.nodeId
+                if (differentCluster || differentSenderSameCluster) {
+                    joinStateMachine?.transition(
+                        JoinEvent.CoordinatorReceived(
+                            senderNodeId = payload.senderNodeId.hexToByteArray(),
+                            clusterId = payload.clusterId,
+                            gpsLatitude = payload.gpsLatitude,
+                            gpsLongitude = payload.gpsLongitude,
+                            maxRadiusMeters = payload.maxRadiusMeters
+                        )
+                    )
+                }
+
                 Result.success(ElectionEvent.CoordinatorRegistered(payload.senderNodeId))
             }
         }
@@ -232,16 +258,22 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                 Exception("Bully ${payload.type.name} from unknown peer '${payload.senderNodeId}' -- ignored.")
             )
 
-        val dataToVerify = electionSignedBytes(
+        // Tenter d'abord v2 (avec champs GPS), puis fallback v1 pour rétrocompat pairs legacy
+        val dataToVerifyV2 = electionSignedBytes(
             type = payload.type,
             senderNodeId = payload.senderNodeId,
             reliabilityScore = payload.reliabilityScore,
             clusterId = payload.clusterId,
-            timestampMs = payload.timestampMs
+            timestampMs = payload.timestampMs,
+            gpsLatitude = payload.gpsLatitude,
+            gpsLongitude = payload.gpsLongitude,
+            maxRadiusMeters = payload.maxRadiusMeters
         )
 
-        val isValid = securityRepository.verifySignature(
-            data = dataToVerify,
+        // Story 11.2 décision review : v2 strict. Le fallback v1 a été retiré pour empêcher
+        // qu'un attaquant envoie un payload v2 (GPS arbitraire) signé en v1 valide.
+        val isValidV2 = securityRepository.verifySignature(
+            data = dataToVerifyV2,
             signature = payload.signatureBytes,
             publicKey = senderPeer.identity.publicKeyBytes
         ).getOrElse { error ->
@@ -250,7 +282,7 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
             )
         }
 
-        return if (isValid) Result.success(Unit)
+        return if (isValidV2) Result.success(Unit)
         else Result.failure(
             Exception("Invalid signature on ${payload.type.name} from '${payload.senderNodeId}' -- potential forgery, ignored.")
         )

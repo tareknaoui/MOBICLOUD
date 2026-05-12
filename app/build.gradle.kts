@@ -118,6 +118,12 @@ android {
         generateLocaleConfig = true
     }
 
+    // JVM unit tests : retourner les valeurs par défaut au lieu de lever RuntimeException
+    // sur les méthodes du framework Android non mockées (android.util.Log, TextUtils, etc.).
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
+
     namespace = "com.mobicloud.compose"
 }
 
@@ -193,6 +199,9 @@ dependencies {
     // ... LeakCanary
     // Désactivé — ServiceWatcher cause uid=-1 sur Android 12+ (binder UID lost in reflection proxy)
     // debugImplementation(libs.leakcanary.android)
+
+    // ... GPS (Story 11.1) — FusedLocationProviderClient
+    implementation(libs.play.services.location)
 
     // ... Testing
     testImplementation(libs.junit)

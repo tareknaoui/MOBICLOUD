@@ -75,12 +75,13 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        // ACCESS_FINE_LOCATION reste OBLIGATOIRE pour TOUS les Android 8.1+ tant que MobiCloud
-        // utilise l'API legacy WifiManager.connectionInfo.ssid. NEARBY_WIFI_DEVICES (Android 13+)
-        // ne suffit que si on migre vers ConnectivityManager.NetworkCapabilities.transportInfo.
-        // Cette migration est listee comme perspective ; en attendant, on demande FINE_LOCATION
-        // sur toutes les versions. MobiCloud n'utilise PAS le GPS -- la permission sert uniquement
-        // a lever le blocage Android sur la lecture SSID.
+        // ACCESS_FINE_LOCATION est OBLIGATOIRE pour deux usages :
+        // 1. Lecture SSID Wi-Fi (API legacy WifiManager.connectionInfo.ssid) — requis Android 8.1+.
+        //    NEARBY_WIFI_DEVICES (Android 13+) ne suffit pas tant qu'on n'a pas migré vers
+        //    ConnectivityManager.NetworkCapabilities.transportInfo (perspective).
+        // 2. GPS optionnel via LocationRepository (Story 11.1) — FusedLocationProviderClient
+        //    nécessite ACCESS_FINE_LOCATION pour les updates. Si refusée, LocationRepository émet
+        //    null en permanence et l'admission cluster (Story 11.2) se base sur la capacité seule.
         add(Manifest.permission.ACCESS_FINE_LOCATION)
     }
 
