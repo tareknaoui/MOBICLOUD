@@ -142,9 +142,9 @@ class JoinStateMachine @Inject constructor(
                 memberHeartbeatUseCaseLazy.get().stop()
             }
 
-            // Member + SpTimeoutDetected → Rejoining(SP_TIMEOUT)
+            // Member + SpTimeoutDetected → Rejoining(SP_TIMEOUT, clusterId préservé)
             state is NodeJoinState.Member && event is JoinEvent.SpTimeoutDetected -> {
-                val newState = NodeJoinState.Rejoining(RejoinReason.SP_TIMEOUT)
+                val newState = NodeJoinState.Rejoining(RejoinReason.SP_TIMEOUT, state.clusterId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
                 // RunBullyElectionUseCase est déclenché par le service — pas de dépendance directe ici
@@ -155,21 +155,25 @@ class JoinStateMachine @Inject constructor(
             // (idem BullySoloElectionUseCase) ; rappeler markSelf ici provoquerait un re-entry
             // dans transition() → deadlock du mutex.
             state is NodeJoinState.Rejoining && event is JoinEvent.BullyVictory -> {
-                val newState = NodeJoinState.SuperPair(event.clusterId)
+                // P13/D3 (review R2) : assert que `event.clusterId == state.clusterId` (les deux
+                // doivent référencer le même cluster, sinon RunBullyElectionUseCase a divergé).
+                // Log + utiliser state.clusterId comme source de vérité (préservée par H9).
+                if (event.clusterId != state.clusterId) {
+                    networkEventRepository.pushEvent(
+                        "[JOIN-FSM] WARN BullyVictory clusterId mismatch state=${state.clusterId.take(8)} event=${event.clusterId.take(8)} — utilise state"
+                    )
+                }
+                val newState = NodeJoinState.SuperPair(state.clusterId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
                 // checkSpTimeout l'a normalement déjà stoppé, mais idempotent par sécurité.
                 memberHeartbeatUseCaseLazy.get().stop()
             }
 
-            // Rejoining + BullyLost → Member (nouveau SP)
+            // Rejoining + BullyLost → Member (nouveau SP, clusterId restauré depuis Rejoining)
             state is NodeJoinState.Rejoining && event is JoinEvent.BullyLost -> {
                 val memberId = event.newSuperPairNodeId
-                val clusterId = when (val cur = _currentState.value) {
-                    is NodeJoinState.Member -> cur.clusterId
-                    else -> ""
-                }
-                val newState = NodeJoinState.Member(clusterId, memberId)
+                val newState = NodeJoinState.Member(state.clusterId, memberId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
                 memberHeartbeatUseCaseLazy.get().stop()
@@ -185,6 +189,10 @@ class JoinStateMachine @Inject constructor(
 
             // SuperPair → Undiscovered (défaite Bully involontaire — concurrent SP a gagné)
             state is NodeJoinState.SuperPair && event is JoinEvent.BullyLost -> {
+                // P8 (review R2) : stop le monitor — sinon le clusterId resté caché (M8) reste
+                // référencé alors que le SP n'est plus le nôtre, et un futur start() ne re-init
+                // pas la cache. Symétrique avec AbdicationTriggered (déjà stoppé).
+                monitorMemberLivenessUseCaseLazy.get().stop()
                 _currentState.value = NodeJoinState.Undiscovered
                 logStateChange(state, NodeJoinState.Undiscovered, event)
             }

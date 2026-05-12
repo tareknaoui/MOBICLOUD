@@ -55,6 +55,7 @@ import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
 import com.mobicloud.domain.usecase.m11_join.ProcessHeartbeatUseCase
 import com.mobicloud.domain.usecase.m11_join.ProcessJoinRequestUseCase
 import com.mobicloud.domain.usecase.m11_join.ProcessLeaveUseCase
+import com.mobicloud.domain.usecase.m11_join.ProcessMemberUpdateUseCase
 import com.mobicloud.domain.usecase.m11_join.SendLeaveUseCase
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -110,6 +111,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var relayWebSocketClient: RelayWebSocketClient
     @Inject lateinit var processHeartbeatUseCase: ProcessHeartbeatUseCase
     @Inject lateinit var processLeaveUseCase: ProcessLeaveUseCase
+    @Inject lateinit var processMemberUpdateUseCase: ProcessMemberUpdateUseCase
     @Inject lateinit var sendLeaveUseCase: SendLeaveUseCase
     @Inject lateinit var memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase
     @Inject lateinit var memberHeartbeatUseCase: MemberHeartbeatUseCase
@@ -213,9 +215,17 @@ class MobicloudP2PService : Service() {
             // Collecter joinIncomingFlow du relai et dispatcher vers JoinNetworkClientImpl.
             // Côté SP : pour un JOIN_REQUEST, on délègue à ProcessJoinRequestUseCase puis on
             // renvoie la JoinResponse via sendJoinResponse (boucle SP→candidat).
-            launch {
+            // P12/D2 (review R2) : on attend que le collector soit subscribed avant d'autoriser
+            // toute init WS aval. `subscriptionCount.first { it > 0 }` est l'API officielle pour
+            // attendre la subscription d'une SharedFlow → garantit qu'aucun emit JOIN/HB/MEMBER_UPDATE
+            // n'est perdu entre le démarrage du collector et le AUTH_OK WebSocket.
+            val collectorJob = launch {
                 relayWebSocketClient.joinIncomingFlow.collect { msg ->
-                    joinNetworkClientImpl.onRelayMessage(msg)
+                    // M23 : un throw dans onRelayMessage annulait tout le collector → tous les
+                    // messages JOIN/HB/MEMBER_UPDATE suivants étaient perdus jusqu'au redémarrage
+                    // du service. runCatching isole la faute par message.
+                    runCatching { joinNetworkClientImpl.onRelayMessage(msg) }
+                        .onFailure { Log.w(LOGTAG, "[JOIN] onRelayMessage failed (msg ignoré)", it) }
                     when (msg.subTypeByte) {
                         JoinSubType.JOIN_REQUEST.byte -> {
                             runCatching {
@@ -238,51 +248,12 @@ class MobicloudP2PService : Service() {
                         JoinSubType.MEMBER_UPDATE.byte -> {
                             runCatching {
                                 val update = ProtoBuf.decodeFromByteArray<MemberUpdate>(msg.payload)
-                                // AC14 : ne valide que si fromNodeId correspond EXACTEMENT à un membre
-                                // SUPER_PAIR connu. Sans ce cross-check, un ancien SP encore listé
-                                // dans inMemory peut signer un MEMBER_UPDATE accepté (bypass défense).
-                                val fromHex = msg.fromNodeId.lowercase()
-                                val spPublicKey = memberSnapshotCacheUseCase.inMemory.value
-                                    .firstOrNull {
-                                        it.role == com.mobicloud.domain.models.m11_join.MemberRole.SUPER_PAIR
-                                            && it.nodeId.toHexString().lowercase() == fromHex
-                                    }
-                                    ?.publicKey
-                                if (spPublicKey == null) {
-                                    networkEventRepository.pushEvent(
-                                        "[MEMBER-UPDATE-RX] fromNodeId=${fromHex.take(8)} pas SP courant — ignoré"
-                                    )
-                                    return@runCatching
+                                // T1 : validation AC14 extraite dans ProcessMemberUpdateUseCase
+                                // pour permettre les tests JVM purs.
+                                val outcome = processMemberUpdateUseCase(msg.fromNodeId, update)
+                                if (outcome is ProcessMemberUpdateUseCase.Result.Applied) {
+                                    memberHeartbeatUseCase.markSpSeen()
                                 }
-                                val memberOrNodeIdHex = update.member?.nodeId?.toHexString()
-                                    ?: update.leftNodeId?.toHexString() ?: return@runCatching
-                                val senderNodeIdBytes = fromHex.hexToByteArray()
-                                val signedBytes = memberUpdateSignedBytes(
-                                    senderNodeId = senderNodeIdBytes,
-                                    event = update.event,
-                                    memberOrNodeIdHex = memberOrNodeIdHex,
-                                    ts = update.timestampMs
-                                )
-                                val valid = securityRepository.verifySignature(signedBytes, update.signatureBytes, spPublicKey)
-                                    .getOrDefault(false)
-                                if (!valid) {
-                                    networkEventRepository.pushEvent(
-                                        "[MEMBER-UPDATE-RX] Signature invalide — ignoré"
-                                    )
-                                    return@runCatching
-                                }
-                                val now = System.currentTimeMillis()
-                                // Cf. ProcessHeartbeatUseCase : éviter abs() overflow Long.MIN_VALUE.
-                                val window = com.mobicloud.domain.models.BULLY_TIMESTAMP_WINDOW_MS
-                                if (update.timestampMs < now - window || update.timestampMs > now + window) {
-                                    networkEventRepository.pushEvent("[MEMBER-UPDATE-RX] Timestamp stale — ignoré")
-                                    return@runCatching
-                                }
-                                networkEventRepository.pushEvent(
-                                    "[MEMBER-UPDATE-RX] ${update.event} ${memberOrNodeIdHex.take(8)} reçu du SP ${msg.fromNodeId.take(8)}"
-                                )
-                                memberSnapshotCacheUseCase.applyUpdate(update)
-                                memberHeartbeatUseCase.markSpSeen()
                             }.onFailure { Log.w(LOGTAG, "[MEMBER-UPDATE-RX] decode/process échoué", it) }
                         }
                         JoinSubType.LEAVE.byte -> {
@@ -295,6 +266,10 @@ class MobicloudP2PService : Service() {
                     }
                 }
             }
+            // P12/D2 (review R2) : on bloque le reste de l'init aval jusqu'à ce que le collector
+            // soit effectivement subscribed au SharedFlow. `subscriptionCount.first { it > 0 }`
+            // ne suspend que jusqu'à la première subscription (typiquement < 1 ms).
+            relayWebSocketClient.joinIncomingFlow.subscriptionCount.first { it > 0 }
             tcpConnectionManager.dhtRelayHandler = dhtRepository
             tcpConnectionManager.hostedBlockProvider = hostedBlockRepository
             // Story 7.2 — câblage des handlers de migration proactive

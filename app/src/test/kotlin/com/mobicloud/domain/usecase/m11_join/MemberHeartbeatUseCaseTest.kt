@@ -101,14 +101,19 @@ class MemberHeartbeatUseCaseTest {
         useCase.stop()
     }
 
-    // 4. start() × 2 → idempotent
+    // 4. start() × 2 → P1 (review R2) : nouvelle sémantique, le deuxième start() remplace
+    // proprement l'ancien Job via cancelAndJoin (idempotent vis-à-vis "un seul Job actif",
+    // mais le Job lui-même est neuf après le 2e appel).
     @Test
-    fun `start deux fois idempotent`() = runTest(testDispatcher) {
+    fun `start deux fois ne fuit pas de Job actif`() = runTest(testDispatcher) {
         val useCase = makeUseCase(this)
         useCase.start(spNodeId)
         val firstJob = useCase.heartbeatJob
         useCase.start(spNodeId)
-        assertTrue(firstJob === useCase.heartbeatJob)
+        // Le précédent Job a été cancelAndJoin → il n'est plus actif.
+        assertTrue("Le premier Job doit être annulé", firstJob?.isActive == false || firstJob?.isCancelled == true)
+        // Un nouveau Job actif est en place.
+        assertTrue("Un Job actif doit être en place après le 2e start", useCase.heartbeatJob?.isActive == true)
         useCase.stop()
     }
 

@@ -36,10 +36,17 @@ class MonitorMemberLivenessUseCase @Inject constructor(
     fun start() {
         if (monitorJob?.isActive == true) return
         monitorJob = scope.launch {
+            // M8 : clusterId lu une seule fois au démarrage (V5 mono-cluster par device — il
+            // ne change pas durant un mandat SP). Évite un coût `Flow.first()` × 120 cycles/heure.
+            val clusterId = runCatching {
+                nodeSettingsRepository.observeSettings().first().clusterId
+            }.getOrNull().orEmpty()
+            if (clusterId.isBlank()) {
+                networkEventRepository.pushEvent("[HB-SP-MON] WARN clusterId vide au start — monitor inactif")
+                return@launch
+            }
             while (isActive) {
                 delay(LIVENESS_CHECK_INTERVAL_MS)
-                val clusterId = nodeSettingsRepository.observeSettings().first().clusterId
-                if (clusterId.isBlank()) continue
                 val cutoff = clock() - SP_TIMEOUT_MS
                 val deadMembers = memberDao.listActiveSnapshot(clusterId).filter { it.lastSeen < cutoff }
                 deadMembers.forEach { dead ->

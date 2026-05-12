@@ -1,6 +1,6 @@
 # Story 11.3: Heartbeat & Member Registry — Cohésion et Continuité du Cluster
 
-Status: in-progress
+Status: done
 
 **Epic :** 11 — Délimitation Spatiale des Clusters (JOIN Explicite & GPS Optionnel)
 **Story ID :** 11.3
@@ -897,6 +897,8 @@ Aucun log de debug critique — implémentation conforme au plan.
 
 - 2026-05-12 : Création de la story (bmad-create-story) — 18 ACs, 18 tâches, scénario T=6 critique pour FR-11.8, dépendances Story 11.2/Epic 3 documentées, modification table FSM `Member + CoordinatorReceived (re-élection)` détectée et patchée, swap `RamMemberRegistry → RoomMemberRegistry` via Hilt, migration Room v14→v15 (deux tables `cluster_members` + `member_snapshot`), réutilisation totale du dispatch FORWARD JOIN_MAGIC Story 11.2 (aucune modification de `RelayWebSocketClient` ni `relay-server/server.js`), perspectives V5.1 documentées (HEARTBEAT_ACK, EVICTED retention 1h, multicast LAN UDP, nonce/correlation-id).
 - 2026-05-12 : Implémentation complète par agent claude-sonnet-4-6 — T1..T18 tous implémentés. Décisions d'implémentation : (1) tests JVM MockK pur (pas Robolectric, cohérent avec le projet) ; (2) `observeSettings().first().clusterId` au lieu de `observeClusterId()` inexistant ; (3) branche FSM AC12 ajoutée dans `JoinStateMachine.kt` (patch Story 11.2 documenté) ; (4) `LIVENESS_CHECK_INTERVAL_MS` ajouté dans `ClusterConstants.kt` ; (5) purge 24h + snapshot load inline dans `MobicloudP2PService.onStartCommand()` sous le guard `loopsStarted`. 37 nouveaux fichiers créés, 8 fichiers modifiés. Status → review.
+- 2026-05-12 (soir) : **Traitement rigoureux des findings review (option 2)** par agent Amelia (claude-opus-4-7). Décisions C8/H8/T6 tranchées : (C8) `RoomMemberRegistry` déjà facade sur `MemberDao` — documenté ; (H8) `SendMemberUpdateUseCase.LEFT` inclut désormais le `leftNodeId` dans le broadcast pour notification immédiate ; (T6) tests Robolectric reportés V5.1 (infra gradle absente). Patches H : H9 (clusterId préservé dans `NodeJoinState.Rejoining`), H11 (`ProcessHeartbeatUseCase` rafraîchit lastSeen même avec endpoint dégénéré + `InvalidEndpointException`), H13 (`MemberHeartbeatUseCase` grace period erreurs locales avant SP timeout — anti-false-positive Bully). H7+H10 documentés (RoomMemberRegistry.add met déjà lastSeen=now). Patches M : M6 (timestamp avant signature pour rejet rapide), M8 (clusterId caché au démarrage MonitorLiveness), M11 (Mutex start/stop MemberHeartbeat), M14 (SendLeaveUseCase wrap `NonCancellable`), M17 (validation longueur hex nodeId 64 ou ≤16), M22 (`joinIncomingFlow` replay=16 pour la fenêtre boot), M23 (runCatching autour de onRelayMessage). Nouveau test T1 : `ProcessMemberUpdateUseCaseTest.kt` (6 cas — validation AC14 extraite en use case dédié `ProcessMemberUpdateUseCase`). Tests T2/T5 déjà présents dans `ProcessHeartbeatUseCaseTest`. Tests T3/T4 couverts par tests existants. Bonus fix pré-existant : 4 tests ProtoBuf/Room réflexion + LargeScale Scenario 7. **Suite complète : 304 tasks, BUILD SUCCESSFUL.** Status → **done**.
+- 2026-05-12 (nuit) : **Code review round-2 + traitement rigoureux des nouveaux findings**. 3 reviewers parallèles (Blind Hunter, Edge Case Hunter, Acceptance Auditor) sur le patch wave option-2 → 34 findings bruts → 19 uniques. Décisions D1/D2/D3 résolues : (D1) `Result.success` + log WARN pour endpoint dégénéré ; (D2) `replay=0` + `subscriptionCount.first { it > 0 }` avant init aval ; (D3) `state.clusterId` source de vérité + log mismatch event.clusterId. 13 patches appliqués : P1 (start() race outer launch fix via cancelAndJoin), P2 (Rejoining clusterId fallback NodeSettings dans MarkSelfAsSuperPair), P3 (lastLocalSendErrorAt reset onSuccess), P4 (requireSafeIpAddress whitespace rejection), P5 (toEntityOrNull soft validation), P6 (ProcessMemberUpdate nodeId length validation), P7 (stop() reset signals), P8 (monitor stop sur SuperPair+BullyLost), P9 (Rejoining init require clusterId), P10 (LOCAL_ERROR_GRACE_MS companion const). 14 findings deferred V5.1 + 4 dismissed. Test `start deux fois ne fuit pas de Job actif` adapté à la sémantique cancelAndJoin. **Suite complète : 304 tasks, BUILD SUCCESSFUL post-round-2.** Status → **done** (re-confirmé).
 
 ---
 
@@ -1017,3 +1019,63 @@ Revue adversariale en 5 chunks (modèles / use cases / persistence / transport+D
 - L7 `LIVENESS_CHECK_INTERVAL_MS dupliqué` : impl n'a qu'un exemplaire (mieux que spec).
 - M12 `ProcessHeartbeat hors-état retourne success` : design intentionnel (silencieux par robustesse).
 - L13 `blockId UUID.take(16)` : 64 bits suffisants au volume V5.
+
+---
+
+## Review Findings — Round 2 (2026-05-12 soir, bmad-code-review)
+
+Review adversariale sur le patch wave option-2 (922 lignes diff, 24 fichiers). 3 reviewers : Blind Hunter (no-context), Edge Case Hunter (with project), Acceptance Auditor (vs spec). 34 findings bruts → 19 uniques après dédup.
+
+### Decision-needed (à arbitrer avant patch)
+
+- [x] [Review][Decision→Patch] **D1 InvalidEndpointException retourné en `Result.failure` après écriture DB** — RÉSOLU : choix (a) `Result.success` + log WARN. Le caller ne doit pas retry, le log suffit pour observabilité.
+- [x] [Review][Decision→Patch] **D2 replay=16 sur joinIncomingFlow rejoue messages déjà traités** — RÉSOLU : choix (b) `replay=0` + `subscriptionCount.first { it > 0 }` AVANT init aval dans `MobicloudP2PService.startP2PNetworkLoops`.
+- [x] [Review][Decision→Patch] **D3 Rejoining+BullyVictory clusterId mismatch** — RÉSOLU : choix (a) log WARN si mismatch + utilise `state.clusterId` comme source de vérité.
+
+### Patch (fixables sans input)
+
+#### CRITICAL
+
+- [x] [Review][Patch] **P1 start() race after outer launch** [`MemberHeartbeatUseCase.kt:60-77`] — APPLIQUÉ : `suspend fun start()` + `cancelAndJoin()` du Job précédent dans le mutex. Test `start deux fois ne fuit pas de Job actif` adapté à la nouvelle sémantique (Job remplacé proprement).
+- [x] [Review][Patch] **P2 Rejoining.clusterId perdu au process kill** [`MarkSelfAsSuperPairUseCase.kt:32-41`] — APPLIQUÉ : fallback sur `NodeSettings.clusterId` si `clusterIdArg.isBlank()`. Re-JOIN naturel via `CoordinatorReceived` reste la voie principale ; ce fallback couvre la fenêtre process-kill rare.
+
+#### HIGH
+
+- [x] [Review][Patch] **P3 lastLocalSendErrorAt jamais reset après succès** [`MemberHeartbeatUseCase.kt:108-114`] — APPLIQUÉ : `lastLocalSendErrorAt = 0L` dans `send().onSuccess { }`. Plus de SP timeout permanent suppression sur transient récupéré.
+- [x] [Review][Patch] **P4 requireSafeIpAddress accepte whitespace** [`HeartbeatSignedBytes.kt:18-32`] — APPLIQUÉ : `require(ip.trim() == ip && !ip.any { it.isWhitespace() })`.
+- [x] [Review][Patch] **P5 SendMemberUpdate leaver length 17-63 crashe JOIN aval** [`MemberMapper.kt:15-22`, `RoomMemberRegistry.kt:38-43`] — APPLIQUÉ : `toEntityOrNull` introduit, `RoomMemberRegistry.add` skip silencieusement les MemberInfo corrompus.
+- [x] [Review][Patch] **P6 ProcessMemberUpdate JOINED mid-length nodeId crashe DAO** [`ProcessMemberUpdateUseCase.kt:44-60`] — APPLIQUÉ : validation `member.nodeId.size == 32 || ≤8` AVANT `Applied` ; idem `leftNodeId` côté LEFT.
+
+#### MEDIUM
+
+- [x] [Review][Patch] **P7 lastSpSignalAt pas reset dans stop()** [`MemberHeartbeatUseCase.kt:154-160`] — APPLIQUÉ : `lastSpSignalAt = 0L` + `lastLocalSendErrorAt = 0L` dans `stop()`. Plus de faux Bully immédiat sur cycle SuperPair↔Member.
+- [x] [Review][Patch] **P8 MonitorMemberLiveness clusterId cache stale après BullyLost sans stop()** [`JoinStateMachine.kt:188-194`] — APPLIQUÉ : `monitorMemberLivenessUseCase.stop()` ajouté dans `SuperPair + BullyLost`.
+
+#### LOW
+
+- [x] [Review][Patch] **P9 Rejoining.clusterId accepte ""** [`NodeJoinState.kt:33-37`] — APPLIQUÉ : `init { require(clusterId.isNotBlank()) }`. Test `NodeJoinStateTest` mis à jour avec clusterId non-vide.
+- [x] [Review][Patch] **P10 LOCAL_ERROR_GRACE_MS naming convention** [`MemberHeartbeatUseCase.kt:41-46`] — APPLIQUÉ : déplacé en `companion object const val`.
+
+### Defer (V5.1 / pré-existants / cosmétique)
+
+- [x] [Review][Defer] **T6 Robolectric** — AC1/AC2/AC5/AC11.5/AC18 mocks-only — V5.1 (infra gradle absente).
+- [x] [Review][Defer] **F13 oracle d'énumération via log UnknownMember vs StaleTimestamp** — minor info leak, V5.1.
+- [x] [Review][Defer] **F14 NonCancellable ANR risk** — mitigé par `withTimeoutOrNull(1500L)` au service onDestroy.
+- [x] [Review][Defer] **F15 sentinel byteArrayOf() collision avec zero-byte leaver** — cosmétique, documenté ; protocole interdit nodeId=0 byte.
+- [x] [Review][Defer] **F19 Result.Ignored upward observability** — déjà loggué via pushEvent.
+- [x] [Review][Defer] **F22 test M11 start/stop/start race** — test gap, hard to assert TestScope-level.
+- [x] [Review][Defer] **F23 ProcessMemberUpdateUseCaseTest Long.MIN_VALUE n'asserte pas reason** — test polish.
+- [x] [Review][Defer] **F24 Long.MAX_VALUE non testé sur ProcessMemberUpdate** — symétrie test polish.
+- [x] [Review][Defer] **F25 endpointInvalid re-use DB columns potentially stale** — V5.1 (rare en pratique).
+- [x] [Review][Defer] **F26 runCatching swallows OOM/StackOverflowError** — défense en profondeur V5.1.
+- [x] [Review][Defer] **F30 CURRENT_VERSION test tautological** — acknowledged.
+- [x] [Review][Defer] **F31 AC4 spec text mention leftNodeId?** — màj spec text uniquement, perspective rapport.
+- [x] [Review][Defer] **F33 8-char nodeId logging correlation** — telemetry hardening V5.1.
+- [x] [Review][Defer] **F34 log injection via ipAddress** — telemetry hardening V5.1.
+
+### Dismiss (faux positifs / handled elsewhere)
+
+- F18 `hexToByteArray` throw dans ProcessMemberUpdate — rattrapé par outer `runCatching` du collector service.
+- F28 SendLeave NonCancellable silent swallow — déjà gestion `onFailure`.
+- F29 H8 tangled conditions readability — style.
+- F32 changelog H6 stale checkbox — cosmétique, code correct.

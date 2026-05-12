@@ -15,9 +15,15 @@ package com.mobicloud.domain.models.m11_join
  * - LEAVE inclut désormais le `clusterId` pour empêcher le replay cross-cluster.
  */
 
-/** Valide un ipAddress pour inclusion dans un payload signé. Rejette `|` et IPv6 inline. */
+/** Valide un ipAddress pour inclusion dans un payload signé. Rejette `|`, IPv6 inline, whitespace. */
 fun requireSafeIpAddress(ip: String): String {
     require(ip.isNotBlank()) { "ipAddress vide" }
+    // P4 (review R2) : rejet du whitespace interne ET leading/trailing pour empêcher un attaquant
+    // d'envoyer `"   "` ou `"1.2.3.4 "` qui passait `isNotBlank() + '|' !in + ':' !in` mais collait
+    // ensuite dans le payload signé avec une signature unique alors que l'IP "réelle" différait.
+    require(ip.trim() == ip && !ip.any { it.isWhitespace() }) {
+        "ipAddress contient des whitespace (signature ambiguity)"
+    }
     require('|' !in ip) { "ipAddress contient '|' (collision séparateur signé)" }
     // IPv6 inline non supporté en V5 (collision avec `ip:port`). Détection : présence de `::`
     // ou plus d'un `:` non-port. IPv4 valide a 0 `:`. Tout `:` rejeté côté payload-input.

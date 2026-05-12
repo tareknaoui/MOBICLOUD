@@ -49,6 +49,11 @@ class RelayWebSocketClient @Inject constructor(
 
     // Dispatch JOIN (Epic 11) : SharedFlow vers JoinNetworkClientImpl.
     // Exposé internal pour que JoinNetworkClientImpl puisse s'y abonner.
+    // P12/D2 (review R2) : `replay = 0` (retour à la valeur initiale) — le replay=16 ouvrait une
+    // race de duplicate-processing sur reconnect collector dans le même process : 16 messages
+    // anciens réinjectés → double `applyUpdate` + `markSpSeen` artificiel. La fenêtre boot AUTH_OK
+    // est désormais protégée par `subscriptionCount.first { it > 0 }` côté `MobicloudP2PService`
+    // AVANT le déclenchement de toute connexion WS.
     internal val joinIncomingFlow = MutableSharedFlow<JoinIncomingMessage>(replay = 0, extraBufferCapacity = 64)
 
     /**

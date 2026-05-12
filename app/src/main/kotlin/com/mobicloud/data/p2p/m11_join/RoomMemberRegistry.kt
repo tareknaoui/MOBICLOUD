@@ -1,7 +1,7 @@
 package com.mobicloud.data.p2p.m11_join
 
 import com.mobicloud.data.local.dao.MemberDao
-import com.mobicloud.data.local.m11_join.toEntity
+import com.mobicloud.data.local.m11_join.toEntityOrNull
 import com.mobicloud.data.local.m11_join.toMemberInfoList
 import com.mobicloud.domain.models.m11_join.MemberInfo
 import com.mobicloud.domain.models.m11_join.toHexString
@@ -36,7 +36,11 @@ class RoomMemberRegistry @Inject constructor(
     override suspend fun add(m: MemberInfo) {
         val clusterId = currentClusterId()
         if (clusterId.isBlank()) return
-        memberDao.insertOrReplace(m.toEntity(clusterId, lastSeen = System.currentTimeMillis()))
+        // P5 (review R2) : soft validation — un MemberInfo issu du wire (JoinAccept snapshot,
+        // MEMBER_UPDATE LEFT) avec une longueur hex inattendue ne doit pas crasher le caller.
+        // On skip silencieusement la ligne corrompue.
+        val entity = m.toEntityOrNull(clusterId, lastSeen = System.currentTimeMillis()) ?: return
+        memberDao.insertOrReplace(entity)
     }
 
     override suspend fun remove(nodeId: ByteArray, clusterId: String) {

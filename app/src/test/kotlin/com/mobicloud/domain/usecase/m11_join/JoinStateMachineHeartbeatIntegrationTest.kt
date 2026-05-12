@@ -8,6 +8,7 @@ import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.models.m11_join.RejoinReason
 import com.mobicloud.domain.repository.NetworkEventRepository
 import dagger.Lazy
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
@@ -66,7 +67,7 @@ class JoinStateMachineHeartbeatIntegrationTest {
         fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId, null, null, 5000))
         fsm.transition(JoinEvent.JoinAcceptReceived(accept))
 
-        verify(timeout = 1000) { memberHeartbeatUseCase.start(spNodeId) }
+        coVerify(timeout = 1000) { memberHeartbeatUseCase.start(spNodeId) }
     }
 
     // 2. Member → Rejoining (SP_TIMEOUT) est géré (pas de crash)
@@ -77,7 +78,7 @@ class JoinStateMachineHeartbeatIntegrationTest {
         fsm.transition(JoinEvent.JoinAcceptReceived(accept))
         fsm.transition(JoinEvent.SpTimeoutDetected(spNodeId))
 
-        assertEquals(NodeJoinState.Rejoining(RejoinReason.SP_TIMEOUT), fsm.currentState.value)
+        assertEquals(NodeJoinState.Rejoining(RejoinReason.SP_TIMEOUT, clusterId), fsm.currentState.value)
     }
 
     // 3. Rejoining → Member (BullyLost) redémarre heartbeat vers nouveau SP
@@ -90,7 +91,7 @@ class JoinStateMachineHeartbeatIntegrationTest {
         fsm.transition(JoinEvent.BullyLost(newSpNodeId))
 
         verify(timeout = 1000) { memberHeartbeatUseCase.stop() }
-        verify(timeout = 1000) { memberHeartbeatUseCase.start(newSpNodeId) }
+        coVerify(timeout = 1000) { memberHeartbeatUseCase.start(newSpNodeId) }
     }
 
     // 4. SuperPair → Undiscovered (AbdicationTriggered) arrête MonitorMemberLiveness

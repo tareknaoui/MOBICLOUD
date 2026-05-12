@@ -10,6 +10,8 @@ import com.mobicloud.domain.repository.IMemberHeartbeatSender
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 class SendLeaveUseCase @Inject constructor(
@@ -19,14 +21,18 @@ class SendLeaveUseCase @Inject constructor(
     private val joinStateMachine: JoinStateMachine,
     private val networkEventRepository: NetworkEventRepository
 ) {
-    suspend operator fun invoke() {
+    // M14 + H25 : LEAVE doit s'envoyer même quand le serviceScope est en cours d'annulation
+    // (onDestroy). withContext(NonCancellable) garantit que la signature + l'envoi WS aboutissent
+    // avant que le service ne soit détruit. Sinon : le SP attend SP_TIMEOUT (90s) au lieu
+    // d'évincer immédiatement.
+    suspend operator fun invoke() = withContext(NonCancellable) {
         val state = joinStateMachine.currentState.value
-        if (state !is NodeJoinState.Member) return
-        val identity = identityRepository.getIdentity().getOrElse { return }
+        if (state !is NodeJoinState.Member) return@withContext
+        val identity = identityRepository.getIdentity().getOrElse { return@withContext }
         val ts = System.currentTimeMillis()
         val nodeIdBytes = identity.nodeId.hexToByteArray()
         val signedBytes = leaveSignedBytes(nodeIdBytes, state.clusterId, ts)
-        val signature = securityRepository.signData(signedBytes).getOrElse { return }
+        val signature = securityRepository.signData(signedBytes).getOrElse { return@withContext }
         val leave = Leave(nodeIdBytes, ts, signature)
         networkEventRepository.pushEvent(
             "[LEAVE-MEM] Envoi LEAVE au SP ${state.superPairNodeId.toHexShort()}"

@@ -85,7 +85,7 @@ class MemberSnapshotCacheUseCaseTest {
     fun `applyUpdate JOINED ajoute le membre`() = runTest(testDispatcher) {
         val useCase = makeUseCase(this)
         useCase.seedFromJoinAccept("cid", spNode, listOf(member(nodeA)))
-        val update = MemberUpdate(MemberUpdateEvent.JOINED, member(nodeB), null, 1000L, sig)
+        val update = MemberUpdate(MemberUpdateEvent.JOINED, member(nodeB), byteArrayOf(), 1000L, sig)
         useCase.applyUpdate(update)
         assertEquals(2, useCase.inMemory.value.size)
     }
@@ -109,7 +109,7 @@ class MemberSnapshotCacheUseCaseTest {
         useCase.seedFromJoinAccept("cid", spNode, listOf(member(nodeA)))
         coEvery { snapshotDao.get("cid") } returns MemberSnapshotEntity("cid", "11", 1L, "[]")
 
-        val update = MemberUpdate(MemberUpdateEvent.JOINED, member(nodeB), null, 1000L, sig)
+        val update = MemberUpdate(MemberUpdateEvent.JOINED, member(nodeB), byteArrayOf(), 1000L, sig)
         useCase.applyUpdate(update)
 
         // applyUpdate doit lire le clusterId via NodeSettings et upsert sur la même clé.

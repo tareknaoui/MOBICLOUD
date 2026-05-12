@@ -38,7 +38,7 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         MemberEntity::class,
         MemberSnapshotEntity::class
     ],
-    version = 15,
+    version = CatalogDatabase.CURRENT_VERSION,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -54,6 +54,10 @@ abstract class CatalogDatabase : RoomDatabase() {
     abstract fun memberSnapshotDao(): MemberSnapshotDao
 
     companion object {
+        // Room `@Database` est en `RetentionPolicy.CLASS` → invisible à la réflexion runtime.
+        // Cette constante sert de source unique consommée par l'annotation ET par les tests.
+        const val CURRENT_VERSION = 15
+
         // Story 1-3 — premier ajout de NodeIdentityEntity + PeerNodeEntity (sans is_super_pair).
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {

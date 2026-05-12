@@ -53,8 +53,8 @@ class MemberSnapshotCacheUseCase @Inject constructor(
                 current.filterNot { it.nodeId.contentEquals(m.nodeId) } + m
             }
             MemberUpdateEvent.LEFT -> {
-                val leftId = update.leftNodeId ?: return
-                current.filterNot { it.nodeId.contentEquals(leftId) }
+                if (update.leftNodeId.isEmpty()) return
+                current.filterNot { it.nodeId.contentEquals(update.leftNodeId) }
             }
         }
         _inMemory.value = updated

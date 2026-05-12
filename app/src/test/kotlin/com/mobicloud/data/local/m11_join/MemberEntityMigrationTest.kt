@@ -21,9 +21,9 @@ class MemberEntityMigrationTest {
 
     @Test
     fun `CatalogDatabase version est 15`() {
-        val dbAnnotation = CatalogDatabase::class.java
-            .getAnnotation(androidx.room.Database::class.java)
-        assertEquals(15, dbAnnotation?.version)
+        // Note : `@Database` est en `RetentionPolicy.CLASS`, donc non lisible via réflexion.
+        // On consomme la même constante que l'annotation pour garder le test couplé à la source.
+        assertEquals(15, CatalogDatabase.CURRENT_VERSION)
     }
 
     @Test

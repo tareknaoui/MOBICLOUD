@@ -45,8 +45,9 @@ class NodeJoinStateTest {
 
     @Test
     fun `Rejoining contient la raison`() {
-        val r = NodeJoinState.Rejoining(RejoinReason.SP_TIMEOUT)
+        val r = NodeJoinState.Rejoining(RejoinReason.SP_TIMEOUT, "cid-test")
         assertEquals(RejoinReason.SP_TIMEOUT, r.reason)
+        assertEquals("cid-test", r.clusterId)
     }
 
     @Test
@@ -63,7 +64,7 @@ class NodeJoinStateTest {
             NodeJoinState.Joining(SuperPeerHint(byteArrayOf(1), ipAddress = "x", port = 1, reliabilityScore = 0f), 0),
             NodeJoinState.Member("c", byteArrayOf(2)),
             NodeJoinState.SuperPair("c"),
-            NodeJoinState.Rejoining(RejoinReason.SP_ABDICATION),
+            NodeJoinState.Rejoining(RejoinReason.SP_ABDICATION, "c"),
             NodeJoinState.Isolated(0, 0L)
         )
         assertEquals(6, states.size)
