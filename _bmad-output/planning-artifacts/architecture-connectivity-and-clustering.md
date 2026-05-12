@@ -489,3 +489,42 @@ Le super-peer agit en **relais ponctuel** dans ce cas pathologique. C'est un fal
 - *Skype's Super-Nodes: Network Architecture*, Baset & Schulzrinne, 2006 (super-peer topologies)
 - Kafka multi-cluster patterns (KIP-382 / Mirror Maker 2)
 - BitTorrent : tracker + DHT fallback (BEP-5)
+
+---
+
+## Évolution V5.1 — Retrait du GPS et admission par charge
+
+### Justification originale (Epic 11 — V5.0)
+
+L'Epic 11 a introduit le GPS comme critère de délimitation de cluster (MAX_RADIUS_METERS = 5 000 m, calibré Bab Ezzouar). Cette décision reposait sur une hypothèse de transport local (WiFi Direct / mesh) qui n'a pas été implémentée : V5.0 utilise un Serveur Relai HA WebSocket centralisé (Epic 8).
+
+### Constat du déploiement V5.0 réel
+
+En déployant sur Render (Epic 8), il est apparu que la distance physique entre deux pairs n'impacte ni la latence ni le coût réseau — tout le trafic transite par le relai HA, quelle que soit la position GPS des nœuds. Conserver le filtrage géographique entraîne trois coûts sans bénéfice mesurable :
+
+1. **Bootstrap cassé à petite échelle** — 5 testeurs répartis sur le territoire algérien forment 5 clusters solos au lieu d'un cluster fonctionnel.
+2. **Permission Android intrusive** (ACCESS_FINE_LOCATION) sans utilité fonctionnelle réelle.
+3. **Complexité technique** (Haversine, LocationRepository, ~80 LOC) maintenue sans retour.
+
+### Nouvelle règle d'admission (V5.1 — Story 12.1)
+
+Le critère géographique est remplacé par un **critère de charge** :
+
+> Un nouveau nœud rejoint le super-peer disponible le moins chargé (currentMemberCount ASC) parmi ceux annonçant currentMemberCount < MAX_CLUSTER_SIZE.
+
+Algorithme de sélection dans SendJoinRequestUseCase :
+1. **Affinité de session** — priorité au dernier cluster joint (sticky cluster, persisté par JOIN_ACCEPT).
+2. **Équilibrage de charge** — fallback sortedBy { currentMemberCount } si le cluster historique est indisponible ou plein.
+3. **Fondation BullySolo** — si aucun SP disponible, le nœud fonde un nouveau cluster.
+
+### Bénéfices mesurés
+
+- **–1 permission Android** : ACCESS_FINE_LOCATION supprimée → onboarding simplifié, empreinte vie privée réduite.
+- **~80 LOC supprimées** : Haversine.kt, GpsCoordinate.kt, LocationRepository, 5 classes retirées.
+- **Bootstrap fonctionnel à N ≥ 2** : indépendant de la géographie.
+- **Indicateur de charge cluster** visible dans le Dashboard UI (N / 50 membres).
+
+### Perspectives V6
+
+- **Consistent hashing à 2 niveaux** (clusters + blocs DHT) — Option B étudiée mais reportée.
+- **Ré-équilibrage automatique inter-clusters** — hors scope V5.1.

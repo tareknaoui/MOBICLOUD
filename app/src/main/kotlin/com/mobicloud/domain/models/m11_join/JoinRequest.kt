@@ -6,8 +6,6 @@ import kotlinx.serialization.Serializable
 data class JoinRequest(
     val senderNodeId: ByteArray,
     val candidatePublicKey: ByteArray,
-    val gpsLatitude: Double? = null,
-    val gpsLongitude: Double? = null,
     val freeBytes: Long,
     val reliabilityScore: Float,
     val timestampMs: Long,
@@ -19,8 +17,6 @@ data class JoinRequest(
         other as JoinRequest
         if (!senderNodeId.contentEquals(other.senderNodeId)) return false
         if (!candidatePublicKey.contentEquals(other.candidatePublicKey)) return false
-        if (gpsLatitude != other.gpsLatitude) return false
-        if (gpsLongitude != other.gpsLongitude) return false
         if (freeBytes != other.freeBytes) return false
         if (reliabilityScore != other.reliabilityScore) return false
         if (timestampMs != other.timestampMs) return false
@@ -31,8 +27,6 @@ data class JoinRequest(
     override fun hashCode(): Int {
         var result = senderNodeId.contentHashCode()
         result = 31 * result + candidatePublicKey.contentHashCode()
-        result = 31 * result + (gpsLatitude?.hashCode() ?: 0)
-        result = 31 * result + (gpsLongitude?.hashCode() ?: 0)
         result = 31 * result + freeBytes.hashCode()
         result = 31 * result + reliabilityScore.hashCode()
         result = 31 * result + timestampMs.hashCode()

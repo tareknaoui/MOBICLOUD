@@ -21,23 +21,18 @@ fun memberSnapshotHash(snapshot: List<MemberInfo>): String {
     return digest.toHex()
 }
 
+// Story 12.1 : GPS supprimé du payload signé → JOIN_PROTOCOL_VERSION = 2
 fun joinRequestSignedBytes(
     senderNodeId: ByteArray,
     candidatePublicKey: ByteArray,
-    gpsLatitude: Double?,
-    gpsLongitude: Double?,
     freeBytes: Long,
     reliabilityScore: Float,
     timestampMs: Long
 ): ByteArray = buildString {
-    append("v1|JOIN_REQUEST|")
+    append("v2|JOIN_REQUEST|")
     append(senderNodeId.toHex())
     append("|")
     append(candidatePublicKey.toHex())
-    append("|")
-    append(gpsLatitude ?: "null")
-    append("|")
-    append(gpsLongitude ?: "null")
     append("|")
     append(freeBytes)
     append("|")

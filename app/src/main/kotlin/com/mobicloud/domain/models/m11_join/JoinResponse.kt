@@ -37,7 +37,7 @@ sealed class JoinResponse {
     @Serializable
     data class JoinRedirect(
         val reason: JoinRedirectReason,
-        val distanceMeters: Double? = null,
+        // P15 review : `distanceMeters` retiré Story 12.1 — résidu GPS code mort sur le wire.
         val alternativeSuperPeers: List<SuperPeerHint> = emptyList(),
         val timestampMs: Long,
         val signatureBytes: ByteArray
@@ -47,7 +47,6 @@ sealed class JoinResponse {
             if (javaClass != other?.javaClass) return false
             other as JoinRedirect
             if (reason != other.reason) return false
-            if (distanceMeters != other.distanceMeters) return false
             if (alternativeSuperPeers != other.alternativeSuperPeers) return false
             if (timestampMs != other.timestampMs) return false
             if (!signatureBytes.contentEquals(other.signatureBytes)) return false
@@ -56,7 +55,6 @@ sealed class JoinResponse {
 
         override fun hashCode(): Int {
             var result = reason.hashCode()
-            result = 31 * result + (distanceMeters?.hashCode() ?: 0)
             result = 31 * result + alternativeSuperPeers.hashCode()
             result = 31 * result + timestampMs.hashCode()
             result = 31 * result + signatureBytes.contentHashCode()

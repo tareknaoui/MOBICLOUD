@@ -37,7 +37,7 @@ class MemberSnapshotCacheUseCaseTest {
     private val sig = byteArrayOf(0x01)
 
     private fun member(nodeId: ByteArray) =
-        MemberInfo(nodeId, sig, "1.2.3.4", 80, null, null, 100L, MemberRole.MEMBER)
+        MemberInfo(nodeId, sig, "1.2.3.4", 80, 100L, MemberRole.MEMBER)
 
     @Before
     fun setUp() {

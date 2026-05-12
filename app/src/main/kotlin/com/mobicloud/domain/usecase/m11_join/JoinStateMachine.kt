@@ -6,6 +6,7 @@ import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.models.m11_join.RejoinReason
 import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.repository.NetworkEventRepository
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import dagger.Lazy
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -41,6 +42,7 @@ class JoinStateMachine @Inject constructor(
     private val memberHeartbeatUseCaseLazy: Lazy<MemberHeartbeatUseCase>,
     private val monitorMemberLivenessUseCaseLazy: Lazy<MonitorMemberLivenessUseCase>,
     private val memberSnapshotCacheUseCaseLazy: Lazy<MemberSnapshotCacheUseCase>,
+    private val nodeSettingsRepository: NodeSettingsRepository,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     private val _currentState = MutableStateFlow<NodeJoinState>(NodeJoinState.Undiscovered)
@@ -82,6 +84,9 @@ class JoinStateMachine @Inject constructor(
                 _currentState.value = NodeJoinState.Member(accept.clusterId, accept.superPairNodeId)
                 logStateChange(state, _currentState.value, event)
                 scope.launch {
+                    // P4 — Story 12.1 review : persister le clusterId joint pour activer
+                    // l'affinité de session (sticky cluster dans SendJoinRequestUseCase).
+                    runCatching { nodeSettingsRepository.updateClusterId(accept.clusterId) }
                     memberSnapshotCacheUseCaseLazy.get()
                         .seedFromJoinAccept(accept.clusterId, accept.superPairNodeId, accept.memberSnapshot)
                     memberHeartbeatUseCaseLazy.get().start(accept.superPairNodeId)
@@ -257,11 +262,10 @@ class JoinStateMachine @Inject constructor(
     private fun JoinEvent.CoordinatorReceived.toSuperPeerHint(): com.mobicloud.domain.models.m11_join.SuperPeerHint =
         com.mobicloud.domain.models.m11_join.SuperPeerHint(
             nodeId = senderNodeId,
-            gpsLatitude = gpsLatitude,
-            gpsLongitude = gpsLongitude,
             clusterId = clusterId,
             ipAddress = "",
             port = 0,
-            reliabilityScore = 0f
+            reliabilityScore = 0f,
+            currentMemberCount = 0
         )
 }

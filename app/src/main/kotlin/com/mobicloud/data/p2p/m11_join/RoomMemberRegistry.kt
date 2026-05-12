@@ -8,6 +8,8 @@ import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.usecase.m11_join.MemberRegistry
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -52,5 +54,20 @@ class RoomMemberRegistry @Inject constructor(
         val clusterId = currentClusterId()
         if (clusterId.isBlank()) return 0
         return memberDao.listActiveSnapshot(clusterId).size
+    }
+
+    // P7 review : check-and-add atomique côté SP pour empêcher 2 JOIN concurrents
+    // de dépasser MAX_CLUSTER_SIZE. Mutex coroutine — pas de blocage thread.
+    private val capacityMutex = Mutex()
+
+    override suspend fun addIfBelowCapacity(m: MemberInfo, max: Int): Boolean = capacityMutex.withLock {
+        val clusterId = currentClusterId()
+        if (clusterId.isBlank()) return@withLock false
+        val current = memberDao.listActiveSnapshot(clusterId)
+        val alreadyMember = current.any { it.nodeId.equals(m.nodeId.toHexString().lowercase(), ignoreCase = true) }
+        if (!alreadyMember && current.size >= max) return@withLock false
+        val entity = m.toEntityOrNull(clusterId, lastSeen = System.currentTimeMillis()) ?: return@withLock false
+        memberDao.insertOrReplace(entity)
+        true
     }
 }

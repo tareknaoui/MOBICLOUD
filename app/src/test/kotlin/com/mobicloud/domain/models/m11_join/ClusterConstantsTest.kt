@@ -27,11 +27,6 @@ class ClusterConstantsTest {
     }
 
     @Test
-    fun `MAX_RADIUS_METERS est positif`() {
-        assertTrue(MAX_RADIUS_METERS > 0)
-    }
-
-    @Test
     fun `MAX_CLUSTER_SIZE est positif`() {
         assertTrue(MAX_CLUSTER_SIZE > 0)
     }

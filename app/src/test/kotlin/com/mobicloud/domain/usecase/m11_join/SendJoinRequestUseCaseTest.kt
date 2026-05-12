@@ -1,6 +1,5 @@
 package com.mobicloud.domain.usecase.m11_join
 
-import com.mobicloud.domain.models.GpsCoordinate
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.m11_join.JoinEvent
 import com.mobicloud.domain.models.m11_join.JoinMetrics
@@ -9,7 +8,6 @@ import com.mobicloud.domain.models.m11_join.JoinResponse
 import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.models.m11_join.SuperPeerHint
 import com.mobicloud.domain.repository.IJoinNetworkClient
-import com.mobicloud.domain.repository.LocationRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -18,10 +16,11 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -32,7 +31,6 @@ class SendJoinRequestUseCaseTest {
 
     private lateinit var networkClient: IJoinNetworkClient
     private lateinit var securityRepository: SecurityRepository
-    private lateinit var locationRepository: LocationRepository
     private lateinit var nodeSettingsRepository: NodeSettingsRepository
     private lateinit var networkEventRepository: NetworkEventRepository
     private lateinit var joinStateMachine: JoinStateMachine
@@ -40,8 +38,7 @@ class SendJoinRequestUseCaseTest {
     private val dispatcher = UnconfinedTestDispatcher()
 
     private val localIdentity = NodeIdentity("0102", byteArrayOf(0x01, 0x02), 0.8f)
-    private val spHint = SuperPeerHint(byteArrayOf(0xAA.toByte()), ipAddress = "1.2.3.4", port = 5000, reliabilityScore = 0.9f)
-    private val algerGps = GpsCoordinate(36.7, 3.08, 5f, 1L)
+    private val spHint = SuperPeerHint(byteArrayOf(0xAA.toByte()), clusterId = "alpha", ipAddress = "1.2.3.4", port = 5000, reliabilityScore = 0.9f, currentMemberCount = 1)
 
     private val acceptResponse = JoinResponse.JoinAccept(
         clusterId = "cluster-1",
@@ -55,17 +52,17 @@ class SendJoinRequestUseCaseTest {
     fun setup() {
         networkClient = mockk()
         securityRepository = mockk()
-        locationRepository = mockk()
         nodeSettingsRepository = mockk(relaxed = true)
         networkEventRepository = mockk(relaxed = true)
         joinStateMachine = mockk(relaxed = true)
 
         coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
         coEvery { securityRepository.signData(any()) } returns Result.success(byteArrayOf(0xFF.toByte()))
-        every { locationRepository.currentLocation } returns MutableStateFlow(null)
+        coEvery { nodeSettingsRepository.getClusterIdOnce() } returns ""
+        every { nodeSettingsRepository.observeFreeSpaceBytes() } returns emptyFlow()
 
         useCase = SendJoinRequestUseCase(
-            networkClient, securityRepository, locationRepository,
+            networkClient, securityRepository,
             nodeSettingsRepository, networkEventRepository, joinStateMachine
         )
     }
@@ -85,7 +82,7 @@ class SendJoinRequestUseCaseTest {
     // Scénario 2 : JoinRedirect puis JoinAccept sur candidat alternatif
     @Test
     fun `JoinRedirect avec alternative puis Accept - converge en 2 tentatives`() = runTest(dispatcher) {
-        val altHint = SuperPeerHint(byteArrayOf(0xBB.toByte()), ipAddress = "2.3.4.5", port = 6000, reliabilityScore = 0.7f)
+        val altHint = SuperPeerHint(byteArrayOf(0xBB.toByte()), clusterId = "beta", ipAddress = "2.3.4.5", port = 6000, reliabilityScore = 0.7f, currentMemberCount = 2)
         val redirect = JoinResponse.JoinRedirect(
             reason = JoinRedirectReason.CLUSTER_FULL,
             alternativeSuperPeers = listOf(altHint),
@@ -112,45 +109,45 @@ class SendJoinRequestUseCaseTest {
         coVerify { joinStateMachine.transition(JoinEvent.AllCandidatesExhausted) }
     }
 
-    // Scénario 4 : Tri par distance GPS quand self GPS disponible
+    // AC6 — sticky cluster : le candidat du dernier cluster connu est tenté en premier
     @Test
-    fun `tri par distance GPS si self GPS disponible`() = runTest(dispatcher) {
-        every { locationRepository.currentLocation } returns MutableStateFlow(algerGps)
+    fun `prefersStickyClusterFirst - sticky alpha tente avant les autres`() = runTest(dispatcher) {
+        coEvery { nodeSettingsRepository.getClusterIdOnce() } returns "alpha"
 
-        // Candidat proche (Alger) et candidat loin (Oran ≈ 354 km)
-        val close = SuperPeerHint(byteArrayOf(0xCC.toByte()), gpsLatitude = 36.7, gpsLongitude = 3.1,
-            ipAddress = "1.1.1.1", port = 5000, reliabilityScore = 0.5f)
-        val far = SuperPeerHint(byteArrayOf(0xDD.toByte()), gpsLatitude = 35.7, gpsLongitude = -0.62,
-            ipAddress = "2.2.2.2", port = 5000, reliabilityScore = 0.9f)
+        val beta  = SuperPeerHint(byteArrayOf(0xBB.toByte()), clusterId = "beta",  ipAddress = "2.2.2.2", port = 5000, currentMemberCount = 2)
+        val alpha = SuperPeerHint(byteArrayOf(0xCC.toByte()), clusterId = "alpha", ipAddress = "3.3.3.3", port = 5000, currentMemberCount = 40)
+        val gamma = SuperPeerHint(byteArrayOf(0xDD.toByte()), clusterId = "gamma", ipAddress = "4.4.4.4", port = 5000, currentMemberCount = 1)
 
-        // Le candidat proche doit être appelé en premier (même si son reliabilityScore est inférieur)
-        var firstCalled: ByteArray? = null
+        // ordre d'appel attendu : [alpha(sticky), gamma(count=1), beta(count=2)]
+        val order = mutableListOf<ByteArray>()
         coEvery { networkClient.sendJoinRequest(any(), any()) } answers {
-            if (firstCalled == null) firstCalled = firstArg<SuperPeerHint>().nodeId
+            order += firstArg<SuperPeerHint>().nodeId.copyOf()
             Result.failure(Exception("rejected"))
         }
 
-        useCase.invoke(listOf(far, close)).first()
+        useCase.invoke(listOf(beta, alpha, gamma)).first()
 
-        assertTrue(firstCalled?.contentEquals(close.nodeId) == true)
+        assertTrue("sticky alpha doit être premier", order.first().contentEquals(alpha.nodeId))
+        assertTrue("gamma(count=1) doit être second", order.getOrNull(1)?.contentEquals(gamma.nodeId) == true)
+        assertTrue("beta(count=2) doit être troisième", order.getOrNull(2)?.contentEquals(beta.nodeId) == true)
     }
 
-    // Scénario 5 : Fallback reliabilityScore quand GPS null
+    // AC6 — fallback load-based quand sticky unavailable
     @Test
-    fun `fallback reliabilityScore si self GPS null`() = runTest(dispatcher) {
-        every { locationRepository.currentLocation } returns MutableStateFlow(null)
+    fun `fallsBackToLoadBased_whenStickyUnavailable - tri par memberCount si lastKnown absent`() = runTest(dispatcher) {
+        coEvery { nodeSettingsRepository.getClusterIdOnce() } returns ""
 
-        val lowScore = SuperPeerHint(byteArrayOf(0xEE.toByte()), ipAddress = "3.3.3.3", port = 5000, reliabilityScore = 0.3f)
-        val highScore = SuperPeerHint(byteArrayOf(0xFF.toByte()), ipAddress = "4.4.4.4", port = 5000, reliabilityScore = 0.9f)
+        val high = SuperPeerHint(byteArrayOf(0xEE.toByte()), clusterId = "x", ipAddress = "1.1.1.1", port = 5000, currentMemberCount = 30)
+        val low  = SuperPeerHint(byteArrayOf(0xFF.toByte()), clusterId = "y", ipAddress = "2.2.2.2", port = 5000, currentMemberCount = 5)
 
         var firstCalled: ByteArray? = null
         coEvery { networkClient.sendJoinRequest(any(), any()) } answers {
-            if (firstCalled == null) firstCalled = firstArg<SuperPeerHint>().nodeId
+            if (firstCalled == null) firstCalled = firstArg<SuperPeerHint>().nodeId.copyOf()
             Result.failure(Exception("rejected"))
         }
 
-        useCase.invoke(listOf(lowScore, highScore)).first()
+        useCase.invoke(listOf(high, low)).first()
 
-        assertTrue(firstCalled?.contentEquals(highScore.nodeId) == true)
+        assertTrue("le SP le moins chargé doit être tenté en premier", firstCalled?.contentEquals(low.nodeId) == true)
     }
 }

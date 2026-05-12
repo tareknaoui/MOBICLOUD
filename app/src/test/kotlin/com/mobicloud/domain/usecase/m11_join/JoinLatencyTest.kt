@@ -1,14 +1,10 @@
 package com.mobicloud.domain.usecase.m11_join
 
 import com.mobicloud.domain.models.NodeIdentity
-import com.mobicloud.domain.models.m11_join.JoinRequest
 import com.mobicloud.domain.models.m11_join.JoinResponse
-import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.models.m11_join.SuperPeerHint
-import com.mobicloud.domain.models.m11_join.joinRequestSignedBytes
 import com.mobicloud.domain.repository.IJoinNetworkClient
-import com.mobicloud.domain.repository.LocationRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -19,6 +15,7 @@ import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -30,8 +27,6 @@ import org.junit.Test
  *
  * LAN simulé : réponse instantanée (stub direct) → p95 ≤ 2 000 ms
  * Relais HA simulé : délai 100 ms RTT → p95 ≤ 5 000 ms
- *
- * Ces seuils sont traçables dans le rapport PFE comme évidence NFR-08.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class JoinLatencyTest {
@@ -53,7 +48,6 @@ class JoinLatencyTest {
 
     private fun buildUseCase(delayMs: Long): SendJoinRequestUseCase {
         val secRepo = mockk<SecurityRepository>()
-        val locRepo = mockk<LocationRepository>()
         val settingsRepo = mockk<NodeSettingsRepository>(relaxed = true)
         val eventRepo = mockk<NetworkEventRepository>(relaxed = true)
         val fsm = mockk<JoinStateMachine>(relaxed = true)
@@ -61,15 +55,16 @@ class JoinLatencyTest {
 
         coEvery { secRepo.getIdentity() } returns Result.success(identity)
         coEvery { secRepo.signData(any()) } returns Result.success(byteArrayOf(0xFF.toByte()))
-        every { locRepo.currentLocation } returns MutableStateFlow(null)
+        every { settingsRepo.observeFreeSpaceBytes() } returns emptyFlow()
+        coEvery { settingsRepo.getClusterIdOnce() } returns ""
         every { fsm.currentState } returns MutableStateFlow(NodeJoinState.Undiscovered)
 
         coEvery { networkClient.sendJoinRequest(any(), any()) } coAnswers {
-            delay(delayMs) // simuler le RTT réseau
+            delay(delayMs)
             Result.success(acceptResponse)
         }
 
-        return SendJoinRequestUseCase(networkClient, secRepo, locRepo, settingsRepo, eventRepo, fsm)
+        return SendJoinRequestUseCase(networkClient, secRepo, settingsRepo, eventRepo, fsm)
     }
 
     @Test
@@ -83,7 +78,7 @@ class JoinLatencyTest {
             latencies.add(result.getOrNull()!!.joinLatencyMs)
         }
 
-        val p95 = latencies.sorted()[18] // 95e percentile sur 20 = indice 19 (0-based)
+        val p95 = latencies.sorted()[18]
         assertTrue("LAN p95=$p95 ms doit être ≤ 2000 ms", p95 <= 2_000L)
     }
 

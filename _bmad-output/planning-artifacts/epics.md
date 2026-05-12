@@ -987,3 +987,30 @@ Les éléments suivants sont **explicitement reportés** au-delà de V5 et docum
 - **Défense Sybil GPS spoofing** : un attaquant peut falsifier sa position GPS via Mock Location (Magisk, Android Developer Options). Une attestation device hardware-backed (Play Integrity API, RemoteAttestation TEE) serait nécessaire.
 - **Super-Pair byzantin (refus arbitraire)** : un SP malveillant peut rejeter des candidats légitimes. Modèle d'attaque honest-but-curious assumé pour V5.
 - **Découverte inter-cluster scalable** : à 10 000+ clusters, le tracker HA devient un goulot. Sharding géographique (geohash, S2 cells) ou DHT entre Super-Pairs (Kademlia overlay style IPFS) à étudier.
+
+---
+
+## Epic 12 — Décentralisation de l'Admission (Refactor)
+
+**Objectif :** Retirer le GPS du codebase MobiCloud (Epic 11 refactor) et remplacer le critère de délimitation géographique par un critère de charge (memberCount). L'Epic 12 corrige une décision architecturale de l'Epic 11 devenue incompatible avec le déploiement V5.0 réel (Relai HA — transport centralisé indépendant de la géographie).
+
+**Motivation :** cf. section "Évolution V5.1" dans architecture-connectivity-and-clustering.md.
+
+### Story 12.1 — Suppression du GPS, admission cluster par charge (memberCount)
+
+**Statut :** done
+
+**Résumé :**
+- Suppression de `Haversine.kt`, `GpsCoordinate.kt`, `LocationRepository` (interface + impl + DI module)
+- Retrait des permissions Android `ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION`
+- Remplacement du critère géographique par `currentMemberCount < MAX_CLUSTER_SIZE = 50`
+- Sélection sticky-cluster + load balancing (`sortedBy { currentMemberCount }`) dans `SendJoinRequestUseCase`
+- Migration Room v15 → v16 (retrait colonnes GPS de `cluster_members`)
+- Propagation de `currentMemberCount` dans HELLO multicast, REGISTER_PEER tracker et GET_PEERS
+- UI Dashboard : indicateur "N / 50 membres" dans ClusterTopologyCard
+
+### Story 12.2 — Tracker load-based discovery (Serveur Node.js — story séparée)
+
+**Statut :** backlog (hors scope story 12.1)
+
+**Résumé :** Tri des super-peers par `memberCount` ASC côté tracker (Render relay-server). Les changements de server.js relatifs au retrait GPS ont été inclus dans la Story 12.1 ; la logique de tri serveur et les tests Jest complets font l'objet d'une story dédiée.

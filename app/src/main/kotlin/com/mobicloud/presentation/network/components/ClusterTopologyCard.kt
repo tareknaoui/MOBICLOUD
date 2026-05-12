@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import com.mobicloud.domain.models.ClusterNodeInfo
 import com.mobicloud.domain.models.ClusterNodeStatus
 import com.mobicloud.domain.models.ClusterTopologyState
+import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
 
 private val TerminalGreen = Color(0xFF00FF41)
 private val Amber = Color(0xFFFFB300)
@@ -78,12 +79,13 @@ fun ClusterTopologyCard(
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            // Story 12.1 — indicateur de charge cluster (admission par memberCount)
             Surface(
                 color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = "${state.nodes.size} nœuds",
+                    text = "${state.nodes.size} / $MAX_CLUSTER_SIZE membres",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)

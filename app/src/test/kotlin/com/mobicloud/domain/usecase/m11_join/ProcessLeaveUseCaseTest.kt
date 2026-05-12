@@ -32,7 +32,7 @@ class ProcessLeaveUseCaseTest {
     private val sig = byteArrayOf(0x10)
     private val now = System.currentTimeMillis()
 
-    private val entity = MemberEntity(nodeIdHex, "cid", pubKey, "1.2.3.4", 80, null, null, 100L, now - 5000L, "MEMBER", "ACTIVE")
+    private val entity = MemberEntity(nodeIdHex, "cid", pubKey, "1.2.3.4", 80, 100L, now - 5000L, "MEMBER", "ACTIVE")
     private val leave = Leave(nodeIdBytes, now, sig)
 
     @Before

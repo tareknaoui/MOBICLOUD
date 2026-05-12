@@ -75,14 +75,8 @@ class MainActivity : AppCompatActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        // ACCESS_FINE_LOCATION est OBLIGATOIRE pour deux usages :
-        // 1. Lecture SSID Wi-Fi (API legacy WifiManager.connectionInfo.ssid) — requis Android 8.1+.
-        //    NEARBY_WIFI_DEVICES (Android 13+) ne suffit pas tant qu'on n'a pas migré vers
-        //    ConnectivityManager.NetworkCapabilities.transportInfo (perspective).
-        // 2. GPS optionnel via LocationRepository (Story 11.1) — FusedLocationProviderClient
-        //    nécessite ACCESS_FINE_LOCATION pour les updates. Si refusée, LocationRepository émet
-        //    null en permanence et l'admission cluster (Story 11.2) se base sur la capacité seule.
-        add(Manifest.permission.ACCESS_FINE_LOCATION)
+        // Story 12.1 : ACCESS_FINE_LOCATION supprimé — plus de GPS, plus de SSID-based clustering.
+        // L'admission cluster repose désormais uniquement sur memberCount < MAX_CLUSTER_SIZE.
     }
 
     @Inject

@@ -59,8 +59,6 @@ class MemberLivenessNfrTest {
         publicKeyBytes = byteArrayOf(),
         ipAddress  = "10.0.0.$id",
         port       = 8080,
-        gpsLatitude = null,
-        gpsLongitude = null,
         freeBytes  = 512L,
         lastSeen   = lastSeen,
         role       = "MEMBER",

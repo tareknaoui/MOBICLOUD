@@ -61,7 +61,6 @@ class JoinNetworkClientImplTest {
         val request = JoinRequest(
             senderNodeId = byteArrayOf(0x01),
             candidatePublicKey = byteArrayOf(0x02),
-            gpsLatitude = null, gpsLongitude = null,
             freeBytes = 1000L, reliabilityScore = 0.8f,
             timestampMs = 1L, signatureBytes = byteArrayOf(0x03)
         )

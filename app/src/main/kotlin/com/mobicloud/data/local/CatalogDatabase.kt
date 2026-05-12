@@ -56,7 +56,7 @@ abstract class CatalogDatabase : RoomDatabase() {
     companion object {
         // Room `@Database` est en `RetentionPolicy.CLASS` → invisible à la réflexion runtime.
         // Cette constante sert de source unique consommée par l'annotation ET par les tests.
-        const val CURRENT_VERSION = 15
+        const val CURRENT_VERSION = 16
 
         // Story 1-3 — premier ajout de NodeIdentityEntity + PeerNodeEntity (sans is_super_pair).
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -236,6 +236,35 @@ abstract class CatalogDatabase : RoomDatabase() {
                         schema_version INTEGER NOT NULL DEFAULT 1
                     )
                 """.trimIndent())
+            }
+        }
+
+        // Story 12.1 — retrait colonnes GPS de cluster_members (gps_latitude, gps_longitude).
+        // La distance physique est non pertinente (transport via Relai HA centralisé).
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE cluster_members_new (
+                        node_id TEXT NOT NULL PRIMARY KEY,
+                        cluster_id TEXT NOT NULL,
+                        public_key_bytes BLOB NOT NULL,
+                        ip_address TEXT NOT NULL,
+                        port INTEGER NOT NULL,
+                        free_bytes INTEGER NOT NULL,
+                        last_seen INTEGER NOT NULL,
+                        role TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'ACTIVE'
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO cluster_members_new
+                        SELECT node_id, cluster_id, public_key_bytes, ip_address, port, free_bytes, last_seen, role, status
+                        FROM cluster_members
+                """.trimIndent())
+                db.execSQL("DROP TABLE cluster_members")
+                db.execSQL("ALTER TABLE cluster_members_new RENAME TO cluster_members")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_cluster_members_active_scan ON cluster_members(cluster_id, status, last_seen)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_cluster_members_status ON cluster_members(status)")
             }
         }
     }

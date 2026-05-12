@@ -56,7 +56,7 @@ class MemberHeartbeatSenderImplTest {
         coEvery { relay.uploadBlock("01", any(), any()) } returns Result.failure(Exception("err"))
         coEvery { relay.uploadBlock("02", any(), any()) } returns Result.success(Unit)
 
-        val member = MemberInfo(dest1, sig, "1.2.3.4", 80, null, null, 100L, MemberRole.MEMBER)
+        val member = MemberInfo(dest1, sig, "1.2.3.4", 80, 100L, MemberRole.MEMBER)
         val update = MemberUpdate(MemberUpdateEvent.JOINED, member, byteArrayOf(), ts, sig)
         val result = sender.broadcast(listOf(dest1, dest2), update)
 

@@ -2,8 +2,11 @@ package com.mobicloud.data.repository
 
 import android.os.SystemClock
 import android.util.Log
+import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.data.p2p.websocket.RELAY_SERVER_URLS
 import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
+import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
+import com.mobicloud.domain.models.m11_join.SP_TIMEOUT_MS
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.RelayEvent
@@ -36,7 +39,8 @@ class SignalingRepositoryImpl @Inject constructor(
     private val networkEventRepository: NetworkEventRepository,
     private val identityRepository: IdentityRepository,
     private val nodeSettingsRepository: NodeSettingsRepository,
-    private val hostedBlockRepository: HostedBlockRepository
+    private val hostedBlockRepository: HostedBlockRepository,
+    private val memberDao: MemberDao
 ) : SignalingRepository {
 
     // Scope lié au cycle de vie du processus — correct pour un @Singleton Android.
@@ -182,9 +186,18 @@ class SignalingRepositoryImpl @Inject constructor(
             Log.w(TAG, "freeBytes calc échoué (DB) → fallback=0 : ${e.message}")
             0L
         }
-        val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt, clusterId, freeBytes)
+        // Story 12.1 — currentMemberCount pour load balancing côté tracker.
+        // P21 : cutoff aligné sur SP_TIMEOUT_MS pour exclure les membres dont le HB est expiré
+        // (évite de surestimer la charge avant la purge MonitorMemberLivenessUseCase).
+        val currentMemberCount = runCatching {
+            val cutoff = System.currentTimeMillis() - SP_TIMEOUT_MS
+            memberDao.countActiveByClusterId(clusterId, cutoff)
+        }.onFailure { e ->
+            Log.w(TAG, "countActiveByClusterId échoué — coerce à 0 pour REGISTER_PEER", e)
+        }.getOrDefault(0)
+        val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt, clusterId, freeBytes, currentMemberCount)
         if (!sent) error("RelayWebSocketClient non connecté — REGISTER_PEER non envoyé")
-        Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore clusterId=${clusterId.take(8).ifEmpty { "(legacy)" }} freeBytes=$freeBytes")
+        Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore clusterId=${clusterId.take(8).ifEmpty { "(legacy)" }} freeBytes=$freeBytes memberCount=$currentMemberCount/$MAX_CLUSTER_SIZE")
         Unit
     }.onFailure { e ->
         Log.e(TAG, "registerAsSuperPeer échoué : ${e.message}")

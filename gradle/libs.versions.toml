@@ -50,7 +50,7 @@ room = "2.8.4"
 
 # ... AUTH ...
 playServicesAuth = "21.5.1"
-playServicesLocation = "21.3.0"
+# playServicesLocation retiré Story 12.1 (GPS supprimé)
 androidxCredentials = "1.5.0"
 identityGoogleId = "1.2.0"
 
@@ -176,7 +176,7 @@ room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "
 
 # ... AUTH ...
 play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
-play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+# play-services-location alias retiré Story 12.1 (GPS supprimé)
 # noinspection CredentialDependency - Already added the required dependency
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "androidxCredentials" }
 credentials-play-services-auth = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "androidxCredentials" }

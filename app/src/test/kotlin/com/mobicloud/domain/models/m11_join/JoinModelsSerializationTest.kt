@@ -4,7 +4,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class JoinModelsSerializationTest {
@@ -18,8 +17,6 @@ class JoinModelsSerializationTest {
         val req = JoinRequest(
             senderNodeId = byteArrayOf(1, 2, 3),
             candidatePublicKey = byteArrayOf(4, 5, 6),
-            gpsLatitude = 36.7,
-            gpsLongitude = 3.08,
             freeBytes = 1_000_000L,
             reliabilityScore = 0.8f,
             timestampMs = 1_700_000_000L,
@@ -29,23 +26,9 @@ class JoinModelsSerializationTest {
         val decoded = json.decodeFromString<JoinRequest>(encoded)
         assertArrayEquals(req.senderNodeId, decoded.senderNodeId)
         assertArrayEquals(req.candidatePublicKey, decoded.candidatePublicKey)
-        assertEquals(req.gpsLatitude, decoded.gpsLatitude)
+        assertEquals(req.freeBytes, decoded.freeBytes)
         assertEquals(req.timestampMs, decoded.timestampMs)
         assertArrayEquals(req.signatureBytes, decoded.signatureBytes)
-    }
-
-    @Test
-    fun `JoinRequest sans GPS conserve les nulls`() {
-        val req = JoinRequest(
-            senderNodeId = byteArrayOf(1),
-            candidatePublicKey = byteArrayOf(2),
-            gpsLatitude = null, gpsLongitude = null,
-            freeBytes = 0L, reliabilityScore = 0.5f,
-            timestampMs = 1L, signatureBytes = byteArrayOf(3)
-        )
-        val decoded = json.decodeFromString<JoinRequest>(json.encodeToString(req))
-        assertNull(decoded.gpsLatitude)
-        assertNull(decoded.gpsLongitude)
     }
 
     // ---- JoinResponse.JoinAccept ----
@@ -68,18 +51,17 @@ class JoinModelsSerializationTest {
     // ---- JoinResponse.JoinRedirect ----
 
     @Test
-    fun `JoinRedirect round-trip JSON`() {
+    fun `JoinRedirect CLUSTER_FULL round-trip JSON`() {
         val redirect = JoinResponse.JoinRedirect(
-            reason = JoinRedirectReason.OUT_OF_RADIUS,
-            distanceMeters = 398_000.0,
+            reason = JoinRedirectReason.CLUSTER_FULL,
             alternativeSuperPeers = emptyList(),
             timestampMs = 200L,
             signatureBytes = byteArrayOf(50)
         )
         val encoded = json.encodeToString(JoinResponse.serializer(), redirect)
         val decoded = json.decodeFromString(JoinResponse.serializer(), encoded) as JoinResponse.JoinRedirect
-        assertEquals(JoinRedirectReason.OUT_OF_RADIUS, decoded.reason)
-        assertEquals(398_000.0, decoded.distanceMeters!!, 0.01)
+        assertEquals(JoinRedirectReason.CLUSTER_FULL, decoded.reason)
+        assertEquals(0, decoded.alternativeSuperPeers.size)
     }
 
     // ---- MemberInfo ----
@@ -91,7 +73,6 @@ class JoinModelsSerializationTest {
             publicKey = byteArrayOf(3, 4),
             ipAddress = "10.0.0.1",
             port = 8080,
-            gpsLatitude = null, gpsLongitude = null,
             freeBytes = 500L,
             role = MemberRole.MEMBER
         )

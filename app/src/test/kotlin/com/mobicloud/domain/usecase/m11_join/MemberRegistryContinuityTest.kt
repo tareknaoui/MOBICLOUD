@@ -76,6 +76,7 @@ class MemberRegistryContinuityTest {
             memberHeartbeatUseCaseLazy      = dagger.Lazy { carolHeartbeatUseCase },
             monitorMemberLivenessUseCaseLazy = dagger.Lazy { mockk(relaxed = true) },
             memberSnapshotCacheUseCaseLazy  = dagger.Lazy { carolSnapshotCache },
+            nodeSettingsRepository          = mockk(relaxed = true),
         )
 
         // --- Bob ---
@@ -89,13 +90,14 @@ class MemberRegistryContinuityTest {
             memberHeartbeatUseCaseLazy      = dagger.Lazy { mockk(relaxed = true) },
             monitorMemberLivenessUseCaseLazy = dagger.Lazy { mockk(relaxed = true) },
             memberSnapshotCacheUseCaseLazy  = dagger.Lazy { bobSnapshotCache },
+            nodeSettingsRepository          = mockk(relaxed = true),
         )
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────────
 
     private suspend fun driveToMember(fsm: JoinStateMachine, spId: ByteArray, snapshot: List<MemberInfo> = emptyList()) {
-        fsm.transition(JoinEvent.CoordinatorReceived(spId, CLUSTER_ID, null, null, 5000))
+        fsm.transition(JoinEvent.CoordinatorReceived(spId, CLUSTER_ID))
         fsm.transition(
             JoinEvent.JoinAcceptReceived(
                 JoinResponse.JoinAccept(
@@ -153,7 +155,7 @@ class MemberRegistryContinuityTest {
 
         // Alice meurt — Bob gagne Bully et diffuse COORDINATOR
         carolFsm.transition(
-            JoinEvent.CoordinatorReceived(bobId, CLUSTER_ID, null, null, 5000)
+            JoinEvent.CoordinatorReceived(bobId, CLUSTER_ID)
         )
 
         val stateAfter = carolFsm.currentState.value
@@ -225,7 +227,7 @@ class MemberRegistryContinuityTest {
                 && (carolStateBefore as NodeJoinState.Member).superPairNodeId.contentEquals(aliceId))
 
         carolFsm.transition(
-            JoinEvent.CoordinatorReceived(bobId, CLUSTER_ID, null, null, 5000)
+            JoinEvent.CoordinatorReceived(bobId, CLUSTER_ID)
         )
 
         // Invariants finaux FR-11.8

@@ -26,14 +26,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
-    <!-- Requis depuis Android 8.1 pour lire le SSID du WiFi connecte (cluster identification). -->
-    <!-- Sans cette permission, getCurrentSsid() retourne "<unknown ssid>" et le cluster reste vide. -->
-    <!-- ACCESS_COARSE_LOCATION est suffisante pour le SSID sur certaines versions ; on declare les 2 -->
-    <!-- pour couvrir tout le spectre Android 8.1+. -->
-    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Android 13+ : NEARBY_WIFI_DEVICES decouple la lecture SSID de la geolocalisation. -->
-    <!-- usesPermissionFlags=neverForLocation explicite que MobiCloud ne fait PAS de geoloc. -->
+    <!-- Android 13+ : NEARBY_WIFI_DEVICES pour multicast UDP sans permission de géolocalisation. -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation"
         tools:targetApi="33" />

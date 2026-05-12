@@ -4,12 +4,11 @@ import com.mobicloud.domain.models.RelayPeer
 
 fun RelayPeer.toSuperPeerHint(): SuperPeerHint = SuperPeerHint(
     nodeId = nodeId.hexToByteArray(),
-    gpsLatitude = gpsLatitude,
-    gpsLongitude = gpsLongitude,
     clusterId = clusterId,
     ipAddress = ip,
     port = port,
-    reliabilityScore = reliabilityScore
+    reliabilityScore = reliabilityScore,
+    currentMemberCount = currentMemberCount
 )
 
 // Hex string → ByteArray (chaque paire de caractères = 1 octet).

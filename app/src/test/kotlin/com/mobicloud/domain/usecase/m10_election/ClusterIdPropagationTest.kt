@@ -84,8 +84,6 @@ class ClusterIdPropagationTest {
             allocatedStorageBytes = 2_000_000_000L,
             clusterId = "cluster-local-AAA"
         )
-        // 4G : SSID indispo -> getCurrentWifiClusterId retourne ""
-        coEvery { nodeSettingsRepository.getCurrentWifiClusterId() } returns ""
         coEvery {
             peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any())
         } returns Result.success(Unit)

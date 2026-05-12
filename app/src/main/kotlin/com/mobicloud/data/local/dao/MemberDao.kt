@@ -81,4 +81,10 @@ interface MemberDao {
     @Deprecated("Use purgeStale with separate TTLs (H18)", ReplaceWith("purgeStale(cutoffMs, cutoffMs)"))
     @Query("DELETE FROM cluster_members WHERE last_seen < :cutoffMs")
     suspend fun purgeOlderThan(cutoffMs: Long): Int
+
+    // Story 12.1 — nombre de membres ACTIVE dans un cluster (utilisé pour currentMemberCount tracker + admission).
+    // P21 : filtre `last_seen > :cutoffMs` aligné sur `SP_TIMEOUT_MS` (cf. MonitorMemberLivenessUseCase)
+    // pour ne pas compter des fantômes encore non purgés par la liveness.
+    @Query("SELECT COUNT(*) FROM cluster_members WHERE cluster_id = :clusterId AND status = 'ACTIVE' AND last_seen > :cutoffMs")
+    suspend fun countActiveByClusterId(clusterId: String, cutoffMs: Long): Int
 }

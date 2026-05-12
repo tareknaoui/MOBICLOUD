@@ -49,6 +49,7 @@ class JoinStateMachineHeartbeatIntegrationTest {
             memberHeartbeatUseCaseLazy = Lazy { memberHeartbeatUseCase },
             monitorMemberLivenessUseCaseLazy = Lazy { monitorMemberLivenessUseCase },
             memberSnapshotCacheUseCaseLazy = Lazy { memberSnapshotCacheUseCase },
+            nodeSettingsRepository = mockk(relaxed = true),
             defaultDispatcher = testDispatcher
         )
     }
@@ -64,7 +65,7 @@ class JoinStateMachineHeartbeatIntegrationTest {
             timestampMs = 1000L,
             signatureBytes = byteArrayOf()
         )
-        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId, null, null, 5000))
+        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId))
         fsm.transition(JoinEvent.JoinAcceptReceived(accept))
 
         coVerify(timeout = 1000) { memberHeartbeatUseCase.start(spNodeId) }
@@ -73,7 +74,7 @@ class JoinStateMachineHeartbeatIntegrationTest {
     // 2. Member → Rejoining (SP_TIMEOUT) est géré (pas de crash)
     @Test
     fun `Member vers Rejoining SpTimeout ne plante pas`() = runTest {
-        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId, null, null, 5000))
+        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId))
         val accept = JoinResponse.JoinAccept(clusterId, spNodeId, emptyList(), 1000L, byteArrayOf())
         fsm.transition(JoinEvent.JoinAcceptReceived(accept))
         fsm.transition(JoinEvent.SpTimeoutDetected(spNodeId))
@@ -84,7 +85,7 @@ class JoinStateMachineHeartbeatIntegrationTest {
     // 3. Rejoining → Member (BullyLost) redémarre heartbeat vers nouveau SP
     @Test
     fun `Rejoining BullyLost redémarre heartbeat vers nouveau SP`() = runTest {
-        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId, null, null, 5000))
+        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId))
         val accept = JoinResponse.JoinAccept(clusterId, spNodeId, emptyList(), 1000L, byteArrayOf())
         fsm.transition(JoinEvent.JoinAcceptReceived(accept))
         fsm.transition(JoinEvent.SpTimeoutDetected(spNodeId))
@@ -98,7 +99,7 @@ class JoinStateMachineHeartbeatIntegrationTest {
     @Test
     fun `SuperPair AbdicationTriggered stoppe monitorMemberLiveness`() = runTest {
         // Mettre la FSM en SuperPair en simulant la victoire Bully
-        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId, null, null, 5000))
+        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId))
         val accept = JoinResponse.JoinAccept(clusterId, spNodeId, emptyList(), 1000L, byteArrayOf())
         fsm.transition(JoinEvent.JoinAcceptReceived(accept))
         fsm.transition(JoinEvent.SpTimeoutDetected(spNodeId))
@@ -115,7 +116,7 @@ class JoinStateMachineHeartbeatIntegrationTest {
     @Test
     fun `Member BullyVictory stoppe memberHeartbeat`() = runTest {
         // Atteindre l'état Member
-        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId, null, null, 5000))
+        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId))
         val accept = JoinResponse.JoinAccept(clusterId, spNodeId, emptyList(), 1000L, byteArrayOf())
         fsm.transition(JoinEvent.JoinAcceptReceived(accept))
         assertTrue(fsm.currentState.value is NodeJoinState.Member)

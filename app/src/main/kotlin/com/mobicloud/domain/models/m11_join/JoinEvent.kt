@@ -4,10 +4,7 @@ sealed class JoinEvent {
     /** Un message COORDINATOR Bully a été reçu — le Super-Pair candidat est connu. */
     data class CoordinatorReceived(
         val senderNodeId: ByteArray,
-        val clusterId: String,
-        val gpsLatitude: Double?,
-        val gpsLongitude: Double?,
-        val maxRadiusMeters: Int
+        val clusterId: String
     ) : JoinEvent() {
         override fun equals(other: Any?): Boolean {
             if (this === other) return true
@@ -15,18 +12,12 @@ sealed class JoinEvent {
             other as CoordinatorReceived
             if (!senderNodeId.contentEquals(other.senderNodeId)) return false
             if (clusterId != other.clusterId) return false
-            if (gpsLatitude != other.gpsLatitude) return false
-            if (gpsLongitude != other.gpsLongitude) return false
-            if (maxRadiusMeters != other.maxRadiusMeters) return false
             return true
         }
 
         override fun hashCode(): Int {
             var result = senderNodeId.contentHashCode()
             result = 31 * result + clusterId.hashCode()
-            result = 31 * result + (gpsLatitude?.hashCode() ?: 0)
-            result = 31 * result + (gpsLongitude?.hashCode() ?: 0)
-            result = 31 * result + maxRadiusMeters
             return result
         }
     }

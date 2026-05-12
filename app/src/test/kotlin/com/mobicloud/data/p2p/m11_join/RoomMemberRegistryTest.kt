@@ -25,9 +25,9 @@ class RoomMemberRegistryTest {
 
     private val nodeIdBytes = byteArrayOf(0xAA.toByte(), 0xBB.toByte())
     private val nodeIdHex = nodeIdBytes.toHexString().lowercase()
-    private val member = MemberInfo(nodeIdBytes, byteArrayOf(1, 2), "1.2.3.4", 9090, null, null, 500L, MemberRole.MEMBER)
+    private val member = MemberInfo(nodeIdBytes, byteArrayOf(1, 2), "1.2.3.4", 9090, 500L, MemberRole.MEMBER)
 
-    private val activeEntity = MemberEntity(nodeIdHex, "cid", byteArrayOf(1, 2), "1.2.3.4", 9090, null, null, 500L, 1000L, "MEMBER", "ACTIVE")
+    private val activeEntity = MemberEntity(nodeIdHex, "cid", byteArrayOf(1, 2), "1.2.3.4", 9090, 500L, 1000L, "MEMBER", "ACTIVE")
 
     @Before
     fun setUp() {

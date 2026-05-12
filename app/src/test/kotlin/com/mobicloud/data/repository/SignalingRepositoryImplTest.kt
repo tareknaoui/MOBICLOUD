@@ -2,6 +2,7 @@ package com.mobicloud.data.repository
 
 import android.os.SystemClock
 import android.util.Log
+import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
@@ -38,6 +39,7 @@ class SignalingRepositoryImplTest {
     private lateinit var identityRepository: IdentityRepository
     private lateinit var nodeSettingsRepository: NodeSettingsRepository
     private lateinit var hostedBlockRepository: HostedBlockRepository
+    private lateinit var memberDao: MemberDao
 
     @Before
     fun setUp() {
@@ -57,6 +59,8 @@ class SignalingRepositoryImplTest {
         identityRepository = mockk(relaxed = true)
         nodeSettingsRepository = mockk(relaxed = true)
         hostedBlockRepository = mockk(relaxed = true)
+        memberDao = mockk(relaxed = true)
+        coEvery { memberDao.countActiveByClusterId(any(), any()) } returns 0
 
         // Stub explicite : Result<NodeIdentity> est une inline class, mockk relaxed renvoie un Object
         // qui ne peut pas être cast → ClassCastException dès qu'on accède à .nodeId.
@@ -72,7 +76,7 @@ class SignalingRepositoryImplTest {
 
     private fun buildRepo() = SignalingRepositoryImpl(
         relayClient, peerRepository, networkEventRepository,
-        identityRepository, nodeSettingsRepository, hostedBlockRepository
+        identityRepository, nodeSettingsRepository, hostedBlockRepository, memberDao
     )
 
     // -------------------------------------------------------------------------
@@ -81,13 +85,13 @@ class SignalingRepositoryImplTest {
 
     @Test
     fun `registerAsSuperPeer retourne Result_success quand sendRegisterPeer retourne true`() = runTest {
-        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns true
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any(), any()) } returns true
 
         val repo = buildRepo()
         val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, System.currentTimeMillis(), "test-node-id")
 
         assertTrue(result.isSuccess)
-        verify { relayClient.sendRegisterPeer(any(), "192.168.1.10", 48999, 0.87f, any(), any(), any()) }
+        verify { relayClient.sendRegisterPeer(any(), "192.168.1.10", 48999, 0.87f, any(), any(), any(), any()) }
     }
 
     // -------------------------------------------------------------------------
@@ -96,7 +100,7 @@ class SignalingRepositoryImplTest {
 
     @Test
     fun `registerAsSuperPeer retourne Result_failure quand sendRegisterPeer retourne false`() = runTest {
-        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns false
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any(), any()) } returns false
 
         val repo = buildRepo()
         val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, System.currentTimeMillis(), "test-node-id")
@@ -116,7 +120,7 @@ class SignalingRepositoryImplTest {
             clusterId = "test-cluster-id-0001"
         )
         coEvery { hostedBlockRepository.getTotalHostedBytes() } returns 250_000L
-        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns true
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any(), any()) } returns true
 
         val repo = buildRepo()
         repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, 1000L, "test-node-id")
@@ -125,7 +129,8 @@ class SignalingRepositoryImplTest {
             relayClient.sendRegisterPeer(
                 "test-node-id", "192.168.1.10", 48999, 0.87f, 1000L,
                 "test-cluster-id-0001",
-                750_000L  // 1_000_000 - 250_000
+                750_000L,  // 1_000_000 - 250_000
+                any()      // currentMemberCount
             )
         }
     }
@@ -137,7 +142,7 @@ class SignalingRepositoryImplTest {
             clusterId = "test-cluster-id-0001"
         )
         coEvery { hostedBlockRepository.getTotalHostedBytes() } returns 250_000L  // > allocated
-        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns true
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any(), any()) } returns true
 
         val repo = buildRepo()
         repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, 1000L, "test-node-id")
@@ -145,7 +150,8 @@ class SignalingRepositoryImplTest {
         verify {
             relayClient.sendRegisterPeer(
                 any(), any(), any(), any(), any(), any(),
-                0L  // jamais négatif
+                0L,   // jamais négatif
+                any() // currentMemberCount
             )
         }
     }
@@ -159,7 +165,7 @@ class SignalingRepositoryImplTest {
             clusterId = "test-cluster-id-0001"
         )
         coEvery { hostedBlockRepository.getTotalHostedBytes() } throws RuntimeException("DB locked")
-        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any()) } returns true
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any(), any()) } returns true
 
         val repo = buildRepo()
         val result = repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, 1000L, "test-node-id")
@@ -169,7 +175,8 @@ class SignalingRepositoryImplTest {
             relayClient.sendRegisterPeer(
                 any(), any(), any(), any(), any(),
                 "test-cluster-id-0001",
-                0L  // fallback
+                0L,   // fallback freeBytes
+                any() // currentMemberCount
             )
         }
     }
@@ -422,6 +429,27 @@ class SignalingRepositoryImplTest {
         val snapshot = repo.latestPeers.value
         assertEquals(1, snapshot.size)
         assertEquals("other-node", snapshot[0].nodeId)
+    }
+
+    // -------------------------------------------------------------------------
+    // AC14 — registerAsSuperPeer inclut currentMemberCount (Story 12.1)
+    // -------------------------------------------------------------------------
+
+    @Test
+    fun `registerAsSuperPeer_includesCurrentMemberCount - memberDao countActiveByClusterId est inclus dans REGISTER_PEER`() = runTest {
+        coEvery { memberDao.countActiveByClusterId(any(), any()) } returns 7
+        every { relayClient.sendRegisterPeer(any(), any(), any(), any(), any(), any(), any(), any()) } returns true
+
+        val repo = buildRepo()
+        repo.registerAsSuperPeer("192.168.1.10", 48999, 0.87f, 1000L, "test-node-id")
+
+        verify {
+            relayClient.sendRegisterPeer(
+                any(), any(), any(), any(), any(), any(),
+                any(),  // freeBytes
+                7       // currentMemberCount = valeur de memberDao
+            )
+        }
     }
 
     @Test

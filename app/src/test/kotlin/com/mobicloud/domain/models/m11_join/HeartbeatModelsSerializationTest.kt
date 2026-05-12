@@ -35,7 +35,7 @@ class HeartbeatModelsSerializationTest {
 
     @Test
     fun `MemberUpdate JOINED round-trip ProtoBuf`() {
-        val member = MemberInfo(nodeId, sig, "1.2.3.4", 80, null, null, 500L, MemberRole.MEMBER)
+        val member = MemberInfo(nodeId, sig, "1.2.3.4", 80, 500L, MemberRole.MEMBER)
         val update = MemberUpdate(MemberUpdateEvent.JOINED, member, byteArrayOf(), ts, sig)
         val bytes = ProtoBuf.encodeToByteArray(update)
         val decoded = ProtoBuf.decodeFromByteArray<MemberUpdate>(bytes)

@@ -34,7 +34,6 @@ import com.mobicloud.domain.usecase.m06_m07_repair_migration.TriggerAutoRepairUs
 import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
 import com.mobicloud.core.network.NetworkChangeObserver
 import com.mobicloud.domain.repository.LocalDiscoveryRepository
-import com.mobicloud.domain.repository.LocationRepository
 import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.data.p2p.join.JoinNetworkClientImpl
 import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
@@ -102,7 +101,6 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var triggerAutoRepairUseCase: TriggerAutoRepairUseCase
     @Inject lateinit var executeReplicationPlanUseCase: ExecuteReplicationPlanUseCase
     @Inject lateinit var localDiscoveryRepository: LocalDiscoveryRepository
-    @Inject lateinit var locationRepository: LocationRepository
     @Inject lateinit var nodeSettingsRepository: NodeSettingsRepository
     @Inject lateinit var wifiNetworkRepository: com.mobicloud.domain.repository.WifiNetworkRepository
     @Inject lateinit var joinStateMachine: JoinStateMachine
@@ -160,7 +158,6 @@ class MobicloudP2PService : Service() {
         // P3: Évite de lancer plusieurs boucles P2P si START_STICKY redémarre le service
         if (!loopsStarted) {
             loopsStarted = true
-            locationRepository.start()
             // Story 11.3 — purge des membres dont lastSeen > 24h (anti-fuite registres orphelins)
             serviceScope.launch {
                 val now = System.currentTimeMillis()
@@ -278,32 +275,10 @@ class MobicloudP2PService : Service() {
             // Story 7.3 — handler du donneur qui exécute une directive de réplication reçue
             tcpConnectionManager.replicationPlanHandler = executeReplicationPlanUseCase
 
-            // Story 7.1 — démarrer l'observation des changements réseau WiFi → 4G
-            // Hook : a chaque WiFi disponible, recalculer le clusterId depuis le SSID.
-            // Couvre le cas ou l'app demarre avant la connexion WiFi (clusterId vide
-            // jusqu'au callback) ou la permission ACCESS_FINE_LOCATION est accordee
-            // apres le 1er getSettings().
-            networkChangeObserver.onWifiAvailable = {
-                serviceScope.launch {
-                    runCatching { nodeSettingsRepository.refreshClusterIdFromWifi() }
-                        .onSuccess { id ->
-                            Log.i(LOGTAG, "[CLUSTER] refresh apres WiFi available: clusterId=${id.take(8).ifEmpty { "(vide -- SSID indisponible)" }}")
-                        }
-                        .onFailure { Log.w(LOGTAG, "[CLUSTER] refresh apres WiFi available echoue", it) }
-                }
-            }
+            // Story 7.1 — observation des changements réseau (4G ↔ WiFi) toujours utile pour
+            // les évènements applicatifs en aval. Story 12.1 : plus de dérivation clusterId depuis
+            // le SSID — le clusterId vient désormais de BullySolo (élection) ou JOIN_ACCEPT (admission).
             networkChangeObserver.register()
-
-            // Refresh initial best-effort : si le WiFi est deja connecte au demarrage du service
-            // (cas frequent : on relance l'app sans changer de reseau), onAvailable ne se redeclenche
-            // pas forcement -- on force un refresh maintenant.
-            serviceScope.launch {
-                runCatching { nodeSettingsRepository.refreshClusterIdFromWifi() }
-                    .onSuccess { id ->
-                        Log.i(LOGTAG, "[CLUSTER] refresh initial: clusterId=${id.take(8).ifEmpty { "(vide -- SSID indisponible)" }}")
-                    }
-                    .onFailure { Log.w(LOGTAG, "[CLUSTER] refresh initial echoue", it) }
-            }
 
             // Démarrer le TCP server EN PREMIER pour obtenir le port avant d'annoncer sur Firebase
             val tcpPortResult = tcpConnectionManager.startServer()
@@ -482,6 +457,22 @@ class MobicloudP2PService : Service() {
                                             }
                                         }
                                     }
+                                    // Story 12.1 — push currentMemberCount vers LocalDiscoveryRepo pour que
+                                    // les HELLO multicast reflètent la charge réelle du cluster.
+                                    // P5 : clusterId re-lu à chaque tick (changement possible via JOIN_ACCEPT/Bully).
+                                    // P6 : garde clusterId.isBlank() pour éviter un faux memberCount=0 broadcast.
+                                    launch {
+                                        while (isActive) {
+                                            val clusterId = nodeSettingsRepository.getClusterIdOnce()
+                                            if (clusterId.isNotBlank()) {
+                                                // P21 : cutoff aligné SP_TIMEOUT_MS pour exclure membres dont le HB est expiré.
+                                                val cutoff = System.currentTimeMillis() - com.mobicloud.domain.models.m11_join.SP_TIMEOUT_MS
+                                                val count = runCatching { memberDao.countActiveByClusterId(clusterId, cutoff) }.getOrDefault(0)
+                                                localDiscoveryRepository.updateCurrentMemberCount(count)
+                                            }
+                                            delay(30_000L)
+                                        }
+                                    }
                                     launch {
                                         Log.i(LOGTAG, "Timer d'abdication démarré (${ABDICATION_DELAY_MS / 60_000}min)")
                                         delay(ABDICATION_DELAY_MS)
@@ -554,7 +545,6 @@ class MobicloudP2PService : Service() {
                 }
             }
         }
-        locationRepository.stop()
         localDiscoveryRepository.stop()
         networkChangeObserver.unregister()
         tcpConnectionManager.stopServer()

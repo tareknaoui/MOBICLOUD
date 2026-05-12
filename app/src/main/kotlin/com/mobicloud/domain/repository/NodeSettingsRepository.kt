@@ -8,28 +8,13 @@ interface NodeSettingsRepository {
     suspend fun updateAllocatedStorage(bytes: Long)
     suspend fun updateClusterId(id: String)
 
-    /**
-     * Recalcule le clusterId depuis le SSID WiFi courant si possible.
-     * Sans permission de localisation ou hors WiFi, le SSID est null --
-     * dans ce cas le clusterId reste vide (pas de fallback UUID random
-     * qui figerait un cluster aleatoire a vie). A appeler quand le reseau
-     * change ou apres acquisition de la permission.
-     *
-     * @return le clusterId resultant (potentiellement "" si SSID indisponible)
-     */
-    suspend fun refreshClusterIdFromWifi(): String
+    // P14 review (Story 12.1) : reset explicite du sticky cluster sur rejet définitif
+    // (CLUSTER_FULL / INVALID_STATE) — `updateClusterId("")` est no-op par design.
+    suspend fun clearClusterId()
 
-    /**
-     * Retourne le clusterId derive UNIQUEMENT du SSID WiFi courant, sans
-     * consultation de la DB. Si le SSID est indisponible (4G, permission
-     * location refusee, hotspot AP), retourne "".
-     *
-     * FIX SPLIT-CLUSTER : a utiliser dans Bully (broadcast COORDINATOR) et
-     * dans le garde WG1 (rejet cross-cluster) pour garantir que la decision
-     * de clustering repose toujours sur l'etat WiFi LIVE, jamais sur un
-     * clusterId stale en DB d'une session precedente.
-     */
-    suspend fun getCurrentWifiClusterId(): String
+    // Story 12.1 — retourne le clusterId persiste (attribue par JOIN_ACCEPT ou BullySolo).
+    // Le clusterId n'est plus jamais derive du SSID WiFi.
+    suspend fun getClusterIdOnce(): String
 
     fun observeSettings(): Flow<NodeSettings>
     fun observeFreeSpaceBytes(): Flow<Long>

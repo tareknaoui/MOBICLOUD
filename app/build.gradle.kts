@@ -200,9 +200,6 @@ dependencies {
     // Désactivé — ServiceWatcher cause uid=-1 sur Android 12+ (binder UID lost in reflection proxy)
     // debugImplementation(libs.leakcanary.android)
 
-    // ... GPS (Story 11.1) — FusedLocationProviderClient
-    implementation(libs.play.services.location)
-
     // ... Testing
     testImplementation(libs.junit)
     testImplementation("io.mockk:mockk:1.13.8")

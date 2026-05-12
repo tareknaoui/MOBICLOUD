@@ -35,7 +35,6 @@ class PurgeOnStartTest {
         nodeId = nodeId, clusterId = "cid",
         publicKeyBytes = byteArrayOf(),
         ipAddress = "1.2.3.4", port = 8080,
-        gpsLatitude = null, gpsLongitude = null,
         freeBytes = 0L, lastSeen = lastSeen, role = "MEMBER", status = "ACTIVE"
     )
 

@@ -14,6 +14,14 @@ interface MemberRegistry {
     suspend fun add(m: MemberInfo)
     suspend fun remove(nodeId: ByteArray, clusterId: String)
     suspend fun size(): Int
+
+    /**
+     * P7 review (Story 12.1) : check-and-add atomique pour borner strictement la taille
+     * du cluster. Sans ça, deux JOIN concurrents franchissent tous deux le check `size() < max`
+     * puis appellent `add()` → cluster à `max + 1`.
+     * @return true si le membre a été ajouté, false si le cluster est saturé.
+     */
+    suspend fun addIfBelowCapacity(m: MemberInfo, max: Int): Boolean
 }
 
 // Conservé pour les tests JVM purs (sans Room) ; en prod, RoomMemberRegistry est utilisé via Hilt @Binds.
@@ -36,4 +44,13 @@ class RamMemberRegistry @javax.inject.Inject constructor() : MemberRegistry {
     }
 
     override suspend fun size(): Int = synchronized(lock) { _members.size }
+
+    override suspend fun addIfBelowCapacity(m: MemberInfo, max: Int): Boolean = synchronized(lock) {
+        // Le check ignore un doublon de l'expéditeur (re-JOIN après timeout) — ne pas le compter
+        // dans la capacité pour ne pas le rejeter à tort.
+        val existing = _members.indexOfFirst { it.nodeId.contentEquals(m.nodeId) }
+        if (existing < 0 && _members.size >= max) return@synchronized false
+        if (existing >= 0) _members[existing] = m else _members.add(m)
+        true
+    }
 }

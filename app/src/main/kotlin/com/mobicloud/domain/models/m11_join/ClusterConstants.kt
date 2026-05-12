@@ -1,13 +1,11 @@
 package com.mobicloud.domain.models.m11_join
 
-// Calibré pour Bab Ezzouar (zone PFE) : urbain dense + tolérance imprécision GPS indoor.
-// Doc design recommande 200m/1km/10km selon contexte ; 5 km = compromis défendable
-// (cf. epics.md Epic 11 table divergences).
-const val MAX_RADIUS_METERS = 5_000
-
-// Plafond batterie côté Super-Pair : 50 membres × heartbeat 30 s = 1 667 msg/min.
-// Au-delà, le SP consomme trop pour maintenir la liveness de tous les membres.
+// Plafond batterie côté SP + critère unique d'admission (Story 12.1)
+// 50 membres × heartbeat 30 s = 1 667 msg/min.
 const val MAX_CLUSTER_SIZE = 50
+
+// Bump de version protocole JOIN suite au retrait GPS du payload signé (Story 12.1).
+const val JOIN_PROTOCOL_VERSION = 2
 
 // Compromis batterie vs détection mort : 30 s = 2 cycles radio min, détection décès ≤ 2 min
 // (3 heartbeats manqués = SP_TIMEOUT_MS = 90 s) sans surcharger la radio 4G en permanence.

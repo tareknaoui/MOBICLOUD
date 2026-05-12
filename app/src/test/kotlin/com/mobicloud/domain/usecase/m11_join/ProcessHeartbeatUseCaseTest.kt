@@ -35,7 +35,7 @@ class ProcessHeartbeatUseCaseTest {
 
     private val validEntity = MemberEntity(
         nodeId = nodeIdHex, clusterId = "cid", publicKeyBytes = pubKey,
-        ipAddress = "1.2.3.4", port = 9090, gpsLatitude = null, gpsLongitude = null,
+        ipAddress = "1.2.3.4", port = 9090,
         freeBytes = 100L, lastSeen = now - 5000L, role = "MEMBER", status = "ACTIVE"
     )
 

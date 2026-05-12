@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Valide la structure de MIGRATION_14_15 : présence des deux tables,
+ * Valide la structure des migrations Room : présence des deux tables,
  * version attendue et SQL bien formé.
  * (Tests JVM purs — la vérification d'intégration Room réelle se fait via
  * les tests androidTest s'ils sont activés ou manuellement via test-migration.ps1.)
@@ -20,10 +20,16 @@ class MemberEntityMigrationTest {
     }
 
     @Test
-    fun `CatalogDatabase version est 15`() {
+    fun `MIGRATION_15_16 retire colonnes GPS de cluster_members`() {
+        assertEquals(15, CatalogDatabase.MIGRATION_15_16.startVersion)
+        assertEquals(16, CatalogDatabase.MIGRATION_15_16.endVersion)
+    }
+
+    @Test
+    fun `CatalogDatabase version est 16`() {
         // Note : `@Database` est en `RetentionPolicy.CLASS`, donc non lisible via réflexion.
         // On consomme la même constante que l'annotation pour garder le test couplé à la source.
-        assertEquals(15, CatalogDatabase.CURRENT_VERSION)
+        assertEquals(16, CatalogDatabase.CURRENT_VERSION)
     }
 
     @Test

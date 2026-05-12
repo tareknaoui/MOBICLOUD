@@ -7,7 +7,6 @@ import com.mobicloud.domain.models.m11_join.JoinSubType
 import com.mobicloud.domain.models.m11_join.toJoinSubType
 import com.mobicloud.domain.repository.IJoinNetworkClient
 import com.mobicloud.domain.repository.JoinIncomingMessage
-import com.mobicloud.domain.repository.LocationRepository
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
@@ -34,8 +33,7 @@ internal val RELAY_SERVER_URLS = listOf(
 
 @Singleton
 class RelayWebSocketClient @Inject constructor(
-    private val authSigner: RelayAuthSigner,
-    private val locationRepository: LocationRepository
+    private val authSigner: RelayAuthSigner
 ) {
     private val okHttpClient = OkHttpClient.Builder()
         .pingInterval(30, java.util.concurrent.TimeUnit.SECONDS)
@@ -266,7 +264,7 @@ class RelayWebSocketClient @Inject constructor(
         return ws.send(RelayFraming.buildFrame(RelayMsg.JOIN, payload).toByteString())
     }
 
-    /** Envoie REGISTER_PEER (0x03) avec les métadonnées du Super-Pair. */
+    /** Envoie REGISTER_PEER (0x03) avec les métadonnées du Super-Pair. Story 12.1 : currentMemberCount remplace GPS. */
     fun sendRegisterPeer(
         nodeId: String,
         ip: String,
@@ -274,28 +272,19 @@ class RelayWebSocketClient @Inject constructor(
         reliabilityScore: Float,
         electedAt: Long,
         clusterId: String,
-        freeBytes: Long
+        freeBytes: Long,
+        currentMemberCount: Int
     ): Boolean {
         val ws = activeWebSocket ?: return false
-        val gps = locationRepository.currentLocation.value
         val json = org.json.JSONObject().apply {
-            put("nodeId",           nodeId)
-            put("ip",               ip)
-            put("port",             port)
-            put("reliabilityScore", reliabilityScore.toDouble())
-            put("electedAt",        electedAt)
-            put("clusterId",        clusterId)
-            // Story 9.2 — capacité libre snapshot (allocated - used, ≥ 0). JSONObject sérialise
-            // le Long en Number JSON (sûr tant que < 2^53, soit ~9 PB).
-            put("freeBytes",        freeBytes)
-            // Story 11.1 — coordonnées GPS optionnelles ; absents si permission refusée ou pas de fix.
-            // NaN/Infinity rejetés : JSONObject sérialise NaN sans guillemets → JSON invalide
-            // côté serveur ; mieux vaut omettre les champs que de propager des bytes corrompus.
-            if (gps != null && gps.latitude.isFinite() && gps.longitude.isFinite() &&
-                gps.latitude in -90.0..90.0 && gps.longitude in -180.0..180.0) {
-                put("gpsLatitude",  gps.latitude)
-                put("gpsLongitude", gps.longitude)
-            }
+            put("nodeId",             nodeId)
+            put("ip",                 ip)
+            put("port",               port)
+            put("reliabilityScore",   reliabilityScore.toDouble())
+            put("electedAt",          electedAt)
+            put("clusterId",          clusterId)
+            put("freeBytes",          freeBytes)
+            put("currentMemberCount", currentMemberCount)
         }
         val payload = json.toString().toByteArray(Charsets.UTF_8)
         return ws.send(RelayFraming.buildFrame(RelayMsg.REGISTER_PEER, payload).toByteString())
@@ -307,26 +296,22 @@ class RelayWebSocketClient @Inject constructor(
             (0 until arr.length()).map { i ->
                 val obj = arr.getJSONObject(i)
                 RelayPeer(
-                    nodeId           = obj.getString("nodeId"),
-                    ip               = obj.getString("ip"),
-                    port             = obj.getInt("port"),
-                    reliabilityScore = obj.getDouble("reliabilityScore").toFloat(),
-                    lastSeen         = obj.getLong("lastSeen"),
-                    // Champ ajouté côté serveur Story Bully ; absent dans les anciennes réponses → false
-                    isSuperPair      = obj.optBoolean("isSuperPair", false),
-                    // Story 9.2 — defaults garantissent la rétrocompatibilité avec
-                    // d'anciennes réponses serveur sans ces champs. isNull() distingue
-                    // un null JSON explicite (sinon org.json renvoie le littéral "null").
-                    clusterId        = if (obj.isNull("clusterId")) "" else obj.optString("clusterId", ""),
-                    freeBytes        = if (obj.isNull("freeBytes")) 0L else obj.optLong("freeBytes", 0L),
-                    // Story 10.1 — clé publique EC P-256 SPKI-DER en Base64 ; absent/null → ""
-                    // (rétrocompatibilité serveur sans ce champ).
-                    pubKeySpkiDerB64 = if (obj.isNull("pubKeySpkiDerB64")) ""
-                                       else obj.optString("pubKeySpkiDerB64", ""),
-                    // Story 11.1 — coordonnées GPS ; absent/null → null (rétrocompatibilité).
-                    // Review F7 : !has() couvre le cas clé absente (isNull() ne le fait pas).
-                    gpsLatitude  = if (!obj.has("gpsLatitude")  || obj.isNull("gpsLatitude"))  null else obj.optDouble("gpsLatitude",  Double.NaN).takeUnless { it.isNaN() },
-                    gpsLongitude = if (!obj.has("gpsLongitude") || obj.isNull("gpsLongitude")) null else obj.optDouble("gpsLongitude", Double.NaN).takeUnless { it.isNaN() }
+                    nodeId             = obj.getString("nodeId"),
+                    ip                 = obj.getString("ip"),
+                    port               = obj.getInt("port"),
+                    reliabilityScore   = obj.getDouble("reliabilityScore").toFloat(),
+                    lastSeen           = obj.getLong("lastSeen"),
+                    isSuperPair        = obj.optBoolean("isSuperPair", false),
+                    clusterId          = if (obj.isNull("clusterId")) "" else obj.optString("clusterId", ""),
+                    freeBytes          = if (obj.isNull("freeBytes")) 0L else obj.optLong("freeBytes", 0L),
+                    pubKeySpkiDerB64   = if (obj.isNull("pubKeySpkiDerB64")) ""
+                                         else obj.optString("pubKeySpkiDerB64", ""),
+                    // Story 12.1 — charge cluster du SP distant (load balancing admission).
+                    // P8 review : clamp [0, MAX_CLUSTER_SIZE] pour neutraliser un SP byzantin ou buggé
+                    // qui annoncerait une valeur négative (Int.MIN_VALUE capterait tout le trafic via
+                    // sortedBy { currentMemberCount }) ou > MAX.
+                    currentMemberCount = obj.optInt("currentMemberCount", 0)
+                        .coerceIn(0, com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE)
                 )
             }
         }.getOrDefault(emptyList())

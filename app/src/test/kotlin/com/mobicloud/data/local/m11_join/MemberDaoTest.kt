@@ -24,8 +24,6 @@ class MemberDaoTest {
         publicKeyBytes = byteArrayOf(1, 2, 3),
         ipAddress = "192.168.1.10",
         port = 9090,
-        gpsLatitude = 36.7,
-        gpsLongitude = 3.1,
         freeBytes = 1_000_000L,
         lastSeen = 1_000L,
         role = "MEMBER",

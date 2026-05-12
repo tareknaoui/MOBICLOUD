@@ -45,7 +45,7 @@ class JoinStateMachineTest {
         val snapLazy = dagger.Lazy<MemberSnapshotCacheUseCase> { mockk(relaxed = true) }
         fsm = JoinStateMachine(
             networkEventRepository, sendLazy, markLazy, bullyLazy,
-            hbLazy, monLazy, snapLazy, dispatcher
+            hbLazy, monLazy, snapLazy, mockk(relaxed = true), dispatcher
         )
     }
 
@@ -53,7 +53,15 @@ class JoinStateMachineTest {
 
     @Test
     fun `L1 Undiscovered + CoordinatorReceived → Joining`() = runTest(dispatcher) {
-        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId, null, null, 5000))
+        fsm.transition(JoinEvent.CoordinatorReceived(spNodeId, clusterId))
+        assertTrue(fsm.currentState.value is NodeJoinState.Joining)
+    }
+
+    // AC9 (Story 12.1) — nom de test mandaté par la spec : valide que la FSM accepte
+    // un CoordinatorReceived sans GPS (champs retirés en V5.1) et transite correctement.
+    @Test
+    fun `coordinatorReceived transitionsToJoining withoutGps`() = runTest(dispatcher) {
+        fsm.transition(JoinEvent.CoordinatorReceived(senderNodeId = spNodeId, clusterId = clusterId))
         assertTrue(fsm.currentState.value is NodeJoinState.Joining)
     }
 
@@ -105,7 +113,7 @@ class JoinStateMachineTest {
     fun `L4b Joining + JoinRedirectReceived sans alternatives → Isolated`() = runTest(dispatcher) {
         fsm.transition(JoinEvent.NewCandidateDetected(spHint))
         val redirect = JoinResponse.JoinRedirect(
-            reason = JoinRedirectReason.OUT_OF_RADIUS,
+            reason = JoinRedirectReason.CLUSTER_FULL,
             alternativeSuperPeers = emptyList(),
             timestampMs = 1L,
             signatureBytes = byteArrayOf(2)

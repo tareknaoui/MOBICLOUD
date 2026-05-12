@@ -33,7 +33,7 @@ class MonitorMemberLivenessUseCaseTest {
     private var virtualNow = 100_000L
 
     private fun entity(nodeId: String, lastSeen: Long) = MemberEntity(
-        nodeId, "cid", byteArrayOf(), "", 0, null, null, 0L, lastSeen, "MEMBER", "ACTIVE"
+        nodeId, "cid", byteArrayOf(), "", 0, 0L, lastSeen, "MEMBER", "ACTIVE"
     )
 
     @Before

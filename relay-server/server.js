@@ -23,6 +23,9 @@ const MSG = {
   ERROR: 0xFF
 };
 
+// Story 12.1 — MIRROR: app/.../ClusterConstants.kt#MAX_CLUSTER_SIZE
+const MAX_CLUSTER_SIZE_SERVER = 50;
+
 const TTL_MS = 60_000;               // TTL registre signaling + buffer relay
 const AUTH_WINDOW_MS = 30_000;       // fenêtre anti-replay auth
 const AUTH_TIMEOUT_MS = 10_000;      // délai max pour envoyer AUTH après connexion
@@ -142,7 +145,7 @@ function handleRegisterPeer(nodeId, payload) {
   let entry;
   try { entry = JSON.parse(payload.toString('utf8')); } catch { return false; }
 
-  const { ip, port, reliabilityScore, electedAt, clusterId, freeBytes, gpsLatitude, gpsLongitude } = entry;
+  const { ip, port, reliabilityScore, electedAt, clusterId, freeBytes, currentMemberCount } = entry;
   if (!ip || typeof port !== 'number' || port < 1 || port > 65535) return false;
 
   // Valider le format IP (pas de hostname, pas de loopback non contrôlé)
@@ -177,19 +180,19 @@ function handleRegisterPeer(nodeId, payload) {
     }
   }
 
-  // Story 11.1 — gpsLatitude / gpsLongitude optionnels : Number fini dans les bornes géodésiques ;
-  // sinon coerce en null + warn (même pattern que clusterId/freeBytes).
-  // Review F5 : validés et stockés comme paire — si l'un est invalide, les deux sont null
-  // (une coordonnée GPS n'a pas de sens avec un seul axe).
-  let gpsLatNum = null;
-  let gpsLngNum = null;
-  const latPresent = gpsLatitude !== undefined && gpsLatitude !== null;
-  const lngPresent = gpsLongitude !== undefined && gpsLongitude !== null;
-  const latValid = latPresent && typeof gpsLatitude === 'number' && Number.isFinite(gpsLatitude) && gpsLatitude >= -90 && gpsLatitude <= 90;
-  const lngValid = lngPresent && typeof gpsLongitude === 'number' && Number.isFinite(gpsLongitude) && gpsLongitude >= -180 && gpsLongitude <= 180;
-  if (latPresent && !latValid) console.warn(`[SIGNALING] gpsLatitude invalide rejeté (coerce en null) — nodeId=${nodeId.slice(0, 8)} val=${gpsLatitude}`);
-  if (lngPresent && !lngValid) console.warn(`[SIGNALING] gpsLongitude invalide rejeté (coerce en null) — nodeId=${nodeId.slice(0, 8)} val=${gpsLongitude}`);
-  if (latValid && lngValid) { gpsLatNum = gpsLatitude; gpsLngNum = gpsLongitude; }
+  // Story 12.1 — currentMemberCount : Number entier fini 0 ≤ x ≤ MAX_CLUSTER_SIZE_SERVER ;
+  // coerce en 0 + warn si invalide — même pattern que freeBytes.
+  let currentMemberCountNum = 0;
+  if (currentMemberCount !== undefined && currentMemberCount !== null) {
+    if (typeof currentMemberCount === 'number'
+      && Number.isFinite(currentMemberCount)
+      && currentMemberCount >= 0
+      && currentMemberCount <= MAX_CLUSTER_SIZE_SERVER) {
+      currentMemberCountNum = Math.floor(currentMemberCount);
+    } else {
+      console.warn(`[SIGNALING] currentMemberCount invalide rejeté (coerce en 0) — nodeId=${nodeId.slice(0, 8)} val=${currentMemberCount}`);
+    }
+  }
 
   // Cap : refuser si annuaire plein et ce nœud n'est pas déjà enregistré
   if (!signalingRegistry.has(nodeId) && signalingRegistry.size >= MAX_SIGNALING_PEERS) return false;
@@ -209,14 +212,13 @@ function handleRegisterPeer(nodeId, payload) {
     electedAt: electedAt ?? Date.now(),
     clusterId: clusterIdStr,
     freeBytes: freeBytesNum,
-    gpsLatitude: gpsLatNum,
-    gpsLongitude: gpsLngNum,
+    currentMemberCount: currentMemberCountNum,
     lastSeen: Date.now(),
     ttlTimer,
     isSuperPair: true   // REGISTER_PEER = revendication formelle de statut Super-Pair (post-Bully)
   });
 
-  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port} clusterId=${clusterIdStr.slice(0, 8) || '(legacy)'} freeBytes=${freeBytesNum} gps=${gpsLatNum !== null ? `${gpsLatNum},${gpsLngNum}` : 'absent'}`);
+  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port} clusterId=${clusterIdStr.slice(0, 8) || '(legacy)'} freeBytes=${freeBytesNum} memberCount=${currentMemberCountNum}/${MAX_CLUSTER_SIZE_SERVER}`);
   return true;
 }
 
@@ -250,11 +252,8 @@ function handleJoin(nodeId, payload) {
   // Préserver le statut Super-Pair si déjà élu — re-JOIN ne déclasse pas.
   const wasSuperPair = existing?.isSuperPair ?? false;
 
-  // Story 9.2 review (P1) : préserver clusterId/freeBytes existants — un Super-Pair
-  // envoyant un JOIN heartbeat ne doit PAS être démotivé en "legacy" (clusterId="",
-  // freeBytes=0) jusqu'au prochain REGISTER_PEER. Le payload JOIN ne porte pas ces
-  // champs ; on les hérite de l'entrée précédente, sinon defaults legacy.
-  // Story 11.1 review (F2) : même logique pour gpsLatitude/gpsLongitude.
+  // Story 9.2 : préserver clusterId/freeBytes/currentMemberCount existants — un Super-Pair
+  // envoyant un JOIN heartbeat ne doit PAS être rétrogradé jusqu'au prochain REGISTER_PEER.
   signalingRegistry.set(nodeId, {
     ip: ip ?? '0.0.0.0',
     port: port ?? 0,
@@ -262,8 +261,7 @@ function handleJoin(nodeId, payload) {
     electedAt: existing?.electedAt ?? null,
     clusterId: existing?.clusterId ?? '',
     freeBytes: existing?.freeBytes ?? 0,
-    gpsLatitude: existing?.gpsLatitude ?? null,
-    gpsLongitude: existing?.gpsLongitude ?? null,
+    currentMemberCount: existing?.currentMemberCount ?? 0,
     lastSeen: Date.now(),
     ttlTimer,
     isSuperPair: wasSuperPair
@@ -298,16 +296,13 @@ function handleGetPeers(ws) {
       port: entry.port,
       reliabilityScore: entry.reliabilityScore,
       lastSeen: entry.lastSeen,
-      isSuperPair: entry.isSuperPair === true,   // exposé au client pour qu'il sache qui est Super-Pair élu
-      // Story 9.2 — exposés pour le placement inter-cluster (Stories 9.3/9.4).
-      // Defaults explicites pour les entrées JOIN-only (handleJoin n'écrit jamais ces champs).
+      isSuperPair: entry.isSuperPair === true,
       clusterId: entry.clusterId ?? '',
       freeBytes: entry.freeBytes ?? 0,
-      // Story 10.1 — clé publique EC P-256 SPKI-DER encodée Base64 ; "" si session absente/fermée.
+      // Story 10.1 — clé publique EC P-256 SPKI-DER encodée Base64.
       pubKeySpkiDerB64,
-      // Story 11.1 — coordonnées GPS snapshot ; null si le Super-Pair n'a pas de fix ou legacy.
-      gpsLatitude: entry.gpsLatitude ?? null,
-      gpsLongitude: entry.gpsLongitude ?? null
+      // Story 12.1 — charge cluster (membres actifs) pour load balancing admission.
+      currentMemberCount: entry.currentMemberCount ?? 0
     });
   }
   safeSend(ws, buildFrame(MSG.PEERS, Buffer.from(JSON.stringify(peers), 'utf8')));

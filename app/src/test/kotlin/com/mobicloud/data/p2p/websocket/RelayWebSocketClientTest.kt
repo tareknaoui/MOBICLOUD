@@ -1,6 +1,5 @@
 package com.mobicloud.data.p2p.websocket
 
-import com.mobicloud.domain.repository.LocationRepository
 import io.mockk.coEvery
 import io.mockk.mockk
 import kotlinx.coroutines.*
@@ -40,7 +39,7 @@ class RelayWebSocketClientTest {
         server.start()
         authSigner = mockk()
         coEvery { authSigner.buildAuthPayload() } returns fakeAuthPayload
-        client = RelayWebSocketClient(authSigner, mockk(relaxed = true))
+        client = RelayWebSocketClient(authSigner)
     }
 
     @After
@@ -261,7 +260,7 @@ class RelayWebSocketClientTest {
         assertTrue("AUTH frame non reçu dans 5s", authReceived.await(5, TimeUnit.SECONDS))
 
         // activeWebSocket doit encore être null → sendRegisterPeer retourne false
-        val result = client.sendRegisterPeer("node1", "192.168.1.1", 8080, 0.9f, 1_000L, "test-cluster-id", 4096L)
+        val result = client.sendRegisterPeer("node1", "192.168.1.1", 8080, 0.9f, 1_000L, "test-cluster-id", 4096L, 0)
         assertFalse("sendRegisterPeer doit retourner false avant AUTH_OK", result)
 
         connectJob.cancel()
