@@ -111,6 +111,9 @@ class JoinIntegrationTest {
             dagger.Lazy<SendJoinRequestUseCase> { mockk(relaxed = true) },
             dagger.Lazy<MarkSelfAsSuperPairUseCase> { mockk(relaxed = true) },
             dagger.Lazy<BullySoloElectionUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MemberHeartbeatUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MonitorMemberLivenessUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MemberSnapshotCacheUseCase> { mockk(relaxed = true) },
             dispatcher
         )
 
@@ -168,7 +171,7 @@ class JoinIntegrationTest {
         val state = candidateFsm.currentState.value
         assertTrue("Bob doit être Member", state is NodeJoinState.Member)
         assertEquals("cluster-alice", (state as NodeJoinState.Member).clusterId)
-        assertTrue("Snapshot doit contenir Bob", aliceMemberRegistry.size >= 1)
+        assertTrue("Snapshot doit contenir Bob", aliceMemberRegistry.size() >= 1)
     }
 
     // ---- T=2 : Carol (800 m, découverte multicast) → JoinAccept ----
@@ -183,6 +186,9 @@ class JoinIntegrationTest {
             dagger.Lazy<SendJoinRequestUseCase> { mockk(relaxed = true) },
             dagger.Lazy<MarkSelfAsSuperPairUseCase> { mockk(relaxed = true) },
             dagger.Lazy<BullySoloElectionUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MemberHeartbeatUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MonitorMemberLivenessUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MemberSnapshotCacheUseCase> { mockk(relaxed = true) },
             dispatcher
         )
         val request = buildRequest(carolId, carolGps)
@@ -206,6 +212,9 @@ class JoinIntegrationTest {
             dagger.Lazy<SendJoinRequestUseCase> { mockk(relaxed = true) },
             dagger.Lazy<MarkSelfAsSuperPairUseCase> { mockk(relaxed = true) },
             dagger.Lazy<BullySoloElectionUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MemberHeartbeatUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MonitorMemberLivenessUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MemberSnapshotCacheUseCase> { mockk(relaxed = true) },
             dispatcher
         )
 
@@ -242,6 +251,9 @@ class JoinIntegrationTest {
             dagger.Lazy<SendJoinRequestUseCase> { mockk(relaxed = true) },
             dagger.Lazy<MarkSelfAsSuperPairUseCase> { mockk(relaxed = true) },
             dagger.Lazy<BullySoloElectionUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MemberHeartbeatUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MonitorMemberLivenessUseCase> { mockk(relaxed = true) },
+            dagger.Lazy<MemberSnapshotCacheUseCase> { mockk(relaxed = true) },
             dispatcher
         )
         val request = buildRequest(eveId, null)

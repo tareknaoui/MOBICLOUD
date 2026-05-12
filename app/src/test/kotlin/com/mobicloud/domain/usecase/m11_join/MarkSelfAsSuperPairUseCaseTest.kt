@@ -42,15 +42,18 @@ class MarkSelfAsSuperPairUseCaseTest {
 
         coEvery { securityRepository.getIdentity() } returns Result.success(identity)
 
+        val monLazy = dagger.Lazy<MonitorMemberLivenessUseCase> { mockk(relaxed = true) }
+        val snapLazy = dagger.Lazy<MemberSnapshotCacheUseCase> { mockk(relaxed = true) }
         useCase = MarkSelfAsSuperPairUseCase(
-            securityRepository, nodeSettingsRepository, peerRepository, memberRegistry, joinStateMachine
+            securityRepository, nodeSettingsRepository, peerRepository, memberRegistry,
+            joinStateMachine, monLazy, snapLazy
         )
     }
 
     @Test
     fun `invoke initialise memberRegistry avec self comme SUPER_PAIR`() = runTest {
         useCase.invoke("cluster-x")
-        assertEquals(1, memberRegistry.size)
+        assertEquals(1, memberRegistry.size())
         assertEquals(MemberRole.SUPER_PAIR, memberRegistry.list().first().role)
     }
 

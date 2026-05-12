@@ -9,6 +9,8 @@ import com.mobicloud.data.local.dao.CatalogDao
 import com.mobicloud.data.local.dao.DhtDao
 import com.mobicloud.data.local.dao.HostedBlockDao
 import com.mobicloud.data.local.dao.IdentityDao
+import com.mobicloud.data.local.dao.MemberDao
+import com.mobicloud.data.local.dao.MemberSnapshotDao
 import com.mobicloud.data.local.dao.NodeSettingsDao
 import com.mobicloud.data.local.dao.PeerDao
 import com.mobicloud.data.local.dao.TombstoneDao
@@ -16,6 +18,8 @@ import com.mobicloud.data.local.entity.CatalogEntryEntity
 import com.mobicloud.data.local.entity.DhtEntryEntity
 import com.mobicloud.data.local.entity.FragmentLocationEntity
 import com.mobicloud.data.local.entity.HostedBlockEntity
+import com.mobicloud.data.local.entity.MemberEntity
+import com.mobicloud.data.local.entity.MemberSnapshotEntity
 import com.mobicloud.data.local.entity.NodeIdentityEntity
 import com.mobicloud.data.local.entity.NodeSettingsEntity
 import com.mobicloud.data.local.entity.PeerNodeEntity
@@ -30,9 +34,11 @@ import com.mobicloud.data.local.entity.TombstoneEntryEntity
         DhtEntryEntity::class,
         TombstoneEntryEntity::class,
         HostedBlockEntity::class,
-        NodeSettingsEntity::class
+        NodeSettingsEntity::class,
+        MemberEntity::class,
+        MemberSnapshotEntity::class
     ],
-    version = 14,
+    version = 15,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -44,6 +50,8 @@ abstract class CatalogDatabase : RoomDatabase() {
     abstract fun tombstoneDao(): TombstoneDao
     abstract fun hostedBlockDao(): HostedBlockDao
     abstract fun nodeSettingsDao(): NodeSettingsDao
+    abstract fun memberDao(): MemberDao
+    abstract fun memberSnapshotDao(): MemberSnapshotDao
 
     companion object {
         // Story 1-3 — premier ajout de NodeIdentityEntity + PeerNodeEntity (sans is_super_pair).
@@ -188,6 +196,42 @@ abstract class CatalogDatabase : RoomDatabase() {
         val MIGRATION_13_14 = object : Migration(13, 14) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE peer_nodes ADD COLUMN free_storage_bytes INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        // Story 11.3 — table cluster_members (registre autoritaire côté SP) +
+        // table member_snapshot (conscience du cluster côté membre, survit au crash).
+        // Convention `snake_case` cohérente avec `peer_nodes`, `dht_entries`, etc.
+        // Index composite `(cluster_id, status, last_seen)` couvre listByClusterId,
+        // listActiveSnapshot et le scan MonitorMemberLiveness.
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS cluster_members (
+                        node_id TEXT NOT NULL PRIMARY KEY,
+                        cluster_id TEXT NOT NULL,
+                        public_key_bytes BLOB NOT NULL,
+                        ip_address TEXT NOT NULL,
+                        port INTEGER NOT NULL,
+                        gps_latitude REAL,
+                        gps_longitude REAL,
+                        free_bytes INTEGER NOT NULL,
+                        last_seen INTEGER NOT NULL,
+                        role TEXT NOT NULL,
+                        status TEXT NOT NULL DEFAULT 'ACTIVE'
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_cluster_members_active_scan ON cluster_members(cluster_id, status, last_seen)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS idx_cluster_members_status ON cluster_members(status)")
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS member_snapshot (
+                        cluster_id TEXT NOT NULL PRIMARY KEY,
+                        super_pair_node_id_hex TEXT NOT NULL,
+                        last_updated_ms INTEGER NOT NULL,
+                        members_json TEXT NOT NULL,
+                        schema_version INTEGER NOT NULL DEFAULT 1
+                    )
+                """.trimIndent())
             }
         }
     }

@@ -163,6 +163,6 @@ class ProcessJoinRequestUseCaseTest {
         every { locationRepository.currentLocation } returns MutableStateFlow(algerGps)
         val result = useCase.invoke(makeRequest(algerGps.latitude + 0.01, algerGps.longitude + 0.01))
         assertTrue(result is JoinResponse.JoinAccept)
-        assertEquals(1, memberRegistry.size)
+        assertEquals(1, memberRegistry.size())
     }
 }

@@ -35,14 +35,31 @@ import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
 import com.mobicloud.core.network.NetworkChangeObserver
 import com.mobicloud.domain.repository.LocalDiscoveryRepository
 import com.mobicloud.domain.repository.LocationRepository
+import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.data.p2p.join.JoinNetworkClientImpl
 import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
+import com.mobicloud.domain.models.m11_join.Heartbeat
+import com.mobicloud.domain.models.m11_join.JoinSubType
+import com.mobicloud.domain.models.m11_join.Leave
+import com.mobicloud.domain.models.m11_join.MemberUpdate
+import com.mobicloud.domain.models.m11_join.memberUpdateSignedBytes
+import com.mobicloud.domain.models.m11_join.toHexShort
+import com.mobicloud.domain.models.m11_join.hexToByteArray
+import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
 import com.mobicloud.domain.usecase.m11_join.JoinStateMachine
+import com.mobicloud.domain.usecase.m11_join.MemberHeartbeatUseCase
+import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
+import com.mobicloud.domain.usecase.m11_join.ProcessHeartbeatUseCase
 import com.mobicloud.domain.usecase.m11_join.ProcessJoinRequestUseCase
+import com.mobicloud.domain.usecase.m11_join.ProcessLeaveUseCase
+import com.mobicloud.domain.usecase.m11_join.SendLeaveUseCase
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.decodeFromByteArray
+import kotlinx.serialization.protobuf.ProtoBuf
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -50,8 +67,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
 @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
@@ -89,6 +108,12 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var joinNetworkClientImpl: JoinNetworkClientImpl
     @Inject lateinit var processJoinRequestUseCase: ProcessJoinRequestUseCase
     @Inject lateinit var relayWebSocketClient: RelayWebSocketClient
+    @Inject lateinit var processHeartbeatUseCase: ProcessHeartbeatUseCase
+    @Inject lateinit var processLeaveUseCase: ProcessLeaveUseCase
+    @Inject lateinit var sendLeaveUseCase: SendLeaveUseCase
+    @Inject lateinit var memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase
+    @Inject lateinit var memberHeartbeatUseCase: MemberHeartbeatUseCase
+    @Inject lateinit var memberDao: MemberDao
 
     // Accessible uniquement via abdicate() — @Volatile garantit la visibilité inter-thread
     @Volatile
@@ -134,6 +159,29 @@ class MobicloudP2PService : Service() {
         if (!loopsStarted) {
             loopsStarted = true
             locationRepository.start()
+            // Story 11.3 — purge des membres dont lastSeen > 24h (anti-fuite registres orphelins)
+            serviceScope.launch {
+                val now = System.currentTimeMillis()
+                @Suppress("DEPRECATION")
+                memberDao.purgeStale(
+                    activeCutoffMs = now - 24 * 3600_000L,    // 24h pour ACTIVE
+                    evictedCutoffMs = now - 1 * 3600_000L     // 1h pour EVICTED (spec AC2)
+                )
+            }
+            // Story 11.3 — chargement snapshot mémoire du cluster (survit au crash, no-op si vide)
+            serviceScope.launch {
+                val clusterId = nodeSettingsRepository.observeSettings().first()?.clusterId ?: ""
+                if (clusterId.isNotBlank()) {
+                    val loaded = memberSnapshotCacheUseCase.loadFromDisk(clusterId)
+                    if (loaded != null) {
+                        networkEventRepository.pushEvent(
+                            "[SNAPSHOT] Loaded ${loaded.size} membres depuis disque (clusterId=${clusterId.take(8)})"
+                        )
+                    } else {
+                        Log.i(LOGTAG, "[SNAPSHOT] aucun snapshot pour clusterId=${clusterId.take(8)} — fresh boot")
+                    }
+                }
+            }
             startP2PNetworkLoops()
         }
 
@@ -168,16 +216,82 @@ class MobicloudP2PService : Service() {
             launch {
                 relayWebSocketClient.joinIncomingFlow.collect { msg ->
                     joinNetworkClientImpl.onRelayMessage(msg)
-                    if (msg.subTypeByte == com.mobicloud.domain.models.m11_join.JoinSubType.JOIN_REQUEST.byte) {
-                        runCatching {
-                            val request = kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(
-                                com.mobicloud.domain.models.m11_join.JoinRequest.serializer(),
-                                msg.payload
-                            )
-                            val response = processJoinRequestUseCase(request)
-                            joinNetworkClientImpl.sendJoinResponse(msg.fromNodeId, response)
-                                .onFailure { Log.w(LOGTAG, "[JOIN-SP] sendJoinResponse échoué", it) }
-                        }.onFailure { Log.w(LOGTAG, "[JOIN-SP] JOIN_REQUEST decode/process échoué", it) }
+                    when (msg.subTypeByte) {
+                        JoinSubType.JOIN_REQUEST.byte -> {
+                            runCatching {
+                                val request = ProtoBuf.decodeFromByteArray(
+                                    com.mobicloud.domain.models.m11_join.JoinRequest.serializer(),
+                                    msg.payload
+                                )
+                                val response = processJoinRequestUseCase(request)
+                                joinNetworkClientImpl.sendJoinResponse(msg.fromNodeId, response)
+                                    .onFailure { Log.w(LOGTAG, "[JOIN-SP] sendJoinResponse échoué", it) }
+                            }.onFailure { Log.w(LOGTAG, "[JOIN-SP] JOIN_REQUEST decode/process échoué", it) }
+                        }
+                        JoinSubType.HEARTBEAT.byte -> {
+                            runCatching {
+                                val hb = ProtoBuf.decodeFromByteArray<Heartbeat>(msg.payload)
+                                processHeartbeatUseCase(hb)
+                                    .onFailure { Log.w(LOGTAG, "[HB-SP] traitement heartbeat échoué", it) }
+                            }.onFailure { Log.w(LOGTAG, "[HB-SP] decode heartbeat échoué", it) }
+                        }
+                        JoinSubType.MEMBER_UPDATE.byte -> {
+                            runCatching {
+                                val update = ProtoBuf.decodeFromByteArray<MemberUpdate>(msg.payload)
+                                // AC14 : ne valide que si fromNodeId correspond EXACTEMENT à un membre
+                                // SUPER_PAIR connu. Sans ce cross-check, un ancien SP encore listé
+                                // dans inMemory peut signer un MEMBER_UPDATE accepté (bypass défense).
+                                val fromHex = msg.fromNodeId.lowercase()
+                                val spPublicKey = memberSnapshotCacheUseCase.inMemory.value
+                                    .firstOrNull {
+                                        it.role == com.mobicloud.domain.models.m11_join.MemberRole.SUPER_PAIR
+                                            && it.nodeId.toHexString().lowercase() == fromHex
+                                    }
+                                    ?.publicKey
+                                if (spPublicKey == null) {
+                                    networkEventRepository.pushEvent(
+                                        "[MEMBER-UPDATE-RX] fromNodeId=${fromHex.take(8)} pas SP courant — ignoré"
+                                    )
+                                    return@runCatching
+                                }
+                                val memberOrNodeIdHex = update.member?.nodeId?.toHexString()
+                                    ?: update.leftNodeId?.toHexString() ?: return@runCatching
+                                val senderNodeIdBytes = fromHex.hexToByteArray()
+                                val signedBytes = memberUpdateSignedBytes(
+                                    senderNodeId = senderNodeIdBytes,
+                                    event = update.event,
+                                    memberOrNodeIdHex = memberOrNodeIdHex,
+                                    ts = update.timestampMs
+                                )
+                                val valid = securityRepository.verifySignature(signedBytes, update.signatureBytes, spPublicKey)
+                                    .getOrDefault(false)
+                                if (!valid) {
+                                    networkEventRepository.pushEvent(
+                                        "[MEMBER-UPDATE-RX] Signature invalide — ignoré"
+                                    )
+                                    return@runCatching
+                                }
+                                val now = System.currentTimeMillis()
+                                // Cf. ProcessHeartbeatUseCase : éviter abs() overflow Long.MIN_VALUE.
+                                val window = com.mobicloud.domain.models.BULLY_TIMESTAMP_WINDOW_MS
+                                if (update.timestampMs < now - window || update.timestampMs > now + window) {
+                                    networkEventRepository.pushEvent("[MEMBER-UPDATE-RX] Timestamp stale — ignoré")
+                                    return@runCatching
+                                }
+                                networkEventRepository.pushEvent(
+                                    "[MEMBER-UPDATE-RX] ${update.event} ${memberOrNodeIdHex.take(8)} reçu du SP ${msg.fromNodeId.take(8)}"
+                                )
+                                memberSnapshotCacheUseCase.applyUpdate(update)
+                                memberHeartbeatUseCase.markSpSeen()
+                            }.onFailure { Log.w(LOGTAG, "[MEMBER-UPDATE-RX] decode/process échoué", it) }
+                        }
+                        JoinSubType.LEAVE.byte -> {
+                            runCatching {
+                                val leave = ProtoBuf.decodeFromByteArray<Leave>(msg.payload)
+                                processLeaveUseCase(leave)
+                                    .onFailure { Log.w(LOGTAG, "[LEAVE-SP] traitement leave échoué", it) }
+                            }.onFailure { Log.w(LOGTAG, "[LEAVE-SP] decode leave échoué", it) }
+                        }
                     }
                 }
             }
@@ -452,6 +566,19 @@ class MobicloudP2PService : Service() {
 
     override fun onDestroy() {
         loopsStarted = false
+        // H25 : envoyer LEAVE gracieusement avant de tuer le scope.
+        // runBlocking + withContext(NonCancellable) garantit que le LEAVE part avant
+        // que serviceScope.cancel() ne le coupe à mi-route. SendLeaveUseCase est no-op
+        // si l'état FSM n'est pas Member, donc safe à appeler systématiquement.
+        runCatching {
+            kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    kotlinx.coroutines.withTimeoutOrNull(1500L) {
+                        sendLeaveUseCase.invoke()
+                    }
+                }
+            }
+        }
         locationRepository.stop()
         localDiscoveryRepository.stop()
         networkChangeObserver.unregister()

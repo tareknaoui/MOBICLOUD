@@ -40,7 +40,13 @@ class JoinStateMachineTest {
         val sendLazy = dagger.Lazy<SendJoinRequestUseCase> { mockk(relaxed = true) }
         val markLazy = dagger.Lazy<MarkSelfAsSuperPairUseCase> { mockk(relaxed = true) }
         val bullyLazy = dagger.Lazy<BullySoloElectionUseCase> { mockk(relaxed = true) }
-        fsm = JoinStateMachine(networkEventRepository, sendLazy, markLazy, bullyLazy, dispatcher)
+        val hbLazy = dagger.Lazy<MemberHeartbeatUseCase> { mockk(relaxed = true) }
+        val monLazy = dagger.Lazy<MonitorMemberLivenessUseCase> { mockk(relaxed = true) }
+        val snapLazy = dagger.Lazy<MemberSnapshotCacheUseCase> { mockk(relaxed = true) }
+        fsm = JoinStateMachine(
+            networkEventRepository, sendLazy, markLazy, bullyLazy,
+            hbLazy, monLazy, snapLazy, dispatcher
+        )
     }
 
     // ---- Ligne 1 : Undiscovered + CoordinatorReceived → Joining ----

@@ -25,3 +25,7 @@ const val JOIN_REQUEST_TIMEOUT_MS = 5_000L
 // qu'une coupure 4G passagère (reconnexion ≤ 10 s) ne déclenche pas une Bully solo
 // et un nouveau cluster orphelin. Inférieur à SP_TIMEOUT_MS (90 s) pour converger vite.
 const val ISOLATION_BACKOFF_MS = 20_000L
+
+// 15s = 1/6 de SP_TIMEOUT_MS — granularité d'éviction acceptable (max 105s détection mort réelle),
+// et 4× moins de scans que toutes les 5s.
+const val LIVENESS_CHECK_INTERVAL_MS = 15_000L

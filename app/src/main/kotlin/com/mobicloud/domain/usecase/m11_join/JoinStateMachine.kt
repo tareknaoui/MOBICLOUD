@@ -4,6 +4,7 @@ import com.mobicloud.domain.models.m11_join.ISOLATION_BACKOFF_MS
 import com.mobicloud.domain.models.m11_join.JoinEvent
 import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.models.m11_join.RejoinReason
+import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.repository.NetworkEventRepository
 import dagger.Lazy
 import kotlinx.coroutines.CoroutineDispatcher
@@ -37,6 +38,9 @@ class JoinStateMachine @Inject constructor(
     private val sendJoinRequestUseCaseLazy: Lazy<SendJoinRequestUseCase>,
     private val markSelfAsSuperPairUseCaseLazy: Lazy<MarkSelfAsSuperPairUseCase>,
     private val bullySoloElectionUseCaseLazy: Lazy<BullySoloElectionUseCase>,
+    private val memberHeartbeatUseCaseLazy: Lazy<MemberHeartbeatUseCase>,
+    private val monitorMemberLivenessUseCaseLazy: Lazy<MonitorMemberLivenessUseCase>,
+    private val memberSnapshotCacheUseCaseLazy: Lazy<MemberSnapshotCacheUseCase>,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     private val _currentState = MutableStateFlow<NodeJoinState>(NodeJoinState.Undiscovered)
@@ -77,7 +81,11 @@ class JoinStateMachine @Inject constructor(
                 val accept = event.accept
                 _currentState.value = NodeJoinState.Member(accept.clusterId, accept.superPairNodeId)
                 logStateChange(state, _currentState.value, event)
-                // TODO Story 11.3 : démarrer MemberHeartbeatUseCase
+                scope.launch {
+                    memberSnapshotCacheUseCaseLazy.get()
+                        .seedFromJoinAccept(accept.clusterId, accept.superPairNodeId, accept.memberSnapshot)
+                    memberHeartbeatUseCaseLazy.get().start(accept.superPairNodeId)
+                }
             }
 
             // Joining + JoinRedirectReceived → Joining (next) ou Isolated
@@ -130,6 +138,8 @@ class JoinStateMachine @Inject constructor(
                 val newState = NodeJoinState.SuperPair(event.clusterId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
+                // Défensif : si un heartbeatJob traîne (ne devrait pas en Isolated), le couper.
+                memberHeartbeatUseCaseLazy.get().stop()
             }
 
             // Member + SpTimeoutDetected → Rejoining(SP_TIMEOUT)
@@ -148,11 +158,12 @@ class JoinStateMachine @Inject constructor(
                 val newState = NodeJoinState.SuperPair(event.clusterId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
+                // checkSpTimeout l'a normalement déjà stoppé, mais idempotent par sécurité.
+                memberHeartbeatUseCaseLazy.get().stop()
             }
 
             // Rejoining + BullyLost → Member (nouveau SP)
             state is NodeJoinState.Rejoining && event is JoinEvent.BullyLost -> {
-                // On reste Member avec le nouveau SP ; clusterId inchangé (SP du même cluster)
                 val memberId = event.newSuperPairNodeId
                 val clusterId = when (val cur = _currentState.value) {
                     is NodeJoinState.Member -> cur.clusterId
@@ -161,11 +172,13 @@ class JoinStateMachine @Inject constructor(
                 val newState = NodeJoinState.Member(clusterId, memberId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
-                // TODO Story 11.3 : reprendre heartbeats vers nouveau SP
+                memberHeartbeatUseCaseLazy.get().stop()
+                memberHeartbeatUseCaseLazy.get().start(memberId)
             }
 
             // SuperPair → Undiscovered (abdication volontaire Story 3.3)
             state is NodeJoinState.SuperPair && event is JoinEvent.AbdicationTriggered -> {
+                monitorMemberLivenessUseCaseLazy.get().stop()
                 _currentState.value = NodeJoinState.Undiscovered
                 logStateChange(state, NodeJoinState.Undiscovered, event)
             }
@@ -182,6 +195,27 @@ class JoinStateMachine @Inject constructor(
                 val newState = NodeJoinState.SuperPair(event.clusterId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
+                // CRITIQUE : sans stop(), le nouveau SP continue d'envoyer des HB à lui-même
+                // (ancien spNodeId capturé dans la coroutine sendOnce). Coroutine leak.
+                memberHeartbeatUseCaseLazy.get().stop()
+            }
+
+            // Member + CoordinatorReceived (même clusterId, nouveau SP) → swap SP sans re-JOIN (FR-11.8)
+            // Patch AC12 : branche manquante Story 11.2. COORDINATOR du nouveau SP post-Bully.
+            state is NodeJoinState.Member && event is JoinEvent.CoordinatorReceived
+                && event.clusterId == state.clusterId
+                && !event.senderNodeId.contentEquals(state.superPairNodeId) -> {
+                val oldSpHex = state.superPairNodeId.toHexString().take(8)
+                val newSpHex = event.senderNodeId.toHexString().take(8)
+                val newState = NodeJoinState.Member(state.clusterId, event.senderNodeId)
+                _currentState.value = newState
+                logStateChange(state, newState, event)
+                memberHeartbeatUseCaseLazy.get().stop()
+                memberHeartbeatUseCaseLazy.get().start(event.senderNodeId)
+                memberHeartbeatUseCaseLazy.get().markSpSeen()
+                networkEventRepository.pushEvent(
+                    "[JOIN-FSM] SP changé sans re-JOIN: $oldSpHex → $newSpHex (continuité Bully post-mort)"
+                )
             }
 
             else -> {

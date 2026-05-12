@@ -99,15 +99,15 @@ class ProcessJoinRequestUseCase @Inject constructor(
             val distMeters = Haversine.distanceMeters(selfGps, reqGps)
             if (distMeters > MAX_RADIUS_METERS) {
                 val alts = getAlternativeSuperPeers(reqGps, selfNodeIdBytes)
-                networkEventRepository.pushEvent("[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: OUT_OF_RADIUS (dist=${distMeters.toLong()}m, cluster=${memberRegistry.size}/$MAX_CLUSTER_SIZE)")
+                networkEventRepository.pushEvent("[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: OUT_OF_RADIUS (dist=${distMeters.toLong()}m, cluster=${memberRegistry.size()}/$MAX_CLUSTER_SIZE)")
                 return signedRedirect(JoinRedirectReason.OUT_OF_RADIUS, distMeters, alts, selfNodeIdBytes)
             }
         }
 
         // Branche 4 : Filtre capacité
-        if (memberRegistry.size >= MAX_CLUSTER_SIZE) {
+        if (memberRegistry.size() >= MAX_CLUSTER_SIZE) {
             val alts = getAlternativeSuperPeers(reqGps, selfNodeIdBytes)
-            networkEventRepository.pushEvent("[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: CLUSTER_FULL (cluster=${memberRegistry.size}/$MAX_CLUSTER_SIZE)")
+            networkEventRepository.pushEvent("[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: CLUSTER_FULL (cluster=${memberRegistry.size()}/$MAX_CLUSTER_SIZE)")
             return signedRedirect(JoinRedirectReason.CLUSTER_FULL, null, alts, selfNodeIdBytes)
         }
 
@@ -133,7 +133,7 @@ class ProcessJoinRequestUseCase @Inject constructor(
         // signData failure : on rollback l'ajout au registre et on rejette plutôt que d'émettre
         // une signature vide silencieuse qui serait rejetée côté candidat sans contexte.
         val acceptSignature = securityRepository.signData(acceptSignedBytes).getOrElse { err ->
-            memberRegistry.remove(newMember.nodeId)
+            memberRegistry.remove(newMember.nodeId, clusterId)
             networkEventRepository.pushEvent(
                 "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: SIGN_FAILED (${err.message})"
             )
