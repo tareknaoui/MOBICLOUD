@@ -150,7 +150,7 @@ function handleRegisterPeer(nodeId, payload) {
   try { entry = JSON.parse(payload.toString('utf8')); } catch { return false; }
 
   const { ip, port, reliabilityScore, electedAt, clusterId, freeBytes, currentMemberCount } = entry;
-  if (!ip || typeof port !== 'number' || port < 1 || port > 65535) return false;
+  if (!ip || typeof port !== 'number' || port < 0 || port > 65535) return false;
 
   // Valider le format IP (pas de hostname, pas de loopback non contrôlé)
   if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) return false;
