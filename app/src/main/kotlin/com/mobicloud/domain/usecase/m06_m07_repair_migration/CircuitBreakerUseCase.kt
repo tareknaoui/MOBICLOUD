@@ -39,11 +39,17 @@ class CircuitBreakerUseCase @Inject constructor(
     companion object {
         // P1 — Taille minimale du cluster pour éviter les faux positifs sur micro-clusters
         internal const val MIN_CLUSTER_SIZE = 3
-        private const val CHURN_WINDOW_MS = 5 * 60 * 1000L
-        private const val REEVALUATION_DELAY_MS = 2 * 60 * 1000L
+        private const val CHURN_WINDOW_MS = 2 * 60 * 1000L
+        private const val REEVALUATION_DELAY_MS = 30_000L
         private const val CHURN_OPEN_THRESHOLD = 0.3
         private const val CHURN_CLOSE_THRESHOLD = 0.1
+        // Startup grace: Room persists is_active=1 across sessions; stale peers are evicted
+        // within ~1s of service start, which would immediately trigger churn > 30% on a 3-node
+        // cluster. Ignore churn for the first 30s so only real instability opens the circuit.
+        internal const val STARTUP_GRACE_MS = 30_000L
     }
+
+    private val startupTimeMs: Long = System.currentTimeMillis()
 
     init {
         applicationScope.launch {
@@ -58,12 +64,22 @@ class CircuitBreakerUseCase @Inject constructor(
         var shouldActivate = false
 
         mutex.withLock {
+            // Startup grace: skip churn detection while stale Room entries are being evicted.
+            if (currentTime - startupTimeMs < STARTUP_GRACE_MS) {
+                previousPeersList = currentPeers
+                return@withLock
+            }
+
             // Détecter les pairs qui viennent de passer INACTIVE
             val previousActive = previousPeersList
                 .filter { it.isActive }
                 .associateBy { it.identity.nodeId }
-            val newlyInactiveCount = currentPeers.count { peer ->
+            val newlyInactive = currentPeers.filter { peer ->
                 !peer.isActive && previousActive[peer.identity.nodeId] != null
+            }
+            val newlyInactiveCount = newlyInactive.size
+            if (newlyInactiveCount > 0) {
+                android.util.Log.w("CircuitBreaker", "[CHURN] $newlyInactiveCount peer(s) → INACTIVE: ${newlyInactive.map { it.identity.nodeId.take(8) }}")
             }
 
             repeat(newlyInactiveCount) { churnHistory.add(currentTime) }

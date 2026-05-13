@@ -133,7 +133,7 @@ class MobicloudP2PService : Service() {
     companion object {
         const val CHANNEL_ID = "mobicloud_p2p_channel"
         const val NOTIFICATION_ID = 404
-        private const val PEER_TIMEOUT_MS = 15000L
+        private const val PEER_TIMEOUT_MS = 60_000L
         private const val EVICTION_CHECK_INTERVAL_MS = 1000L
         private const val RELIABILITY_SCORE_INTERVAL_MS = 30_000L
         private const val LOGTAG = "MobicloudP2PService"

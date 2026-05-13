@@ -56,9 +56,18 @@ class RegisterSuperPeerUseCase @Inject constructor(
         }
 
         try {
-            // Enregistrement initial
-            signalingRepository.registerAsSuperPeer(ip, tcpPort, reliabilityScore, electedAt, identity.nodeId)
-                .getOrThrow()
+            // Enregistrement initial avec retry — si le WS relay est en cours de reconnexion
+            // au moment de la victoire Bully, on retente toutes les 5s jusqu'au succès.
+            // Avant ce fix, .getOrThrow() échouait silencieusement → la boucle keepalive
+            // ne démarrait jamais → TTL 60s expirait → registeredSuperPeers = 0 → élections
+            // en boucle sur les autres nœuds même si ce nœud est bien Super-Pair.
+            while (currentCoroutineContext().isActive) {
+                val reg = signalingRepository.registerAsSuperPeer(ip, tcpPort, reliabilityScore, electedAt, identity.nodeId)
+                if (reg.isSuccess) break
+                Log.w(TAG, "Initial REGISTER_PEER échoué (relay WS?), retry dans 5s: ${reg.exceptionOrNull()?.message}")
+                networkEventRepository.pushEvent("[ELECTION] REGISTER_PEER échoué — retry dans 5s (relay WS?)")
+                delay(5_000L)
+            }
 
             // Log dans RadarLogConsole
             networkEventRepository.pushEvent(
