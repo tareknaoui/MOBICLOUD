@@ -1,5 +1,6 @@
 package com.mobicloud.presentation.network.components
 
+import android.os.SystemClock
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -231,7 +232,7 @@ private fun StatusBadge(status: ClusterNodeStatus) {
 @Composable
 private fun NodeDetailSheet(node: ClusterNodeInfo) {
     val clipboardManager = LocalClipboardManager.current
-    val now = System.currentTimeMillis()
+    val now = SystemClock.elapsedRealtime()
     val sinceMs = now - node.lastSeenMs
     val lastSeenLabel = if (sinceMs < 60_000L) "il y a ${sinceMs / 1000} s"
     else "il y a ${sinceMs / 60_000} min"

@@ -10,6 +10,7 @@ import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.repository.DiagnosticsRepository
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.PeerRepository
+import android.os.SystemClock
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -34,7 +35,7 @@ class NetworkViewModel @Inject constructor(
         localNodeIdFlow,
         diagnosticsRepository.diagnostics
     ) { peers, localNodeId, diagnostics ->
-        val now = System.currentTimeMillis()
+        val now = SystemClock.elapsedRealtime()
 
         // Un super-pair est "local" s'il est sur le LAN, s'il est ce device,
         // ou s'il est le seul SP visible (découvert via RELAY_HA après victoire Bully).
@@ -45,13 +46,16 @@ class NetworkViewModel @Inject constructor(
             )
         } ?: peers.singleOrNull { it.isSuperPair }
 
+        // On ignore les peers trop anciens (> 2 min) : orphelins d'anciennes sessions stockés en DB.
+        val freshPeers = peers.filter { peer -> (now - peer.lastSeenTimestampMs) <= 120_000L }
+
         // Cluster local = membres non-super-pair + le super-pair local
-        val localPeers = peers.filter { peer ->
+        val localPeers = freshPeers.filter { peer ->
             !peer.isSuperPair || peer == localSuperPeer
         }
 
         // Clusters distants = super-pairs qui ne sont PAS le super-pair local
-        val remotePeers = peers.filter { peer ->
+        val remotePeers = freshPeers.filter { peer ->
             peer.isSuperPair && peer != localSuperPeer
         }
 
@@ -93,7 +97,7 @@ class NetworkViewModel @Inject constructor(
         val isLocal = identity.nodeId == localNodeId
         val sinceMs = now - lastSeenTimestampMs
         val status = when {
-            sinceMs > 15_000L -> ClusterNodeStatus.OFFLINE
+            sinceMs > 45_000L -> ClusterNodeStatus.OFFLINE
             identity.reliabilityScore < 0.4f -> ClusterNodeStatus.DEGRADED
             else -> ClusterNodeStatus.ACTIF
         }

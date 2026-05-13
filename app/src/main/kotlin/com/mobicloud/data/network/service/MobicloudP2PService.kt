@@ -126,6 +126,10 @@ class MobicloudP2PService : Service() {
     @Volatile
     private var superPeerJob: Job? = null
 
+    // Stocké à la victoire Bully pour le re-register immédiat après reconnexion relay.
+    @Volatile
+    private var lastElectedAt: Long = 0L
+
     companion object {
         const val CHANNEL_ID = "mobicloud_p2p_channel"
         const val NOTIFICATION_ID = 404
@@ -315,9 +319,22 @@ class MobicloudP2PService : Service() {
                         .onFailure { Log.w(LOGTAG, "fetchActiveSuperPeers échoué", it) }
                 }
 
-                // Hook : sur reconnexion WebSocket, refait JOIN + GET_PEERS immédiatement
+                // Hook : sur reconnexion WebSocket, refait JOIN + GET_PEERS immédiatement.
+                // Si ce nœud est SP actif, renvoie aussi REGISTER_PEER sans attendre le keepalive 10s.
                 (signalingRepository as? com.mobicloud.data.repository.SignalingRepositoryImpl)
-                    ?.onConnectedHook = { joinAndFetch() }
+                    ?.onConnectedHook = {
+                        joinAndFetch()
+                        val electedAt = lastElectedAt
+                        if (superPeerJob?.isActive == true && electedAt > 0L) {
+                            signalingRepository.registerAsSuperPeer(
+                                ip = wifiNetworkRepository.getLocalIpAddress() ?: "0.0.0.0",
+                                port = tcpPort,
+                                reliabilityScore = identity.reliabilityScore,
+                                electedAt = electedAt,
+                                nodeId = identity.nodeId
+                            ).onFailure { Log.w(LOGTAG, "[RECONNECT] re-register SP échoué : ${it.message}") }
+                        }
+                    }
 
                 while (isActive) {
                     joinAndFetch()
@@ -503,6 +520,7 @@ class MobicloudP2PService : Service() {
                         result
                             .onSuccess { election ->
                                 Log.i(LOGTAG, "Élection remportée — démarrage keepalive Super-Pair Relais HA")
+                                lastElectedAt = election.electedAt
                                 localDiscoveryRepository.updateSuperPairStatus(true)
                                 superPeerJob?.cancel()
                                 superPeerJob = launch {

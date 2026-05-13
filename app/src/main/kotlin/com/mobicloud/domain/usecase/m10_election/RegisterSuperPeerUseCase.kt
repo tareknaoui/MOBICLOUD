@@ -17,7 +17,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 private const val TAG = "RegisterSuperPeerUC"
-private const val KEEPALIVE_INTERVAL_MS = 30_000L
+private const val KEEPALIVE_INTERVAL_MS = 10_000L
 
 class RegisterSuperPeerUseCase @Inject constructor(
     private val signalingRepository: SignalingRepository,
