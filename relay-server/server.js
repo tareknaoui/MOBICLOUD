@@ -150,10 +150,17 @@ function handleRegisterPeer(nodeId, payload) {
   try { entry = JSON.parse(payload.toString('utf8')); } catch { return false; }
 
   const { ip, port, reliabilityScore, electedAt, clusterId, freeBytes, currentMemberCount } = entry;
-  if (!ip || typeof port !== 'number' || port < 0 || port > 65535) return false;
+  console.log(`[REGISTER-DBG] nodeId=${nodeId.slice(0,8)} ip=${ip} port=${port} typeof_port=${typeof port}`);
+  if (!ip || typeof port !== 'number' || port < 0 || port > 65535) {
+    console.warn(`[REGISTER_PEER] rejeté: ip=${ip} port=${port} typeof_port=${typeof port}`);
+    return false;
+  }
 
   // Valider le format IP (pas de hostname, pas de loopback non contrôlé)
-  if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) return false;
+  if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) {
+    console.warn(`[REGISTER_PEER] rejeté: IP_RE invalide — ip=${ip}`);
+    return false;
+  }
 
   // clusterId optionnel : UUID v4 strict ou "" pour nœuds legacy.
   // Story 9.1 review (option b) : valider format UUID v4 ; coerce en "" + warn si invalide.
@@ -231,16 +238,26 @@ function handleRegisterPeer(nodeId, payload) {
 // ip/port sont optionnels — peuvent être omis pour les nœuds non joignables directement.
 function handleJoin(nodeId, payload) {
   let entry;
-  try { entry = JSON.parse(payload.toString('utf8')); } catch { return false; }
+  try { entry = JSON.parse(payload.toString('utf8')); } catch (e) {
+    console.warn(`[JOIN] JSON parse failed for nodeId=${nodeId.slice(0,8)}: ${e.message}`);
+    return false;
+  }
 
   const { ip, port, reliabilityScore } = entry;
+  console.log(`[JOIN-DBG] nodeId=${nodeId.slice(0,8)} ip=${ip} port=${port} typeof_port=${typeof port}`);
 
   // ip/port optionnels — si présents, doivent être valides
   if (ip !== undefined && ip !== null) {
-    if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) return false;
+    if (typeof ip !== 'string' || !IP_RE.test(ip) || ip.length > 45) {
+      console.warn(`[JOIN] rejeté: ip invalide — ip=${ip}`);
+      return false;
+    }
   }
   if (port !== undefined && port !== null) {
-    if (typeof port !== 'number' || port < 0 || port > 65535) return false;
+    if (typeof port !== 'number' || port < 0 || port > 65535) {
+      console.warn(`[JOIN] rejeté: port invalide — port=${port} typeof=${typeof port}`);
+      return false;
+    }
   }
 
   if (!signalingRegistry.has(nodeId) && signalingRegistry.size >= MAX_SIGNALING_PEERS) return false;
