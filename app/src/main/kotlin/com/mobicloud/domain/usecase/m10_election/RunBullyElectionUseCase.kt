@@ -82,7 +82,11 @@ class RunBullyElectionUseCase @Inject constructor(
         val localScore = trustScoreProvider.getTrustScore(localIdentity.nodeId).toFloat()
 
         // Story 12.1 : clusterId attribué par JOIN_ACCEPT ou BullySolo — plus dérivé du SSID.
+        // Si vide (première élection, jamais rejoint de cluster), génère un UUID pour créer
+        // un nouveau cluster. Sans ça, MarkSelfAsSuperPairUseCase retourne prématurément
+        // et la FSM reste en Undiscovered → résolution de conflit SP impossible.
         val localClusterId = nodeSettingsRepository.getClusterIdOnce()
+            .ifBlank { java.util.UUID.randomUUID().toString() }
 
         val electionPayload = createPayload(localIdentity, localScore, ElectionMessageType.ELECTION)
             .getOrElse { error ->
