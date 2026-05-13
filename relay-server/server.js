@@ -32,7 +32,8 @@ const MSG = {
 };
 
 // Story 12.1 — MIRROR: app/.../ClusterConstants.kt#MAX_CLUSTER_SIZE
-const MAX_CLUSTER_SIZE_SERVER = 50;
+// TEST ONLY — réduit à 2 pour tester la création de cluster par un 3ème nœud.
+const MAX_CLUSTER_SIZE_SERVER = 2;
 
 const TTL_MS = 60_000;               // TTL registre signaling + buffer relay
 const AUTH_WINDOW_MS = 30_000;       // fenêtre anti-replay auth
