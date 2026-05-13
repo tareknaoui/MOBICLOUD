@@ -2,7 +2,7 @@
 title: 'Relay Election Network Client — Bully via relay'
 type: 'feature'
 created: '2026-05-13'
-status: 'in-review'
+status: 'done'
 baseline_commit: '5bda519c7e299a140829fbeac5f470e8dff3702a'
 context: []
 ---
