@@ -372,8 +372,16 @@ class MobicloudP2PService : Service() {
                         val hint = peer.toSuperPeerHint()
                         when (val fsmState = joinStateMachine.currentState.value) {
                             is NodeJoinState.Undiscovered, is NodeJoinState.Isolated -> {
-                                joinStateMachine.transition(JoinEvent.NewCandidateDetected(hint))
-                                Log.i(LOGTAG, "[JOIN] NewCandidateDetected → SP ${peer.nodeId.take(8)} (state=${fsmState::class.simpleName})")
+                                // En Isolated : ignorer les SPs pleins pour laisser le timer d'isolation
+                                // expirer → BullySolo. Sans ça, GET_PEERS toutes les 10s remet le timer
+                                // à zéro et BullySolo ne démarre jamais.
+                                if (fsmState is NodeJoinState.Isolated &&
+                                    hint.currentMemberCount >= com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE) {
+                                    Log.i(LOGTAG, "[JOIN] SP ${peer.nodeId.take(8)} plein (${hint.currentMemberCount}/${ com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE}) — Isolated timer préservé")
+                                } else {
+                                    joinStateMachine.transition(JoinEvent.NewCandidateDetected(hint))
+                                    Log.i(LOGTAG, "[JOIN] NewCandidateDetected → SP ${peer.nodeId.take(8)} (state=${fsmState::class.simpleName})")
+                                }
                                 // Ne PAS ajouter à seenSuperPairIds ici : si ce nœud gagne ensuite
                                 // Bully et passe en SuperPair, le prochain GET_PEERS doit re-évaluer
                                 // ce SP pour la résolution de conflit.
