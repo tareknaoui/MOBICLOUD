@@ -370,6 +370,9 @@ class MobicloudP2PService : Service() {
 
             // Après abdication, la FSM passe en Undiscovered — scanner immédiatement
             // les SPs connus dans latestPeers pour ne pas attendre le prochain GET_PEERS.
+            // En entrant en SuperPair : vérifier immédiatement si un autre SP de nodeId
+            // supérieur est déjà connu (cas race Bully où seenSuperPairIds l'avait déjà vu
+            // pendant l'état Undiscovered et l'avait écarté du filtre de conflit).
             launch {
                 joinStateMachine.currentState.collect { state ->
                     if (state is NodeJoinState.Undiscovered) {
@@ -378,6 +381,16 @@ class MobicloudP2PService : Service() {
                         availableSPs.firstOrNull()?.let { sp ->
                             Log.i(LOGTAG, "[JOIN] Post-abdication → NewCandidateDetected ${sp.nodeId.take(8)}")
                             joinStateMachine.transition(JoinEvent.NewCandidateDetected(sp.toSuperPeerHint()))
+                        }
+                    } else if (state is NodeJoinState.SuperPair) {
+                        delay(1_000L) // laisser latestPeers se mettre à jour via GET_PEERS
+                        val rival = signalingRepository.latestPeers.value
+                            .filter { it.isSuperPair && it.nodeId > identity.nodeId }
+                            .firstOrNull()
+                        if (rival != null) {
+                            Log.i(LOGTAG, "[JOIN] SP conflict (on SuperPair entry): yield to ${rival.nodeId.take(8)}")
+                            abdicate()
+                            launch { abdicateSuperPeerUseCase() }
                         }
                     }
                 }
