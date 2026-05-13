@@ -35,10 +35,9 @@ class ProcessJoinRequestUseCase @Inject constructor(
         // Branche 0 : garde d'état — seul un Super-Pair traite les JOIN_REQUEST.
         val currentState = joinStateMachine.currentState.value
         if (currentState !is NodeJoinState.SuperPair) {
-            networkEventRepository.pushEvent(
-                "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: " +
-                    "INVALID_STATE (state=${currentState::class.simpleName})"
-            )
+            val msg = "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: INVALID_STATE (state=${currentState::class.simpleName})"
+            networkEventRepository.pushEvent(msg)
+            android.util.Log.d("JOIN_DEBUG", msg)
             val alts = getAlternativeSuperPeers(selfNodeIdBytes)
             return signedRedirect(JoinRedirectReason.INVALID_STATE, alts, selfNodeIdBytes)
         }
@@ -58,16 +57,18 @@ class ProcessJoinRequestUseCase @Inject constructor(
         ).getOrElse { false }
 
         if (!sigValid) {
-            networkEventRepository.pushEvent("[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: INVALID_SIGNATURE")
+            val msg = "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: INVALID_SIGNATURE"
+            networkEventRepository.pushEvent(msg)
+            android.util.Log.d("JOIN_DEBUG", msg)
             return signedRedirect(JoinRedirectReason.INVALID_SIGNATURE, emptyList(), selfNodeIdBytes)
         }
 
         // Branche 2 : Fenêtre anti-replay (±30 s)
         val skewMs = abs(now - request.timestampMs)
         if (skewMs > BULLY_TIMESTAMP_WINDOW_MS) {
-            networkEventRepository.pushEvent(
-                "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: REPLAY (skewMs=$skewMs)"
-            )
+            val msg = "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: REPLAY (skewMs=$skewMs)"
+            networkEventRepository.pushEvent(msg)
+            android.util.Log.d("JOIN_DEBUG", msg)
             return signedRedirect(JoinRedirectReason.INVALID_SIGNATURE, emptyList(), selfNodeIdBytes)
         }
 
@@ -85,9 +86,9 @@ class ProcessJoinRequestUseCase @Inject constructor(
         val admitted = memberRegistry.addIfBelowCapacity(newMember, MAX_CLUSTER_SIZE)
         if (!admitted) {
             val alts = getAlternativeSuperPeers(selfNodeIdBytes)
-            networkEventRepository.pushEvent(
-                "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: CLUSTER_FULL (${memberRegistry.size()}/$MAX_CLUSTER_SIZE)"
-            )
+            val msg = "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: CLUSTER_FULL (${memberRegistry.size()}/$MAX_CLUSTER_SIZE)"
+            networkEventRepository.pushEvent(msg)
+            android.util.Log.d("JOIN_DEBUG", msg)
             return signedRedirect(JoinRedirectReason.CLUSTER_FULL, alts, selfNodeIdBytes)
         }
 
@@ -104,9 +105,9 @@ class ProcessJoinRequestUseCase @Inject constructor(
             return signedRedirect(JoinRedirectReason.INVALID_SIGNATURE, emptyList(), selfNodeIdBytes)
         }
 
-        networkEventRepository.pushEvent(
-            "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} (free=${request.freeBytes}) → ACCEPT (cluster=${memberRegistry.size()}/$MAX_CLUSTER_SIZE)"
-        )
+        val acceptMsg = "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} (free=${request.freeBytes}) → ACCEPT (cluster=${memberRegistry.size()}/$MAX_CLUSTER_SIZE)"
+        networkEventRepository.pushEvent(acceptMsg)
+        android.util.Log.d("JOIN_DEBUG", acceptMsg)
 
         return JoinResponse.JoinAccept(
             clusterId = clusterId,

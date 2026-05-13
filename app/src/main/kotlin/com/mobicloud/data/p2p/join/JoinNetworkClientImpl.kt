@@ -56,8 +56,8 @@ class JoinNetworkClientImpl @Inject constructor(
         return runCatching {
             val protobufBytes = ProtoBuf.encodeToByteArray(request)
             val payload = byteArrayOf(JOIN_MAGIC, JoinSubType.JOIN_REQUEST.byte) + protobufBytes
-            // blockId synthétique pour traçabilité serveur ; le relai forward sans interpréter.
-            val blockId = "JOIN-${UUID.randomUUID().toString().take(16)}"
+            // blockId 64 hex chars (regex relay: ^[0-9a-fA-F]{64}$) — deux UUID sans tirets.
+            val blockId = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "")
 
             val destNodeId = hint.nodeId.toHexString()
             relayWebSocketClient.uploadBlock(destNodeId, blockId, payload).getOrThrow()
@@ -89,7 +89,7 @@ class JoinNetworkClientImpl @Inject constructor(
                 is JoinResponse.JoinRedirect -> JoinSubType.JOIN_REDIRECT to ProtoBuf.encodeToByteArray(response)
             }
             val payload = byteArrayOf(JOIN_MAGIC, subType.byte) + bytes
-            val blockId = "JOIN-${UUID.randomUUID().toString().take(16)}"
+            val blockId = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "")
             relayWebSocketClient.uploadBlock(destNodeId, blockId, payload).getOrThrow()
         }
     }

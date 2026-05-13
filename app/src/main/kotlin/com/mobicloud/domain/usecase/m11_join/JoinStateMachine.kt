@@ -68,14 +68,14 @@ class JoinStateMachine @Inject constructor(
                 val hint = event.toSuperPeerHint()
                 _currentState.value = NodeJoinState.Joining(hint, 0)
                 logStateChange(state, _currentState.value, event)
-                sendJoinRequestUseCaseLazy.get().invoke(listOf(hint))
+                scope.launch { sendJoinRequestUseCaseLazy.get().invoke(listOf(hint)).collect {} }
             }
 
             // Undiscovered + NewCandidateDetected → Joining
             state is NodeJoinState.Undiscovered && event is JoinEvent.NewCandidateDetected -> {
                 _currentState.value = NodeJoinState.Joining(event.hint, 0)
                 logStateChange(state, _currentState.value, event)
-                sendJoinRequestUseCaseLazy.get().invoke(listOf(event.hint))
+                scope.launch { sendJoinRequestUseCaseLazy.get().invoke(listOf(event.hint)).collect {} }
             }
 
             // Joining + JoinAcceptReceived → Member
@@ -94,6 +94,8 @@ class JoinStateMachine @Inject constructor(
             }
 
             // Joining + JoinRedirectReceived → Joining (next) ou Isolated
+            // SendJoinRequestUseCase gère les alternatives dans sa boucle while interne —
+            // pas besoin de relancer invoke() ici (ce serait une double tentative concurrente).
             state is NodeJoinState.Joining && event is JoinEvent.JoinRedirectReceived -> {
                 val alts = event.redirect.alternativeSuperPeers
                 if (alts.isNotEmpty()) {
@@ -101,7 +103,6 @@ class JoinStateMachine @Inject constructor(
                     val newState = NodeJoinState.Joining(next, state.attemptIndex + 1)
                     _currentState.value = newState
                     logStateChange(state, newState, event)
-                    sendJoinRequestUseCaseLazy.get().invoke(alts)
                 } else {
                     val iso = NodeJoinState.Isolated(1, System.currentTimeMillis())
                     _currentState.value = iso
@@ -127,7 +128,7 @@ class JoinStateMachine @Inject constructor(
                 val newState = NodeJoinState.Joining(event.hint, 0)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
-                sendJoinRequestUseCaseLazy.get().invoke(listOf(event.hint))
+                scope.launch { sendJoinRequestUseCaseLazy.get().invoke(listOf(event.hint)).collect {} }
             }
 
             // Isolated + IsolationBackoffElapsed → SuperPair (BullySolo)
@@ -136,6 +137,14 @@ class JoinStateMachine @Inject constructor(
             state is NodeJoinState.Isolated && event is JoinEvent.IsolationBackoffElapsed -> {
                 networkEventRepository.pushEvent("[JOIN-FSM] Isolation backoff elapsed → BullySolo election")
                 scope.launch { bullySoloElectionUseCaseLazy.get().invoke() }
+            }
+
+            // Undiscovered + BullyVictory → SuperPair (premier démarrage ou redémarrage propre :
+            // RunBullyElectionUseCase gagne avant que la FSM atteigne Isolated)
+            state is NodeJoinState.Undiscovered && event is JoinEvent.BullyVictory -> {
+                val newState = NodeJoinState.SuperPair(event.clusterId)
+                _currentState.value = newState
+                logStateChange(state, newState, event)
             }
 
             // Isolated + BullyVictory → SuperPair (sortie d'isolement via BullySolo réussie)
@@ -232,9 +241,9 @@ class JoinStateMachine @Inject constructor(
             }
 
             else -> {
-                networkEventRepository.pushEvent(
-                    "[JOIN-FSM] WARN Transition ignorée: ${state::class.simpleName} × ${event::class.simpleName}"
-                )
+                val warn = "[JOIN-FSM] WARN Transition ignorée: ${state::class.simpleName} × ${event::class.simpleName}"
+                networkEventRepository.pushEvent(warn)
+                android.util.Log.w("JOIN_FSM", warn)
             }
         }
     }
@@ -256,7 +265,9 @@ class JoinStateMachine @Inject constructor(
     }
 
     private suspend fun logStateChange(old: NodeJoinState, new: NodeJoinState, event: JoinEvent) {
-        networkEventRepository.pushEvent("[JOIN-FSM] State transition: $old → $new (event=$event)")
+        val msg = "[JOIN-FSM] $old → $new (event=${event::class.simpleName})"
+        networkEventRepository.pushEvent(msg)
+        android.util.Log.d("JOIN_FSM", msg)
     }
 
     private fun JoinEvent.CoordinatorReceived.toSuperPeerHint(): com.mobicloud.domain.models.m11_join.SuperPeerHint =
