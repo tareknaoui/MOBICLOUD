@@ -48,6 +48,9 @@ class RelayWebSocketClient @Inject constructor(
     // Dispatch SIGNAL_RECEIVED (0x0F) : Pair<fromNodeId, data> — utilisé par GossipRelayChannel.
     internal val incomingSignals = MutableSharedFlow<Pair<String, ByteArray>>(replay = 0, extraBufferCapacity = 64)
 
+    // Dispatch ELECTION_RECEIVED (0x11) : payload JSON brut — consommé par RelayElectionNetworkClient.
+    internal val incomingElectionMessages = MutableSharedFlow<ByteArray>(replay = 0, extraBufferCapacity = 64)
+
     // Dispatch JOIN (Epic 11) : SharedFlow vers JoinNetworkClientImpl.
     // Exposé internal pour que JoinNetworkClientImpl puisse s'y abonner.
     // P12/D2 (review R2) : `replay = 0` (retour à la valeur initiale) — le replay=16 ouvrait une
@@ -173,6 +176,9 @@ class RelayWebSocketClient @Inject constructor(
                         val (fromNodeId, data) = parsed
                         flowScope.launch { incomingSignals.emit(Pair(fromNodeId, data)) }
                     }
+                    RelayMsg.ELECTION_RECEIVED -> {
+                        flowScope.launch { incomingElectionMessages.emit(payload) }
+                    }
                     RelayMsg.PONG -> { /* keepalive applicatif — ignoré, OkHttp gère le ping natif */ }
                     RelayMsg.ERROR -> {
                         val msg = payload.toString(Charsets.UTF_8)
@@ -250,6 +256,15 @@ class RelayWebSocketClient @Inject constructor(
         } else {
             Result.failure(IllegalStateException("WebSocket.send() retourné false"))
         }
+    }
+
+    /**
+     * Envoie ELECTION_BROADCAST (0x10) — forward le payload JSON à tous les nœuds connectés
+     * sauf l'émetteur. Fire-and-forget, pas d'ACK. Retourne false si WebSocket inactive.
+     */
+    fun sendElectionBroadcast(jsonPayload: ByteArray): Boolean {
+        val ws = activeWebSocket ?: return false
+        return ws.send(RelayFraming.buildFrame(RelayMsg.ELECTION_BROADCAST, jsonPayload).toByteString())
     }
 
     /**

@@ -21,5 +21,8 @@ internal object RelayMsg {
     // SIGNAL (0x0E) : forwarding P2P éphémère pour Gossip DHT entre pairs (relay-only).
     const val SIGNAL: Byte          = 0x0E
     const val SIGNAL_RECEIVED: Byte = 0x0F
+    // Bully election broadcast via relay — forward à toutes les sessions sauf l'émetteur.
+    const val ELECTION_BROADCAST: Byte = 0x10
+    const val ELECTION_RECEIVED: Byte  = 0x11
     const val ERROR: Byte          = 0xFF.toByte()
 }

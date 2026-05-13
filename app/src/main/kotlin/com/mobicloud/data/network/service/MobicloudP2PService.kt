@@ -49,6 +49,7 @@ import com.mobicloud.domain.models.m11_join.JoinEvent
 import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.models.m11_join.toSuperPeerHint
 import com.mobicloud.data.p2p.relay.GossipRelayChannel
+import com.mobicloud.domain.usecase.m10_election.ProcessIncomingElectionEventUseCase
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
@@ -94,6 +95,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var runBullyElectionUseCase: RunBullyElectionUseCase
     @Inject lateinit var registerSuperPeerUseCase: RegisterSuperPeerUseCase
     @Inject lateinit var abdicateSuperPeerUseCase: AbdicateSuperPeerUseCase
+    @Inject lateinit var processIncomingElectionEventUseCase: ProcessIncomingElectionEventUseCase
     @Inject lateinit var gossipRelayChannel: GossipRelayChannel
     @Inject lateinit var gossipSyncUseCase: GossipSyncUseCase
     @Inject lateinit var resolveDhtConflictUseCase: ResolveDhtConflictUseCase
@@ -206,6 +208,15 @@ class MobicloudP2PService : Service() {
             // Architecture relay-only : handler Gossip câblé sur le canal relay (plus de TCP).
             gossipRelayChannel.gossipHandler = gossipSyncUseCase
             gossipRelayChannel.startIncomingDispatch()
+
+            // Bully election — écoute les messages entrants ELECTION/ALIVE/COORDINATOR via relay.
+            // ProcessIncomingElectionEventUseCase répond ALIVE si score local > émetteur,
+            // et gère COORDINATOR → JoinEvent.CoordinatorReceived → FSM Joining → rejoint le cluster.
+            launch {
+                processIncomingElectionEventUseCase().collect { result ->
+                    result.onFailure { Log.d(LOGTAG, "[ELECTION-IN] ${it.message}") }
+                }
+            }
 
             // Epic 11 — Les use cases JOIN sont injectés par Hilt via dagger.Lazy dans
             // JoinStateMachine (cycle de dépendances résolu côté DI). Aucune construction
@@ -346,7 +357,9 @@ class MobicloudP2PService : Service() {
                             is NodeJoinState.Undiscovered, is NodeJoinState.Isolated -> {
                                 joinStateMachine.transition(JoinEvent.NewCandidateDetected(hint))
                                 Log.i(LOGTAG, "[JOIN] NewCandidateDetected → SP ${peer.nodeId.take(8)} (state=${fsmState::class.simpleName})")
-                                seenSuperPairIds = seenSuperPairIds + peer.nodeId
+                                // Ne PAS ajouter à seenSuperPairIds ici : si ce nœud gagne ensuite
+                                // Bully et passe en SuperPair, le prochain GET_PEERS doit re-évaluer
+                                // ce SP pour la résolution de conflit.
                             }
                             is NodeJoinState.SuperPair -> {
                                 if (peer.nodeId > identity.nodeId) {
@@ -374,8 +387,11 @@ class MobicloudP2PService : Service() {
             // supérieur est déjà connu (cas race Bully où seenSuperPairIds l'avait déjà vu
             // pendant l'état Undiscovered et l'avait écarté du filtre de conflit).
             launch {
+                var spScanJob: Job? = null
                 joinStateMachine.currentState.collect { state ->
                     if (state is NodeJoinState.Undiscovered) {
+                        spScanJob?.cancel()
+                        spScanJob = null
                         delay(300)
                         val availableSPs = signalingRepository.latestPeers.value.filter { it.isSuperPair }
                         availableSPs.firstOrNull()?.let { sp ->
@@ -383,14 +399,24 @@ class MobicloudP2PService : Service() {
                             joinStateMachine.transition(JoinEvent.NewCandidateDetected(sp.toSuperPeerHint()))
                         }
                     } else if (state is NodeJoinState.SuperPair) {
-                        delay(1_000L) // laisser latestPeers se mettre à jour via GET_PEERS
-                        val rival = signalingRepository.latestPeers.value
-                            .filter { it.isSuperPair && it.nodeId > identity.nodeId }
-                            .firstOrNull()
-                        if (rival != null) {
-                            Log.i(LOGTAG, "[JOIN] SP conflict (on SuperPair entry): yield to ${rival.nodeId.take(8)}")
-                            abdicate()
-                            launch { abdicateSuperPeerUseCase() }
+                        // Polling 2s × 8 = 16s pour laisser le GET_PEERS (intervalle 10s) retourner
+                        // la liste mise à jour. Couvre la race où l'autre SP a enregistré après
+                        // le dernier GET_PEERS et ne serait pas encore dans latestPeers.
+                        // Guard : annule le scan précédent si FSM re-entre SuperPair (abdication + re-victoire).
+                        spScanJob?.cancel()
+                        spScanJob = launch {
+                            repeat(8) {
+                                delay(2_000L)
+                                val rival = signalingRepository.latestPeers.value
+                                    .filter { it.isSuperPair && it.nodeId > identity.nodeId }
+                                    .firstOrNull()
+                                if (rival != null) {
+                                    Log.i(LOGTAG, "[JOIN] SP conflict (on SuperPair entry): yield to ${rival.nodeId.take(8)}")
+                                    abdicate()
+                                    launch { abdicateSuperPeerUseCase() }
+                                    return@launch
+                                }
+                            }
                         }
                     }
                 }

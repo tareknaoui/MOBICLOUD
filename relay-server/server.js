@@ -24,6 +24,10 @@ const MSG = {
   // Pas de buffering : si le destinataire est absent le signal est droppé.
   SIGNAL: 0x0E,
   SIGNAL_RECEIVED: 0x0F,
+  // ELECTION_BROADCAST (0x10) : broadcast Bully — forward à toutes les sessions sauf l'émetteur.
+  // Fire-and-forget, pas de buffering. ELECTION_RECEIVED (0x11) = opcode de livraison.
+  ELECTION_BROADCAST: 0x10,
+  ELECTION_RECEIVED: 0x11,
   ERROR: 0xFF
 };
 
@@ -499,6 +503,25 @@ function handleSignal(fromNodeId, payload) {
   // dest absent → signal droppé silencieusement
 }
 
+// ─── ELECTION_BROADCAST — broadcast Bully (ELECTION / ALIVE / COORDINATOR) ──
+// Payload : JSON sérialisé de ElectionPayload (senderNodeId, type, reliabilityScore,
+// signatureBytes base64, clusterId, timestampMs).
+// Forward à toutes les sessions connectées SAUF l'émetteur. Fire-and-forget.
+function handleElectionBroadcast(fromNodeId, payload) {
+  let forwarded = 0;
+  for (const [nodeId, session] of sessions.entries()) {
+    if (nodeId === fromNodeId) continue;
+    if (session.ws.readyState === WebSocket.OPEN) {
+      safeSend(session.ws, buildFrame(MSG.ELECTION_RECEIVED, payload));
+      forwarded++;
+    }
+  }
+  // Parse type pour le log (best-effort, pas de validation stricte ici)
+  let msgType = '?';
+  try { msgType = JSON.parse(payload.toString('utf8')).type ?? '?'; } catch { /* ignore */ }
+  console.log(`[ELECTION] BROADCAST type=${msgType} from=${fromNodeId.slice(0,8)} → ${forwarded} nœud(s)`);
+}
+
 // ─── Serveur HTTP + WebSocketServer ─────────────────────────────────────────
 
 const httpServer = http.createServer((req, res) => {
@@ -615,6 +638,10 @@ wss.on('connection', (ws) => {
       }
       case MSG.SIGNAL: {
         handleSignal(nodeId, frame.payload);
+        break;
+      }
+      case MSG.ELECTION_BROADCAST: {
+        handleElectionBroadcast(nodeId, frame.payload);
         break;
       }
       case MSG.PING: {

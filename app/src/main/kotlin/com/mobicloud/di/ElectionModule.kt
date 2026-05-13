@@ -1,7 +1,7 @@
 package com.mobicloud.di
 
+import com.mobicloud.data.election.RelayElectionNetworkClient
 import com.mobicloud.data.election.ReliabilityTrustScoreAdapter
-import com.mobicloud.data.election.StubElectionNetworkClient
 import com.mobicloud.data.local.election.SharedPrefsCooldownStore
 import com.mobicloud.domain.repository.IElectionNetworkClient
 import com.mobicloud.domain.repository.ITrustScoreProvider
@@ -22,7 +22,7 @@ abstract class ElectionBindingsModule {
     @Binds
     @Singleton
     abstract fun bindElectionNetworkClient(
-        impl: StubElectionNetworkClient
+        impl: RelayElectionNetworkClient
     ): IElectionNetworkClient
 
     @Binds
