@@ -36,13 +36,14 @@ class NetworkViewModel @Inject constructor(
     ) { peers, localNodeId, diagnostics ->
         val now = System.currentTimeMillis()
 
-        // Un super-pair est "local" s'il est sur le LAN ou s'il est ce device
+        // Un super-pair est "local" s'il est sur le LAN, s'il est ce device,
+        // ou s'il est le seul SP visible (découvert via RELAY_HA après victoire Bully).
         val localSuperPeer = peers.firstOrNull { peer ->
             peer.isSuperPair && (
                 peer.source == DiscoverySource.LAN_MULTICAST ||
                 peer.identity.nodeId == localNodeId
             )
-        }
+        } ?: peers.singleOrNull { it.isSuperPair }
 
         // Cluster local = membres non-super-pair + le super-pair local
         val localPeers = peers.filter { peer ->
@@ -54,12 +55,28 @@ class NetworkViewModel @Inject constructor(
             peer.isSuperPair && peer != localSuperPeer
         }
 
-        val localNodes = localPeers
+        var localNodes = localPeers
             .map { peer -> peer.toNodeInfo(localNodeId, diagnostics.batteryPercent, now) }
             .sortedWith(
                 compareByDescending<ClusterNodeInfo> { it.isSuperPair }
                     .thenByDescending { it.reliabilityScore }
             )
+
+        // Le nœud local est filtré de peerRepository (processPeerList ignore l'auto-référence).
+        // On l'injecte ici pour que le compteur X/50 soit cohérent sur tous les devices.
+        if (localNodeId != null && localNodes.none { it.nodeId == localNodeId }) {
+            val selfNode = ClusterNodeInfo(
+                nodeId           = localNodeId,
+                isSuperPair      = localSuperPeer?.identity?.nodeId == localNodeId,
+                isLocal          = true,
+                batteryPercent   = diagnostics.batteryPercent,
+                reliabilityScore = diagnostics.reliabilityScore,
+                nodeStatus       = ClusterNodeStatus.ACTIF,
+                channel          = "Local",
+                lastSeenMs       = now
+            )
+            localNodes = localNodes + selfNode
+        }
 
         val remoteNodes = remotePeers
             .map { peer -> peer.toNodeInfo(localNodeId, null, now) }
@@ -81,7 +98,7 @@ class NetworkViewModel @Inject constructor(
             else -> ClusterNodeStatus.ACTIF
         }
         val channel = when (source) {
-            DiscoverySource.LAN_MULTICAST -> "Direct TCP"
+            DiscoverySource.LAN_MULTICAST -> "WiFi local"
             DiscoverySource.RELAY_HA -> "Relais HA"
             else -> "Unknown"
         }
