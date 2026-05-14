@@ -468,8 +468,13 @@ class MobicloudP2PService : Service() {
                         spScanJob = launch {
                             repeat(8) {
                                 delay(2_000L)
+                                // N'abdiquer que si le rival a une priorité plus haute ET de la capacité.
+                                // Si son cluster est plein, inutile d'abdiquer : on ne pourrait pas le rejoindre
+                                // et on créerait une boucle BullySolo → abdication infinie.
                                 val rival = signalingRepository.latestPeers.value
-                                    .filter { it.isSuperPair && it.nodeId > identity.nodeId }
+                                    .filter { it.isSuperPair
+                                        && it.nodeId > identity.nodeId
+                                        && it.currentMemberCount < com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE }
                                     .firstOrNull()
                                 if (rival != null) {
                                     Log.i(LOGTAG, "[JOIN] SP conflict (on SuperPair entry): yield to ${rival.nodeId.take(8)}")

@@ -7,6 +7,8 @@ import com.mobicloud.domain.models.m11_join.JoinResponse
 import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
 import com.mobicloud.domain.models.m11_join.MemberInfo
 import com.mobicloud.domain.models.m11_join.MemberRole
+import com.mobicloud.domain.models.m11_join.MemberUpdate
+import com.mobicloud.domain.models.m11_join.MemberUpdateEvent
 import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.models.m11_join.SuperPeerHint
 import com.mobicloud.domain.models.m11_join.hexToByteArray
@@ -25,7 +27,8 @@ class ProcessJoinRequestUseCase @Inject constructor(
     private val signalingRepository: SignalingRepository,
     private val memberRegistry: MemberRegistry,
     private val joinStateMachine: JoinStateMachine,
-    private val networkEventRepository: NetworkEventRepository
+    private val networkEventRepository: NetworkEventRepository,
+    private val memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase
 ) {
     suspend operator fun invoke(request: JoinRequest): JoinResponse {
         val localIdentity = securityRepository.getIdentity().getOrThrow()
@@ -90,6 +93,17 @@ class ProcessJoinRequestUseCase @Inject constructor(
             networkEventRepository.pushEvent(msg)
             android.util.Log.d("JOIN_DEBUG", msg)
             return signedRedirect(JoinRedirectReason.CLUSTER_FULL, alts, selfNodeIdBytes)
+        }
+
+        // Sync inMemory pour que NetworkViewModel reflète immédiatement le nouveau membre côté SP.
+        runCatching {
+            memberSnapshotCacheUseCase.applyUpdate(MemberUpdate(
+                event = MemberUpdateEvent.JOINED,
+                member = newMember,
+                leftNodeId = byteArrayOf(),
+                timestampMs = System.currentTimeMillis(),
+                signatureBytes = byteArrayOf()
+            ))
         }
 
         val snapshot = memberRegistry.list()

@@ -70,6 +70,13 @@ class MarkSelfAsSuperPairUseCase @Inject constructor(
             return
         }
 
+        // Sync inMemory : source de vérité pour NetworkViewModel côté SP.
+        // Sans ça, localPeers du ViewModel groupe tous les non-SP peers quel que soit leur cluster.
+        val currentMembers = runCatching { memberRegistry.list() }.getOrDefault(emptyList())
+        runCatching {
+            memberSnapshotCacheUseCaseLazy.get().seedFromJoinAccept(clusterId, selfNodeId, currentMembers)
+        }
+
         joinStateMachine.transition(JoinEvent.BullyVictory(clusterId))
 
         monitorMemberLivenessUseCaseLazy.get().start()

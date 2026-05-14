@@ -7,9 +7,11 @@ import com.mobicloud.domain.models.ClusterNodeStatus
 import com.mobicloud.domain.models.ClusterTopologyState
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.Peer
+import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.repository.DiagnosticsRepository
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.PeerRepository
+import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
 import android.os.SystemClock
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -23,7 +25,8 @@ import javax.inject.Inject
 class NetworkViewModel @Inject constructor(
     peerRepository: PeerRepository,
     private val identityRepository: IdentityRepository,
-    diagnosticsRepository: DiagnosticsRepository
+    diagnosticsRepository: DiagnosticsRepository,
+    memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase
 ) : ViewModel() {
 
     private val localNodeIdFlow: StateFlow<String?> = flow {
@@ -33,9 +36,13 @@ class NetworkViewModel @Inject constructor(
     val clusterTopology: StateFlow<ClusterTopologyState> = combine(
         peerRepository.peers,
         localNodeIdFlow,
-        diagnosticsRepository.diagnostics
-    ) { peers, localNodeId, diagnostics ->
+        diagnosticsRepository.diagnostics,
+        memberSnapshotCacheUseCase.inMemory
+    ) { peers, localNodeId, diagnostics, clusterMembers ->
         val now = SystemClock.elapsedRealtime()
+
+        // nodeIds des membres confirmés du cluster local (JOIN_ACCEPT + MEMBER_UPDATE)
+        val clusterMemberNodeIds = clusterMembers.map { it.nodeId.toHexString() }.toSet()
 
         // Un super-pair est "local" s'il est sur le LAN, s'il est ce device,
         // ou s'il est le seul SP visible (découvert via RELAY_HA après victoire Bully).
@@ -49,9 +56,12 @@ class NetworkViewModel @Inject constructor(
         // On ignore les peers trop anciens (> 2 min) : orphelins d'anciennes sessions stockés en DB.
         val freshPeers = peers.filter { peer -> (now - peer.lastSeenTimestampMs) <= 120_000L }
 
-        // Cluster local = membres non-super-pair + le super-pair local
+        // Cluster local = super-pair local + membres dont le nodeId est dans clusterMemberNodeIds.
+        // Sans ce filtre, tous les non-SP peers connus apparaissaient dans "mon cluster" même s'ils
+        // appartiennent à un cluster différent (cas 2 SP simultanés post-BullySolo).
         val localPeers = freshPeers.filter { peer ->
-            !peer.isSuperPair || peer == localSuperPeer
+            peer == localSuperPeer ||
+            (!peer.isSuperPair && peer.identity.nodeId in clusterMemberNodeIds)
         }
 
         // Clusters distants = super-pairs qui ne sont PAS le super-pair local

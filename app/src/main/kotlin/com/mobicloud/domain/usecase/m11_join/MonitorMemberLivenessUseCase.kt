@@ -28,6 +28,7 @@ class MonitorMemberLivenessUseCase @Inject constructor(
     private val nodeSettingsRepository: NodeSettingsRepository,
     private val sendMemberUpdateUseCase: SendMemberUpdateUseCase,
     private val networkEventRepository: NetworkEventRepository,
+    private val memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase,
     @ApplicationScope private val scope: CoroutineScope,
     val clock: () -> Long = { System.currentTimeMillis() }
 ) {
@@ -62,15 +63,16 @@ class MonitorMemberLivenessUseCase @Inject constructor(
                         // EVICTED rows purgés ensuite via purgeStale (TTL 1h, AC2 spec).
                         val evicted = memberDao.markEvictedIfStale(dead.nodeId, cutoff)
                         if (evicted == 1) {
-                            sendMemberUpdateUseCase.invoke(
-                                MemberUpdate(
-                                    event = MemberUpdateEvent.LEFT,
-                                    member = null,
-                                    leftNodeId = dead.nodeId.hexToByteArray(),
-                                    timestampMs = clock(),
-                                    signatureBytes = byteArrayOf()
-                                )
+                            val leftUpdate = MemberUpdate(
+                                event = MemberUpdateEvent.LEFT,
+                                member = null,
+                                leftNodeId = dead.nodeId.hexToByteArray(),
+                                timestampMs = clock(),
+                                signatureBytes = byteArrayOf()
                             )
+                            sendMemberUpdateUseCase.invoke(leftUpdate)
+                            // Sync inMemory pour que NetworkViewModel reflète l'éviction côté SP.
+                            runCatching { memberSnapshotCacheUseCase.applyUpdate(leftUpdate) }
                         }
                     }.onFailure {
                         networkEventRepository.pushEvent(
