@@ -73,9 +73,12 @@ fun ExplorerScreen(
     LaunchedEffect(terminalState) {
         when (terminalState) {
             is StoreState.Success -> snackbarHostState.showSnackbar(
-                "Fichier stocké avec succès sur ${terminalState.nodeCount} nœuds"
+                "Sauvegardé chez ${terminalState.nodeCount} membres"
             )
-            is StoreState.Error -> snackbarHostState.showSnackbar("Erreur : ${terminalState.message}")
+            is StoreState.Error -> {
+                android.util.Log.d("MobiCloud:Explorer", "[STORE-ERROR] ${terminalState.message}")
+                snackbarHostState.showSnackbar("Une erreur est survenue. Réessayez.")
+            }
             else -> Unit
         }
     }
@@ -86,10 +89,11 @@ fun ExplorerScreen(
     }
     LaunchedEffect(terminalDownloadState) {
         val s = terminalDownloadState as? DownloadState.Error ?: return@LaunchedEffect
+        android.util.Log.d("MobiCloud:Explorer", "[DOWNLOAD-ERROR] ${s.message}")
         val friendlyMessage = if (s.message.contains("blocs valides") || s.message.contains("nœuds actifs"))
-            "Fichier irrécupérable — trop peu de nœuds actifs"
+            "Trop peu de membres en ligne pour reconstituer ce fichier"
         else
-            "Erreur : ${s.message}"
+            "Une erreur est survenue. Réessayez."
         snackbarHostState.showSnackbar(friendlyMessage)
     }
 
@@ -115,11 +119,11 @@ fun ExplorerScreen(
                         viewModel.resetDownloadState()
                     } catch (e: ActivityNotFoundException) {
                         android.util.Log.w("MobiCloud:Open", "[DIAG] ActivityNotFound mime=$mimeType", e)
-                        scope.launch { snackbarHostState.showSnackbar("Aucune application pour ouvrir ce fichier (mime=$mimeType)") }
+                        scope.launch { snackbarHostState.showSnackbar("Aucune application n'est installée pour ouvrir ce type de fichier.") }
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("MobiCloud:Open", "[DIAG] FileProvider échoué path=$filePath", e)
-                    scope.launch { snackbarHostState.showSnackbar("Impossible d'ouvrir : ${e.javaClass.simpleName} — ${e.message}") }
+                    scope.launch { snackbarHostState.showSnackbar("Impossible d'ouvrir le fichier. Réessayez.") }
                 }
             },
             onDismiss = { viewModel.resetDownloadState() }
@@ -176,10 +180,9 @@ fun ExplorerScreen(
                 if (entries.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            text = "> CATALOGUE VIDE — aucun fichier stocké dans le cluster_",
+                            text = "Aucun fichier partagé.\nAppuyez sur + pour commencer.",
                             color = Color(0xFFFFB300),
-                            fontSize = 13.sp,
-                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(16.dp)
                         )

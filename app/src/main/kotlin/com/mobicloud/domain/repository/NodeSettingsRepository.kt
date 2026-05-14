@@ -18,4 +18,8 @@ interface NodeSettingsRepository {
 
     fun observeSettings(): Flow<NodeSettings>
     fun observeFreeSpaceBytes(): Flow<Long>
+
+    // Story 13.1 — Mode Diagnostics Avancés (toggle UI Simple/Expert)
+    suspend fun updateExpertMode(enabled: Boolean)
+    fun observeExpertMode(): Flow<Boolean>
 }

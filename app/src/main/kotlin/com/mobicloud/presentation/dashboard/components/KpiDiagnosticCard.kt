@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -20,11 +22,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 
+/**
+ * Story 13.1 — paramètre [hint] ajouté pour la sémantique humaine
+ * (ex: "Membres connectés", "Espace que je partage").
+ * Compatible ascendant : hint optionnel, défaut null → comportement Story 2.4 inchangé.
+ */
 @Composable
 fun KpiDiagnosticCard(
     label: String,
     value: String,
     accentColor: Color = MaterialTheme.colorScheme.primary,
+    hint: String? = null,
     modifier: Modifier = Modifier
 ) {
     ElevatedCard(
@@ -37,7 +45,7 @@ fun KpiDiagnosticCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(76.dp)
+                .defaultMinSize(minHeight = 76.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -62,6 +70,14 @@ fun KpiDiagnosticCard(
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurface
                 )
+                if (hint != null) {
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        text = hint,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

@@ -38,4 +38,7 @@ interface HostedBlockRepository {
      * pour calculer `freeBytes` au moment de l'envoi de REGISTER_PEER (snapshot best-effort, pas de Flow).
      */
     suspend fun getTotalHostedBytes(): Long
+
+    /** Story 13.1 — KPI Dashboard "Fichiers protégés" : nombre de fragments hébergés. */
+    fun observeHostedBlockCount(): kotlinx.coroutines.flow.Flow<Int>
 }

@@ -131,6 +131,8 @@ class HostedBlockRepositoryImpl @Inject constructor(
         hostedBlockDao.getTotalSizeBytes()
     }
 
+    override fun observeHostedBlockCount(): Flow<Int> = hostedBlockDao.observeHostedBlockCount()
+
     companion object {
         // Story 6.2 — défense en profondeur identique à ReceiveAndHostBlockUseCase
         private val BLOCK_ID_REGEX = Regex("^[0-9a-f]{64}$")

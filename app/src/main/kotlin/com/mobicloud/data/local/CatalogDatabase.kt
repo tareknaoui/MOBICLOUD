@@ -56,7 +56,7 @@ abstract class CatalogDatabase : RoomDatabase() {
     companion object {
         // Room `@Database` est en `RetentionPolicy.CLASS` → invisible à la réflexion runtime.
         // Cette constante sert de source unique consommée par l'annotation ET par les tests.
-        const val CURRENT_VERSION = 16
+        const val CURRENT_VERSION = 17
 
         // Story 1-3 — premier ajout de NodeIdentityEntity + PeerNodeEntity (sans is_super_pair).
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -265,6 +265,16 @@ abstract class CatalogDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE cluster_members_new RENAME TO cluster_members")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_cluster_members_active_scan ON cluster_members(cluster_id, status, last_seen)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_cluster_members_status ON cluster_members(status)")
+            }
+        }
+
+        // Story 13.1 — toggle UI Mode Diagnostics Avancés (Simple par défaut, Expert sur opt-in).
+        // INTEGER NOT NULL DEFAULT 0 = false (mode Simple par défaut sur les installs existantes).
+        val MIGRATION_16_17 = object : Migration(16, 17) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE node_settings ADD COLUMN is_expert_mode_enabled INTEGER NOT NULL DEFAULT 0"
+                )
             }
         }
     }

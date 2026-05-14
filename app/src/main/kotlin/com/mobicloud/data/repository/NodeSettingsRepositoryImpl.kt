@@ -9,6 +9,7 @@ import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.sync.Mutex
@@ -23,7 +24,6 @@ class NodeSettingsRepositoryImpl @Inject constructor(
     private val initMutex = Mutex()
 
     private fun defaultBytes(): Long {
-        // P16 review : factoriser le StatFs (avant : 2 syscalls + risque d'incohérence entre les deux lectures).
         val stat = StatFs(Environment.getDataDirectory().path)
         val freeBytes = stat.availableBlocksLong * stat.blockSizeLong
         val twoGb = 2L * 1024 * 1024 * 1024
@@ -34,10 +34,8 @@ class NodeSettingsRepositoryImpl @Inject constructor(
         dao.getSettings()?.toDomain() ?: NodeSettings(allocatedStorageBytes = defaultBytes())
     }
 
-    // Story 12.1 — retourne le clusterId persiste directement, sans derivation SSID.
     override suspend fun getClusterIdOnce(): String = getSettings().clusterId
 
-    // AC6 — adopte le clusterId du super-pair élu ; no-op si blank.
     override suspend fun updateClusterId(id: String) {
         if (id.isBlank()) return
         initMutex.withLock {
@@ -48,7 +46,6 @@ class NodeSettingsRepositoryImpl @Inject constructor(
         }
     }
 
-    // P14 review — reset explicite (utilisé sur rejet définitif d'un cluster sticky).
     override suspend fun clearClusterId() {
         initMutex.withLock {
             val existing = dao.getSettings() ?: return@withLock
@@ -60,8 +57,19 @@ class NodeSettingsRepositoryImpl @Inject constructor(
         require(bytes > 0) { "allocatedStorageBytes must be positive, got $bytes" }
         initMutex.withLock {
             val existing = dao.getSettings()
-            val clusterId = existing?.clusterId ?: ""
-            dao.upsert(NodeSettingsEntity(id = 0, allocatedStorageBytes = bytes, clusterId = clusterId))
+            dao.upsert(
+                (existing ?: NodeSettingsEntity(id = 0, allocatedStorageBytes = bytes, clusterId = ""))
+                    .copy(allocatedStorageBytes = bytes)
+            )
+        }
+    }
+
+    // Story 13.1 — préservation des autres champs (allocatedStorageBytes, clusterId) lors du toggle.
+    override suspend fun updateExpertMode(enabled: Boolean) {
+        initMutex.withLock {
+            val existing = dao.getSettings()
+                ?: NodeSettingsEntity(id = 0, allocatedStorageBytes = defaultBytes())
+            dao.upsert(existing.copy(isExpertModeEnabled = enabled))
         }
     }
 
@@ -69,6 +77,11 @@ class NodeSettingsRepositoryImpl @Inject constructor(
         dao.observeSettings().map { entity ->
             entity?.toDomain() ?: NodeSettings(allocatedStorageBytes = defaultBytes())
         }
+
+    override fun observeExpertMode(): Flow<Boolean> =
+        dao.observeExpertMode()
+            .map { it ?: false }
+            .distinctUntilChanged()
 
     override fun observeFreeSpaceBytes(): Flow<Long> = flow {
         val stat = StatFs(Environment.getDataDirectory().path)
@@ -79,11 +92,6 @@ class NodeSettingsRepositoryImpl @Inject constructor(
 private fun NodeSettingsEntity.toDomain() = NodeSettings(
     allocatedStorageBytes = allocatedStorageBytes,
     clusterId = clusterId,
+    isExpertModeEnabled = isExpertModeEnabled,
     id = id
-)
-
-private fun NodeSettings.toEntity() = NodeSettingsEntity(
-    id = id,
-    allocatedStorageBytes = allocatedStorageBytes,
-    clusterId = clusterId
 )

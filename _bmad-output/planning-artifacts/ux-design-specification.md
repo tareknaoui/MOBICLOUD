@@ -1,13 +1,17 @@
 ---
-stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15-readiness-fix, 16-topology-view]
-lastStep: 16
+stepsCompleted: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15-readiness-fix, 16-topology-view, 17-detailed-functionalities, 18-ux-simplification]
+lastStep: 18
 inputDocuments: ["c:\\Users\\naoui\\Desktop\\Projets\\PFE\\_bmad-output\\planning-artifacts\\prd.md"]
-lastEdited: "2026-05-07"
+lastEdited: "2026-05-14"
 editHistory:
   - date: "2026-04-28"
     changes: "Alignement V5 — purge references obsoletes (Score IA -> Score de Fiabilite, BLE et Wi-Fi Direct supprimes au profit de Multicast UDP local + WSS Relais HA, permissions Bluetooth retirees) ; ajout UX-DR9 Slider Quota et UX-DR10 Cloud Relay Badge ; permissions alignees avec Story 1.4 (ACCESS_WIFI_STATE, INTERNET, ACCESS_NETWORK_STATE, CHANGE_WIFI_MULTICAST_STATE)."
   - date: "2026-05-07"
     changes: "Ajout UX-DR11 Vue Topologie Cluster — nouveau composant ClusterTopologyCard integre dans Onglet 3 (Reseau P2P) ; specification de la hierarchie super-pair/nœuds, des etats par nœud et de l'interaction tap-to-detail."
+  - date: "2026-05-14"
+    changes: "Révision V5.1 — Intégration des tableaux fonctionnels détaillés pour tous les modules (Corbeille, Téléchargements, Uploads, Explorateur, Paramètres, SplashScreen). Précision des interactions et des messages d'état pour une transparence maximale."
+  - date: "2026-05-14"
+    changes: "Révision V5.2 — Simplification radicale de l'UX. Introduction du 'Mode Expert' masqué par défaut. Humanisation des termes techniques (Super-Pair -> Coordinateur). Réduction du Dashboard à 4 KPIs essentiels. Masquage des logs et de la topologie brute pour réduire la charge cognitive."
 ---
 
 # UX Design Specification PFE
@@ -38,17 +42,21 @@ MobiCloud transforme un groupe de smartphones géolocalisés à proximité (camp
 
 ### Design Opportunities
 
-- **Tableau de bord statique et économe :** Créer un "cadran de diagnostiques" clair et basse consommation affichant les métriques essentielles (Batterie locale, Score de Fiabilité) plutôt qu'une cartographie animée coûteuse en énergie.
-- **Explorateur de fichiers DHT P2P :** L'interface principale doit se concentrer sur l'efficacité utilitariste d'un explorateur de fichiers décentralisé, offrant une navigation rapide sans fioritures.
-- **Onboarding sans friction :** Intégrer l'authentification et la génération des clés cryptographiques de manière transparente lors de la première connexion.
+- **Concept de 'Cloud Invisible' :** Faire en sorte que l'utilisateur oublie la complexité (DHT, Gossip) pour ne voir que la valeur (fichiers disponibles partout).
+- **Double interface (Simple vs Expert) :** Une application grand public par défaut qui se transforme en outil de diagnostic pour le jury.
+- **Onboarding narratif :** Expliquer la fragmentation comme une "mise sous scellés" plutôt que du "Erasure Coding".
 
 ## Core User Experience
 
-### Defining Experience
+### Defining Experience (V5.2 Simplified)
 
-La valeur fondamentale de MobiCloud réside dans deux interactions principales : la navigation intuitive dans un explorateur de fichiers décentralisé (DHT) et la surveillance rassurante de la santé de son propre appareil au sein du réseau, via un tableau de bord statique et utilitariste.
+La valeur fondamentale de MobiCloud réside dans le sentiment de **sérénité connectée**. L'utilisateur doit ressentir que ses fichiers sont "vivants" et protégés par la communauté, sans jamais avoir à gérer les protocoles sous-jacents. L'expérience est celle d'un cloud classique, mais avec le super-pouvoir du hors-ligne.
 
 ### Platform Strategy
+
+- **Native Android :** Jetpack Compose.
+- **Stratégie de Visibilité Progressive :** Masquer 90% de la complexité distribuée derrière un bouton "Diagnostics Avancés" pour éviter la surcharge cognitive.
+- **UI Réactive :** Observation passive des états du Foreground Service.
 
 - **Native Android :** Interface développée exclusivement de manière native (Jetpack Compose).
 - **Background-first (Headless) :** Le cœur du système s'exécute silencieusement via un Foreground Service (maintien du `MulticastLock` pour la découverte UDP locale, connexion WSS persistante vers les Serveurs Relais HA, sockets TCP directs pour les transferts), permettant au réseau de survivre même lorsque l'écran est éteint.
@@ -66,9 +74,10 @@ La valeur fondamentale de MobiCloud réside dans deux interactions principales :
 
 ### Experience Principles
 
-1. **L'utilitarisme comme boussole :** Prioriser de l'information claire et statique face aux animations coûteuses en énergie.
-2. **Confiance par la clarté :** Exposer les métriques vitales (Score de Fiabilité de Fiabilité, Batterie) pour rendre le "Zero-Trust" tangible.
-3. **Zéro-friction cryptographique :** La complexité cryptographique doit être mathématiquement paranoïaque en backend, mais totalement invisible en frontend.
+1. **L'invisibilité technique :** La technologie (DHT, Bully, Gossip) doit être un moteur silencieux, pas une interface.
+2. **Confiance par le résultat, pas par le log :** Montrer que le fichier est "Sécurisé" plutôt que de montrer les ACKs techniques.
+3. **Sobriété Énergétique :** OLED pur et absence d'animations inutiles pour prouver le respect de la batterie.
+4. **Sémantique Humaine :** Utiliser des termes familiers (Coordinateur, Santé, Espace Communautaire).
 
 ## Desired Emotional Response
 
@@ -191,30 +200,142 @@ C'est le cœur de l'interaction "Fire-and-Forget".
   - Action "Partager un fichier local".
   - *Feedback Visuel :* Modale transitoire montrant la jauge de découpage (Erasure Coding) et de chiffrement (Icône Cadenas) avant injection sur le réseau.
 
-#### Onglet 2 : Mon Nœud (Tableau de Bord Diagnostique)
-L'écran matérialisant la "Confiance" (NFR-03).
-- **En-tête Identité :** Hash tronqué du nœud (ex: `0x4F...B2A`).
-- **Bloc "Santé & Énergie" :**
-  - Score de Fiabilité de Fiabilité (0-100%).
-  - Impact Batterie (estimation statique, ex: `-2.4%/heure`).
-- **Bloc "Stockage" :**
-  - Jauge utilitariste de l'espace alloué aux fragments tiers vs Espace total disponible.
+#### Onglet 2 : Mon Nœud (Tableau de Bord Épuré)
+Focus sur la sérénité et le contrôle.
+- **4 KPIs Majeurs uniquement :**
+  1. **Score de Fiabilité** (Confiance globale).
+  2. **Capacité du Cluster** (Force de la communauté).
+  3. **Impact Batterie** (Rassurance énergétique).
+  4. **Ma Contribution** (Go partagés).
+- **Bouton "Détails Techniques" :** Ouvre une vue secondaire avec l'uptime, l'ID complet, et les scores bruts.
 
-#### Onglet 3 : Réseau P2P (Statut de la Constellation)
-Permet de diagnostiquer l'état du "Datalake" sans animations coûteuses.
-- **Section "Vue Topologie Cluster" (UX-DR11) :** *(voir composant `ClusterTopologyCard` ci-dessous)*
-  - Affichage statique de la hiérarchie super-pair / nœuds du cluster actuel.
-  - Positionnée en haut de l'onglet, avant les cartes de synthèse.
-- **Cartes de Synthèse (Cards) :**
-  - Pairs découverts en LAN (Multicast UDP).
-  - Pairs découverts via Relais HA (inter-réseaux).
-  - **Cloud Relay Badge (UX-DR10)** : indicateur d'état du canal de transfert actif (✓ Direct P2P / ☁ Relais HA / ⚠ Hors-ligne).
-- **Console de Logs (Terminal-style) :**
-  - Un composant texte défilant affichant les événements bruts du Foreground Service (`Découverte pair X via UDP...`, `WSS Relais HA connecté...`, `Réception fragment partiel...`). Cela remplace le "syndrome de l'écran vide" lors des temps de latence réseau.
+#### Onglet 3 : Communauté (Anciennement Réseau)
+- **Vue Simplifiée :**
+  - Statut de connexion ("Excellent", "Instable").
+  - Nombre de membres à proximité.
+  - Badge de rôle humain : **"Coordinateur de Réseau"** (au lieu de Super-Pair).
+- **Bouton "Diagnostics Avancés" (Mode Expert) :**
+  - Déverrouille la `ClusterTopologyCard` (UX-DR11).
+  - Déverrouille la `RadarLogConsole` (UX-DR3).
+  - Déverrouille les détails des Opcodes.
 
 ### 3. États Globaux Transverses
 
 - **Alertes de Migration (Snackbar/Bannière) :** Si la batterie devient critique, une bannière ambre informe de façon persistante : "Évacuation d'urgence en cours..."
+
+## Detailed Screen Functionalities (V5.1)
+
+### 1. SplashScreen & Connexion
+*Responsable de l'initialisation et du feedback visuel lors de la jonction au réseau.*
+
+| Élément UI                    | Fonction                     |
+| ----------------------------- | ---------------------------- |
+| Logo MobiCloud                | Branding                     |
+| Animation réseau              | Montrer connexion distribuée |
+| “Connecting securely…”        | Initialisation AUTH          |
+| “Discovering nearby devices…” | Découverte UDP/Relay         |
+| “Joining cluster…”            | Connexion cluster            |
+| Barre progression             | Feedback utilisateur         |
+| Retry automatique             | Reconnexion réseau           |
+| Détection offline             | Afficher absence réseau      |
+
+### 2. Explorateur de Fichiers (Onglet 1)
+*L'interface principale de gestion des données distribuées.*
+
+| Fonctionnalité             | Description               |
+| -------------------------- | ------------------------- |
+| Liste fichiers             | Tous fichiers utilisateur |
+| Vue grille/liste           | Changement affichage      |
+| Recherche                  | Recherche locale          |
+| Tri                        | Date / taille / nom       |
+| Filtres                    | Images / vidéos / docs    |
+| Création dossier           | Organisation              |
+| Renommer fichier           | Gestion                   |
+| Déplacer fichier           | Changer dossier           |
+| Copier fichier             | Duplication               |
+| Multi-sélection            | Actions groupées          |
+| Upload fichier             | Import                    |
+| Upload dossier             | Import multiple           |
+| Download fichier           | Téléchargement            |
+| Supprimer fichier          | Vers la corbeille         |
+| Favoris                    | Accès rapide              |
+| Partage                    | Envoyer                   |
+| Aperçu fichier             | Voir contenu              |
+| Détails fichier            | Métadonnées               |
+| Icône sync                 | État synchronisation      |
+| Icône sécurisé             | Chiffrement               |
+| Disponibilité fichier      | Available / degraded      |
+| Fichiers récents           | Dernières modifications   |
+
+### 3. Gestion des Uploads & Téléchargements
+*Suivi technique et transparence des transferts.*
+
+#### Uploads
+| Fonctionnalité        | Description        |
+| --------------------- | ------------------ |
+| Sélection fichier     | Upload             |
+| Sélection dossier     | Upload multiple    |
+| Drag & Drop           | UX moderne         |
+| Barre progression     | Avancement         |
+| Pause upload          | Contrôle           |
+| Resume upload         | Continuer          |
+| Cancel upload         | Annuler            |
+| Encryption progress   | Sécurisation       |
+| Distribution progress | Répartition        |
+| Retry automatique     | Résilience         |
+| Upload queue          | Plusieurs uploads  |
+| Notification succès   | Confirmation       |
+| Upload background     | Continuer hors app |
+
+#### Téléchargements
+| Fonctionnalité          | Description    |
+| ----------------------- | -------------- |
+| Liste téléchargements   | Historique     |
+| Barre progression       | Avancement     |
+| Download speed          | Débit          |
+| Sources actives         | Nearby devices |
+| Pause                   | Suspendre      |
+| Resume                  | Continuer      |
+| Cancel                  | Annuler        |
+| Retry failed            | Réessayer      |
+| Download complete       | Confirmation   |
+| Open file               | Ouvrir         |
+| Remove history          | Nettoyage      |
+| Priorité téléchargement | Gestion queue  |
+| Estimated time          | Temps restant  |
+| Offline waiting         | Attente réseau |
+
+### 4. La Corbeille
+*Gestion de la suppression et des tombstones.*
+
+| Fonctionnalité             | Description            |
+| -------------------------- | ---------------------- |
+| Liste fichiers supprimés   | Corbeille              |
+| Date suppression           | Historique             |
+| Restore file               | Restaurer              |
+| Delete permanently         | Suppression définitive |
+| Empty trash                | Vider corbeille        |
+| Auto-delete timer          | Expiration             |
+| Multi-select delete        | Gestion                |
+| Search trash               | Recherche              |
+| File preview               | Vérification           |
+| Restore to original folder | Récupération           |
+
+### 5. Paramètres & Onboarding
+*Configuration de l'identité et des limites de contribution.*
+
+| Fonctionnalité                | Description                    |
+| ----------------------------- | ------------------------------ |
+| Choisir nom appareil          | Ex: “Yasmine Galaxy S24”       |
+| Autorisation stockage         | Accès fichiers                 |
+| Autorisation réseau local     | Découverte peers               |
+| Autorisation notifications    | Upload/download                |
+| Choisir quota partagé         | Limite stockage contribué      |
+| Wifi uniquement               | Option économie data           |
+| Mode batterie                 | Saver / Balanced / Performance |
+| Génération identité sécurisée | Clé EC P-256                   |
+| QR identité                   | Associer appareils             |
+| Tutoriel rapide               | Présentation app               |
 
 ## Visual Design Foundation
 
