@@ -79,6 +79,6 @@ class MarkSelfAsSuperPairUseCase @Inject constructor(
 
         joinStateMachine.transition(JoinEvent.BullyVictory(clusterId))
 
-        monitorMemberLivenessUseCaseLazy.get().start()
+        monitorMemberLivenessUseCaseLazy.get().start(selfMember)
     }
 }

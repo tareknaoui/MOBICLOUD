@@ -3,6 +3,7 @@ package com.mobicloud.domain.usecase.m11_join
 import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.di.ApplicationScope
 import com.mobicloud.domain.models.m11_join.LIVENESS_CHECK_INTERVAL_MS
+import com.mobicloud.domain.models.m11_join.MemberInfo
 import com.mobicloud.domain.models.m11_join.MemberUpdate
 import com.mobicloud.domain.models.m11_join.MemberUpdateEvent
 import com.mobicloud.domain.models.m11_join.SP_TIMEOUT_MS
@@ -34,7 +35,7 @@ class MonitorMemberLivenessUseCase @Inject constructor(
 ) {
     internal var monitorJob: Job? = null
 
-    fun start() {
+    fun start(spMemberInfo: MemberInfo) {
         if (monitorJob?.isActive == true) return
         monitorJob = scope.launch {
             // M8 : clusterId lu une seule fois au démarrage (V5 mono-cluster par device — il
@@ -45,6 +46,25 @@ class MonitorMemberLivenessUseCase @Inject constructor(
             if (clusterId.isBlank()) {
                 networkEventRepository.pushEvent("[HB-SP-MON] WARN clusterId vide au start — monitor inactif")
                 return@launch
+            }
+            // Keepalive SP→membres : ré-émet le MemberInfo du SP toutes les SP_TIMEOUT_MS/2 (45s)
+            // pour que les membres appellent markSpSeen() et ne déclenchent pas BullySolo solo
+            // faute de signal SP. Sans ça, le SP ne répond qu'aux JOINED/LEFT — silence 90s → Bully.
+            launch {
+                while (isActive) {
+                    delay(SP_TIMEOUT_MS / 2L)
+                    val keepalive = MemberUpdate(
+                        event = MemberUpdateEvent.JOINED,
+                        member = spMemberInfo,
+                        leftNodeId = byteArrayOf(),
+                        timestampMs = clock(),
+                        signatureBytes = byteArrayOf()
+                    )
+                    runCatching { sendMemberUpdateUseCase.invoke(keepalive) }
+                        .onFailure {
+                            networkEventRepository.pushEvent("[HB-SP-MON] WARN keepalive broadcast échoué: ${it.message}")
+                        }
+                }
             }
             while (isActive) {
                 delay(LIVENESS_CHECK_INTERVAL_MS)
