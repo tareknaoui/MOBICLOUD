@@ -92,6 +92,8 @@ class DashboardViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
 
     fun toggleExpertMode() = viewModelScope.launch {
-        nodeSettingsRepository.updateExpertMode(!isExpertMode.value)
+        // F9 fix: lecture atomique depuis le repo (source de vérité DB) évite la race condition double-tap
+        val current = nodeSettingsRepository.getSettings().isExpertModeEnabled
+        nodeSettingsRepository.updateExpertMode(!current)
     }
 }

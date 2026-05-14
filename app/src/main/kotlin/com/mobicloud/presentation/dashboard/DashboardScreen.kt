@@ -65,15 +65,8 @@ fun DashboardScreen(
         NetworkType.UNKNOWN -> "—"
     }
 
-    // Story 13.1 — Calcul du HealthState (Mode Simple uniquement, mais évalué dans les deux modes)
-    val healthState = remember(
-        diagnostics.reliabilityScore,
-        hasActivePeers,
-        networkLabel,
-        relayState,
-        isNetworkUnstable,
-        diagnostics.activePeerCount
-    ) {
+    // Story 13.1 — Calcul du HealthState — F1 fix: remember sans clés + derivedStateOf trackent les State lus
+    val healthState by remember {
         derivedStateOf {
             val reliability = (diagnostics.reliabilityScore * 100).toInt()
             val peerCount = diagnostics.activePeerCount
@@ -97,7 +90,7 @@ fun DashboardScreen(
         // === Story 13.1 — Bannière santé (Mode Simple uniquement) ===
         if (!isExpertMode) {
             Spacer(Modifier.height(4.dp))
-            HealthBanner(state = healthState.value)
+            HealthBanner(state = healthState)
         }
 
         // === Jauge de fiabilité — TOUJOURS visible (Simple + Expert) ===

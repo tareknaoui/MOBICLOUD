@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -117,7 +118,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            Spacer(modifier = Modifier.padding(start = 12.dp))
+            Spacer(Modifier.width(12.dp))  // F3 fix: width crée l'espace dans le Row (padding sur Spacer = sans effet)
             Switch(
                 checked = isExpertMode,
                 onCheckedChange = viewModel::updateExpertMode

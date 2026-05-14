@@ -1,6 +1,6 @@
 # Story 13.1 : Refonte UX Grand Public — Sémantique Humaine & Mode Diagnostics Avancés
 
-Status: review
+Status: done
 
 **Epic :** 13 — Refonte UX Grand Public (V5.2 Simplified)
 **Story ID :** 13.1
@@ -518,3 +518,31 @@ Story 12.1 (`12-1-suppression-gps-admission-cluster-par-charge.md`) a :
 ### Change Log
 
 - **2026-05-14** — Implémentation initiale Story 13.1 (haiku 4.5 dev-story). 12 AC adressés, 17 fichiers UPDATE + 3 NEW + 1 strings.xml. Migration Room v17. Tests automatisés différés à `bmad-code-review`. Status → `review`.
+
+---
+
+### Review Findings
+
+> Code review adversarial — 3 couches (Blind Hunter · Edge Case Hunter · Acceptance Auditor) — 2026-05-14
+
+**`decision_needed` (2)**
+
+- [x] [Review][Decision] **F4 — `MemberListCard` : `Column.forEach` vs `LazyColumn`** — Résolu : (A) garder `Column` — justifié par la contrainte `verticalScroll` parent dans `NetworkScreen`.
+- [x] [Review][Decision] **F10 — `reliabilityScore * 100` : type Float 0-1 ou Int 0-100 ?** — Résolu : (A) `reliabilityScore` est Float [0.0–1.0], `* 100` est correct.
+
+**`patch` (4)**
+
+- [x] [Review][Patch] **F1 — `derivedStateOf` wrappé dans `remember(key)` — anti-pattern Compose** [`DashboardScreen.kt`] — ✅ Corrigé : `val healthState by remember { derivedStateOf { ... } }`, suppression des clés explicites et `.value`.
+- [x] [Review][Patch] **F2 — Clock mismatch `System.currentTimeMillis()` vs `SystemClock.elapsedRealtime()`** [`MemberListCard.kt`] — ✅ Corrigé : remplacement par `SystemClock.elapsedRealtime()`.
+- [x] [Review][Patch] **F3 — `Spacer(modifier = Modifier.padding(start = 12.dp))` sans effet visuel** [`SettingsScreen.kt`] — ✅ Corrigé : `Spacer(Modifier.width(12.dp))`.
+- [x] [Review][Patch] **F9 — Race condition double-tap `toggleExpertMode()`** [`DashboardViewModel.kt` + `NetworkViewModel.kt`] — ✅ Corrigé : lecture atomique via `nodeSettingsRepository.getSettings().isExpertModeEnabled`.
+
+**`defer` (7)**
+
+- [x] [Review][Defer] **F5 — `HealthState` sealed class définie dans `HealthBanner.kt`** [`HealthBanner.kt`] — deferred, séparation des concerns ; extraire dans `HealthState.kt` séparé lors d'un refactoring futur.
+- [x] [Review][Defer] **F6 — `formatBytesShort()` duplique `Long.toReadable()`** [`DashboardScreen.kt`] — deferred, extraction dans `core/format/ByteFormatter.kt` à planifier.
+- [x] [Review][Defer] **F7 — `onCancel` du `DownloadProgressIndicator` appelle `resetDownloadState()` non une vraie annulation** [`ExplorerScreen.kt`] — deferred, annulation réelle du téléchargement hors scope Story 13.1.
+- [x] [Review][Defer] **F8 — `observeExpertMode WHERE id=0` n'émet rien si table vide au 1er lancement** [`NodeSettingsDao.kt`] — deferred, mitigé par la séquence d'initialisation des settings existante.
+- [x] [Review][Defer] **F11 — Tests automatisés manquants** (ViewModel, Room migration v16→v17, Compose, SemanticAuditTest) — deferred, explicitement différés dans Completion Notes.
+- [x] [Review][Defer] **F12 — `MIGRATION_17_18` (Story 13.2) incluse dans le diff Story 13.1** [`CatalogDatabase.kt`] — deferred, commits co-livrés intentionnellement ; périmètre mélangé accepté.
+- [x] [Review][Defer] **F14 — `ExplorerScreen.kt` contient du code Story 13.2 (SwipeToDismiss, undoEvent) et 13.3 (uploadBusyEvent)** — deferred, implémentation anticipée co-livrée.

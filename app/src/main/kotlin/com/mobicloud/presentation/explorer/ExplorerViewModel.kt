@@ -218,6 +218,12 @@ class ExplorerViewModel @Inject constructor(
     }
 
     fun cancelUpload() {
+        // [Review][Patch] P2 — guard double-tap : si déjà Cancelled, le resetJob est en cours ;
+        // un 2e appel l'annulerait → état Cancelled permanent. On sort immédiatement.
+        if (_storeState.value is StoreState.Cancelled) return
+        // [Review][Patch] P1 — guard Idle : si aucun upload actif, ne pas afficher "⊘ Upload annulé"
+        // storeJob null ou inactif = pas d'upload en cours.
+        if (storeJob?.isActive != true) return
         storeJob?.cancel()
         resetJob?.cancel()
         _storeState.value = StoreState.Cancelled

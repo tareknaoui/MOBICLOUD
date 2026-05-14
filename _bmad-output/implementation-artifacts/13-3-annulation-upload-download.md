@@ -10,7 +10,7 @@
 
 ## Status
 
-review
+done
 
 ---
 
@@ -124,6 +124,17 @@ La file d'attente (upload queue) est également hors scope : l'UI notifiera déj
   - Test : `cancelUpload() scheduleReset à 3s` → advanceTimeBy(3001), state == `Idle`
   - Test : `storeFile() quand InProgress émet uploadBusyEvent` → lancer storeFile, state devient InProgress, relancer storeFile, vérifier event émis
 - [x] 6.2 Mettre à jour `ExplorerViewModelTrashTest.kt` si la signature de `ExplorerViewModel` a changé (vérifier compilation)
+
+### Review Findings
+
+- [x] [Review][Patch] P1 — `cancelUpload()` depuis Idle affiche "⊘ Upload annulé" sans upload actif [ExplorerViewModel.kt] — Guard `if (storeJob?.isActive != true) return` ajouté. ✅
+- [x] [Review][Patch] P2 — `cancelUpload()` double-tap : 2e appel annule le `resetJob` en cours → état `Cancelled` permanent [ExplorerViewModel.kt] — Guard `if (_storeState.value is StoreState.Cancelled) return` ajouté. ✅
+- [x] [Review][Patch] P3 — AC4 violé : bouton Annuler invisible pendant `DownloadState.Locating` [DownloadProgressIndicator.kt] — `Locating` ajouté à la condition de rendu + branche `when` avec indicateur indéterminé. ✅
+- [x] [Review][Patch] P4 — AC3 non testé [ExplorerViewModelCancelUploadTest.kt] — Test `cancelUpload depuis Idle est un no-op` ajouté (couvre guard P1). ✅
+- [x] [Review][Patch] P5 — AC1 couverture partielle [ExplorerViewModelCancelUploadTest.kt] — Test `cancelUpload double-tap ne bloque pas le retour a Idle` ajouté (couvre guard P2 + storeJob actif). ✅
+- [x] [Review][Defer] P6 — `SwipeToDismissBox.confirmValueChange` retourne `true` même si `moveToTrash` échoue silencieusement [ExplorerScreen.kt] — deferred, pre-existing (architecture coroutine sans error handler dans moveToTrash)
+- [x] [Review][Defer] P7 — Test via réflexion sur `_storeState` : fragile, cassera au refactoring [ExplorerViewModelCancelUploadTest.kt] — deferred, pre-existing (manque @VisibleForTesting setter)
+- [x] [Review][Defer] P8 — `undoEvent` buffer capacity=1 : 3e swipe rapide → event perdu [ExplorerViewModel.kt] — deferred, pre-existing (décision Story 13.2)
 
 ---
 

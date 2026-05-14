@@ -1,0 +1,604 @@
+﻿commit 235a3369b5cabfd1510e50251d33b3661beef5d3
+Author: Yasmine Nemiri Sara <127095561+yasmine23nem@users.noreply.github.com>
+Date:   Thu May 14 17:19:12 2026 +0100
+
+    ui v2
+
+diff --git a/app/src/main/kotlin/com/mobicloud/data/local/dao/CatalogDao.kt b/app/src/main/kotlin/com/mobicloud/data/local/dao/CatalogDao.kt
+index 3463b12..fed72d8 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/local/dao/CatalogDao.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/local/dao/CatalogDao.kt
+@@ -53,4 +53,52 @@ interface CatalogDao {
+      */
+     @Insert(onConflict = OnConflictStrategy.REPLACE)
+     suspend fun updateCatalogEntryOnly(entry: CatalogEntryEntity)
++
++    // Story 13.2 ΓÇö requ├¬tes corbeille (soft-delete local, non distribu├⌐ dans le DHT)
++
++    @Transaction
++    @Query("SELECT * FROM catalog_entry WHERE is_in_trash = 0")
++    fun getAllActiveEntriesFlow(): Flow<List<CatalogEntryWithFragments>>
++
++    @Transaction
++    @Query("SELECT * FROM catalog_entry WHERE is_in_trash = 1")
++    fun getDeletedEntriesFlow(): Flow<List<CatalogEntryWithFragments>>
++
++    @Query("UPDATE catalog_entry SET is_in_trash = 1, deleted_at = :ts WHERE file_hash = :hash")
++    suspend fun softDeleteEntry(hash: String, ts: Long)
++
++    @Query("UPDATE catalog_entry SET is_in_trash = 0, deleted_at = NULL WHERE file_hash = :hash")
++    suspend fun restoreEntry(hash: String)
++
++    @Query("DELETE FROM catalog_entry WHERE file_hash = :hash")
++    suspend fun deleteCatalogEntry(hash: String)
++
++    @Transaction
++    suspend fun permanentlyDeleteEntry(hash: String) {
++        deleteFragmentLocations(hash)
++        deleteCatalogEntry(hash)
++    }
++
++    @Transaction
++    @Query("SELECT * FROM catalog_entry WHERE is_in_trash = 1 AND deleted_at < :expiryTs")
++    suspend fun getExpiredEntries(expiryTs: Long): List<CatalogEntryWithFragments>
++
++    @Query("SELECT file_hash FROM catalog_entry WHERE is_in_trash = 1")
++    suspend fun getAllTrashHashes(): List<String>
++
++    @Transaction
++    suspend fun purgeExpiredEntries(expiryTs: Long) {
++        val expired = getExpiredEntries(expiryTs)
++        for (e in expired) {
++            permanentlyDeleteEntry(e.catalogEntry.fileHash)
++        }
++    }
++
++    @Transaction
++    suspend fun emptyTrash() {
++        val hashes = getAllTrashHashes()
++        for (h in hashes) {
++            permanentlyDeleteEntry(h)
++        }
++    }
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/data/local/entity/CatalogEntryEntity.kt b/app/src/main/kotlin/com/mobicloud/data/local/entity/CatalogEntryEntity.kt
+index 7399fbe..386f792 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/local/entity/CatalogEntryEntity.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/local/entity/CatalogEntryEntity.kt
+@@ -32,5 +32,12 @@ data class CatalogEntryEntity(
+     val k: Int = 4,
+ 
+     @ColumnInfo(name = "n", defaultValue = "2")
+-    val n: Int = 2
++    val n: Int = 2,
++
++    // Story 13.2 ΓÇö corbeille locale (non distribu├⌐e dans le DHT)
++    @ColumnInfo(name = "is_in_trash", defaultValue = "0")
++    val isInTrash: Boolean = false,
++
++    @ColumnInfo(name = "deleted_at", defaultValue = "NULL")
++    val deletedAt: Long? = null
+ )
+diff --git a/app/src/main/kotlin/com/mobicloud/data/repository_impl/CatalogRepositoryImpl.kt b/app/src/main/kotlin/com/mobicloud/data/repository_impl/CatalogRepositoryImpl.kt
+index edb77f2..e5ead2c 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/repository_impl/CatalogRepositoryImpl.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/repository_impl/CatalogRepositoryImpl.kt
+@@ -46,7 +46,9 @@ class CatalogRepositoryImpl(
+             originalFileSize = originalFileSize,
+             originalFileName = originalFileName,
+             k = k,
+-            n = n
++            n = n,
++            isInTrash = isInTrash,
++            deletedAt = deletedAt
+         )
+ 
+     private fun FragmentLocation.toEntity(catalogFileHash: String): FragmentLocationEntity =
+@@ -85,7 +87,9 @@ class CatalogRepositoryImpl(
+             originalFileSize = catalogEntry.originalFileSize,
+             originalFileName = catalogEntry.originalFileName,
+             k = catalogEntry.k,
+-            n = catalogEntry.n
++            n = catalogEntry.n,
++            isInTrash = catalogEntry.isInTrash,
++            deletedAt = catalogEntry.deletedAt
+         )
+ 
+     // --- CatalogRepository impl ---
+@@ -141,4 +145,40 @@ class CatalogRepositoryImpl(
+         withContext(Dispatchers.IO) {
+             runCatching { catalogDao.getCatalogEntry(hash)?.toDomain() }
+         }
++
++    // Story 13.2 ΓÇö corbeille
++
++    override fun getActiveEntriesFlow(): Flow<List<CatalogEntry>> =
++        catalogDao.getAllActiveEntriesFlow().map { list -> list.map { it.toDomain() } }
++
++    override fun getDeletedEntriesFlow(): Flow<List<CatalogEntry>> =
++        catalogDao.getDeletedEntriesFlow().map { list -> list.map { it.toDomain() } }
++
++    override suspend fun moveToTrash(fileHash: String): Result<Unit> =
++        withContext(Dispatchers.IO) {
++            runCatching { catalogDao.softDeleteEntry(fileHash, System.currentTimeMillis()) }
++        }
++
++    override suspend fun restoreFromTrash(fileHash: String): Result<Unit> =
++        withContext(Dispatchers.IO) {
++            runCatching { catalogDao.restoreEntry(fileHash) }
++        }
++
++    override suspend fun permanentlyDelete(fileHash: String): Result<Unit> =
++        withContext(Dispatchers.IO) {
++            runCatching { catalogDao.permanentlyDeleteEntry(fileHash) }
++        }
++
++    override suspend fun emptyTrash(): Result<Unit> =
++        withContext(Dispatchers.IO) {
++            runCatching { catalogDao.emptyTrash() }
++        }
++
++    override suspend fun purgeExpired(): Result<Unit> =
++        withContext(Dispatchers.IO) {
++            runCatching {
++                val expiryTs = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
++                catalogDao.purgeExpiredEntries(expiryTs)
++            }
++        }
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/models/CatalogEntry.kt b/app/src/main/kotlin/com/mobicloud/domain/models/CatalogEntry.kt
+index 2d64d16..209feab 100644
+--- a/app/src/main/kotlin/com/mobicloud/domain/models/CatalogEntry.kt
++++ b/app/src/main/kotlin/com/mobicloud/domain/models/CatalogEntry.kt
+@@ -27,5 +27,8 @@ data class CatalogEntry(
+     @ProtoNumber(6) val originalFileSize: Long = 0L,
+     @ProtoNumber(7) val originalFileName: String = "",
+     @ProtoNumber(8) val k: Int = 4,
+-    @ProtoNumber(9) val n: Int = 2
++    @ProtoNumber(9) val n: Int = 2,
++    // Story 13.2 ΓÇö m├⌐tadonn├⌐es de corbeille (locales uniquement, non distribu├⌐es dans le DHT)
++    val isInTrash: Boolean = false,
++    val deletedAt: Long? = null
+ )
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/repository/CatalogRepository.kt b/app/src/main/kotlin/com/mobicloud/domain/repository/CatalogRepository.kt
+index 77fac9f..911d5a7 100644
+--- a/app/src/main/kotlin/com/mobicloud/domain/repository/CatalogRepository.kt
++++ b/app/src/main/kotlin/com/mobicloud/domain/repository/CatalogRepository.kt
+@@ -55,4 +55,27 @@ interface CatalogRepository {
+      * R├⌐serv├⌐ au n┼ôud propri├⌐taire qui distribue ses propres blocs (Story 5.3).
+      */
+     suspend fun insertOwnerEntry(entry: CatalogEntry): Result<Unit>
++
++    // Story 13.2 ΓÇö corbeille locale (non distribu├⌐e dans le DHT)
++
++    /** Observe les entr├⌐es actives (non en corbeille). */
++    fun getActiveEntriesFlow(): Flow<List<CatalogEntry>>
++
++    /** Observe les entr├⌐es en corbeille. */
++    fun getDeletedEntriesFlow(): Flow<List<CatalogEntry>>
++
++    /** D├⌐place une entr├⌐e vers la corbeille (soft-delete). */
++    suspend fun moveToTrash(fileHash: String): Result<Unit>
++
++    /** Restaure une entr├⌐e depuis la corbeille. */
++    suspend fun restoreFromTrash(fileHash: String): Result<Unit>
++
++    /** Supprime d├⌐finitivement une entr├⌐e (catalog_entry + fragment_location). */
++    suspend fun permanentlyDelete(fileHash: String): Result<Unit>
++
++    /** Vide enti├¿rement la corbeille. */
++    suspend fun emptyTrash(): Result<Unit>
++
++    /** Supprime les entr├⌐es dont deletedAt < (now - 30 jours). */
++    suspend fun purgeExpired(): Result<Unit>
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt b/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt
+index faf6be1..6e0c063 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt
+@@ -28,9 +28,12 @@ import kotlinx.coroutines.CoroutineDispatcher
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.Job
+ import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.MutableSharedFlow
+ import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.SharedFlow
+ import kotlinx.coroutines.flow.SharingStarted
+ import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asSharedFlow
+ import kotlinx.coroutines.flow.asStateFlow
+ import kotlinx.coroutines.flow.stateIn
+ import kotlinx.coroutines.flow.update
+@@ -56,9 +59,17 @@ class ExplorerViewModel @Inject constructor(
+     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+ ) : ViewModel() {
+ 
+-    val catalogEntries: StateFlow<List<CatalogEntry>> = catalogRepository.getAllEntriesFlow()
++    val catalogEntries: StateFlow<List<CatalogEntry>> = catalogRepository.getActiveEntriesFlow()
+         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
+ 
++    // Story 13.2 ΓÇö corbeille : fileHash ├⌐mis pour d├⌐clencher la snackbar "Annuler"
++    private val _undoEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
++    val undoEvent: SharedFlow<String> = _undoEvent.asSharedFlow()
++
++    // Story 13.3 ΓÇö upload occup├⌐ : notifie l'UI quand un 2e upload est tent├⌐ pendant InProgress
++    private val _uploadBusyEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
++    val uploadBusyEvent: SharedFlow<Unit> = _uploadBusyEvent.asSharedFlow()
++
+     private val _isRefreshing = MutableStateFlow(false)
+     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+ 
+@@ -69,10 +80,16 @@ class ExplorerViewModel @Inject constructor(
+     val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
+ 
+     private var resetJob: Job? = null
++    private var storeJob: Job? = null
+ 
+     // [Review][Patch] Tracker le job de download pour annulation en cas de relance concurrente.
+     private var downloadJob: Job? = null
+ 
++    init {
++        // Story 13.2 ΓÇö purger les entr├⌐es expir├⌐es (TTL 30 jours) ├á chaque ouverture de l'explorateur
++        viewModelScope.launch { catalogRepository.purgeExpired() }
++    }
++
+     // [Review][Patch] P7 ΓÇö tracker le job de localisation : sans ├ºa, un vieux `localize` en cours
+     // pouvait ├⌐mettre `Located(fileHashA)` et ├⌐craser le state d'un download fileHashB plus r├⌐cent.
+     private var locateJob: Job? = null
+@@ -92,6 +109,19 @@ class ExplorerViewModel @Inject constructor(
+         }
+     }
+ 
++    fun moveToTrash(fileHash: String) {
++        viewModelScope.launch {
++            catalogRepository.moveToTrash(fileHash)
++            _undoEvent.emit(fileHash)
++        }
++    }
++
++    fun undoMoveToTrash(fileHash: String) {
++        viewModelScope.launch {
++            catalogRepository.restoreFromTrash(fileHash)
++        }
++    }
++
+     fun initiateDownload(fileHash: String) {
+         // [Review][Patch] P6 ΓÇö preemption : un utilisateur qui tape un fichier B pendant que
+         // A est `Locating` doit pouvoir basculer. On annule les deux jobs (locate + download)
+@@ -187,11 +217,21 @@ class ExplorerViewModel @Inject constructor(
+         _downloadState.value = DownloadState.Idle
+     }
+ 
++    fun cancelUpload() {
++        storeJob?.cancel()
++        resetJob?.cancel()
++        _storeState.value = StoreState.Cancelled
++        scheduleReset(delayMs = 3000L)
++    }
++
+     fun storeFile(uri: Uri) {
+-        if (_storeState.value is StoreState.InProgress) return
++        if (_storeState.value is StoreState.InProgress) {
++            _uploadBusyEvent.tryEmit(Unit)
++            return
++        }
+         resetJob?.cancel()
+         _storeState.value = StoreState.InProgress.Encoding  // P7: set before launch to close TOCTOU window
+-        viewModelScope.launch {
++        storeJob = viewModelScope.launch {
+             val (fileSizeBytes, originalFileName) = withContext(ioDispatcher) {
+                 context.contentResolver.query(
+                     uri,
+@@ -320,9 +360,9 @@ class ExplorerViewModel @Inject constructor(
+         }
+     }
+ 
+-    private fun scheduleReset() {
++    private fun scheduleReset(delayMs: Long = 5000L) {
+         resetJob = viewModelScope.launch {
+-            delay(5000L)  // > Snackbar Short duration to avoid cancelling in-flight snackbar
++            delay(delayMs)  // > Snackbar Short duration to avoid cancelling in-flight snackbar
+             _storeState.value = StoreState.Idle
+         }
+     }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/trash/TrashScreen.kt b/app/src/main/kotlin/com/mobicloud/presentation/trash/TrashScreen.kt
+new file mode 100644
+index 0000000..96b39ea
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/presentation/trash/TrashScreen.kt
+@@ -0,0 +1,255 @@
++package com.mobicloud.presentation.trash
++
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.lazy.LazyColumn
++import androidx.compose.foundation.lazy.items
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.automirrored.filled.ArrowBack
++import androidx.compose.material.icons.filled.Delete
++import androidx.compose.material.icons.filled.DeleteForever
++import androidx.compose.material.icons.filled.Restore
++import androidx.compose.material3.AlertDialog
++import androidx.compose.material3.Card
++import androidx.compose.material3.CardDefaults
++import androidx.compose.material3.ExperimentalMaterial3Api
++import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.Scaffold
++import androidx.compose.material3.SnackbarHost
++import androidx.compose.material3.SnackbarHostState
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.material3.TopAppBar
++import androidx.compose.material3.TopAppBarDefaults
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.font.FontFamily
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.hilt.navigation.compose.hiltViewModel
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import com.mobicloud.domain.models.CatalogEntry
++import kotlinx.coroutines.launch
++import kotlinx.serialization.Serializable
++import java.text.SimpleDateFormat
++import java.util.Date
++import java.util.Locale
++import java.util.concurrent.TimeUnit
++
++@Serializable
++object TrashRoute
++
++private val DATE_FORMAT = SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE)
++private const val TTL_DAYS = 30L
++
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++fun TrashScreen(
++    onNavigateBack: () -> Unit,
++    modifier: Modifier = Modifier,
++    viewModel: TrashViewModel = hiltViewModel()
++) {
++    val entries by viewModel.deletedEntries.collectAsStateWithLifecycle()
++    val snackbarHostState = remember { SnackbarHostState() }
++    val scope = rememberCoroutineScope()
++
++    var confirmDeleteHash by remember { mutableStateOf<String?>(null) }
++    var showEmptyConfirm by remember { mutableStateOf(false) }
++
++    // Dialogue suppression individuelle
++    if (confirmDeleteHash != null) {
++        AlertDialog(
++            onDismissRequest = { confirmDeleteHash = null },
++            title = { Text("Supprimer d├⌐finitivement ?", color = Color.White) },
++            text = { Text("Ce fichier sera supprim├⌐ de fa├ºon irr├⌐versible.", color = Color(0xFFCCCCCC)) },
++            confirmButton = {
++                TextButton(onClick = {
++                    viewModel.permanentlyDelete(confirmDeleteHash!!)
++                    confirmDeleteHash = null
++                }) {
++                    Text("Supprimer", color = Color(0xFFFF3333))
++                }
++            },
++            dismissButton = {
++                TextButton(onClick = { confirmDeleteHash = null }) {
++                    Text("Annuler", color = Color(0xFFFFB300))
++                }
++            },
++            containerColor = Color(0xFF1A1A1A)
++        )
++    }
++
++    // Dialogue vider la corbeille
++    if (showEmptyConfirm) {
++        AlertDialog(
++            onDismissRequest = { showEmptyConfirm = false },
++            title = { Text("Vider la corbeille ?", color = Color.White) },
++            text = { Text("Tous les fichiers seront supprim├⌐s d├⌐finitivement. Cette action est irr├⌐versible.", color = Color(0xFFCCCCCC)) },
++            confirmButton = {
++                TextButton(onClick = {
++                    viewModel.emptyTrash()
++                    showEmptyConfirm = false
++                }) {
++                    Text("Vider", color = Color(0xFFFF3333))
++                }
++            },
++            dismissButton = {
++                TextButton(onClick = { showEmptyConfirm = false }) {
++                    Text("Annuler", color = Color(0xFFFFB300))
++                }
++            },
++            containerColor = Color(0xFF1A1A1A)
++        )
++    }
++
++    Scaffold(
++        modifier = modifier,
++        containerColor = Color.Black,
++        snackbarHost = { SnackbarHost(snackbarHostState) },
++        topBar = {
++            TopAppBar(
++                title = { Text("Corbeille", color = Color.White) },
++                navigationIcon = {
++                    IconButton(onClick = onNavigateBack) {
++                        Icon(
++                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
++                            contentDescription = "Retour",
++                            tint = Color.White
++                        )
++                    }
++                },
++                actions = {
++                    if (entries.isNotEmpty()) {
++                        IconButton(onClick = { showEmptyConfirm = true }) {
++                            Icon(
++                                imageVector = Icons.Default.DeleteForever,
++                                contentDescription = "Vider la corbeille",
++                                tint = Color(0xFFFF3333)
++                            )
++                        }
++                    }
++                },
++                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
++            )
++        }
++    ) { innerPadding ->
++        if (entries.isEmpty()) {
++            Box(
++                modifier = Modifier
++                    .fillMaxSize()
++                    .padding(innerPadding),
++                contentAlignment = Alignment.Center
++            ) {
++                Column(horizontalAlignment = Alignment.CenterHorizontally) {
++                    Icon(
++                        imageVector = Icons.Default.Delete,
++                        contentDescription = null,
++                        tint = Color(0xFF444444),
++                        modifier = Modifier.size(64.dp)
++                    )
++                    Text(
++                        text = "Votre corbeille est vide",
++                        color = Color(0xFF888888),
++                        fontSize = 16.sp,
++                        textAlign = TextAlign.Center,
++                        modifier = Modifier.padding(top = 16.dp)
++                    )
++                }
++            }
++        } else {
++            LazyColumn(
++                modifier = Modifier
++                    .fillMaxSize()
++                    .padding(innerPadding),
++                contentPadding = PaddingValues(16.dp),
++                verticalArrangement = Arrangement.spacedBy(8.dp)
++            ) {
++                items(entries, key = { it.fileHash }) { entry ->
++                    TrashEntryRow(
++                        entry = entry,
++                        onRestore = {
++                            viewModel.restoreEntry(entry.fileHash)
++                            scope.launch { snackbarHostState.showSnackbar("Fichier restaur├⌐") }
++                        },
++                        onDelete = { confirmDeleteHash = entry.fileHash }
++                    )
++                }
++            }
++        }
++    }
++}
++
++@Composable
++private fun TrashEntryRow(
++    entry: CatalogEntry,
++    onRestore: () -> Unit,
++    onDelete: () -> Unit
++) {
++    val deletedDate = entry.deletedAt?.let { DATE_FORMAT.format(Date(it)) } ?: "ΓÇö"
++    val daysLeft = entry.deletedAt?.let {
++        val elapsed = TimeUnit.MILLISECONDS.toDays(System.currentTimeMillis() - it)
++        (TTL_DAYS - elapsed).coerceAtLeast(0)
++    } ?: TTL_DAYS
++
++    Card(
++        colors = CardDefaults.cardColors(containerColor = Color(0xFF111111)),
++        modifier = Modifier.fillMaxWidth()
++    ) {
++        Row(
++            modifier = Modifier
++                .fillMaxWidth()
++                .padding(horizontal = 12.dp, vertical = 8.dp),
++            verticalAlignment = Alignment.CenterVertically
++        ) {
++            Column(modifier = Modifier.weight(1f)) {
++                Text(
++                    text = entry.originalFileName.ifBlank { entry.fileHash.take(16) },
++                    color = Color.White,
++                    fontSize = 14.sp,
++                    maxLines = 1,
++                    overflow = TextOverflow.Ellipsis
++                )
++                Text(
++                    text = "Supprim├⌐ le $deletedDate ┬╖ $daysLeft j restants",
++                    color = Color(0xFF888888),
++                    fontSize = 11.sp,
++                    fontFamily = FontFamily.Monospace
++                )
++            }
++            Spacer(Modifier.width(8.dp))
++            IconButton(onClick = onRestore) {
++                Icon(
++                    imageVector = Icons.Default.Restore,
++                    contentDescription = "Restaurer",
++                    tint = Color(0xFFFFB300)
++                )
++            }
++            IconButton(onClick = onDelete) {
++                Icon(
++                    imageVector = Icons.Default.DeleteForever,
++                    contentDescription = "Supprimer d├⌐finitivement",
++                    tint = Color(0xFFFF3333)
++                )
++            }
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/trash/TrashViewModel.kt b/app/src/main/kotlin/com/mobicloud/presentation/trash/TrashViewModel.kt
+new file mode 100644
+index 0000000..7aef839
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/presentation/trash/TrashViewModel.kt
+@@ -0,0 +1,34 @@
++package com.mobicloud.presentation.trash
++
++import androidx.lifecycle.ViewModel
++import androidx.lifecycle.viewModelScope
++import com.mobicloud.domain.models.CatalogEntry
++import com.mobicloud.domain.repository.CatalogRepository
++import dagger.hilt.android.lifecycle.HiltViewModel
++import kotlinx.coroutines.flow.SharingStarted
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.stateIn
++import kotlinx.coroutines.launch
++import javax.inject.Inject
++
++@HiltViewModel
++class TrashViewModel @Inject constructor(
++    private val catalogRepository: CatalogRepository
++) : ViewModel() {
++
++    val deletedEntries: StateFlow<List<CatalogEntry>> =
++        catalogRepository.getDeletedEntriesFlow()
++            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
++
++    fun restoreEntry(fileHash: String) {
++        viewModelScope.launch { catalogRepository.restoreFromTrash(fileHash) }
++    }
++
++    fun permanentlyDelete(fileHash: String) {
++        viewModelScope.launch { catalogRepository.permanentlyDelete(fileHash) }
++    }
++
++    fun emptyTrash() {
++        viewModelScope.launch { catalogRepository.emptyTrash() }
++    }
++}

@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-05-14T12:00:00+02:00  # story 13.1 → review (impl Phase 1+2 terminée, tests différés à code-review)
+last_updated: 2026-05-14T17:43:00+01:00  # story 13.3 → done (code review complet, 5 patches appliqués)
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
@@ -111,8 +111,8 @@ development_status:
   12-1-suppression-gps-admission-cluster-par-charge: done
   epic-12-retrospective: optional
   epic-13: in-progress
-  13-1-refonte-ux-grand-public-semantique-humaine-et-mode-expert: review
+  13-1-refonte-ux-grand-public-semantique-humaine-et-mode-expert: done
   13-2-corbeille-suppression-et-restauration-de-fichiers: review
-  13-3-annulation-upload-download: review
+  13-3-annulation-upload-download: done
   13-4-ecran-initialisation-p2p-et-permissions-groupees-grand-public: review
   epic-13-retrospective: optional

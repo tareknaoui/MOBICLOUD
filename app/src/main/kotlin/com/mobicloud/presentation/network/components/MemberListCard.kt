@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.os.SystemClock
 import com.mobicloud.domain.models.ClusterNodeInfo
 import com.mobicloud.domain.models.ClusterNodeStatus
 
@@ -50,7 +51,7 @@ fun MemberListCard(
 
 @Composable
 private fun MemberRow(node: ClusterNodeInfo) {
-    val now = System.currentTimeMillis()
+    val now = SystemClock.elapsedRealtime()  // F2 fix: même horloge que lastSeenMs (elapsedRealtime dans NetworkViewModel)
     val ageSec = ((now - node.lastSeenMs) / 1000L).coerceAtLeast(0L)
     val battery = node.batteryPercent?.let { "$it% batterie" } ?: "batterie inconnue"
     val seenLabel = if (node.isLocal) "Vous" else "Connecté il y a ${ageSec}s"

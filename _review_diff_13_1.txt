@@ -1,0 +1,1533 @@
+﻿diff --git a/app/src/main/kotlin/com/mobicloud/data/local/CatalogDatabase.kt b/app/src/main/kotlin/com/mobicloud/data/local/CatalogDatabase.kt
+index e18d92c..3914096 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/local/CatalogDatabase.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/local/CatalogDatabase.kt
+@@ -56,7 +56,7 @@ abstract class CatalogDatabase : RoomDatabase() {
+     companion object {
+         // Room `@Database` est en `RetentionPolicy.CLASS` ΓåÆ invisible ├á la r├⌐flexion runtime.
+         // Cette constante sert de source unique consomm├⌐e par l'annotation ET par les tests.
+-        const val CURRENT_VERSION = 16
++        const val CURRENT_VERSION = 18
+ 
+         // Story 1-3 ΓÇö premier ajout de NodeIdentityEntity + PeerNodeEntity (sans is_super_pair).
+         val MIGRATION_1_2 = object : Migration(1, 2) {
+@@ -267,5 +267,24 @@ abstract class CatalogDatabase : RoomDatabase() {
+                 db.execSQL("CREATE INDEX IF NOT EXISTS idx_cluster_members_status ON cluster_members(status)")
+             }
+         }
++
++        // Story 13.1 ΓÇö toggle UI Mode Diagnostics Avanc├⌐s (Simple par d├⌐faut, Expert sur opt-in).
++        // INTEGER NOT NULL DEFAULT 0 = false (mode Simple par d├⌐faut sur les installs existantes).
++        val MIGRATION_16_17 = object : Migration(16, 17) {
++            override fun migrate(db: SupportSQLiteDatabase) {
++                db.execSQL(
++                    "ALTER TABLE node_settings ADD COLUMN is_expert_mode_enabled INTEGER NOT NULL DEFAULT 0"
++                )
++            }
++        }
++
++        // Story 13.2 ΓÇö corbeille locale (soft-delete). Champs non distribu├⌐s dans le DHT.
++        // is_in_trash = 0 par d├⌐faut ΓåÆ entr├⌐es existantes restent visibles dans l'explorateur.
++        val MIGRATION_17_18 = object : Migration(17, 18) {
++            override fun migrate(db: SupportSQLiteDatabase) {
++                db.execSQL("ALTER TABLE catalog_entry ADD COLUMN is_in_trash INTEGER NOT NULL DEFAULT 0")
++                db.execSQL("ALTER TABLE catalog_entry ADD COLUMN deleted_at INTEGER DEFAULT NULL")
++            }
++        }
+     }
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/data/local/dao/HostedBlockDao.kt b/app/src/main/kotlin/com/mobicloud/data/local/dao/HostedBlockDao.kt
+index 37daccf..941b62c 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/local/dao/HostedBlockDao.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/local/dao/HostedBlockDao.kt
+@@ -32,4 +32,10 @@ interface HostedBlockDao {
+     // Story 9.2 ΓÇö lecture one-shot de la m├¬me agr├⌐gation, pour calcul `freeBytes` lors du REGISTER_PEER
+     @Query("SELECT COALESCE(SUM(size_bytes), 0) FROM hosted_blocks")
+     suspend fun getTotalSizeBytes(): Long
++
++    // Story 13.1 ΓÇö KPI Dashboard "Fichiers prot├⌐g├⌐s" : count des fragments h├⌐berg├⌐s.
++    // Approximation grand public (chaque fragment Γëê part d'un fichier ; un utilisateur n'a pas
++    // ├á conna├«tre la distinction technique fragment / fichier dans le Mode Simple).
++    @Query("SELECT COUNT(*) FROM hosted_blocks")
++    fun observeHostedBlockCount(): Flow<Int>
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/data/local/dao/NodeSettingsDao.kt b/app/src/main/kotlin/com/mobicloud/data/local/dao/NodeSettingsDao.kt
+index 3107716..0238c73 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/local/dao/NodeSettingsDao.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/local/dao/NodeSettingsDao.kt
+@@ -18,4 +18,8 @@ interface NodeSettingsDao {
+ 
+     @Insert(onConflict = OnConflictStrategy.REPLACE)
+     suspend fun upsert(entity: NodeSettingsEntity)
++
++    // Story 13.1 ΓÇö observation isol├⌐e du flag expert (├⌐vite recomposition compl├¿te sur changement de quota)
++    @Query("SELECT is_expert_mode_enabled FROM node_settings WHERE id = 0")
++    fun observeExpertMode(): Flow<Boolean?>
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/data/local/entity/NodeSettingsEntity.kt b/app/src/main/kotlin/com/mobicloud/data/local/entity/NodeSettingsEntity.kt
+index 32bfbed..525bdad 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/local/entity/NodeSettingsEntity.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/local/entity/NodeSettingsEntity.kt
+@@ -8,5 +8,6 @@ import androidx.room.PrimaryKey
+ data class NodeSettingsEntity(
+     @PrimaryKey val id: Int = 0,
+     @ColumnInfo(name = "allocated_storage_bytes") val allocatedStorageBytes: Long,
+-    @ColumnInfo(name = "cluster_id") val clusterId: String = ""
++    @ColumnInfo(name = "cluster_id") val clusterId: String = "",
++    @ColumnInfo(name = "is_expert_mode_enabled") val isExpertModeEnabled: Boolean = false
+ )
+diff --git a/app/src/main/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImpl.kt b/app/src/main/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImpl.kt
+index 9e6d201..997582e 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImpl.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/repository/NodeSettingsRepositoryImpl.kt
+@@ -9,6 +9,7 @@ import com.mobicloud.domain.models.NodeSettings
+ import com.mobicloud.domain.repository.NodeSettingsRepository
+ import dagger.hilt.android.qualifiers.ApplicationContext
+ import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.distinctUntilChanged
+ import kotlinx.coroutines.flow.flow
+ import kotlinx.coroutines.flow.map
+ import kotlinx.coroutines.sync.Mutex
+@@ -23,7 +24,6 @@ class NodeSettingsRepositoryImpl @Inject constructor(
+     private val initMutex = Mutex()
+ 
+     private fun defaultBytes(): Long {
+-        // P16 review : factoriser le StatFs (avant : 2 syscalls + risque d'incoh├⌐rence entre les deux lectures).
+         val stat = StatFs(Environment.getDataDirectory().path)
+         val freeBytes = stat.availableBlocksLong * stat.blockSizeLong
+         val twoGb = 2L * 1024 * 1024 * 1024
+@@ -34,10 +34,8 @@ class NodeSettingsRepositoryImpl @Inject constructor(
+         dao.getSettings()?.toDomain() ?: NodeSettings(allocatedStorageBytes = defaultBytes())
+     }
+ 
+-    // Story 12.1 ΓÇö retourne le clusterId persiste directement, sans derivation SSID.
+     override suspend fun getClusterIdOnce(): String = getSettings().clusterId
+ 
+-    // AC6 ΓÇö adopte le clusterId du super-pair ├⌐lu ; no-op si blank.
+     override suspend fun updateClusterId(id: String) {
+         if (id.isBlank()) return
+         initMutex.withLock {
+@@ -48,7 +46,6 @@ class NodeSettingsRepositoryImpl @Inject constructor(
+         }
+     }
+ 
+-    // P14 review ΓÇö reset explicite (utilis├⌐ sur rejet d├⌐finitif d'un cluster sticky).
+     override suspend fun clearClusterId() {
+         initMutex.withLock {
+             val existing = dao.getSettings() ?: return@withLock
+@@ -60,8 +57,19 @@ class NodeSettingsRepositoryImpl @Inject constructor(
+         require(bytes > 0) { "allocatedStorageBytes must be positive, got $bytes" }
+         initMutex.withLock {
+             val existing = dao.getSettings()
+-            val clusterId = existing?.clusterId ?: ""
+-            dao.upsert(NodeSettingsEntity(id = 0, allocatedStorageBytes = bytes, clusterId = clusterId))
++            dao.upsert(
++                (existing ?: NodeSettingsEntity(id = 0, allocatedStorageBytes = bytes, clusterId = ""))
++                    .copy(allocatedStorageBytes = bytes)
++            )
++        }
++    }
++
++    // Story 13.1 ΓÇö pr├⌐servation des autres champs (allocatedStorageBytes, clusterId) lors du toggle.
++    override suspend fun updateExpertMode(enabled: Boolean) {
++        initMutex.withLock {
++            val existing = dao.getSettings()
++                ?: NodeSettingsEntity(id = 0, allocatedStorageBytes = defaultBytes())
++            dao.upsert(existing.copy(isExpertModeEnabled = enabled))
+         }
+     }
+ 
+@@ -70,6 +78,11 @@ class NodeSettingsRepositoryImpl @Inject constructor(
+             entity?.toDomain() ?: NodeSettings(allocatedStorageBytes = defaultBytes())
+         }
+ 
++    override fun observeExpertMode(): Flow<Boolean> =
++        dao.observeExpertMode()
++            .map { it ?: false }
++            .distinctUntilChanged()
++
+     override fun observeFreeSpaceBytes(): Flow<Long> = flow {
+         val stat = StatFs(Environment.getDataDirectory().path)
+         emit(stat.availableBlocksLong * stat.blockSizeLong)
+@@ -79,11 +92,6 @@ class NodeSettingsRepositoryImpl @Inject constructor(
+ private fun NodeSettingsEntity.toDomain() = NodeSettings(
+     allocatedStorageBytes = allocatedStorageBytes,
+     clusterId = clusterId,
++    isExpertModeEnabled = isExpertModeEnabled,
+     id = id
+ )
+-
+-private fun NodeSettings.toEntity() = NodeSettingsEntity(
+-    id = id,
+-    allocatedStorageBytes = allocatedStorageBytes,
+-    clusterId = clusterId
+-)
+diff --git a/app/src/main/kotlin/com/mobicloud/data/repository_impl/HostedBlockRepositoryImpl.kt b/app/src/main/kotlin/com/mobicloud/data/repository_impl/HostedBlockRepositoryImpl.kt
+index 039afca..dcd35e0 100644
+--- a/app/src/main/kotlin/com/mobicloud/data/repository_impl/HostedBlockRepositoryImpl.kt
++++ b/app/src/main/kotlin/com/mobicloud/data/repository_impl/HostedBlockRepositoryImpl.kt
+@@ -131,6 +131,8 @@ class HostedBlockRepositoryImpl @Inject constructor(
+         hostedBlockDao.getTotalSizeBytes()
+     }
+ 
++    override fun observeHostedBlockCount(): Flow<Int> = hostedBlockDao.observeHostedBlockCount()
++
+     companion object {
+         // Story 6.2 ΓÇö d├⌐fense en profondeur identique ├á ReceiveAndHostBlockUseCase
+         private val BLOCK_ID_REGEX = Regex("^[0-9a-f]{64}$")
+diff --git a/app/src/main/kotlin/com/mobicloud/di/IdentityModule.kt b/app/src/main/kotlin/com/mobicloud/di/IdentityModule.kt
+index 960a60f..0e0df06 100644
+--- a/app/src/main/kotlin/com/mobicloud/di/IdentityModule.kt
++++ b/app/src/main/kotlin/com/mobicloud/di/IdentityModule.kt
+@@ -53,7 +53,9 @@ object IdentityModule {
+             CatalogDatabase.MIGRATION_12_13,
+             CatalogDatabase.MIGRATION_13_14,
+             CatalogDatabase.MIGRATION_14_15,
+-            CatalogDatabase.MIGRATION_15_16
++            CatalogDatabase.MIGRATION_15_16,
++            CatalogDatabase.MIGRATION_16_17,
++            CatalogDatabase.MIGRATION_17_18
+         ).build()
+     }
+ 
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/models/NodeSettings.kt b/app/src/main/kotlin/com/mobicloud/domain/models/NodeSettings.kt
+index 2689a8b..3dfaab6 100644
+--- a/app/src/main/kotlin/com/mobicloud/domain/models/NodeSettings.kt
++++ b/app/src/main/kotlin/com/mobicloud/domain/models/NodeSettings.kt
+@@ -3,5 +3,6 @@ package com.mobicloud.domain.models
+ data class NodeSettings(
+     val allocatedStorageBytes: Long,
+     val clusterId: String = "",
++    val isExpertModeEnabled: Boolean = false,
+     val id: Int = 0
+ )
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/repository/HostedBlockRepository.kt b/app/src/main/kotlin/com/mobicloud/domain/repository/HostedBlockRepository.kt
+index faabd0d..b69d1ba 100644
+--- a/app/src/main/kotlin/com/mobicloud/domain/repository/HostedBlockRepository.kt
++++ b/app/src/main/kotlin/com/mobicloud/domain/repository/HostedBlockRepository.kt
+@@ -38,4 +38,7 @@ interface HostedBlockRepository {
+      * pour calculer `freeBytes` au moment de l'envoi de REGISTER_PEER (snapshot best-effort, pas de Flow).
+      */
+     suspend fun getTotalHostedBytes(): Long
++
++    /** Story 13.1 ΓÇö KPI Dashboard "Fichiers prot├⌐g├⌐s" : nombre de fragments h├⌐berg├⌐s. */
++    fun observeHostedBlockCount(): kotlinx.coroutines.flow.Flow<Int>
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/domain/repository/NodeSettingsRepository.kt b/app/src/main/kotlin/com/mobicloud/domain/repository/NodeSettingsRepository.kt
+index e334df8..03e5b42 100644
+--- a/app/src/main/kotlin/com/mobicloud/domain/repository/NodeSettingsRepository.kt
++++ b/app/src/main/kotlin/com/mobicloud/domain/repository/NodeSettingsRepository.kt
+@@ -18,4 +18,8 @@ interface NodeSettingsRepository {
+ 
+     fun observeSettings(): Flow<NodeSettings>
+     fun observeFreeSpaceBytes(): Flow<Long>
++
++    // Story 13.1 ΓÇö Mode Diagnostics Avanc├⌐s (toggle UI Simple/Expert)
++    suspend fun updateExpertMode(enabled: Boolean)
++    fun observeExpertMode(): Flow<Boolean>
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/dashboard/DashboardScreen.kt b/app/src/main/kotlin/com/mobicloud/presentation/dashboard/DashboardScreen.kt
+index 6f76f83..57f5c6b 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/dashboard/DashboardScreen.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/dashboard/DashboardScreen.kt
+@@ -11,9 +11,12 @@ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.OutlinedButton
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.derivedStateOf
+ import androidx.compose.runtime.getValue
++import androidx.compose.runtime.remember
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
+@@ -24,7 +27,11 @@ import androidx.hilt.navigation.compose.hiltViewModel
+ import androidx.lifecycle.compose.collectAsStateWithLifecycle
+ import com.mobicloud.domain.models.NetworkType
+ import com.mobicloud.domain.models.NodeRole
++import com.mobicloud.domain.models.TransferChannelState
++import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
+ import com.mobicloud.presentation.dashboard.components.CloudRelayBadge
++import com.mobicloud.presentation.dashboard.components.HealthBanner
++import com.mobicloud.presentation.dashboard.components.HealthState
+ import com.mobicloud.presentation.dashboard.components.KpiDiagnosticCard
+ import com.mobicloud.presentation.dashboard.components.RadarLogConsole
+ import com.mobicloud.presentation.dashboard.components.ReliabilityGauge
+@@ -39,7 +46,6 @@ fun DashboardScreen(
+     modifier: Modifier = Modifier,
+     viewModel: DashboardViewModel = hiltViewModel()
+ ) {
+-    val serviceStatus by viewModel.serviceStatus.collectAsStateWithLifecycle()
+     val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
+     val networkEvents by viewModel.networkEvents.collectAsStateWithLifecycle()
+     val hasActivePeers by viewModel.hasActivePeers.collectAsStateWithLifecycle()
+@@ -47,6 +53,11 @@ fun DashboardScreen(
+     val isNetworkUnstable by viewModel.isNetworkUnstable.collectAsStateWithLifecycle()
+     val relayState by viewModel.relayState.collectAsStateWithLifecycle()
+ 
++    val isExpertMode by viewModel.isExpertMode.collectAsStateWithLifecycle()
++    val communitySize by viewModel.communitySize.collectAsStateWithLifecycle()
++    val allocatedBytes by viewModel.allocatedStorageBytes.collectAsStateWithLifecycle()
++    val hostedBlockCount by viewModel.hostedBlockCount.collectAsStateWithLifecycle()
++
+     val uptimeFormatted = formatUptime(diagnostics.uptimeMs)
+     val networkLabel = when (diagnostics.networkType) {
+         NetworkType.WIFI -> "Wifi"
+@@ -54,6 +65,28 @@ fun DashboardScreen(
+         NetworkType.UNKNOWN -> "ΓÇö"
+     }
+ 
++    // Story 13.1 ΓÇö Calcul du HealthState (Mode Simple uniquement, mais ├⌐valu├⌐ dans les deux modes)
++    val healthState = remember(
++        diagnostics.reliabilityScore,
++        hasActivePeers,
++        networkLabel,
++        relayState,
++        isNetworkUnstable,
++        diagnostics.activePeerCount
++    ) {
++        derivedStateOf {
++            val reliability = (diagnostics.reliabilityScore * 100).toInt()
++            val peerCount = diagnostics.activePeerCount
++            when {
++                !hasActivePeers -> HealthState.Searching
++                reliability < 40 || isNetworkUnstable -> HealthState.Degraded(peerCount)
++                reliability >= 70 && relayState == TransferChannelState.DIRECT ->
++                    HealthState.Healthy(peerCount, networkLabel)
++                else -> HealthState.Slow(peerCount, networkLabel)
++            }
++        }
++    }
++
+     Column(
+         modifier = modifier
+             .fillMaxSize()
+@@ -61,15 +94,21 @@ fun DashboardScreen(
+             .padding(horizontal = 16.dp, vertical = 8.dp),
+         horizontalAlignment = Alignment.CenterHorizontally
+     ) {
+-        // Jauge de fiabilit├⌐ centrale
++        // === Story 13.1 ΓÇö Banni├¿re sant├⌐ (Mode Simple uniquement) ===
++        if (!isExpertMode) {
++            Spacer(Modifier.height(4.dp))
++            HealthBanner(state = healthState.value)
++        }
++
++        // === Jauge de fiabilit├⌐ ΓÇö TOUJOURS visible (Simple + Expert) ===
+         ReliabilityGauge(
+             score = diagnostics.reliabilityScore,
+             modifier = Modifier.padding(vertical = 12.dp)
+         )
+ 
+-        // R├┤le + canal
++        // === Badge r├┤le ΓÇö s├⌐mantique humaine (Story 13.1 AC2) ===
+         Text(
+-            text = if (nodeRole == NodeRole.SUPER_PAIR) "Γÿà Super-Pair" else "ΓùÅ N┼ôud connect├⌐",
++            text = if (nodeRole == NodeRole.SUPER_PAIR) "Γÿà Coordinateur de R├⌐seau" else "ΓùÅ Membre actif",
+             style = MaterialTheme.typography.labelLarge,
+             color = if (nodeRole == NodeRole.SUPER_PAIR) Color(0xFF00FF41) else MaterialTheme.colorScheme.primary,
+             modifier = Modifier.padding(bottom = 4.dp)
+@@ -80,28 +119,20 @@ fun DashboardScreen(
+             modifier = Modifier.padding(bottom = 4.dp)
+         )
+ 
+-        if (isNetworkUnstable) {
++        // Alerte "Connexion lente" ΓÇö Expert uniquement (en Simple, la banni├¿re s'en charge)
++        if (isExpertMode && isNetworkUnstable) {
+             Text(
+-                text = "ΓÜá R├⌐seau instable",
++                text = "ΓÜá Connexion lente",
+                 style = MaterialTheme.typography.labelMedium,
+                 color = MaterialTheme.colorScheme.error,
+                 modifier = Modifier.padding(bottom = 4.dp)
+             )
+         }
+ 
+-        if (!hasActivePeers) {
+-            Text(
+-                text = "Aucun pair d├⌐tect├⌐ ΓÇö scan en coursΓÇª",
+-                style = MaterialTheme.typography.labelMedium,
+-                color = Color(0xFFFFB300),
+-                modifier = Modifier.padding(bottom = 8.dp)
+-            )
+-        }
+-
+         Spacer(Modifier.height(16.dp))
+ 
+-        // Section M├⌐triques
+-        SectionLabel("M├⌐triques")
++        // === Section "Aper├ºu" ΓÇö 4 KPIs s├⌐mantiques (Story 13.1 AC4) ===
++        SectionLabel("Aper├ºu")
+         Spacer(Modifier.height(8.dp))
+ 
+         Row(
+@@ -111,11 +142,13 @@ fun DashboardScreen(
+             KpiDiagnosticCard(
+                 label = "BATTERIE",
+                 value = "${diagnostics.batteryPercent}%",
++                hint = "Impact app : minime",
+                 modifier = Modifier.weight(1f)
+             )
+             KpiDiagnosticCard(
+-                label = "UPTIME",
+-                value = uptimeFormatted,
++                label = "COMMUNAUT├ë",
++                value = "$communitySize/$MAX_CLUSTER_SIZE",
++                hint = "Membres connect├⌐s",
+                 modifier = Modifier.weight(1f)
+             )
+         }
+@@ -125,27 +158,65 @@ fun DashboardScreen(
+             horizontalArrangement = Arrangement.spacedBy(8.dp)
+         ) {
+             KpiDiagnosticCard(
+-                label = "R├ëSEAU",
+-                value = networkLabel,
++                label = "MA CONTRIBUTION",
++                value = formatBytesShort(allocatedBytes),
++                hint = "Espace que je partage",
+                 modifier = Modifier.weight(1f)
+             )
+             KpiDiagnosticCard(
+-                label = "PAIRS ACTIFS",
+-                value = "${diagnostics.activePeerCount}",
++                label = "FICHIERS PROT├ëG├ëS",
++                value = "$hostedBlockCount",
++                hint = "Sauvegard├⌐s Γ£ô",
+                 modifier = Modifier.weight(1f)
+             )
+         }
+ 
+-        Spacer(Modifier.height(20.dp))
+-
+-        // Section Activit├⌐
+-        SectionLabel("Activit├⌐")
+-        Spacer(Modifier.height(8.dp))
++        Spacer(Modifier.height(16.dp))
+ 
+-        RadarLogConsole(
+-            events = networkEvents,
++        // === Toggle D├⌐tails techniques (Story 13.1 AC5) ===
++        OutlinedButton(
++            onClick = { viewModel.toggleExpertMode() },
+             modifier = Modifier.fillMaxWidth()
+-        )
++        ) {
++            Text(
++                text = if (isExpertMode) "Γû┤ MASQUER D├ëTAILS TECHNIQUES" else "Γû╛ D├ëTAILS TECHNIQUES",
++                fontFamily = FontFamily.Monospace,
++                fontSize = 12.sp,
++                color = MaterialTheme.colorScheme.onSurfaceVariant
++            )
++        }
++
++        // === Mode Expert : KPIs techniques + RadarLog (Story 13.1 AC5) ===
++        if (isExpertMode) {
++            Spacer(Modifier.height(20.dp))
++            SectionLabel("Diagnostic technique")
++            Spacer(Modifier.height(8.dp))
++
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                horizontalArrangement = Arrangement.spacedBy(8.dp)
++            ) {
++                KpiDiagnosticCard(
++                    label = "UPTIME",
++                    value = uptimeFormatted,
++                    modifier = Modifier.weight(1f)
++                )
++                KpiDiagnosticCard(
++                    label = "R├ëSEAU",
++                    value = networkLabel,
++                    modifier = Modifier.weight(1f)
++                )
++            }
++
++            Spacer(Modifier.height(20.dp))
++            SectionLabel("Activit├⌐ r├⌐seau")
++            Spacer(Modifier.height(8.dp))
++
++            RadarLogConsole(
++                events = networkEvents,
++                modifier = Modifier.fillMaxWidth()
++            )
++        }
+ 
+         Spacer(Modifier.height(16.dp))
+     }
+@@ -171,3 +242,13 @@ private fun formatUptime(uptimeMs: Long): String {
+     val minutes = TimeUnit.MILLISECONDS.toMinutes(uptimeMs) % 60
+     return "%02d:%02d".format(hours, minutes)
+ }
++
++private fun formatBytesShort(bytes: Long): String {
++    val gb = bytes / (1024.0 * 1024 * 1024)
++    val mb = bytes / (1024.0 * 1024)
++    return when {
++        gb >= 1.0 -> "%.1f GB".format(gb)
++        mb >= 1.0 -> "%.0f MB".format(mb)
++        else -> "$bytes B"
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/dashboard/DashboardViewModel.kt b/app/src/main/kotlin/com/mobicloud/presentation/dashboard/DashboardViewModel.kt
+index f83454c..057f1c1 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/dashboard/DashboardViewModel.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/dashboard/DashboardViewModel.kt
+@@ -8,11 +8,14 @@ import com.mobicloud.domain.models.NodeRole
+ import com.mobicloud.domain.models.ServiceStatus
+ import com.mobicloud.domain.models.TransferChannelState
+ import com.mobicloud.domain.repository.DiagnosticsRepository
++import com.mobicloud.domain.repository.HostedBlockRepository
+ import com.mobicloud.domain.repository.IdentityRepository
+ import com.mobicloud.domain.repository.NetworkEventRepository
+ import com.mobicloud.domain.repository.NetworkServiceController
++import com.mobicloud.domain.repository.NodeSettingsRepository
+ import com.mobicloud.domain.repository.PeerRepository
+ import com.mobicloud.domain.usecase.m06_m07_repair_migration.CircuitBreakerUseCase
++import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
+ import dagger.hilt.android.lifecycle.HiltViewModel
+ import kotlinx.coroutines.flow.SharingStarted
+ import kotlinx.coroutines.flow.StateFlow
+@@ -20,6 +23,7 @@ import kotlinx.coroutines.flow.combine
+ import kotlinx.coroutines.flow.flow
+ import kotlinx.coroutines.flow.map
+ import kotlinx.coroutines.flow.stateIn
++import kotlinx.coroutines.launch
+ import javax.inject.Inject
+ import javax.inject.Named
+ 
+@@ -31,6 +35,9 @@ class DashboardViewModel @Inject constructor(
+     private val peerRepository: PeerRepository,
+     private val identityRepository: IdentityRepository,
+     circuitBreakerUseCase: CircuitBreakerUseCase,
++    private val nodeSettingsRepository: NodeSettingsRepository,
++    hostedBlockRepository: HostedBlockRepository,
++    memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase,
+     @Named("transfer_channel_state") transferChannelStateFlow: @JvmSuppressWildcards StateFlow<TransferChannelState>
+ ) : ViewModel() {
+ 
+@@ -47,7 +54,6 @@ class DashboardViewModel @Inject constructor(
+         .map { it.activePeerCount > 0 }
+         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
+ 
+-    // StateFlow Eagerly : r├⌐solu une fois au d├⌐marrage, jamais null apr├¿s init
+     private val localNodeIdFlow: StateFlow<String?> = flow {
+         emit(identityRepository.getIdentity().getOrNull()?.nodeId)
+     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+@@ -57,15 +63,35 @@ class DashboardViewModel @Inject constructor(
+         localNodeIdFlow
+     ) { peers, localNodeId ->
+         val match = localNodeId != null && peers.any { p -> p.isSuperPair && p.isActive && p.identity.nodeId == localNodeId }
+-        android.util.Log.i("DashboardVM", "[ROLE-DIAG] localNodeId=${localNodeId?.take(8)} peersCount=${peers.size} peers=${peers.map { "${it.identity.nodeId.take(8)}:sp=${it.isSuperPair}:active=${it.isActive}" }} ΓåÆ ${if (match) "SUPER_PAIR" else "PEER"}")
++        android.util.Log.i("DashboardVM", "[ROLE-DIAG] localNodeId=${localNodeId?.take(8)} peersCount=${peers.size} ΓåÆ ${if (match) "SUPER_PAIR" else "PEER"}")
+         if (match) NodeRole.SUPER_PAIR else NodeRole.PEER
+     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), NodeRole.PEER)
+ 
+-    // AC#6 ΓÇö Badge "R├⌐seau instable" : vrai si le Circuit-Breaker est actif (Story 3.4)
+     val isNetworkUnstable: StateFlow<Boolean> = circuitBreakerUseCase.isCircuitOpen
+         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
+ 
+-    // AC#6 Story 8.3 ΓÇö Canal de transfert actif (DIRECT / RELAY_HA / OFFLINE)
+     val relayState: StateFlow<TransferChannelState> = transferChannelStateFlow
+         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), TransferChannelState.OFFLINE)
++
++    // === Story 13.1 ΓÇö toggle Mode Diagnostics Avanc├⌐s ===
++    val isExpertMode: StateFlow<Boolean> = nodeSettingsRepository.observeExpertMode()
++        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
++
++    // KPI s├⌐mantique "Communaut├⌐" ΓÇö taille du cluster via snapshot m├⌐moire (source de v├⌐rit├⌐ c├┤t├⌐ UI)
++    val communitySize: StateFlow<Int> = memberSnapshotCacheUseCase.inMemory
++        .map { it.size }
++        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
++
++    // KPI s├⌐mantique "Ma contribution" ΓÇö quota partag├⌐ persist├⌐ en NodeSettings
++    val allocatedStorageBytes: StateFlow<Long> = nodeSettingsRepository.observeSettings()
++        .map { it.allocatedStorageBytes }
++        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0L)
++
++    // KPI s├⌐mantique "Fichiers prot├⌐g├⌐s" ΓÇö count des fragments h├⌐berg├⌐s
++    val hostedBlockCount: StateFlow<Int> = hostedBlockRepository.observeHostedBlockCount()
++        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
++
++    fun toggleExpertMode() = viewModelScope.launch {
++        nodeSettingsRepository.updateExpertMode(!isExpertMode.value)
++    }
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/dashboard/components/HealthBanner.kt b/app/src/main/kotlin/com/mobicloud/presentation/dashboard/components/HealthBanner.kt
+new file mode 100644
+index 0000000..31c88d5
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/presentation/dashboard/components/HealthBanner.kt
+@@ -0,0 +1,74 @@
++package com.mobicloud.presentation.dashboard.components
++
++import androidx.compose.foundation.BorderStroke
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++
++/**
++ * Story 13.1 ΓÇö Banni├¿re sant├⌐ contextuelle (Mode Simple uniquement).
++ *
++ * Affiche un message d'├⌐tat humain d├⌐riv├⌐ des signaux techniques pour rassurer l'utilisateur lambda.
++ * 4 ├⌐tats mutuellement exclusifs, mapp├⌐s depuis (reliabilityScore, hasActivePeers, networkLabel) :
++ *  - Healthy   : reliability >= 70 && hasActivePeers (vert)
++ *  - Slow      : reliability >= 40 (ambre)
++ *  - Searching : !hasActivePeers (ambre)
++ *  - Degraded  : reliability < 40 (rouge)
++ */
++sealed class HealthState(val message: String, val color: Color) {
++    data class Healthy(val peerCount: Int, val network: String) :
++        HealthState(
++            message = "Γ£ô Tout fonctionne ┬╖ Connect├⌐ ├á $peerCount membres ┬╖ $network",
++            color = Color(0xFF00FF41)
++        )
++
++    data class Slow(val peerCount: Int, val network: String) :
++        HealthState(
++            message = "ΓÜá Connexion lente ┬╖ $peerCount membres ┬╖ $network",
++            color = Color(0xFFFFB300)
++        )
++
++    data object Searching :
++        HealthState(
++            message = "≡ƒöì ├Ç la recherche de membres ├á proximit├⌐ΓÇª",
++            color = Color(0xFFFFB300)
++        )
++
++    data class Degraded(val peerCount: Int) :
++        HealthState(
++            message = "ΓÜá Service d├⌐grad├⌐ ┬╖ $peerCount membres",
++            color = Color(0xFFFF3333)
++        )
++}
++
++@Composable
++fun HealthBanner(state: HealthState, modifier: Modifier = Modifier) {
++    Box(
++        modifier = modifier
++            .fillMaxWidth()
++            .clip(RoundedCornerShape(4.dp))
++            .background(state.color.copy(alpha = 0.05f))
++            .border(BorderStroke(1.dp, state.color.copy(alpha = 0.25f)), RoundedCornerShape(4.dp))
++            .padding(horizontal = 12.dp, vertical = 12.dp),
++        contentAlignment = Alignment.Center
++    ) {
++        Text(
++            text = state.message,
++            color = state.color,
++            style = MaterialTheme.typography.bodyMedium,
++            textAlign = TextAlign.Center
++        )
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/dashboard/components/KpiDiagnosticCard.kt b/app/src/main/kotlin/com/mobicloud/presentation/dashboard/components/KpiDiagnosticCard.kt
+index b1125f9..0b98ef1 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/dashboard/components/KpiDiagnosticCard.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/dashboard/components/KpiDiagnosticCard.kt
+@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.defaultMinSize
+ import androidx.compose.foundation.layout.fillMaxHeight
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.height
+@@ -20,11 +22,17 @@ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.text.font.FontFamily
+ import androidx.compose.ui.unit.dp
+ 
++/**
++ * Story 13.1 ΓÇö param├¿tre [hint] ajout├⌐ pour la s├⌐mantique humaine
++ * (ex: "Membres connect├⌐s", "Espace que je partage").
++ * Compatible ascendant : hint optionnel, d├⌐faut null ΓåÆ comportement Story 2.4 inchang├⌐.
++ */
+ @Composable
+ fun KpiDiagnosticCard(
+     label: String,
+     value: String,
+     accentColor: Color = MaterialTheme.colorScheme.primary,
++    hint: String? = null,
+     modifier: Modifier = Modifier
+ ) {
+     ElevatedCard(
+@@ -37,7 +45,7 @@ fun KpiDiagnosticCard(
+         Row(
+             modifier = Modifier
+                 .fillMaxWidth()
+-                .height(76.dp)
++                .defaultMinSize(minHeight = 76.dp)
+         ) {
+             Box(
+                 modifier = Modifier
+@@ -62,6 +70,14 @@ fun KpiDiagnosticCard(
+                     fontFamily = FontFamily.Monospace,
+                     color = MaterialTheme.colorScheme.onSurface
+                 )
++                if (hint != null) {
++                    Spacer(Modifier.height(2.dp))
++                    Text(
++                        text = hint,
++                        style = MaterialTheme.typography.bodySmall,
++                        color = MaterialTheme.colorScheme.onSurfaceVariant
++                    )
++                }
+             }
+         }
+     }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerScreen.kt b/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerScreen.kt
+index d6f0ac8..aaeaefa 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerScreen.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerScreen.kt
+@@ -5,6 +5,7 @@ import android.content.Intent
+ import android.webkit.MimeTypeMap
+ import androidx.activity.compose.rememberLauncherForActivityResult
+ import androidx.activity.result.contract.ActivityResultContracts
++import androidx.compose.foundation.background
+ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
+@@ -15,15 +16,24 @@ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.lazy.LazyColumn
+ import androidx.compose.foundation.lazy.items
+ import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Delete
+ import androidx.compose.material.icons.filled.Upload
+ import androidx.compose.material3.ExperimentalMaterial3Api
+ import androidx.compose.material3.FloatingActionButton
+ import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
+ import androidx.compose.material3.Scaffold
++import androidx.compose.material3.SnackbarDuration
+ import androidx.compose.material3.SnackbarHost
+ import androidx.compose.material3.SnackbarHostState
++import androidx.compose.material3.SnackbarResult
++import androidx.compose.material3.SwipeToDismissBox
++import androidx.compose.material3.SwipeToDismissBoxValue
+ import androidx.compose.material3.Text
++import androidx.compose.material3.TopAppBar
++import androidx.compose.material3.TopAppBarDefaults
+ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
++import androidx.compose.material3.rememberSwipeToDismissBoxState
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
+@@ -54,6 +64,7 @@ object ExplorerRoute
+ @OptIn(ExperimentalMaterial3Api::class)
+ @Composable
+ fun ExplorerScreen(
++    onNavigateToTrash: () -> Unit = {},
+     modifier: Modifier = Modifier,
+     viewModel: ExplorerViewModel = hiltViewModel()
+ ) {
+@@ -73,9 +84,12 @@ fun ExplorerScreen(
+     LaunchedEffect(terminalState) {
+         when (terminalState) {
+             is StoreState.Success -> snackbarHostState.showSnackbar(
+-                "Fichier stock├⌐ avec succ├¿s sur ${terminalState.nodeCount} n┼ôuds"
++                "Sauvegard├⌐ chez ${terminalState.nodeCount} membres"
+             )
+-            is StoreState.Error -> snackbarHostState.showSnackbar("Erreur : ${terminalState.message}")
++            is StoreState.Error -> {
++                android.util.Log.d("MobiCloud:Explorer", "[STORE-ERROR] ${terminalState.message}")
++                snackbarHostState.showSnackbar("Une erreur est survenue. R├⌐essayez.")
++            }
+             else -> Unit
+         }
+     }
+@@ -86,10 +100,11 @@ fun ExplorerScreen(
+     }
+     LaunchedEffect(terminalDownloadState) {
+         val s = terminalDownloadState as? DownloadState.Error ?: return@LaunchedEffect
++        android.util.Log.d("MobiCloud:Explorer", "[DOWNLOAD-ERROR] ${s.message}")
+         val friendlyMessage = if (s.message.contains("blocs valides") || s.message.contains("n┼ôuds actifs"))
+-            "Fichier irr├⌐cup├⌐rable ΓÇö trop peu de n┼ôuds actifs"
++            "Trop peu de membres en ligne pour reconstituer ce fichier"
+         else
+-            "Erreur : ${s.message}"
++            "Une erreur est survenue. R├⌐essayez."
+         snackbarHostState.showSnackbar(friendlyMessage)
+     }
+ 
+@@ -115,17 +130,38 @@ fun ExplorerScreen(
+                         viewModel.resetDownloadState()
+                     } catch (e: ActivityNotFoundException) {
+                         android.util.Log.w("MobiCloud:Open", "[DIAG] ActivityNotFound mime=$mimeType", e)
+-                        scope.launch { snackbarHostState.showSnackbar("Aucune application pour ouvrir ce fichier (mime=$mimeType)") }
++                        scope.launch { snackbarHostState.showSnackbar("Aucune application n'est install├⌐e pour ouvrir ce type de fichier.") }
+                     }
+                 } catch (e: Exception) {
+                     android.util.Log.e("MobiCloud:Open", "[DIAG] FileProvider ├⌐chou├⌐ path=$filePath", e)
+-                    scope.launch { snackbarHostState.showSnackbar("Impossible d'ouvrir : ${e.javaClass.simpleName} ΓÇö ${e.message}") }
++                    scope.launch { snackbarHostState.showSnackbar("Impossible d'ouvrir le fichier. R├⌐essayez.") }
+                 }
+             },
+             onDismiss = { viewModel.resetDownloadState() }
+         )
+     }
+ 
++    // Story 13.3 ΓÇö snackbar "Upload en cours" quand l'utilisateur tente un 2e upload
++    LaunchedEffect(Unit) {
++        viewModel.uploadBusyEvent.collect {
++            snackbarHostState.showSnackbar("Upload en cours, veuillez patienter")
++        }
++    }
++
++    // Story 13.2 ΓÇö snackbar "D├⌐plac├⌐ vers la corbeille" avec action "Annuler"
++    LaunchedEffect(Unit) {
++        viewModel.undoEvent.collect { fileHash ->
++            val result = snackbarHostState.showSnackbar(
++                message = "D├⌐plac├⌐ vers la corbeille",
++                actionLabel = "Annuler",
++                duration = SnackbarDuration.Short
++            )
++            if (result == SnackbarResult.ActionPerformed) {
++                viewModel.undoMoveToTrash(fileHash)
++            }
++        }
++    }
++
+     val storeLauncher = rememberLauncherForActivityResult(
+         ActivityResultContracts.GetContent()
+     ) { uri ->
+@@ -135,6 +171,21 @@ fun ExplorerScreen(
+     Scaffold(
+         modifier = modifier,
+         snackbarHost = { SnackbarHost(snackbarHostState) },
++        topBar = {
++            TopAppBar(
++                title = { Text("Mes fichiers") },
++                actions = {
++                    IconButton(onClick = onNavigateToTrash) {
++                        Icon(
++                            imageVector = Icons.Default.Delete,
++                            contentDescription = "Corbeille",
++                            tint = Color(0xFFFFB300)
++                        )
++                    }
++                },
++                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
++            )
++        },
+         floatingActionButton = {
+             FloatingActionButton(onClick = { storeLauncher.launch("*/*") }) {
+                 Icon(Icons.Default.Upload, contentDescription = "Stocker un fichier")
+@@ -150,11 +201,21 @@ fun ExplorerScreen(
+             if (inProgressState != null) {
+                 ErasureProgressIndicator(
+                     state = inProgressState,
++                    onCancel = { viewModel.cancelUpload() },
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .padding(horizontal = 16.dp, vertical = 8.dp)
+                 )
+             }
++            if (storeState is StoreState.Cancelled) {
++                Text(
++                    text = "Γèÿ Upload annul├⌐",
++                    color = Color(0xFFFF3333),
++                    fontSize = 13.sp,
++                    fontFamily = FontFamily.Monospace,
++                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
++                )
++            }
+ 
+             val inProgressDownloadState = downloadState.takeIf {
+                 it is DownloadState.Downloading || it is DownloadState.Decrypting
+@@ -162,6 +223,7 @@ fun ExplorerScreen(
+             if (inProgressDownloadState != null) {
+                 DownloadProgressIndicator(
+                     state = inProgressDownloadState,
++                    onCancel = { viewModel.resetDownloadState() },
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .padding(horizontal = 16.dp, vertical = 4.dp)
+@@ -176,10 +238,9 @@ fun ExplorerScreen(
+                 if (entries.isEmpty()) {
+                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                         Text(
+-                            text = "> CATALOGUE VIDE ΓÇö aucun fichier stock├⌐ dans le cluster_",
++                            text = "Aucun fichier partag├⌐.\nAppuyez sur + pour commencer.",
+                             color = Color(0xFFFFB300),
+-                            fontSize = 13.sp,
+-                            fontFamily = FontFamily.Monospace,
++                            fontSize = 14.sp,
+                             textAlign = TextAlign.Center,
+                             modifier = Modifier.padding(16.dp)
+                         )
+@@ -191,10 +252,38 @@ fun ExplorerScreen(
+                         verticalArrangement = Arrangement.spacedBy(8.dp)
+                     ) {
+                         items(entries, key = { it.fileHash }) { entry ->
+-                            CatalogEntryCard(
+-                                entry = entry,
+-                                onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
++                            val dismissState = rememberSwipeToDismissBoxState(
++                                confirmValueChange = { value ->
++                                    if (value == SwipeToDismissBoxValue.EndToStart) {
++                                        viewModel.moveToTrash(entry.fileHash)
++                                        true
++                                    } else false
++                                }
+                             )
++                            SwipeToDismissBox(
++                                state = dismissState,
++                                enableDismissFromStartToEnd = false,
++                                backgroundContent = {
++                                    Box(
++                                        modifier = Modifier
++                                            .fillMaxSize()
++                                            .background(Color(0xFFFF3333))
++                                            .padding(end = 20.dp),
++                                        contentAlignment = Alignment.CenterEnd
++                                    ) {
++                                        Icon(
++                                            imageVector = Icons.Default.Delete,
++                                            contentDescription = "Supprimer",
++                                            tint = Color.White
++                                        )
++                                    }
++                                }
++                            ) {
++                                CatalogEntryCard(
++                                    entry = entry,
++                                    onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
++                                )
++                            }
+                         }
+                     }
+                 }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/network/NetworkScreen.kt b/app/src/main/kotlin/com/mobicloud/presentation/network/NetworkScreen.kt
+index a0a776f..6cb8e70 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/network/NetworkScreen.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/network/NetworkScreen.kt
+@@ -8,18 +8,25 @@ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.verticalScroll
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.OutlinedButton
++import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.getValue
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.text.font.FontFamily
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
+ import androidx.hilt.navigation.compose.hiltViewModel
+ import androidx.lifecycle.compose.collectAsStateWithLifecycle
+ import com.mobicloud.presentation.network.components.ClusterTopologyCard
++import com.mobicloud.presentation.network.components.CommunitySummaryCard
++import com.mobicloud.presentation.network.components.MemberListCard
+ import com.mobicloud.presentation.network.components.RemoteClustersCard
+ import kotlinx.serialization.Serializable
+ 
+ @Serializable
+-object NetworkRoute
++object NetworkRoute  // NE PAS RENOMMER ΓÇö label utilisateur "Communaut├⌐" g├⌐r├⌐ via strings.xml (Story 13.1)
+ 
+ @Composable
+ fun NetworkScreen(
+@@ -27,6 +34,12 @@ fun NetworkScreen(
+     viewModel: NetworkViewModel = hiltViewModel()
+ ) {
+     val topology by viewModel.clusterTopology.collectAsStateWithLifecycle()
++    val isExpertMode by viewModel.isExpertMode.collectAsStateWithLifecycle()
++    val quality by viewModel.connectionQuality.collectAsStateWithLifecycle()
++    val coordinatorAlias by viewModel.coordinatorAlias.collectAsStateWithLifecycle()
++
++    val isCoordinator = topology.nodes.any { it.isLocal && it.isSuperPair }
++    val memberCount = topology.nodes.size
+ 
+     Column(
+         modifier = modifier
+@@ -34,14 +47,52 @@ fun NetworkScreen(
+             .verticalScroll(rememberScrollState())
+             .padding(16.dp)
+     ) {
+-        ClusterTopologyCard(
+-            state = topology,
+-            modifier = Modifier.fillMaxWidth()
+-        )
+-        Spacer(Modifier.height(12.dp))
+-        RemoteClustersCard(
+-            remoteSuperPeers = topology.remoteSuperPeers,
++        // === Story 13.1 ΓÇö Mode Simple : r├⌐sum├⌐ humain + liste membres (AC7) ===
++        if (!isExpertMode) {
++            CommunitySummaryCard(
++                qualityLabel = quality.label,
++                memberCount = memberCount,
++                isCoordinator = isCoordinator,
++                coordinatorAlias = coordinatorAlias,
++                modifier = Modifier.fillMaxWidth()
++            )
++            Spacer(Modifier.height(8.dp))
++            Text(
++                text = "MEMBRES DU GROUPE",
++                style = MaterialTheme.typography.labelSmall,
++                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                letterSpacing = 1.2.sp,
++                modifier = Modifier.padding(start = 16.dp, top = 8.dp, bottom = 4.dp)
++            )
++            MemberListCard(members = topology.nodes)
++            Spacer(Modifier.height(12.dp))
++        }
++
++        // === Story 13.1 ΓÇö Toggle Diagnostics Avanc├⌐s (AC8) ===
++        OutlinedButton(
++            onClick = { viewModel.toggleExpertMode() },
+             modifier = Modifier.fillMaxWidth()
+-        )
++        ) {
++            Text(
++                text = if (isExpertMode) "Γû┤ MASQUER DIAGNOSTICS" else "Γû╛ DIAGNOSTICS AVANC├ëS",
++                fontFamily = FontFamily.Monospace,
++                fontSize = 12.sp,
++                color = MaterialTheme.colorScheme.onSurfaceVariant
++            )
++        }
++
++        // === Mode Expert : topologie technique + clusters distants (AC8) ===
++        if (isExpertMode) {
++            Spacer(Modifier.height(12.dp))
++            ClusterTopologyCard(
++                state = topology,
++                modifier = Modifier.fillMaxWidth()
++            )
++            Spacer(Modifier.height(12.dp))
++            RemoteClustersCard(
++                remoteSuperPeers = topology.remoteSuperPeers,
++                modifier = Modifier.fillMaxWidth()
++            )
++        }
+     }
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/network/NetworkViewModel.kt b/app/src/main/kotlin/com/mobicloud/presentation/network/NetworkViewModel.kt
+index c8e25ab..d99a37c 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/network/NetworkViewModel.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/network/NetworkViewModel.kt
+@@ -7,9 +7,11 @@ import com.mobicloud.domain.models.ClusterNodeStatus
+ import com.mobicloud.domain.models.ClusterTopologyState
+ import com.mobicloud.domain.models.DiscoverySource
+ import com.mobicloud.domain.models.Peer
++import com.mobicloud.domain.models.TransferChannelState
+ import com.mobicloud.domain.models.m11_join.toHexString
+ import com.mobicloud.domain.repository.DiagnosticsRepository
+ import com.mobicloud.domain.repository.IdentityRepository
++import com.mobicloud.domain.repository.NodeSettingsRepository
+ import com.mobicloud.domain.repository.PeerRepository
+ import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
+ import android.os.SystemClock
+@@ -18,15 +20,29 @@ import kotlinx.coroutines.flow.SharingStarted
+ import kotlinx.coroutines.flow.StateFlow
+ import kotlinx.coroutines.flow.combine
+ import kotlinx.coroutines.flow.flow
++import kotlinx.coroutines.flow.map
+ import kotlinx.coroutines.flow.stateIn
++import kotlinx.coroutines.launch
+ import javax.inject.Inject
++import javax.inject.Named
++
++/**
++ * Story 13.1 ΓÇö Qualit├⌐ de connexion humanis├⌐e pour l'├⌐cran Communaut├⌐ (Mode Simple).
++ */
++enum class ConnectionQuality(val label: String) {
++    EXCELLENT("Connexion excellente"),
++    STABLE("Connexion stable"),
++    LIMITED("Connexion limit├⌐e")
++}
+ 
+ @HiltViewModel
+ class NetworkViewModel @Inject constructor(
+     peerRepository: PeerRepository,
+     private val identityRepository: IdentityRepository,
+-    diagnosticsRepository: DiagnosticsRepository,
+-    memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase
++    private val diagnosticsRepository: DiagnosticsRepository,
++    memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase,
++    private val nodeSettingsRepository: NodeSettingsRepository,
++    @Named("transfer_channel_state") transferChannelStateFlow: @JvmSuppressWildcards StateFlow<TransferChannelState>
+ ) : ViewModel() {
+ 
+     private val localNodeIdFlow: StateFlow<String?> = flow {
+@@ -40,12 +56,8 @@ class NetworkViewModel @Inject constructor(
+         memberSnapshotCacheUseCase.inMemory
+     ) { peers, localNodeId, diagnostics, clusterMembers ->
+         val now = SystemClock.elapsedRealtime()
+-
+-        // nodeIds des membres confirm├⌐s du cluster local (JOIN_ACCEPT + MEMBER_UPDATE)
+         val clusterMemberNodeIds = clusterMembers.map { it.nodeId.toHexString() }.toSet()
+ 
+-        // Un super-pair est "local" s'il est sur le LAN, s'il est ce device,
+-        // ou s'il est le seul SP visible (d├⌐couvert via RELAY_HA apr├¿s victoire Bully).
+         val localSuperPeer = peers.firstOrNull { peer ->
+             peer.isSuperPair && (
+                 peer.source == DiscoverySource.LAN_MULTICAST ||
+@@ -53,18 +65,13 @@ class NetworkViewModel @Inject constructor(
+             )
+         } ?: peers.singleOrNull { it.isSuperPair }
+ 
+-        // On ignore les peers trop anciens (> 2 min) : orphelins d'anciennes sessions stock├⌐s en DB.
+         val freshPeers = peers.filter { peer -> (now - peer.lastSeenTimestampMs) <= 120_000L }
+ 
+-        // Cluster local = super-pair local + membres dont le nodeId est dans clusterMemberNodeIds.
+-        // Sans ce filtre, tous les non-SP peers connus apparaissaient dans "mon cluster" m├¬me s'ils
+-        // appartiennent ├á un cluster diff├⌐rent (cas 2 SP simultan├⌐s post-BullySolo).
+         val localPeers = freshPeers.filter { peer ->
+             peer == localSuperPeer ||
+             (!peer.isSuperPair && peer.identity.nodeId in clusterMemberNodeIds)
+         }
+ 
+-        // Clusters distants = super-pairs qui ne sont PAS le super-pair local
+         val remotePeers = freshPeers.filter { peer ->
+             peer.isSuperPair && peer != localSuperPeer
+         }
+@@ -76,8 +83,6 @@ class NetworkViewModel @Inject constructor(
+                     .thenByDescending { it.reliabilityScore }
+             )
+ 
+-        // Le n┼ôud local est filtr├⌐ de peerRepository (processPeerList ignore l'auto-r├⌐f├⌐rence).
+-        // On l'injecte ici pour que le compteur X/50 soit coh├⌐rent sur tous les devices.
+         if (localNodeId != null && localNodes.none { it.nodeId == localNodeId }) {
+             val selfNode = ClusterNodeInfo(
+                 nodeId           = localNodeId,
+@@ -99,6 +104,32 @@ class NetworkViewModel @Inject constructor(
+         ClusterTopologyState(nodes = localNodes, remoteSuperPeers = remoteNodes)
+     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), ClusterTopologyState())
+ 
++    // === Story 13.1 ΓÇö Mode Diagnostics Avanc├⌐s ===
++    val isExpertMode: StateFlow<Boolean> = nodeSettingsRepository.observeExpertMode()
++        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
++
++    val connectionQuality: StateFlow<ConnectionQuality> = combine(
++        diagnosticsRepository.diagnostics,
++        transferChannelStateFlow
++    ) { diag, channel ->
++        val reliability = (diag.reliabilityScore * 100).toInt()
++        when {
++            reliability >= 70 && channel == TransferChannelState.DIRECT -> ConnectionQuality.EXCELLENT
++            reliability >= 40 || channel == TransferChannelState.RELAY_HA -> ConnectionQuality.STABLE
++            else -> ConnectionQuality.LIMITED
++        }
++    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), ConnectionQuality.STABLE)
++
++    val coordinatorAlias: StateFlow<String?> = clusterTopology.map { topo ->
++        topo.nodes.firstOrNull { it.isSuperPair && !it.isLocal }?.let { sp ->
++            "Membre " + sp.nodeId.take(4)
++        }
++    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), null)
++
++    fun toggleExpertMode() = viewModelScope.launch {
++        nodeSettingsRepository.updateExpertMode(!isExpertMode.value)
++    }
++
+     private fun Peer.toNodeInfo(
+         localNodeId: String?,
+         localBattery: Int?,
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/network/components/CommunitySummaryCard.kt b/app/src/main/kotlin/com/mobicloud/presentation/network/components/CommunitySummaryCard.kt
+new file mode 100644
+index 0000000..1c41e51
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/presentation/network/components/CommunitySummaryCard.kt
+@@ -0,0 +1,70 @@
++package com.mobicloud.presentation.network.components
++
++import androidx.compose.foundation.BorderStroke
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++
++/**
++ * Story 13.1 ΓÇö R├⌐sum├⌐ humain de la communaut├⌐ (Mode Simple uniquement).
++ *
++ * @param qualityLabel `"Connexion excellente"` / `"Connexion stable"` / `"Connexion limit├⌐e"`
++ * @param memberCount Nombre de membres connect├⌐s au cluster local (inclus soi-m├¬me)
++ * @param isCoordinator Si le n┼ôud local est Coordinateur (Super-Pair)
++ * @param coordinatorAlias Alias court du Coordinateur si n┼ôud n'est pas SP (ex: `"Membre 4f2a"`)
++ */
++@Composable
++fun CommunitySummaryCard(
++    qualityLabel: String,
++    memberCount: Int,
++    isCoordinator: Boolean,
++    coordinatorAlias: String?,
++    modifier: Modifier = Modifier
++) {
++    val accent = Color(0xFF00FF41)
++    val subtitle = buildString {
++        append("$memberCount membres ├á proximit├⌐ ┬╖ ")
++        append(
++            if (isCoordinator) "Vous coordonnez le groupe"
++            else "Coordinateur : ${coordinatorAlias ?: "ΓÇö"}"
++        )
++    }
++
++    Column(
++        modifier = modifier
++            .fillMaxWidth()
++            .clip(RoundedCornerShape(4.dp))
++            .background(accent.copy(alpha = 0.05f))
++            .border(BorderStroke(1.dp, accent.copy(alpha = 0.25f)), RoundedCornerShape(4.dp))
++            .padding(horizontal = 16.dp, vertical = 18.dp),
++        horizontalAlignment = Alignment.CenterHorizontally
++    ) {
++        Text(
++            text = qualityLabel,
++            color = MaterialTheme.colorScheme.onSurface,
++            style = MaterialTheme.typography.titleMedium,
++            textAlign = TextAlign.Center
++        )
++        Spacer(Modifier.height(4.dp))
++        Text(
++            text = subtitle,
++            color = MaterialTheme.colorScheme.onSurfaceVariant,
++            style = MaterialTheme.typography.bodySmall,
++            textAlign = TextAlign.Center
++        )
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/network/components/MemberListCard.kt b/app/src/main/kotlin/com/mobicloud/presentation/network/components/MemberListCard.kt
+new file mode 100644
+index 0000000..c30b4ad
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/presentation/network/components/MemberListCard.kt
+@@ -0,0 +1,137 @@
++package com.mobicloud.presentation.network.components
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.font.FontFamily
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import com.mobicloud.domain.models.ClusterNodeInfo
++import com.mobicloud.domain.models.ClusterNodeStatus
++
++/**
++ * Story 13.1 ΓÇö Liste des membres du cluster (Mode Simple).
++ *
++ * Avatars NEUTRES (sans initiale, conforme demande utilisateur du 2026-05-14) :
++ *  - Coordinateur : cercle vert d├⌐grad├⌐ avec Γÿà centr├⌐
++ *  - Membre standard : cercle vert sombre d├⌐grad├⌐, vide
++ *
++ * Tri : Coordinateur (SP) en t├¬te, puis membres tri├⌐s par reliabilityScore d├⌐croissant.
++ */
++@Composable
++fun MemberListCard(
++    members: List<ClusterNodeInfo>,
++    modifier: Modifier = Modifier
++) {
++    Column(modifier = modifier.fillMaxWidth()) {
++        members.forEach { node ->
++            MemberRow(node = node)
++        }
++    }
++}
++
++@Composable
++private fun MemberRow(node: ClusterNodeInfo) {
++    val now = System.currentTimeMillis()
++    val ageSec = ((now - node.lastSeenMs) / 1000L).coerceAtLeast(0L)
++    val battery = node.batteryPercent?.let { "$it% batterie" } ?: "batterie inconnue"
++    val seenLabel = if (node.isLocal) "Vous" else "Connect├⌐ il y a ${ageSec}s"
++
++    val displayName = when {
++        node.isLocal && node.isSuperPair -> "Vous (Coordinateur)"
++        node.isLocal -> "Vous"
++        else -> "Membre " + node.nodeId.take(4)
++    }
++
++    Row(
++        modifier = Modifier
++            .fillMaxWidth()
++            .padding(horizontal = 16.dp, vertical = 12.dp),
++        verticalAlignment = Alignment.CenterVertically
++    ) {
++        MemberAvatar(isCoordinator = node.isSuperPair)
++        Spacer(Modifier.size(12.dp))
++        Column(modifier = Modifier.weight(1f)) {
++            Text(
++                text = displayName,
++                style = MaterialTheme.typography.bodyMedium,
++                color = MaterialTheme.colorScheme.onSurface,
++                fontWeight = FontWeight.Medium
++            )
++            Spacer(Modifier.height(2.dp))
++            Text(
++                text = "$seenLabel ┬╖ $battery",
++                style = MaterialTheme.typography.bodySmall,
++                color = MaterialTheme.colorScheme.onSurfaceVariant
++            )
++        }
++        StatusPill(node.nodeStatus)
++    }
++}
++
++@Composable
++private fun MemberAvatar(isCoordinator: Boolean) {
++    val gradient = if (isCoordinator) {
++        Brush.linearGradient(listOf(Color(0xFF00FF41), Color(0xFF00AA2A)))
++    } else {
++        Brush.linearGradient(listOf(Color(0xFF1A4A2A), Color(0xFF003311)))
++    }
++    Box(
++        modifier = Modifier
++            .size(38.dp)
++            .clip(CircleShape)
++            .background(gradient)
++            .border(1.dp, Color(0xFF333333), CircleShape),
++        contentAlignment = Alignment.Center
++    ) {
++        if (isCoordinator) {
++            Text(
++                text = "Γÿà",
++                color = Color.Black,
++                fontSize = 16.sp,
++                fontWeight = FontWeight.Bold
++            )
++        }
++    }
++}
++
++@Composable
++private fun StatusPill(status: ClusterNodeStatus) {
++    val (label, color) = when (status) {
++        ClusterNodeStatus.ACTIF -> "ACTIF" to Color(0xFF00FF41)
++        ClusterNodeStatus.DEGRADED -> "D├ëGRAD├ë" to Color(0xFFFFB300)
++        ClusterNodeStatus.OFFLINE -> "HORS-LIGNE" to Color(0xFFFF3333)
++    }
++    Box(
++        modifier = Modifier
++            .clip(RoundedCornerShape(2.dp))
++            .background(color.copy(alpha = 0.10f))
++            .padding(horizontal = 8.dp, vertical = 3.dp)
++    ) {
++        Text(
++            text = label,
++            color = color,
++            fontSize = 9.sp,
++            fontFamily = FontFamily.Monospace,
++            fontWeight = FontWeight.Bold
++        )
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/settings/SettingsScreen.kt b/app/src/main/kotlin/com/mobicloud/presentation/settings/SettingsScreen.kt
+index c5cbb6c..135e402 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/settings/SettingsScreen.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/settings/SettingsScreen.kt
+@@ -1,6 +1,8 @@
+ package com.mobicloud.presentation.settings
+ 
++import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.Spacer
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+@@ -11,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material3.AlertDialog
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Slider
++import androidx.compose.material3.Switch
+ import androidx.compose.material3.Text
+ import androidx.compose.material3.TextButton
+ import androidx.compose.runtime.Composable
+@@ -18,8 +21,10 @@ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableFloatStateOf
+ import androidx.compose.runtime.remember
+ import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
+ import androidx.hilt.navigation.compose.hiltViewModel
+ import androidx.lifecycle.compose.collectAsStateWithLifecycle
+ import kotlinx.serialization.Serializable
+@@ -39,10 +44,10 @@ fun SettingsScreen(
+     val usedBytes by viewModel.usedStorageBytes.collectAsStateWithLifecycle()
+     val freeBytes by viewModel.freeSpaceBytes.collectAsStateWithLifecycle()
+     val showWarning by viewModel.showWarningDialog.collectAsStateWithLifecycle()
++    val isExpertMode by viewModel.isExpertMode.collectAsStateWithLifecycle()
+ 
+     val minBytes = HALF_GB
+     val maxBytes = ((freeBytes * 0.80f).toLong()).coerceAtLeast(minBytes)
+-    // P5: coerceAtLeast(0) applied after - 1 to prevent steps = -1 on first composition (freeBytes=0)
+     val steps = (((maxBytes - minBytes) / HALF_GB).toInt() - 1).coerceAtLeast(0)
+ 
+     var sliderValue by remember(settings.allocatedStorageBytes) {
+@@ -56,7 +61,7 @@ fun SettingsScreen(
+             .padding(16.dp)
+     ) {
+         Text(
+-            text = "Contribution au r├⌐seau",
++            text = "Espace que je partage",
+             style = MaterialTheme.typography.titleMedium,
+             color = MaterialTheme.colorScheme.onSurface
+         )
+@@ -77,17 +82,54 @@ fun SettingsScreen(
+         Spacer(modifier = Modifier.height(8.dp))
+ 
+         Text(
+-            text = "${usedBytes.toReadable()} utilis├⌐s sur ${sliderValue.toLong().toGb()} GB allou├⌐s",
++            text = "Utilis├⌐ : ${usedBytes.toReadable()} ┬╖ Plus vous partagez, plus vous pouvez sauvegarder chez vos amis.",
+             style = MaterialTheme.typography.bodySmall,
+             color = MaterialTheme.colorScheme.onSurfaceVariant
+         )
++
++        Spacer(modifier = Modifier.height(28.dp))
++
++        // === Story 13.1 ΓÇö Section Affichage ===
++        Text(
++            text = "AFFICHAGE",
++            style = MaterialTheme.typography.labelSmall,
++            color = MaterialTheme.colorScheme.onSurfaceVariant,
++            letterSpacing = 1.2.sp
++        )
++
++        Spacer(modifier = Modifier.height(8.dp))
++
++        Row(
++            modifier = Modifier.fillMaxWidth(),
++            horizontalArrangement = Arrangement.SpaceBetween,
++            verticalAlignment = Alignment.CenterVertically
++        ) {
++            Column(modifier = Modifier.weight(1f)) {
++                Text(
++                    text = "Mode Diagnostics Avanc├⌐s",
++                    style = MaterialTheme.typography.bodyLarge,
++                    color = MaterialTheme.colorScheme.onSurface
++                )
++                Spacer(modifier = Modifier.height(2.dp))
++                Text(
++                    text = "Affiche les d├⌐tails techniques (NodeId, logs r├⌐seau, topologie cluster).",
++                    style = MaterialTheme.typography.bodySmall,
++                    color = MaterialTheme.colorScheme.onSurfaceVariant
++                )
++            }
++            Spacer(modifier = Modifier.padding(start = 12.dp))
++            Switch(
++                checked = isExpertMode,
++                onCheckedChange = viewModel::updateExpertMode
++            )
++        }
+     }
+ 
+     if (showWarning) {
+         AlertDialog(
+             onDismissRequest = { viewModel.dismissWarningDialog() },
+-            title = { Text("R├⌐duire le quota ?") },
+-            text = { Text("R├⌐duire ce quota supprimera des blocs h├⌐berg├⌐s du r├⌐seau") },
++            title = { Text("R├⌐duire l'espace partag├⌐ ?") },
++            text = { Text("Si vous r├⌐duisez cet espace, certains fichiers de vos amis ne seront plus prot├⌐g├⌐s chez vous.") },
+             confirmButton = {
+                 TextButton(onClick = { viewModel.confirmReduceQuota() }) {
+                     Text("Confirmer")
+@@ -102,8 +144,6 @@ fun SettingsScreen(
+     }
+ }
+ 
+-private fun Long.toGb(): String = "%.1f".format(this / (1024.0 * 1024 * 1024))
+-
+ private fun Long.toReadable(): String {
+     val kb = this / 1024.0
+     val mb = kb / 1024.0
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/settings/SettingsViewModel.kt b/app/src/main/kotlin/com/mobicloud/presentation/settings/SettingsViewModel.kt
+index 5c8c23f..7863201 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/settings/SettingsViewModel.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/settings/SettingsViewModel.kt
+@@ -26,14 +26,16 @@ class SettingsViewModel @Inject constructor(
+     val usedStorageBytes: StateFlow<Long> = hostedBlockRepository.observeTotalHostedBytes()
+         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0L)
+ 
+-    // P3+P4: freeSpace delegated to repository (data layer); single observeSettings subscription
+     val freeSpaceBytes: StateFlow<Long> = settingsRepository.observeFreeSpaceBytes()
+         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0L)
+ 
++    // Story 13.1 ΓÇö toggle Mode Diagnostics Avanc├⌐s
++    val isExpertMode: StateFlow<Boolean> = settingsRepository.observeExpertMode()
++        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
++
+     private val _showWarningDialog = MutableStateFlow(false)
+     val showWarningDialog: StateFlow<Boolean> = _showWarningDialog.asStateFlow()
+ 
+-    // P1: MutableStateFlow instead of plain var to prevent TOCTOU between slider calls
+     private val _pendingBytes = MutableStateFlow<Long?>(null)
+ 
+     fun requestUpdateAllocatedStorage(newBytes: Long) {
+@@ -45,7 +47,6 @@ class SettingsViewModel @Inject constructor(
+         }
+     }
+ 
+-    // P2: persist first, then dismiss dialog so UI reflects actual state on failure
+     fun confirmReduceQuota() {
+         val bytes = _pendingBytes.value ?: return
+         viewModelScope.launch {
+@@ -59,4 +60,9 @@ class SettingsViewModel @Inject constructor(
+         _showWarningDialog.value = false
+         _pendingBytes.value = null
+     }
++
++    // Story 13.1 ΓÇö persistance imm├⌐diate, sans confirmation (toggle Settings simple).
++    fun updateExpertMode(enabled: Boolean) {
++        viewModelScope.launch { settingsRepository.updateExpertMode(enabled) }
++    }
+ }
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index f50e31e..4337f9d 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -35,5 +35,5 @@
+     <string name="done">Done</string>
+     <string name="purchase_premium">Purchase Jetpack Premium</string>
+     <string name="add">Add</string>
+-    <string name="network">R├⌐seau P2P</string>
++    <string name="network">Communaut├⌐</string>
+ </resources>
+\ No newline at end of file
