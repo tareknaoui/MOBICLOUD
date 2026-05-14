@@ -424,6 +424,42 @@ class MobicloudP2PService : Service() {
                             joinStateMachine.transition(JoinEvent.NewCandidateDetected(sp.toSuperPeerHint()))
                         }
                     } else if (state is NodeJoinState.SuperPair) {
+                        // BullySolo path : FSM → SuperPair sans passer par runBullyElectionUseCase
+                        // → registerSuperPeerUseCase jamais appelé → relay ne sait pas qu'on est SP.
+                        // superPeerJob == null signifie qu'on n'est PAS déjà enregistré via runBully.
+                        if (superPeerJob == null) {
+                            val soloElectedAt = System.currentTimeMillis()
+                            localDiscoveryRepository.updateSuperPairStatus(true)
+                            superPeerJob = launch {
+                                launch {
+                                    registerSuperPeerUseCase(tcpPort, soloElectedAt).collect { regResult ->
+                                        regResult.onFailure {
+                                            Log.w(LOGTAG, "[BullySolo] Enregistrement Super-Pair Relais HA échoué", it)
+                                        }
+                                    }
+                                }
+                                launch {
+                                    while (isActive) {
+                                        val clusterId = nodeSettingsRepository.getClusterIdOnce()
+                                        if (clusterId.isNotBlank()) {
+                                            val cutoff = System.currentTimeMillis() - com.mobicloud.domain.models.m11_join.SP_TIMEOUT_MS
+                                            val count = runCatching { memberDao.countActiveByClusterId(clusterId, cutoff) }.getOrDefault(0)
+                                            localDiscoveryRepository.updateCurrentMemberCount(count)
+                                        }
+                                        delay(30_000L)
+                                    }
+                                }
+                                launch {
+                                    Log.i(LOGTAG, "Timer d'abdication BullySolo démarré (${ABDICATION_DELAY_MS / 60_000}min)")
+                                    delay(ABDICATION_DELAY_MS)
+                                    Log.i(LOGTAG, "Timer d'abdication BullySolo expiré — abdication")
+                                    abdicateSuperPeerUseCase()
+                                        .onFailure { Log.w(LOGTAG, "Broadcast ABDICATION échoué — abdication tout de même", it) }
+                                    networkEventRepository.pushEvent("[ELECTION] Abdication automatique après ${ABDICATION_DELAY_MS / 60_000}min")
+                                    abdicate()
+                                }
+                            }
+                        }
                         // Polling 2s × 8 = 16s pour laisser le GET_PEERS (intervalle 10s) retourner
                         // la liste mise à jour. Couvre la race où l'autre SP a enregistré après
                         // le dernier GET_PEERS et ne serait pas encore dans latestPeers.

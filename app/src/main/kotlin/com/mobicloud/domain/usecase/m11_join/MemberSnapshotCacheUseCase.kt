@@ -29,11 +29,16 @@ class MemberSnapshotCacheUseCase @Inject constructor(
     private val _inMemory = MutableStateFlow<List<MemberInfo>>(emptyList())
     val inMemory: StateFlow<List<MemberInfo>> = _inMemory.asStateFlow()
 
+    private var _inMemoryClusterId: String = ""
+
+    fun snapshotClusterId(): String = _inMemoryClusterId
+
     suspend fun seedFromJoinAccept(
         clusterId: String,
         superPairNodeId: ByteArray,
         snapshot: List<MemberInfo>
     ) {
+        _inMemoryClusterId = clusterId
         _inMemory.value = snapshot
         snapshotDao.upsert(
             MemberSnapshotEntity(

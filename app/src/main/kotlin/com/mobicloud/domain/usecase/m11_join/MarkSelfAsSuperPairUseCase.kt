@@ -55,12 +55,14 @@ class MarkSelfAsSuperPairUseCase @Inject constructor(
 
         // Repeuplement depuis snapshot (FR-11.8) : les membres connus restent dans le cluster
         // sans re-JOIN après mort de l'ancien SP.
-        // H7+H10 : `RoomMemberRegistry.add` injecte `lastSeen = now` ; aucun membre n'est
-        // évincé dès le premier tick MonitorLiveness — chacun a une fenêtre `SP_TIMEOUT_MS`
-        // pour envoyer un HB. Membres réellement morts seront évincés naturellement après 90s.
+        // Guard : seulement si le snapshot vient du MÊME cluster (promotion dans cluster existant).
+        // BullySolo crée un nouveau UUID → snapshot appartient à un autre cluster → ne pas hériter,
+        // sinon les membres de l'ancien cluster apparaissent faussement dans le nouveau cluster.
         val snapshot = memberSnapshotCacheUseCaseLazy.get().snapshot()
-        snapshot.filter { !it.nodeId.contentEquals(selfNodeId) }
-                .forEach { memberRegistry.add(it) }
+        if (memberSnapshotCacheUseCaseLazy.get().snapshotClusterId() == clusterId) {
+            snapshot.filter { !it.nodeId.contentEquals(selfNodeId) }
+                    .forEach { memberRegistry.add(it) }
+        }
 
         val persisted = runCatching { nodeSettingsRepository.updateClusterId(clusterId) }
         if (persisted.isFailure) {
