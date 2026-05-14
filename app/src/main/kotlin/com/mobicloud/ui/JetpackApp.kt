@@ -84,6 +84,7 @@ import timber.log.Timber
 @Composable
 fun JetpackApp(
     appState: JetpackAppState,
+    hasCompletedOnboarding: Boolean?,
     modifier: Modifier = Modifier,
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
 ) {
@@ -117,6 +118,7 @@ fun JetpackApp(
                 appState = appState,
                 snackbarHostState = snackbarHostState,
                 showSettingsDialog = showSettingsDialog,
+                hasCompletedOnboarding = hasCompletedOnboarding,
                 onDismissSettings = { showSettingsDialog = false },
                 onTopAppBarActionClick = { showSettingsDialog = true },
                 windowAdaptiveInfo = windowAdaptiveInfo,
@@ -141,6 +143,7 @@ private fun JetpackApp(
     appState: JetpackAppState,
     snackbarHostState: SnackbarHostState,
     showSettingsDialog: Boolean,
+    hasCompletedOnboarding: Boolean?,
     onDismissSettings: () -> Unit,
     onTopAppBarActionClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -163,6 +166,7 @@ private fun JetpackApp(
         JetpackScaffold(
             appState = appState,
             snackbarHostState = snackbarHostState,
+            hasCompletedOnboarding = hasCompletedOnboarding,
             onTopAppBarActionClick = onTopAppBarActionClick,
             modifier = modifier,
         )
@@ -183,6 +187,7 @@ private fun JetpackApp(
         JetpackScaffold(
             appState = appState,
             snackbarHostState = snackbarHostState,
+            hasCompletedOnboarding = hasCompletedOnboarding,
             onTopAppBarActionClick = onTopAppBarActionClick,
             modifier = modifier,
         )
@@ -201,6 +206,7 @@ private fun JetpackApp(
 private fun JetpackScaffold(
     appState: JetpackAppState,
     snackbarHostState: SnackbarHostState,
+    hasCompletedOnboarding: Boolean?,
     onTopAppBarActionClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -262,22 +268,26 @@ private fun JetpackScaffold(
 
                 // Resolve context once in composable scope for use in suspend callbacks
                 // Suppressing lint because we need context in suspend callback where composables aren't allowed
-                @Suppress("LocalContextGetResourceValueCall")
-                JetpackNavHost(
-                    appState = appState,
-                    onShowSnackbar = { message, action, throwable ->
-                        val actionPerformed = snackbarHostState.showSnackbar(
-                            message = message,
-                            actionLabel = context.getString(action.actionText),
-                            duration = SnackbarDuration.Short,
-                        ) == SnackbarResult.ActionPerformed
-                        if (actionPerformed && action == SnackbarAction.REPORT) {
-                            // TODO: Implémenter le système de reporting (ex. Firebase Crashlytics ou rapport utilisateur)
-                            Timber.w(throwable, "[REPORT] Action demandée par l'utilisateur — reporting non implémenté")
-                        }
-                        actionPerformed
-                    },
-                )
+                // Story 13.4 — ne pas composer NavHost tant que hasCompletedOnboarding est null (DataStore pas encore chargé)
+                if (hasCompletedOnboarding != null) {
+                    @Suppress("LocalContextGetResourceValueCall")
+                    JetpackNavHost(
+                        appState = appState,
+                        hasCompletedOnboarding = hasCompletedOnboarding,
+                        onShowSnackbar = { message, action, throwable ->
+                            val actionPerformed = snackbarHostState.showSnackbar(
+                                message = message,
+                                actionLabel = context.getString(action.actionText),
+                                duration = SnackbarDuration.Short,
+                            ) == SnackbarResult.ActionPerformed
+                            if (actionPerformed && action == SnackbarAction.REPORT) {
+                                // TODO: Implémenter le système de reporting (ex. Firebase Crashlytics ou rapport utilisateur)
+                                Timber.w(throwable, "[REPORT] Action demandée par l'utilisateur — reporting non implémenté")
+                            }
+                            actionPerformed
+                        },
+                    )
+                }
             }
             // TODO: We may want to add padding or spacer when the snackbar is shown so that
             //  content doesn't display behind it.

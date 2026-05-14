@@ -27,5 +27,8 @@ data class CatalogEntry(
     @ProtoNumber(6) val originalFileSize: Long = 0L,
     @ProtoNumber(7) val originalFileName: String = "",
     @ProtoNumber(8) val k: Int = 4,
-    @ProtoNumber(9) val n: Int = 2
+    @ProtoNumber(9) val n: Int = 2,
+    // Story 13.2 — métadonnées de corbeille (locales uniquement, non distribuées dans le DHT)
+    val isInTrash: Boolean = false,
+    val deletedAt: Long? = null
 )

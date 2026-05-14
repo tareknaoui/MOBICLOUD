@@ -32,4 +32,10 @@ interface HostedBlockDao {
     // Story 9.2 — lecture one-shot de la même agrégation, pour calcul `freeBytes` lors du REGISTER_PEER
     @Query("SELECT COALESCE(SUM(size_bytes), 0) FROM hosted_blocks")
     suspend fun getTotalSizeBytes(): Long
+
+    // Story 13.1 — KPI Dashboard "Fichiers protégés" : count des fragments hébergés.
+    // Approximation grand public (chaque fragment ≈ part d'un fichier ; un utilisateur n'a pas
+    // à connaître la distinction technique fragment / fichier dans le Mode Simple).
+    @Query("SELECT COUNT(*) FROM hosted_blocks")
+    fun observeHostedBlockCount(): Flow<Int>
 }

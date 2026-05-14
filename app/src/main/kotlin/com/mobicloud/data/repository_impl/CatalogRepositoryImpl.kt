@@ -46,7 +46,9 @@ class CatalogRepositoryImpl(
             originalFileSize = originalFileSize,
             originalFileName = originalFileName,
             k = k,
-            n = n
+            n = n,
+            isInTrash = isInTrash,
+            deletedAt = deletedAt
         )
 
     private fun FragmentLocation.toEntity(catalogFileHash: String): FragmentLocationEntity =
@@ -85,7 +87,9 @@ class CatalogRepositoryImpl(
             originalFileSize = catalogEntry.originalFileSize,
             originalFileName = catalogEntry.originalFileName,
             k = catalogEntry.k,
-            n = catalogEntry.n
+            n = catalogEntry.n,
+            isInTrash = catalogEntry.isInTrash,
+            deletedAt = catalogEntry.deletedAt
         )
 
     // --- CatalogRepository impl ---
@@ -140,5 +144,41 @@ class CatalogRepositoryImpl(
     override suspend fun getEntry(hash: String): Result<CatalogEntry?> =
         withContext(Dispatchers.IO) {
             runCatching { catalogDao.getCatalogEntry(hash)?.toDomain() }
+        }
+
+    // Story 13.2 — corbeille
+
+    override fun getActiveEntriesFlow(): Flow<List<CatalogEntry>> =
+        catalogDao.getAllActiveEntriesFlow().map { list -> list.map { it.toDomain() } }
+
+    override fun getDeletedEntriesFlow(): Flow<List<CatalogEntry>> =
+        catalogDao.getDeletedEntriesFlow().map { list -> list.map { it.toDomain() } }
+
+    override suspend fun moveToTrash(fileHash: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching { catalogDao.softDeleteEntry(fileHash, System.currentTimeMillis()) }
+        }
+
+    override suspend fun restoreFromTrash(fileHash: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching { catalogDao.restoreEntry(fileHash) }
+        }
+
+    override suspend fun permanentlyDelete(fileHash: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching { catalogDao.permanentlyDeleteEntry(fileHash) }
+        }
+
+    override suspend fun emptyTrash(): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching { catalogDao.emptyTrash() }
+        }
+
+    override suspend fun purgeExpired(): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val expiryTs = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
+                catalogDao.purgeExpiredEntries(expiryTs)
+            }
         }
 }

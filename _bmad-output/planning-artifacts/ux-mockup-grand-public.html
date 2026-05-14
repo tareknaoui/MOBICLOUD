@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MobiCloud — Mockup UX Grand Public (post-implémentation 13.1 + 13.4 + 13.2 + 13.3)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: linear-gradient(135deg, #1a1a1a, #050505);
+    color: #E0E0E0;
+    font-family: 'Inter', system-ui, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 28px;
+    flex-wrap: wrap;
+  }
+
+  .phone {
+    width: 360px;
+    height: 760px;
+    background: #000;
+    border-radius: 38px;
+    border: 8px solid #1a1a1a;
+    box-shadow: 0 30px 80px rgba(0,255,65,0.06), 0 0 0 1px #333;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .status-bar {
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    background: #000;
+  }
+  .top-bar {
+    height: 52px;
+    background: #000;
+    border-bottom: 1px solid #1a1a1a;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+  }
+  .top-bar .title { font-size: 17px; font-weight: 600; letter-spacing: .3px; }
+  .top-bar .actions { display:flex; align-items:center; gap:12px; }
+  .status-dot { width:10px; height:10px; border-radius:50%; background:#00FF41; box-shadow:0 0 6px rgba(0,255,65,.6); }
+  .icon-btn { background:none; border:none; color:#9E9E9E; font-size:18px; cursor:pointer; padding:6px; }
+  .icon-btn:hover { color:#E0E0E0; }
+
+  .screen { flex:1; overflow-y:auto; background:#000; display:none; }
+  .screen.active { display:block; }
+  .screen::-webkit-scrollbar { width:4px; }
+  .screen::-webkit-scrollbar-thumb { background:#333; }
+
+  .bottom-nav { height:62px; background:#000; border-top:1px solid #333; display:flex; }
+  .nav-item {
+    flex:1; background:none; border:none; color:#9E9E9E; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:3px; font-family:'Inter',sans-serif; font-size:11px; font-weight:500;
+  }
+  .nav-item .icon { font-size:20px; }
+  .nav-item.active { color:#00FF41; }
+
+  .section-label {
+    font-size:10px; font-weight:600; color:#9E9E9E;
+    text-transform:uppercase; letter-spacing:1.2px;
+    padding:16px 16px 8px;
+  }
+  .card { background:#000; border:1px solid #333; border-radius:4px; padding:12px; }
+
+  /* === Dashboard === */
+  .health-banner {
+    text-align:center; margin:8px 16px 0; padding:12px;
+    background:rgba(0,255,65,0.05);
+    border:1px solid rgba(0,255,65,0.25);
+    border-radius:4px; font-size:13px; color:#00FF41;
+  }
+  .health-banner.slow { background:rgba(255,179,0,0.05); border-color:rgba(255,179,0,0.25); color:#FFB300; }
+  .health-banner.searching { background:rgba(255,179,0,0.05); border-color:rgba(255,179,0,0.25); color:#FFB300; }
+  .health-banner.degraded { background:rgba(255,51,51,0.05); border-color:rgba(255,51,51,0.25); color:#FF3333; }
+
+  .gauge-wrap { display:flex; justify-content:center; padding:16px 0 6px; }
+  .gauge {
+    width:150px; height:150px; border-radius:50%;
+    position:relative; display:flex; align-items:center; justify-content:center;
+    background:conic-gradient(#00FF41 0% 92%, #1a1a1a 92% 100%);
+  }
+  .gauge::before { content:""; position:absolute; inset:8px; background:#000; border-radius:50%; }
+  .gauge-value {
+    position:relative; font-family:'JetBrains Mono',monospace;
+    font-size:34px; font-weight:700; color:#00FF41;
+  }
+  .gauge-label {
+    position:absolute; top:62%; font-size:10px; color:#9E9E9E;
+    text-transform:uppercase; letter-spacing:1px;
+  }
+  .role-badge { text-align:center; padding:8px 0 4px; font-size:13px; font-weight:600; color:#00FF41; }
+  .relay-badge { text-align:center; padding:0 0 4px; font-size:12px; color:#00FF41; }
+
+  .kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:8px 16px; }
+  .kpi-card {
+    background:#000; border:1px solid #333; border-left:3px solid #00FF41;
+    border-radius:2px; padding:12px; min-height:76px;
+  }
+  .kpi-label {
+    font-size:10px; color:#9E9E9E; text-transform:uppercase;
+    letter-spacing:1px; margin-bottom:6px;
+  }
+  .kpi-value {
+    font-family:'JetBrains Mono',monospace;
+    font-size:22px; font-weight:700; color:#E0E0E0;
+  }
+  .kpi-hint { font-size:11px; color:#9E9E9E; margin-top:4px; }
+
+  /* Toggle button — toujours visible, texte change selon mode */
+  .expert-toggle-btn {
+    display:block; width:calc(100% - 32px); margin:16px;
+    padding:12px; background:transparent; color:#9E9E9E;
+    border:1px solid #333; border-radius:4px;
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+    cursor:pointer; letter-spacing:0.5px;
+  }
+  .expert-toggle-btn:hover { color:#E0E0E0; border-color:#555; }
+
+  .radar-log {
+    margin:0 16px 16px; background:#000; border:1px solid #333;
+    padding:12px; font-family:'JetBrains Mono',monospace;
+    font-size:11px; color:#00FF41; line-height:1.6;
+    max-height:160px; overflow-y:auto;
+  }
+  .radar-log .ts { color:#555; }
+  .radar-log .warn { color:#FFB300; }
+
+  /* === Fichiers === */
+  .file-card {
+    margin:8px 16px; background:#000; border:1px solid #333;
+    border-radius:4px; padding:12px; display:flex; gap:12px;
+    align-items:center; cursor:pointer;
+  }
+  .file-card:hover { border-color:#555; }
+  .file-icon {
+    width:40px; height:40px; border-radius:4px;
+    background:rgba(0,255,65,0.08); display:flex; align-items:center;
+    justify-content:center; font-size:20px; flex-shrink:0;
+  }
+  .file-info { flex:1; min-width:0; }
+  .file-name {
+    font-size:14px; font-weight:500; color:#E0E0E0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .file-meta {
+    font-size:11px; color:#9E9E9E; margin-top:3px;
+    display:flex; gap:8px; align-items:center;
+  }
+  .file-badge {
+    font-family:'JetBrains Mono',monospace; font-size:9px;
+    padding:2px 6px; border-radius:2px;
+    text-transform:uppercase; letter-spacing:0.5px;
+  }
+  .file-badge.available { background:rgba(0,255,65,0.08); color:#00FF41; }
+  .file-badge.degraded { background:rgba(255,179,0,0.08); color:#FFB300; }
+  .file-secured { color:#00FF41; font-size:12px; }
+
+  .fab {
+    position:absolute; bottom:78px; right:16px;
+    width:54px; height:54px; border-radius:4px;
+    background:#00FF41; color:#000; border:none; cursor:pointer;
+    font-size:26px; font-weight:bold;
+    display:flex; align-items:center; justify-content:center; z-index:10;
+  }
+
+  /* === Communauté === */
+  .summary-card {
+    margin:16px 16px 0; padding:18px;
+    background:rgba(0,255,65,0.05);
+    border:1px solid rgba(0,255,65,0.25);
+    border-radius:4px; text-align:center;
+  }
+  .summary-title { font-size:16px; font-weight:600; color:#E0E0E0; margin-bottom:4px; }
+  .summary-subtitle { font-size:12px; color:#9E9E9E; }
+
+  .member-row {
+    display:flex; align-items:center; padding:12px 16px; gap:12px;
+  }
+  .avatar {
+    width:38px; height:38px; border-radius:50%; flex-shrink:0;
+    background:linear-gradient(135deg,#1a4a2a,#003311);
+    display:flex; align-items:center; justify-content:center;
+    border:1px solid #333;
+  }
+  .avatar.coord {
+    background:linear-gradient(135deg,#00FF41,#00aa2a); color:#000;
+    box-shadow:0 0 10px rgba(0,255,65,0.3);
+    font-size:16px; font-weight:700;
+  }
+  .member-info { flex:1; }
+  .member-name { font-size:14px; color:#E0E0E0; font-weight:500; }
+  .member-status { font-size:11px; color:#9E9E9E; margin-top:2px; }
+  .status-pill {
+    font-family:'JetBrains Mono',monospace; font-size:9px; font-weight:700;
+    padding:3px 8px; border-radius:2px; text-transform:uppercase;
+  }
+  .status-pill.active { background:rgba(0,255,65,0.10); color:#00FF41; }
+  .status-pill.degraded { background:rgba(255,179,0,0.10); color:#FFB300; }
+  .status-pill.offline { background:rgba(255,51,51,0.10); color:#FF3333; }
+
+  .topology { margin:12px 16px; background:#000; border:1px solid #333; padding:12px; border-radius:4px; }
+  .topology-header {
+    display:flex; justify-content:space-between;
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    color:#9E9E9E; text-transform:uppercase; letter-spacing:1px;
+    padding-bottom:8px; border-bottom:1px solid #333;
+  }
+  .node-row {
+    display:flex; align-items:center; padding:10px 0;
+    border-bottom:1px solid #1a1a1a; border-left:3px solid #333;
+    padding-left:8px; gap:8px;
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+  }
+  .node-row.sp { border-left:4px solid #00FF41; background:rgba(0,255,65,0.03); }
+  .node-id { flex:1; color:#E0E0E0; }
+  .node-id .me { color:#FFB300; }
+  .node-tag { font-size:9px; color:#00FF41; font-weight:700; }
+  .node-tag.member { color:#9E9E9E; }
+  .node-metrics { color:#9E9E9E; font-size:10px; }
+
+  /* === Paramètres === */
+  .settings-section { padding:16px; }
+  .setting-row {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 0; border-bottom:1px solid #1a1a1a;
+  }
+  .setting-label { font-size:14px; color:#E0E0E0; }
+  .setting-desc { font-size:11px; color:#9E9E9E; margin-top:3px; max-width:220px; }
+
+  .switch {
+    width:40px; height:22px; background:#333;
+    border-radius:22px; position:relative; cursor:pointer;
+    transition:background .15s; flex-shrink:0;
+  }
+  .switch.on { background:#00FF41; }
+  .switch::after {
+    content:""; width:16px; height:16px; background:#fff;
+    border-radius:50%; position:absolute; top:3px; left:3px;
+    transition:left .15s;
+  }
+  .switch.on::after { left:21px; background:#000; }
+
+  .slider-wrap { padding:16px 0; }
+  .slider-track { height:4px; background:#333; border-radius:2px; position:relative; }
+  .slider-fill {
+    position:absolute; left:0; top:0; height:100%;
+    background:#00FF41; border-radius:2px; width:25%;
+  }
+  .slider-thumb {
+    position:absolute; left:calc(25% - 8px); top:-6px;
+    width:16px; height:16px; background:#00FF41; border-radius:50%;
+    box-shadow:0 0 0 4px rgba(0,255,65,0.1);
+  }
+  .slider-value {
+    font-family:'JetBrains Mono',monospace;
+    font-size:13px; color:#00FF41; margin-top:10px;
+  }
+  .slider-hint { font-size:11px; color:#9E9E9E; margin-top:4px; }
+
+  /* === Onboarding === */
+  .onboarding-screen {
+    flex:1; overflow-y:auto; background:#000; display:flex;
+    flex-direction:column; padding:32px 24px;
+  }
+  .onboarding-title {
+    font-size:22px; font-weight:700; color:#FFB300;
+    text-align:center; margin-bottom:10px;
+  }
+  .onboarding-subtitle {
+    font-size:13px; color:rgba(224,224,224,0.75);
+    text-align:center; line-height:1.55; margin-bottom:36px;
+  }
+  .perm-row {
+    display:flex; gap:14px; align-items:flex-start; margin-bottom:22px;
+  }
+  .perm-emoji { font-size:26px; width:32px; flex-shrink:0; }
+  .perm-info { flex:1; }
+  .perm-title { font-size:14px; font-weight:600; color:#FFB300; margin-bottom:3px; }
+  .perm-desc { font-size:12px; color:rgba(224,224,224,0.65); line-height:1.5; }
+  .onboarding-cta {
+    display:block; width:100%; padding:14px;
+    background:#FFB300; color:#000; border:none; border-radius:4px;
+    font-size:15px; font-weight:700; cursor:pointer; margin-bottom:10px;
+  }
+  .onboarding-skip {
+    display:block; width:100%; padding:8px;
+    background:none; color:rgba(224,224,224,0.4); border:none;
+    font-size:13px; cursor:pointer;
+  }
+
+  .init-screen {
+    flex:1; background:#000; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; padding:32px;
+  }
+  .init-app-name {
+    font-size:30px; font-weight:700; color:#FFB300; margin-bottom:6px;
+  }
+  .init-app-tagline {
+    font-size:12px; color:rgba(224,224,224,0.4); margin-bottom:48px;
+  }
+  .init-progress-bar {
+    width:100%; height:3px; background:rgba(255,255,255,0.1); border-radius:2px;
+    margin-bottom:20px; overflow:hidden;
+  }
+  .init-progress-fill {
+    height:100%; background:#FFB300; border-radius:2px;
+    animation: loadPulse 1.6s ease-in-out infinite alternate;
+    width:55%;
+  }
+  @keyframes loadPulse {
+    from { width:20%; opacity:.7; }
+    to   { width:80%; opacity:1; }
+  }
+  .init-status {
+    font-size:13px; color:rgba(224,224,224,0.75); text-align:center;
+    margin-bottom:40px;
+  }
+  .init-skip {
+    font-size:12px; color:rgba(224,224,224,0.3); background:none;
+    border:none; cursor:pointer;
+  }
+
+  /* === Swipe to dismiss === */
+  .file-card-wrap { position:relative; overflow:hidden; border-radius:4px; margin:8px 16px; }
+  .swipe-bg {
+    position:absolute; inset:0;
+    background:#FF3333;
+    display:flex; align-items:center; justify-content:flex-end;
+    padding-right:20px; border-radius:4px;
+  }
+  .swipe-bg-label { color:#fff; font-size:20px; }
+  .file-card-inner {
+    background:#000; border:1px solid #333;
+    border-radius:4px; padding:12px; display:flex; gap:12px;
+    align-items:center; cursor:pointer;
+    position:relative; z-index:1;
+    transition: transform 0.25s ease;
+  }
+  .file-card-inner:hover { border-color:#555; }
+  .file-card-wrap.swiping .file-card-inner { transform: translateX(-90px); }
+
+  /* === Snackbar === */
+  .snackbar {
+    position:absolute; bottom:72px; left:12px; right:12px;
+    background:#1F1F1F; border:1px solid #333; border-radius:4px;
+    padding:12px 14px; display:flex; justify-content:space-between; align-items:center;
+    font-size:13px; color:#E0E0E0; z-index:20;
+    opacity:0; pointer-events:none; transition: opacity 0.2s;
+  }
+  .snackbar.visible { opacity:1; pointer-events:all; }
+  .snackbar-action { color:#FFB300; font-weight:600; background:none; border:none; cursor:pointer; font-size:13px; }
+
+  /* === TrashScreen === */
+  .trash-top-bar {
+    height:56px; background:#000; border-bottom:1px solid #1a1a1a;
+    display:flex; align-items:center; padding:0 4px 0 4px; gap:4px;
+  }
+  .trash-back-btn { background:none; border:none; color:#E0E0E0; font-size:22px; padding:8px; cursor:pointer; }
+  .trash-top-title { flex:1; font-size:17px; font-weight:600; color:#E0E0E0; }
+  .trash-empty-btn { background:none; border:none; color:#FF3333; font-size:20px; padding:8px; cursor:pointer; }
+
+  .trash-entry {
+    margin:6px 16px; background:#111; border:1px solid #222;
+    border-radius:4px; padding:10px 12px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .trash-entry-info { flex:1; min-width:0; }
+  .trash-entry-name {
+    font-size:14px; font-weight:500; color:#E0E0E0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .trash-entry-meta { font-size:11px; color:#666; margin-top:3px; font-family:'JetBrains Mono',monospace; }
+  .trash-restore-btn { background:none; border:none; color:#FFB300; font-size:20px; padding:4px; cursor:pointer; }
+  .trash-delete-btn  { background:none; border:none; color:#FF3333; font-size:20px; padding:4px; cursor:pointer; }
+
+  .trash-empty-state {
+    flex:1; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:16px; padding:40px;
+  }
+  .trash-empty-icon { font-size:56px; color:#333; }
+  .trash-empty-text { font-size:16px; color:#555; text-align:center; }
+
+  /* === ErasureProgressIndicator / DownloadProgressIndicator (Story 13.3) === */
+  .progress-widget {
+    margin:8px 16px 0; background:#000; border:1px solid #333;
+    border-radius:4px; padding:10px 12px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .progress-label { font-size:13px; color:#E0E0E0; margin-bottom:8px; }
+  .progress-track {
+    height:4px; background:#1A1A1A; border-radius:2px; position:relative; margin-bottom:8px;
+  }
+  .progress-fill { position:absolute; left:0; top:0; height:100%; background:#00FF41; border-radius:2px; }
+  .block-row { display:flex; gap:4px; margin-bottom:8px; flex-wrap:wrap; }
+  .block {
+    width:20px; height:20px; border-radius:2px; border:1px solid #333;
+    background:#0D2B0D; flex-shrink:0;
+  }
+  .block.data-ok  { background:#00FF41; }
+  .block.parity-ok{ background:#FFB300; }
+  .block.failed   { background:#FF3333; }
+  .block.pending-parity { background:#2B2000; }
+  .progress-count { font-size:13px; color:#E0E0E0; margin-bottom:6px; }
+  .cancel-text-btn {
+    display:block; margin-left:auto;
+    background:none; border:none; cursor:pointer;
+    color:#FF3333; font-size:12px;
+    font-family:'JetBrains Mono',monospace; padding:4px 0;
+  }
+  .upload-cancelled {
+    margin:8px 16px 0; padding:8px 12px;
+    font-family:'JetBrains Mono',monospace; font-size:13px; color:#FF3333;
+  }
+  .node-contrib { font-size:11px; color:#9E9E9E; margin-bottom:2px; }
+
+  /* === TopAppBar "Mes fichiers" (ExplorerScreen) === */
+  .files-top-bar {
+    height:56px; background:#000; border-bottom:1px solid #1a1a1a;
+    display:flex; align-items:center; padding:0 16px; gap:8px;
+  }
+  .files-top-title { flex:1; font-size:17px; font-weight:600; color:#E0E0E0; }
+  .files-trash-btn { background:none; border:none; color:#FFB300; font-size:22px; padding:4px; cursor:pointer; }
+
+  /* === Commentaire latéral === */
+  .commentary { width:340px; color:#ccc; font-size:13px; line-height:1.6; }
+  .commentary h2 {
+    color:#00FF41; font-size:14px; text-transform:uppercase;
+    letter-spacing:1.5px; margin:22px 0 8px;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .commentary h2:first-child { margin-top:0; }
+  .commentary p { margin-bottom:10px; color:#aaa; }
+  .commentary .tag {
+    display:inline-block; font-family:'JetBrains Mono',monospace;
+    font-size:10px; padding:2px 6px;
+    background:rgba(0,255,65,0.1); color:#00FF41;
+    border-radius:2px; margin-right:6px;
+  }
+  .commentary .tag.skip { background:rgba(255,51,51,0.1); color:#FF3333; }
+  .commentary .tag.todo { background:rgba(255,179,0,0.1); color:#FFB300; }
+  .commentary .tag.warn { background:rgba(255,179,0,0.1); color:#FFB300; }
+  .commentary code {
+    font-family:'JetBrains Mono',monospace; font-size:12px;
+    background:#1a1a1a; padding:1px 5px; border-radius:2px; color:#00FF41;
+  }
+
+  .global-toggle {
+    position:fixed; top:20px; right:20px; z-index:100;
+    background:#1a1a1a; border:1px solid #333; color:#E0E0E0;
+    padding:10px 16px; border-radius:4px;
+    font-family:'JetBrains Mono',monospace; font-size:11px;
+    cursor:pointer; text-transform:uppercase; letter-spacing:1px;
+  }
+  .global-toggle.expert { background:#FFB300; color:#000; border-color:#FFB300; }
+
+  /* Visibilité conditionnelle Simple / Expert */
+  .simple-only { display:block; }
+  .expert-only { display:none; }
+  body.expert .expert-only { display:block; }
+  body.expert .simple-only { display:none; }
+</style>
+</head>
+<body>
+
+<button class="global-toggle" id="modeToggle">Mode: Simple</button>
+
+<!-- ===== ONBOARDING : PermissionsScreen ===== -->
+<div class="phone">
+  <div class="status-bar">
+    <span>21:36</span>
+    <span>🔋 87%</span>
+  </div>
+
+  <div class="onboarding-screen">
+    <div style="flex:1;display:flex;flex-direction:column;justify-content:center;">
+      <div class="onboarding-title">Bienvenue sur MobiCloud</div>
+      <div class="onboarding-subtitle">Pour fonctionner, MobiCloud a besoin de quelques autorisations.</div>
+
+      <div class="perm-row">
+        <div class="perm-emoji">🔔</div>
+        <div class="perm-info">
+          <div class="perm-title">Notifications</div>
+          <div class="perm-desc">Pour vous informer lorsqu'un fichier est disponible ou qu'un transfert est terminé.</div>
+        </div>
+      </div>
+
+      <div class="perm-row">
+        <div class="perm-emoji">📶</div>
+        <div class="perm-info">
+          <div class="perm-title">Wi-Fi de proximité</div>
+          <div class="perm-desc">Pour découvrir et rejoindre le groupe de partage sécurisé à proximité.</div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <button class="onboarding-cta">Continuer</button>
+      <button class="onboarding-skip">Passer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ONBOARDING : InitScreen ===== -->
+<div class="phone">
+  <div class="status-bar">
+    <span>21:36</span>
+    <span>🔋 87%</span>
+  </div>
+
+  <div class="init-screen">
+    <div class="init-app-name">MobiCloud</div>
+    <div class="init-app-tagline">Stockage distribué sécurisé</div>
+
+    <div class="init-progress-bar">
+      <div class="init-progress-fill"></div>
+    </div>
+
+    <div class="init-status">Recherche de membres à proximité…</div>
+
+    <button class="init-skip">Accéder à l'application</button>
+  </div>
+</div>
+
+<!-- ===== APPLICATION PRINCIPALE ===== -->
+<div class="phone">
+  <div class="status-bar">
+    <span>21:36</span>
+    <span>🔋 87%</span>
+  </div>
+
+  <!-- TopAppBar principale — masquée sur l'écran Fichiers (ExplorerScreen a sa propre TopAppBar) -->
+  <div class="top-bar" id="mainTopBar">
+    <div class="title" id="screenTitle">Mon Nœud</div>
+    <div class="actions">
+      <span class="status-dot" title="Tout fonctionne"></span>
+      <button class="icon-btn" onclick="showScreen('settings')">⚙</button>
+    </div>
+  </div>
+
+  <!-- ============ DASHBOARD ============ -->
+  <div class="screen active" id="screen-dashboard">
+
+    <!-- Bannière santé — Mode Simple uniquement (AC3) -->
+    <div class="simple-only">
+      <div class="health-banner">
+        ✓ Tout fonctionne · Connecté à 4 membres · WiFi
+      </div>
+    </div>
+
+    <!-- Jauge de fiabilité — TOUJOURS visible (Simple + Expert) -->
+    <div class="gauge-wrap">
+      <div class="gauge">
+        <span class="gauge-value">92</span>
+        <span class="gauge-label">Santé</span>
+      </div>
+    </div>
+
+    <!-- Badge rôle — sémantique humaine (AC2) -->
+    <div class="role-badge">★ Coordinateur de Réseau</div>
+    <div class="relay-badge">✓ Pair-à-pair direct</div>
+
+    <!-- Alerte réseau instable — Expert uniquement -->
+    <div class="expert-only" style="text-align:center;padding:4px 0;font-size:12px;color:#FF3333;">
+      ⚠ Connexion lente
+    </div>
+
+    <!-- Section Aperçu — 4 KPIs sémantiques (AC4) -->
+    <div class="section-label">Aperçu</div>
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">Batterie</div>
+        <div class="kpi-value">87%</div>
+        <div class="kpi-hint">Impact app : minime</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Communauté</div>
+        <div class="kpi-value">4/50</div>
+        <div class="kpi-hint">Membres connectés</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Ma contribution</div>
+        <div class="kpi-value">2.3 <span style="font-size:13px;color:#9E9E9E;">GB</span></div>
+        <div class="kpi-hint">Espace que je partage</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Fichiers protégés</div>
+        <div class="kpi-value">12</div>
+        <div class="kpi-hint">Sauvegardés ✓</div>
+      </div>
+    </div>
+
+    <!-- Toggle Détails techniques — toujours visible, texte change (AC5) -->
+    <button class="expert-toggle-btn" id="dashToggleBtn" onclick="toggleExpert()">▾ DÉTAILS TECHNIQUES</button>
+
+    <!-- Mode Expert : KPIs techniques + RadarLog (AC5) -->
+    <div class="expert-only">
+      <div class="section-label">Diagnostic technique</div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">Uptime</div>
+          <div class="kpi-value">04:23</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Réseau</div>
+          <div class="kpi-value">Wifi</div>
+        </div>
+      </div>
+
+      <div class="section-label">Activité réseau</div>
+      <div class="radar-log">
+        <div><span class="ts">[21:36:04]</span> JOIN_REQUEST 0x7a..3c → ACCEPT</div>
+        <div><span class="ts">[21:36:01]</span> HB-SP keepalive broadcast (4 dest.)</div>
+        <div><span class="ts">[21:35:58]</span> Gossip sync ok (12 entries)</div>
+        <div><span class="ts">[21:35:46]</span> Multicast UDP scan: 4 peers</div>
+        <div><span class="ts">[21:35:31]</span> <span class="warn">WARN handover 4G→Wifi (12s)</span></div>
+        <div><span class="ts">[21:35:12]</span> Bully election concluded — self elected</div>
+        <div><span class="ts">[21:35:00]</span> REGISTER_PEER → Relais HA ok</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============ FICHIERS ============ -->
+  <div class="screen" id="screen-files" style="position:relative;">
+
+    <!-- TopAppBar "Mes fichiers" (Story 13.2) -->
+    <div class="files-top-bar">
+      <span class="files-top-title">Mes fichiers</span>
+      <button class="files-trash-btn" title="Corbeille" onclick="alert('→ TrashScreen (voir téléphone suivant)')">🗑</button>
+    </div>
+
+    <!-- Carte 1 — balayage en cours (démo swipe) -->
+    <div class="file-card-wrap swiping" id="swipeCard" onclick="toggleSwipe()">
+      <div class="swipe-bg"><span class="swipe-bg-label">🗑</span></div>
+      <div class="file-card-inner">
+        <div class="file-icon">📄</div>
+        <div class="file-info">
+          <div class="file-name">Soutenance_diapos.pdf</div>
+          <div class="file-meta">
+            <span>4.2 MB</span>
+            <span class="file-secured">🔒</span>
+            <span class="file-badge available">Disponible</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="file-card-wrap">
+      <div class="file-card-inner">
+        <div class="file-icon">🎥</div>
+        <div class="file-info">
+          <div class="file-name">Démo_cluster_Bully.mp4</div>
+          <div class="file-meta">
+            <span>128 MB</span>
+            <span class="file-secured">🔒</span>
+            <span class="file-badge available">Disponible</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="file-card-wrap">
+      <div class="file-card-inner">
+        <div class="file-icon">📝</div>
+        <div class="file-info">
+          <div class="file-name">Mémoire_PFE_v3.docx</div>
+          <div class="file-meta">
+            <span>2.1 MB</span>
+            <span class="file-secured">🔒</span>
+            <span class="file-badge degraded">Partiel</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="file-card-wrap">
+      <div class="file-card-inner">
+        <div class="file-icon">📊</div>
+        <div class="file-info">
+          <div class="file-name">Benchmarks_erasure.xlsx</div>
+          <div class="file-meta">
+            <span>880 KB</span>
+            <span class="file-secured">🔒</span>
+            <span class="file-badge available">Disponible</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:90px;"></div>
+    <button class="fab" title="Sauvegarder un fichier">+</button>
+
+    <!-- Snackbar "Déplacé vers la corbeille" (AC-2) -->
+    <div class="snackbar" id="trashSnackbar">
+      <span>Déplacé vers la corbeille</span>
+      <button class="snackbar-action" onclick="undoTrash()">Annuler</button>
+    </div>
+  </div>
+
+  <!-- ============ COMMUNAUTÉ ============ -->
+  <div class="screen" id="screen-community">
+
+    <!-- Mode Simple : CommunitySummaryCard + MemberListCard (AC7) -->
+    <!-- En Mode Expert : ces deux composants disparaissent (comportement réel du code) -->
+    <div class="simple-only">
+      <div class="summary-card">
+        <div class="summary-title">Connexion excellente</div>
+        <div class="summary-subtitle">4 membres à proximité · Vous coordonnez le groupe</div>
+      </div>
+
+      <div class="section-label" style="padding-top:12px;">Membres du groupe</div>
+
+      <div class="member-row">
+        <div class="avatar coord">★</div>
+        <div class="member-info">
+          <div class="member-name">Vous (Coordinateur)</div>
+          <div class="member-status">Vous · 87% batterie</div>
+        </div>
+        <span class="status-pill active">ACTIF</span>
+      </div>
+
+      <div class="member-row">
+        <div class="avatar"></div>
+        <div class="member-info">
+          <div class="member-name">Membre 9d1c</div>
+          <div class="member-status">Connecté il y a 2s · 64% batterie</div>
+        </div>
+        <span class="status-pill active">ACTIF</span>
+      </div>
+
+      <div class="member-row">
+        <div class="avatar"></div>
+        <div class="member-info">
+          <div class="member-name">Membre a712</div>
+          <div class="member-status">Connecté il y a 8s · 22% batterie</div>
+        </div>
+        <span class="status-pill degraded">DÉGRADÉ</span>
+      </div>
+
+      <div class="member-row">
+        <div class="avatar"></div>
+        <div class="member-info">
+          <div class="member-name">Membre 3e08</div>
+          <div class="member-status">Connecté il y a 1s · 78% batterie</div>
+        </div>
+        <span class="status-pill active">ACTIF</span>
+      </div>
+    </div>
+
+    <!-- Toggle Diagnostics Avancés — toujours visible (AC8) -->
+    <button class="expert-toggle-btn" id="commToggleBtn" onclick="toggleExpert()">▾ DIAGNOSTICS AVANCÉS</button>
+
+    <!-- Mode Expert : ClusterTopologyCard + RemoteClustersCard (AC8) -->
+    <div class="expert-only">
+      <div class="topology">
+        <div class="topology-header">
+          <span>CLUSTER LOCAL</span>
+          <span>4 nœuds</span>
+        </div>
+        <div class="node-row sp">
+          <span class="node-tag">★ SP</span>
+          <span class="node-id">0x4F2A..B2A <span class="me">[MOI]</span></span>
+          <span class="node-metrics">🔋87% · 92%</span>
+        </div>
+        <div class="node-row">
+          <span class="node-tag member">●</span>
+          <span class="node-id">0x9D1C..F03</span>
+          <span class="node-metrics">🔋64% · 78%</span>
+        </div>
+        <div class="node-row">
+          <span class="node-tag member">●</span>
+          <span class="node-id">0xA712..C45</span>
+          <span class="node-metrics" style="color:#FFB300;">🔋22% · 41%</span>
+        </div>
+        <div class="node-row">
+          <span class="node-tag member">●</span>
+          <span class="node-id">0x3E08..1F9</span>
+          <span class="node-metrics">🔋78% · 82%</span>
+        </div>
+      </div>
+
+      <div class="section-label">Groupes distants accessibles</div>
+      <div class="card" style="margin:0 16px;">
+        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#9E9E9E;">
+          cluster-a3f1 — 12 membres · via Relais HA
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace; font-size:11px; color:#9E9E9E; margin-top:6px;">
+          cluster-b8c2 — 7 membres · via Relais HA
+        </div>
+      </div>
+      <div style="height:16px;"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ PARAMÈTRES ============ -->
+  <!-- Seules les sections réellement implémentées dans SettingsScreen.kt -->
+  <div class="screen" id="screen-settings">
+    <div class="settings-section">
+
+      <!-- Section "Espace que je partage" — AC9 -->
+      <div class="section-label" style="padding-left:0;">Espace que je partage</div>
+      <div class="slider-wrap">
+        <div class="slider-track">
+          <div class="slider-fill"></div>
+          <div class="slider-thumb"></div>
+        </div>
+        <div class="slider-value">2.5 GB <span style="color:#9E9E9E;">/ 10 GB libres</span></div>
+        <div class="slider-hint">Utilisé : 1.2 GB · Plus vous partagez, plus vous pouvez sauvegarder chez vos amis.</div>
+      </div>
+
+      <!-- Section "Affichage" — AC10 -->
+      <div class="section-label" style="padding-left:0;padding-top:20px;">Affichage</div>
+      <div class="setting-row">
+        <div style="flex:1; margin-right:12px;">
+          <div class="setting-label">Mode Diagnostics Avancés</div>
+          <div class="setting-desc">Affiche les détails techniques (NodeId, logs réseau, topologie cluster).</div>
+        </div>
+        <div class="switch" id="expertSwitch"></div>
+      </div>
+
+    </div>
+    <div style="height:16px;"></div>
+  </div>
+
+  <!-- Navigation bas -->
+  <div class="bottom-nav">
+    <button class="nav-item" data-screen="files" onclick="showScreen('files')">
+      <span class="icon">📂</span>
+      <span>Fichiers</span>
+    </button>
+    <button class="nav-item active" data-screen="dashboard" onclick="showScreen('dashboard')">
+      <span class="icon">⌂</span>
+      <span>Mon Nœud</span>
+    </button>
+    <button class="nav-item" data-screen="community" onclick="showScreen('community')">
+      <span class="icon">👥</span>
+      <span>Communauté</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== CORBEILLE : TrashScreen (Story 13.2) ===== -->
+<div class="phone">
+  <div class="status-bar">
+    <span>21:36</span>
+    <span>🔋 87%</span>
+  </div>
+
+  <!-- TopAppBar Corbeille -->
+  <div class="trash-top-bar">
+    <button class="trash-back-btn">←</button>
+    <span class="trash-top-title">Corbeille</span>
+    <!-- Icône "Vider" rouge — visible si liste non vide -->
+    <button class="trash-empty-btn" title="Vider la corbeille">🗑</button>
+  </div>
+
+  <!-- Liste avec fichiers en corbeille -->
+  <div style="flex:1;overflow-y:auto;background:#000;">
+
+    <div class="trash-entry">
+      <div class="trash-entry-info">
+        <div class="trash-entry-name">Soutenance_diapos.pdf</div>
+        <div class="trash-entry-meta">Supprimé le 12/05/2026 · 28 j restants</div>
+      </div>
+      <button class="trash-restore-btn" title="Restaurer">↩</button>
+      <button class="trash-delete-btn" title="Supprimer définitivement">✕</button>
+    </div>
+
+    <div class="trash-entry">
+      <div class="trash-entry-info">
+        <div class="trash-entry-name">Benchmarks_erasure.xlsx</div>
+        <div class="trash-entry-meta">Supprimé le 02/05/2026 · 18 j restants</div>
+      </div>
+      <button class="trash-restore-btn" title="Restaurer">↩</button>
+      <button class="trash-delete-btn" title="Supprimer définitivement">✕</button>
+    </div>
+
+    <div class="trash-entry" style="opacity:0.5;">
+      <div class="trash-entry-info">
+        <div class="trash-entry-name">old_backup_2025.zip</div>
+        <div class="trash-entry-meta" style="color:#FF3333;">Supprimé le 12/04/2026 · 0 j (expiré)</div>
+      </div>
+      <button class="trash-restore-btn" title="Restaurer">↩</button>
+      <button class="trash-delete-btn" title="Supprimer définitivement">✕</button>
+    </div>
+
+  </div>
+
+  <!-- Pas de bottom nav sur TrashScreen -->
+</div>
+
+<!-- ===== CORBEILLE : état vide ===== -->
+<div class="phone">
+  <div class="status-bar">
+    <span>21:36</span>
+    <span>🔋 87%</span>
+  </div>
+
+  <div class="trash-top-bar">
+    <button class="trash-back-btn">←</button>
+    <span class="trash-top-title">Corbeille</span>
+    <!-- Pas d'icône "Vider" — liste vide -->
+  </div>
+
+  <div style="flex:1;background:#000;display:flex;flex-direction:column;">
+    <div class="trash-empty-state">
+      <div class="trash-empty-icon">🗑</div>
+      <div class="trash-empty-text">Votre corbeille est vide</div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== FICHIERS : Upload en cours + bouton Annuler (Story 13.3) ===== -->
+<div class="phone">
+  <div class="status-bar">
+    <span>21:37</span>
+    <span>🔋 85%</span>
+  </div>
+
+  <!-- TopAppBar "Mes fichiers" -->
+  <div class="files-top-bar">
+    <span class="files-top-title">Mes fichiers</span>
+    <button class="files-trash-btn" title="Corbeille">🗑</button>
+  </div>
+
+  <!-- ErasureProgressIndicator — état Distributing -->
+  <div class="progress-widget">
+    <div class="progress-label">⬆ Distribution (5/8 blocs)</div>
+    <div class="block-row">
+      <!-- K=6 data blocs -->
+      <div class="block data-ok"></div>
+      <div class="block data-ok"></div>
+      <div class="block data-ok"></div>
+      <div class="block data-ok"></div>
+      <div class="block data-ok"></div>
+      <div class="block" style="background:#0D2B0D;"></div><!-- en attente -->
+      <!-- N=2 parity blocs -->
+      <div class="block pending-parity"></div>
+      <div class="block pending-parity"></div>
+    </div>
+    <div class="progress-count">5 / 8 blocs</div>
+    <!-- Bouton Annuler (AC1 / AC6 ErasureProgressIndicator) -->
+    <button class="cancel-text-btn" onclick="simulateCancel()">✕ Annuler</button>
+  </div>
+
+  <!-- Fichiers restants (non affectés par l'upload) -->
+  <div class="file-card-wrap" style="margin-top:4px;">
+    <div class="file-card-inner">
+      <div class="file-icon">🎥</div>
+      <div class="file-info">
+        <div class="file-name">Démo_cluster_Bully.mp4</div>
+        <div class="file-meta">
+          <span>128 MB</span>
+          <span class="file-secured">🔒</span>
+          <span class="file-badge available">Disponible</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="file-card-wrap">
+    <div class="file-card-inner">
+      <div class="file-icon">📝</div>
+      <div class="file-info">
+        <div class="file-name">Mémoire_PFE_v3.docx</div>
+        <div class="file-meta">
+          <span>2.1 MB</span>
+          <span class="file-secured">🔒</span>
+          <span class="file-badge available">Disponible</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:90px;"></div>
+  <!-- FAB désactivé visuellement (upload en cours) -->
+  <button class="fab" style="opacity:0.4;cursor:default;" title="Upload en cours">+</button>
+
+  <!-- Snackbar "Upload en cours" — AC5 -->
+  <div class="snackbar visible" id="busySnackbar6" style="pointer-events:none;">
+    <span>Upload en cours, veuillez patienter</span>
+  </div>
+
+  <div class="bottom-nav">
+    <button class="nav-item active" data-screen="files">
+      <span class="icon">📂</span>
+      <span>Fichiers</span>
+    </button>
+    <button class="nav-item">
+      <span class="icon">⌂</span>
+      <span>Mon Nœud</span>
+    </button>
+    <button class="nav-item">
+      <span class="icon">👥</span>
+      <span>Communauté</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== FICHIERS : Upload annulé (Story 13.3) ===== -->
+<div class="phone">
+  <div class="status-bar">
+    <span>21:37</span>
+    <span>🔋 85%</span>
+  </div>
+
+  <div class="files-top-bar">
+    <span class="files-top-title">Mes fichiers</span>
+    <button class="files-trash-btn" title="Corbeille">🗑</button>
+  </div>
+
+  <!-- StoreState.Cancelled — AC2/AC3 -->
+  <div class="upload-cancelled">⊘ Upload annulé</div>
+
+  <!-- Fichiers -->
+  <div class="file-card-wrap" style="margin-top:4px;">
+    <div class="file-card-inner">
+      <div class="file-icon">📄</div>
+      <div class="file-info">
+        <div class="file-name">Soutenance_diapos.pdf</div>
+        <div class="file-meta">
+          <span>4.2 MB</span>
+          <span class="file-secured">🔒</span>
+          <span class="file-badge available">Disponible</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="file-card-wrap">
+    <div class="file-card-inner">
+      <div class="file-icon">🎥</div>
+      <div class="file-info">
+        <div class="file-name">Démo_cluster_Bully.mp4</div>
+        <div class="file-meta">
+          <span>128 MB</span>
+          <span class="file-secured">🔒</span>
+          <span class="file-badge available">Disponible</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:90px;"></div>
+  <button class="fab" title="Sauvegarder un fichier">+</button>
+
+  <div class="bottom-nav">
+    <button class="nav-item active">
+      <span class="icon">📂</span>
+      <span>Fichiers</span>
+    </button>
+    <button class="nav-item">
+      <span class="icon">⌂</span>
+      <span>Mon Nœud</span>
+    </button>
+    <button class="nav-item">
+      <span class="icon">👥</span>
+      <span>Communauté</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== FICHIERS : Download en cours + bouton Annuler (Story 13.3) ===== -->
+<div class="phone">
+  <div class="status-bar">
+    <span>21:37</span>
+    <span>🔋 85%</span>
+  </div>
+
+  <div class="files-top-bar">
+    <span class="files-top-title">Mes fichiers</span>
+    <button class="files-trash-btn" title="Corbeille">🗑</button>
+  </div>
+
+  <!-- DownloadProgressIndicator — état Downloading -->
+  <div class="progress-widget">
+    <div class="progress-label">⬇ 5/6 blocs</div>
+    <div class="progress-track">
+      <div class="progress-fill" style="width:83%;"></div>
+    </div>
+    <div class="block-row">
+      <div class="block data-ok"></div>
+      <div class="block data-ok"></div>
+      <div class="block data-ok"></div>
+      <div class="block data-ok"></div>
+      <div class="block data-ok"></div>
+      <div class="block" style="background:#0D2B0D;"></div>
+      <div class="block parity-ok"></div>
+      <div class="block pending-parity"></div>
+    </div>
+    <div class="node-contrib">9d1c... 14ms</div>
+    <div class="node-contrib">a712... 31ms (secours)</div>
+    <!-- Bouton Annuler — AC4 -->
+    <button class="cancel-text-btn">✕ Annuler</button>
+  </div>
+
+  <div class="file-card-wrap" style="margin-top:4px;">
+    <div class="file-card-inner">
+      <div class="file-icon">📄</div>
+      <div class="file-info">
+        <div class="file-name">Soutenance_diapos.pdf</div>
+        <div class="file-meta">
+          <span>4.2 MB</span>
+          <span class="file-secured">🔒</span>
+          <span class="file-badge available">Disponible</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="file-card-wrap">
+    <div class="file-card-inner" style="opacity:0.5;">
+      <div class="file-icon">🎥</div>
+      <div class="file-info">
+        <div class="file-name">Démo_cluster_Bully.mp4</div>
+        <div class="file-meta">
+          <span>128 MB</span>
+          <span class="file-secured">🔒</span>
+          <span class="file-badge available">Disponible</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="height:90px;"></div>
+  <button class="fab" title="Sauvegarder un fichier">+</button>
+
+  <div class="bottom-nav">
+    <button class="nav-item active">
+      <span class="icon">📂</span>
+      <span>Fichiers</span>
+    </button>
+    <button class="nav-item">
+      <span class="icon">⌂</span>
+      <span>Mon Nœud</span>
+    </button>
+    <button class="nav-item">
+      <span class="icon">👥</span>
+      <span>Communauté</span>
+    </button>
+  </div>
+</div>
+
+<!-- ===== Commentaire latéral ===== -->
+<div class="commentary">
+  <h2>// MOCKUP MOBICLOUD v5</h2>
+  <p>Mis à jour après implémentation Story 13.3 (Annulation upload/download). Reflète exactement le comportement du code Kotlin/Compose.</p>
+
+  <h2>// TÉLÉPHONES DANS CE MOCKUP</h2>
+  <p><strong>1 — PermissionsScreen</strong> : onboarding premier lancement.</p>
+  <p><strong>2 — InitScreen</strong> : initialisation P2P animée.</p>
+  <p><strong>3 — App principale</strong> : Dashboard / Fichiers / Communauté / Paramètres. Onglet <strong>Fichiers</strong> : TopAppBar + swipe (cliquer 1re carte).</p>
+  <p><strong>4 — TrashScreen (non vide)</strong> : liste corbeille avec date + jours restants.</p>
+  <p><strong>5 — TrashScreen (vide)</strong> : état vide.</p>
+  <p><strong>6 — Upload en cours</strong> : <code>ErasureProgressIndicator</code> état Distributing + bouton "✕ Annuler" + snackbar "Upload en cours".</p>
+  <p><strong>7 — Upload annulé</strong> : <code>StoreState.Cancelled</code> → "⊘ Upload annulé" (3s puis Idle).</p>
+  <p><strong>8 — Download en cours</strong> : <code>DownloadProgressIndicator</code> état Downloading + bouton "✕ Annuler".</p>
+
+  <h2>// PARCOURS PREMIER LANCEMENT</h2>
+  <p><strong>PermissionsScreen</strong> → <strong>InitScreen</strong> → <strong>Dashboard</strong>. Pas de bottom nav pendant l'onboarding (<code>currentTopLevelDestination = null</code>).</p>
+
+  <h2>// CE QUI A CHANGÉ (v4→v5 — Story 13.3)</h2>
+  <p><span class="tag">new</span> <strong>StoreState.Cancelled</strong> — état dédié, visible 3s puis retour à Idle.</p>
+  <p><span class="tag">new</span> <strong>cancelUpload()</strong> — annule <code>storeJob</code> + <code>resetJob</code>, émet Cancelled, scheduleReset(3s). Le <code>finally { tempFile.delete() }</code> s'exécute toujours.</p>
+  <p><span class="tag">new</span> <strong>Bouton "✕ Annuler" dans ErasureProgressIndicator</strong> — visible quel que soit le sous-état (Encoding/Encrypting/Distributing).</p>
+  <p><span class="tag">new</span> <strong>Bouton "✕ Annuler" dans DownloadProgressIndicator</strong> — câblé sur <code>resetDownloadState()</code> existant (cancelle locateJob + downloadJob).</p>
+  <p><span class="tag">new</span> <strong>Snackbar "Upload en cours"</strong> — via <code>uploadBusyEvent: SharedFlow&lt;Unit&gt;</code> quand 2e upload tenté pendant InProgress.</p>
+  <p><span class="tag">new</span> <strong>storeJob: Job?</strong> — tracke la coroutine d'upload, pattern identique à downloadJob.</p>
+  <p><span class="tag">new</span> <strong>scheduleReset(delayMs)</strong> — paramètre optionnel, 5s par défaut (inchangé pour Success/Error), 3s pour Cancelled.</p>
+
+  <h2>// CE QUI A CHANGÉ (v3→v4 — Story 13.2)</h2>
+  <p><span class="tag">new</span> <strong>TopAppBar "Mes fichiers"</strong> — titre + icône 🗑 amber en haut à droite → navigue vers TrashScreen.</p>
+  <p><span class="tag">new</span> <strong>SwipeToDismissBox</strong> — balayage vers la gauche sur une fiche = soft-delete (fond rouge, icône 🗑). Cliquer la 1re carte pour simuler.</p>
+  <p><span class="tag">new</span> <strong>Snackbar "Déplacé vers la corbeille"</strong> + bouton "Annuler" (5s) → <code>restoreFromTrash()</code>.</p>
+  <p><span class="tag">new</span> <strong>TrashScreen</strong> — liste avec <code>originalFileName</code>, date suppression, jours restants (TTL 30j), boutons Restaurer (amber) + Supprimer définitivement (rouge).</p>
+  <p><span class="tag">new</span> <strong>Dialogues de confirmation</strong> — "Supprimer définitivement ?" et "Vider la corbeille ?" avec bouton destructif rouge.</p>
+  <p><span class="tag">new</span> <strong>Purge TTL automatique</strong> — au lancement de l'Explorateur, les entrées > 30j sont supprimées définitivement.</p>
+  <p><span class="tag">new</span> <strong>Migration Room v17→v18</strong> — colonnes <code>is_in_trash</code> + <code>deleted_at</code> sur <code>catalog_entry</code>.</p>
+
+  <h2>// FONCTIONNEMENT DU MOCKUP</h2>
+  <p>Bouton <strong>Mode</strong> en haut à droite : bascule Simple ↔ Expert.</p>
+  <p>Sur le téléphone 3, onglets : <strong>Fichiers · Mon Nœud · Communauté</strong>. Icône ⚙ → Paramètres.</p>
+  <p>Sur l'écran Fichiers : <strong>cliquer la 1re carte</strong> pour simuler le swipe → snackbar + fond rouge. Recliquer pour annuler.</p>
+
+  <h2>// ACs IMPLÉMENTÉS (13.2)</h2>
+  <p><span class="tag">AC1</span> Swipe EndToStart → <code>isInTrash=true</code>, <code>deletedAt=now()</code></p>
+  <p><span class="tag">AC2</span> Snackbar "Annuler" 5s → <code>restoreFromTrash()</code></p>
+  <p><span class="tag">AC3</span> Icône corbeille amber dans TopAppBar → navigation TrashRoute</p>
+  <p><span class="tag">AC4</span> Liste : nom + date + jours restants (TTL 30j)</p>
+  <p><span class="tag">AC5</span> Restauration individuelle → retire de la corbeille</p>
+  <p><span class="tag">AC6</span> Suppression définitive + confirmation → DELETE catalog_entry + fragment_location</p>
+  <p><span class="tag">AC7</span> Vider la corbeille + confirmation → <code>emptyTrash()</code></p>
+  <p><span class="tag">AC8</span> Purge TTL 30j dans <code>ExplorerViewModel.init{}</code></p>
+  <p><span class="tag">AC9</span> État vide "Votre corbeille est vide"</p>
+  <p><span class="tag">AC10</span> <code>getActiveEntriesFlow()</code> — les fichiers en corbeille n'apparaissent plus dans l'Explorateur</p>
+
+  <h2>// ACs IMPLÉMENTÉS (13.1)</h2>
+  <p><span class="tag">AC1</span> Room v16→v17 · <code>isExpertModeEnabled</code></p>
+  <p><span class="tag">AC2</span> Badge "★ Coordinateur" / "● Membre actif"</p>
+  <p><span class="tag">AC3</span> HealthBanner 4 états</p>
+  <p><span class="tag">AC4</span> 4 KPIs sémantiques</p>
+  <p><span class="tag">AC5</span> RadarLogConsole expert-only</p>
+  <p><span class="tag">AC6–10</span> Communauté, Paramètres, messages humanisés</p>
+
+  <h2>// ACs IMPLÉMENTÉS (13.4)</h2>
+  <p><span class="tag">AC1</span> NEARBY_WIFI_DEVICES runtime (API 33+)</p>
+  <p><span class="tag">AC2–3</span> PermissionsScreen humanisé</p>
+  <p><span class="tag">AC4</span> InitScreen 3 étapes · timeout 8s</p>
+  <p><span class="tag">AC5–6</span> NavHost gating · <code>hasCompletedOnboarding</code></p>
+
+  <h2>// ÉCARTS CONNUS (reviews en cours)</h2>
+  <p><span class="tag warn">⚠</span> AC8 (13.1) — coexistence Simple+Expert Communauté non implémentée.</p>
+  <p><span class="tag warn">⚠</span> Tests unitaires 13.1 + 13.2 + 13.4 bloqués par erreurs pré-existantes (DashboardViewModelTest etc.).</p>
+
+  <h2>// ACs IMPLÉMENTÉS (13.3)</h2>
+  <p><span class="tag">AC1</span> Bouton "✕ Annuler" dans ErasureProgressIndicator pendant InProgress</p>
+  <p><span class="tag">AC2</span> StoreState.Cancelled → "⊘ Upload annulé" → Idle après 3s</p>
+  <p><span class="tag">AC3</span> Fichier temp supprimé via <code>finally { tempFile.delete() }</code> garanti</p>
+  <p><span class="tag">AC4</span> Bouton "✕ Annuler" dans DownloadProgressIndicator (Locating/Downloading/Decrypting)</p>
+  <p><span class="tag">AC5</span> Snackbar "Upload en cours, veuillez patienter" via uploadBusyEvent</p>
+  <p><span class="tag">AC6</span> ErasureProgressIndicator : paramètre onCancel + TextButton rouge</p>
+
+  <h2>// HORS-SCOPE (stories futures)</h2>
+  <p><span class="tag skip">SKIP</span> Tutoriel 3 écrans (retiré)</p>
+  <p><span class="tag skip">SKIP</span> QR identité (retiré)</p>
+  <p><span class="tag todo">13.3</span> Pause/Resume upload (hors scope — pipeline séquentiel non checkpointable)</p>
+  <p><span class="tag todo">13.3</span> File d'attente upload (hors scope — guard "un seul à la fois" conservé)</p>
+  <p><span class="tag todo">13.5</span> Nom appareil · WiFi-only · Mode batterie</p>
+</div>
+
+<script>
+  var snackbarTimer = null;
+
+  function showScreen(name) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-' + name).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+    const nav = document.querySelector('.nav-item[data-screen="' + name + '"]');
+    if (nav) nav.classList.add('active');
+    const titles = {
+      dashboard: 'Mon Nœud',
+      community: 'Communauté',
+      settings: 'Paramètres'
+    };
+    // TopAppBar principale : masquée sur l'écran Fichiers (ExplorerScreen a sa propre TopAppBar)
+    const mainTopBar = document.getElementById('mainTopBar');
+    if (name === 'files') {
+      mainTopBar.style.display = 'none';
+    } else {
+      mainTopBar.style.display = 'flex';
+      document.getElementById('screenTitle').textContent = titles[name] || '';
+    }
+  }
+
+  function toggleSwipe() {
+    const card = document.getElementById('swipeCard');
+    const snackbar = document.getElementById('trashSnackbar');
+    const isSwiped = card.classList.contains('swiping');
+    if (isSwiped) {
+      // Annuler
+      card.classList.remove('swiping');
+      snackbar.classList.remove('visible');
+      clearTimeout(snackbarTimer);
+    } else {
+      // Déclencher le swipe
+      card.classList.add('swiping');
+      snackbar.classList.add('visible');
+      clearTimeout(snackbarTimer);
+      snackbarTimer = setTimeout(() => {
+        // Auto-dismiss après 5s (comme SnackbarDuration.Short)
+        card.style.display = 'none';
+        snackbar.classList.remove('visible');
+      }, 5000);
+    }
+  }
+
+  function simulateCancel() {
+    // Simule cancelUpload() : snackbar disparaît (déjà affiché statiquement dans ce téléphone)
+    alert('cancelUpload() appelé → storeJob.cancel() → StoreState.Cancelled → scheduleReset(3s) → Idle\n\nVoir téléphone 7 pour l\'état "⊘ Upload annulé".');
+  }
+
+  function undoTrash() {
+    const card = document.getElementById('swipeCard');
+    const snackbar = document.getElementById('trashSnackbar');
+    card.classList.remove('swiping');
+    card.style.display = '';
+    snackbar.classList.remove('visible');
+    clearTimeout(snackbarTimer);
+  }
+
+  function updateToggleButtons(isExpert) {
+    const dashBtn = document.getElementById('dashToggleBtn');
+    const commBtn = document.getElementById('commToggleBtn');
+    if (dashBtn) dashBtn.textContent = isExpert ? '▴ MASQUER DÉTAILS TECHNIQUES' : '▾ DÉTAILS TECHNIQUES';
+    if (commBtn) commBtn.textContent = isExpert ? '▴ MASQUER DIAGNOSTICS' : '▾ DIAGNOSTICS AVANCÉS';
+  }
+
+  function toggleExpert() {
+    document.body.classList.toggle('expert');
+    const isExpert = document.body.classList.contains('expert');
+    const btn = document.getElementById('modeToggle');
+    btn.textContent = 'Mode: ' + (isExpert ? 'Expert' : 'Simple');
+    btn.classList.toggle('expert', isExpert);
+    document.getElementById('expertSwitch').classList.toggle('on', isExpert);
+    updateToggleButtons(isExpert);
+  }
+
+  document.getElementById('modeToggle').addEventListener('click', toggleExpert);
+  document.getElementById('expertSwitch').addEventListener('click', toggleExpert);
+
+  // Démarrer sur Dashboard (onglet central actif)
+  showScreen('dashboard');
+</script>
+
+</body>
+</html>

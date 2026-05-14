@@ -8,11 +8,14 @@ import com.mobicloud.domain.models.NodeRole
 import com.mobicloud.domain.models.ServiceStatus
 import com.mobicloud.domain.models.TransferChannelState
 import com.mobicloud.domain.repository.DiagnosticsRepository
+import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NetworkServiceController
+import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.CircuitBreakerUseCase
+import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -20,6 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Named
 
@@ -31,6 +35,9 @@ class DashboardViewModel @Inject constructor(
     private val peerRepository: PeerRepository,
     private val identityRepository: IdentityRepository,
     circuitBreakerUseCase: CircuitBreakerUseCase,
+    private val nodeSettingsRepository: NodeSettingsRepository,
+    hostedBlockRepository: HostedBlockRepository,
+    memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase,
     @Named("transfer_channel_state") transferChannelStateFlow: @JvmSuppressWildcards StateFlow<TransferChannelState>
 ) : ViewModel() {
 
@@ -47,7 +54,6 @@ class DashboardViewModel @Inject constructor(
         .map { it.activePeerCount > 0 }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
 
-    // StateFlow Eagerly : résolu une fois au démarrage, jamais null après init
     private val localNodeIdFlow: StateFlow<String?> = flow {
         emit(identityRepository.getIdentity().getOrNull()?.nodeId)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -57,15 +63,37 @@ class DashboardViewModel @Inject constructor(
         localNodeIdFlow
     ) { peers, localNodeId ->
         val match = localNodeId != null && peers.any { p -> p.isSuperPair && p.isActive && p.identity.nodeId == localNodeId }
-        android.util.Log.i("DashboardVM", "[ROLE-DIAG] localNodeId=${localNodeId?.take(8)} peersCount=${peers.size} peers=${peers.map { "${it.identity.nodeId.take(8)}:sp=${it.isSuperPair}:active=${it.isActive}" }} → ${if (match) "SUPER_PAIR" else "PEER"}")
+        android.util.Log.i("DashboardVM", "[ROLE-DIAG] localNodeId=${localNodeId?.take(8)} peersCount=${peers.size} → ${if (match) "SUPER_PAIR" else "PEER"}")
         if (match) NodeRole.SUPER_PAIR else NodeRole.PEER
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), NodeRole.PEER)
 
-    // AC#6 — Badge "Réseau instable" : vrai si le Circuit-Breaker est actif (Story 3.4)
     val isNetworkUnstable: StateFlow<Boolean> = circuitBreakerUseCase.isCircuitOpen
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
 
-    // AC#6 Story 8.3 — Canal de transfert actif (DIRECT / RELAY_HA / OFFLINE)
     val relayState: StateFlow<TransferChannelState> = transferChannelStateFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), TransferChannelState.OFFLINE)
+
+    // === Story 13.1 — toggle Mode Diagnostics Avancés ===
+    val isExpertMode: StateFlow<Boolean> = nodeSettingsRepository.observeExpertMode()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
+
+    // KPI sémantique "Communauté" — taille du cluster via snapshot mémoire (source de vérité côté UI)
+    val communitySize: StateFlow<Int> = memberSnapshotCacheUseCase.inMemory
+        .map { it.size }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
+
+    // KPI sémantique "Ma contribution" — quota partagé persisté en NodeSettings
+    val allocatedStorageBytes: StateFlow<Long> = nodeSettingsRepository.observeSettings()
+        .map { it.allocatedStorageBytes }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0L)
+
+    // KPI sémantique "Fichiers protégés" — count des fragments hébergés
+    val hostedBlockCount: StateFlow<Int> = hostedBlockRepository.observeHostedBlockCount()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
+
+    fun toggleExpertMode() = viewModelScope.launch {
+        // F9 fix: lecture atomique depuis le repo (source de vérité DB) évite la race condition double-tap
+        val current = nodeSettingsRepository.getSettings().isExpertModeEnabled
+        nodeSettingsRepository.updateExpertMode(!current)
+    }
 }

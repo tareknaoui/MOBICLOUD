@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,9 +27,12 @@ import com.mobicloud.presentation.explorer.DownloadState
 @Composable
 fun DownloadProgressIndicator(
     state: DownloadState,
+    onCancel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    if (state !is DownloadState.Downloading && state !is DownloadState.Decrypting) return
+    // [Review][Patch] P3 — AC4 : le bouton Annuler doit aussi apparaître pendant Locating.
+    // Avant ce patch, le return excluait Locating → AC4 violé.
+    if (state !is DownloadState.Locating && state !is DownloadState.Downloading && state !is DownloadState.Decrypting) return
 
     Surface(
         modifier = modifier
@@ -43,6 +47,20 @@ fun DownloadProgressIndicator(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             when (state) {
+                is DownloadState.Locating -> {
+                    Text(
+                        text = "⟳ Localisation des blocs...",
+                        color = Color(0xFFE0E0E0),
+                        fontSize = 13.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = Color(0xFF00FF41),
+                        trackColor = Color(0xFF1A1A1A)
+                    )
+                }
+
                 is DownloadState.Downloading -> {
                     Text(
                         text = "⬇ ${state.received}/${state.k} blocs",
@@ -133,6 +151,17 @@ fun DownloadProgressIndicator(
                     )
                 }
 
+            }
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(
+                    text = "✕ Annuler",
+                    color = Color(0xFFFF3333),
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace
+                )
             }
         }
     }

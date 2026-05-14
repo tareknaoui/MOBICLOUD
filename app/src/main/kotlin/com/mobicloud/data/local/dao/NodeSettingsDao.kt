@@ -18,4 +18,8 @@ interface NodeSettingsDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: NodeSettingsEntity)
+
+    // Story 13.1 — observation isolée du flag expert (évite recomposition complète sur changement de quota)
+    @Query("SELECT is_expert_mode_enabled FROM node_settings WHERE id = 0")
+    fun observeExpertMode(): Flow<Boolean?>
 }

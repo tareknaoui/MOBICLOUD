@@ -26,14 +26,16 @@ class SettingsViewModel @Inject constructor(
     val usedStorageBytes: StateFlow<Long> = hostedBlockRepository.observeTotalHostedBytes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0L)
 
-    // P3+P4: freeSpace delegated to repository (data layer); single observeSettings subscription
     val freeSpaceBytes: StateFlow<Long> = settingsRepository.observeFreeSpaceBytes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0L)
+
+    // Story 13.1 — toggle Mode Diagnostics Avancés
+    val isExpertMode: StateFlow<Boolean> = settingsRepository.observeExpertMode()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
 
     private val _showWarningDialog = MutableStateFlow(false)
     val showWarningDialog: StateFlow<Boolean> = _showWarningDialog.asStateFlow()
 
-    // P1: MutableStateFlow instead of plain var to prevent TOCTOU between slider calls
     private val _pendingBytes = MutableStateFlow<Long?>(null)
 
     fun requestUpdateAllocatedStorage(newBytes: Long) {
@@ -45,7 +47,6 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    // P2: persist first, then dismiss dialog so UI reflects actual state on failure
     fun confirmReduceQuota() {
         val bytes = _pendingBytes.value ?: return
         viewModelScope.launch {
@@ -58,5 +59,10 @@ class SettingsViewModel @Inject constructor(
     fun dismissWarningDialog() {
         _showWarningDialog.value = false
         _pendingBytes.value = null
+    }
+
+    // Story 13.1 — persistance immédiate, sans confirmation (toggle Settings simple).
+    fun updateExpertMode(enabled: Boolean) {
+        viewModelScope.launch { settingsRepository.updateExpertMode(enabled) }
     }
 }

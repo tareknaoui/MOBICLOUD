@@ -1,0 +1,647 @@
+﻿commit 235a3369b5cabfd1510e50251d33b3661beef5d3
+Author: Yasmine Nemiri Sara <127095561+yasmine23nem@users.noreply.github.com>
+Date:   Thu May 14 17:19:12 2026 +0100
+
+    ui v2
+
+diff --git a/app/src/main/kotlin/com/mobicloud/MainActivity.kt b/app/src/main/kotlin/com/mobicloud/MainActivity.kt
+index c6ecd1c..c38aa26 100644
+--- a/app/src/main/kotlin/com/mobicloud/MainActivity.kt
++++ b/app/src/main/kotlin/com/mobicloud/MainActivity.kt
+@@ -74,6 +74,7 @@ class MainActivity : AppCompatActivity() {
+     private val permissions = mutableListOf<String>().apply {
+         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+             add(Manifest.permission.POST_NOTIFICATIONS)
++            add(Manifest.permission.NEARBY_WIFI_DEVICES)  // Story 13.4 ΓÇö requis pour Wi-Fi Direct sur API 33+
+         }
+         // Story 12.1 : ACCESS_FINE_LOCATION supprim├⌐ ΓÇö plus de GPS, plus de SSID-based clustering.
+         // L'admission cluster repose d├⌐sormais uniquement sur memberCount < MAX_CLUSTER_SIZE.
+@@ -139,6 +140,7 @@ class MainActivity : AppCompatActivity() {
+ 
+         setContent {
+             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
++            val hasCompletedOnboarding by viewModel.hasCompletedOnboarding.collectAsStateWithLifecycle()
+ 
+             val appState = rememberJetpackAppState(
+                 isUserLoggedIn = isUserLoggedIn(uiState),
+@@ -147,7 +149,7 @@ class MainActivity : AppCompatActivity() {
+                 networkUtils = networkUtils,
+             )
+             JetpackTheme {
+-                JetpackApp(appState)
++                JetpackApp(appState, hasCompletedOnboarding = hasCompletedOnboarding)
+             }
+         }
+ 
+diff --git a/app/src/main/kotlin/com/mobicloud/MainActivityViewModel.kt b/app/src/main/kotlin/com/mobicloud/MainActivityViewModel.kt
+index caad091..e35c94a 100644
+--- a/app/src/main/kotlin/com/mobicloud/MainActivityViewModel.kt
++++ b/app/src/main/kotlin/com/mobicloud/MainActivityViewModel.kt
+@@ -24,12 +24,15 @@ import com.mobicloud.core.extensions.stateInDelayed
+ import com.mobicloud.core.preferences.data.UserPreferencesDataSource
+ import com.mobicloud.core.preferences.model.UserDataPreferences
+ import com.mobicloud.core.ui.utils.UiState
++import kotlinx.coroutines.flow.SharingStarted
+ import kotlinx.coroutines.flow.StateFlow
+ import kotlinx.coroutines.flow.catch
+ import kotlinx.coroutines.flow.map
++import kotlinx.coroutines.flow.stateIn
+ import javax.inject.Inject
+ 
+ import com.mobicloud.domain.repository.IdentityRepository
++import kotlinx.coroutines.flow.map
+ import kotlinx.coroutines.launch
+ 
+ /**
+@@ -66,4 +69,10 @@ class MainActivityViewModel @Inject constructor(
+             .map { userData -> UiState(userData) }
+             .catch { e -> UiState(UserDataPreferences(), error = e.asOneTimeEvent()) }
+             .stateInDelayed(UiState(UserDataPreferences(), loading = true), viewModelScope)
++
++    // Story 13.4 ΓÇö null tant que DataStore n'a pas ├⌐mis (splash couvre ce d├⌐lai)
++    val hasCompletedOnboarding: StateFlow<Boolean?> =
++        userPreferencesDataSource.getUserDataPreferences()
++            .map<UserDataPreferences, Boolean?> { it.hasCompletedOnboarding }
++            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), null)
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/navigation/NavHost.kt b/app/src/main/kotlin/com/mobicloud/navigation/NavHost.kt
+index 6fe3bfb..eb23f1c 100644
+--- a/app/src/main/kotlin/com/mobicloud/navigation/NavHost.kt
++++ b/app/src/main/kotlin/com/mobicloud/navigation/NavHost.kt
+@@ -19,8 +19,6 @@ package com.mobicloud.navigation
+ import androidx.compose.runtime.Composable
+ import androidx.compose.ui.Modifier
+ import androidx.navigation.compose.NavHost
+-import com.mobicloud.ui.JetpackAppState
+-import com.mobicloud.core.ui.utils.SnackbarAction
+ import androidx.navigation.compose.composable
+ import com.mobicloud.presentation.dashboard.DashboardRoute
+ import com.mobicloud.presentation.dashboard.DashboardScreen
+@@ -28,34 +26,60 @@ import com.mobicloud.presentation.explorer.ExplorerRoute
+ import com.mobicloud.presentation.explorer.ExplorerScreen
+ import com.mobicloud.presentation.network.NetworkRoute
+ import com.mobicloud.presentation.network.NetworkScreen
++import com.mobicloud.presentation.onboarding.InitRoute
++import com.mobicloud.presentation.onboarding.InitScreen
++import com.mobicloud.presentation.onboarding.PermissionsRoute
++import com.mobicloud.presentation.onboarding.PermissionsScreen
+ import com.mobicloud.presentation.settings.SettingsRoute
+ import com.mobicloud.presentation.settings.SettingsScreen
++import com.mobicloud.presentation.trash.TrashRoute
++import com.mobicloud.presentation.trash.TrashScreen
++import com.mobicloud.ui.JetpackAppState
++import com.mobicloud.core.ui.utils.SnackbarAction
+ 
+-/**
+- * Composable function that sets up the navigation host for the Jetpack Compose application.
+- *
+- * @param appState The state of the Jetpack application, containing the navigation controller and user login status.
+- * @param onShowSnackbar A lambda function to show a snackbar with a message and an action.
+- * @param modifier The modifier to be applied to the NavHost.
+- */
+ @Composable
+ fun JetpackNavHost(
+     appState: JetpackAppState,
+     onShowSnackbar: suspend (String, SnackbarAction, Throwable?) -> Boolean,
++    hasCompletedOnboarding: Boolean,
+     modifier: Modifier = Modifier,
+ ) {
+     val navController = appState.navController
+-    val startDestination = DashboardRoute
++    val startDestination = if (hasCompletedOnboarding) DashboardRoute else PermissionsRoute
++
+     NavHost(
+         navController = navController,
+         startDestination = startDestination,
+         modifier = modifier,
+     ) {
++        composable<PermissionsRoute> {
++            PermissionsScreen(
++                onNavigateToInit = {
++                    navController.navigate(InitRoute)
++                },
++            )
++        }
++        composable<InitRoute> {
++            InitScreen(
++                onNavigateToDashboard = {
++                    navController.navigate(DashboardRoute) {
++                        popUpTo(PermissionsRoute) { inclusive = true }
++                    }
++                },
++            )
++        }
+         composable<DashboardRoute> {
+             DashboardScreen()
+         }
+         composable<ExplorerRoute> {
+-            ExplorerScreen()
++            ExplorerScreen(
++                onNavigateToTrash = { navController.navigate(TrashRoute) }
++            )
++        }
++        composable<TrashRoute> {
++            TrashScreen(
++                onNavigateBack = { navController.popBackStack() }
++            )
+         }
+         composable<SettingsRoute> {
+             SettingsScreen()
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/onboarding/InitScreen.kt b/app/src/main/kotlin/com/mobicloud/presentation/onboarding/InitScreen.kt
+new file mode 100644
+index 0000000..75d3aad
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/presentation/onboarding/InitScreen.kt
+@@ -0,0 +1,106 @@
++package com.mobicloud.presentation.onboarding
++
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.material3.LinearProgressIndicator
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.hilt.navigation.compose.hiltViewModel
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import kotlinx.serialization.Serializable
++
++@Serializable
++object InitRoute
++
++private val Amber = Color(0xFFFFB300)
++
++@Composable
++fun InitScreen(
++    onNavigateToDashboard: () -> Unit,
++    modifier: Modifier = Modifier,
++    viewModel: InitViewModel = hiltViewModel(),
++) {
++    val currentStep by viewModel.currentStep.collectAsStateWithLifecycle()
++
++    LaunchedEffect(Unit) {
++        viewModel.startInit()
++    }
++
++    LaunchedEffect(currentStep) {
++        if (currentStep is InitStep.Done) {
++            onNavigateToDashboard()
++        }
++    }
++
++    val statusText = when (currentStep) {
++        is InitStep.CreatingIdentity -> "Cr├⌐ation de votre identit├⌐ s├⌐curis├⌐eΓÇª"
++        is InitStep.SearchingMembers -> "Recherche de membres ├á proximit├⌐ΓÇª"
++        is InitStep.ConnectingToGroup -> "Connexion au groupe de partageΓÇª"
++        is InitStep.Done -> "Pr├¬t !"
++    }
++
++    Column(
++        modifier = modifier
++            .fillMaxSize()
++            .padding(horizontal = 32.dp),
++        horizontalAlignment = Alignment.CenterHorizontally,
++        verticalArrangement = Arrangement.Center,
++    ) {
++        Text(
++            text = "MobiCloud",
++            color = Amber,
++            fontSize = 32.sp,
++            fontWeight = FontWeight.Bold,
++        )
++
++        Spacer(modifier = Modifier.height(8.dp))
++
++        Text(
++            text = "Stockage distribu├⌐ s├⌐curis├⌐",
++            color = Color.White.copy(alpha = 0.5f),
++            fontSize = 13.sp,
++        )
++
++        Spacer(modifier = Modifier.height(48.dp))
++
++        LinearProgressIndicator(
++            modifier = Modifier.fillMaxWidth(),
++            color = Amber,
++            trackColor = Color.White.copy(alpha = 0.1f),
++        )
++
++        Spacer(modifier = Modifier.height(24.dp))
++
++        Text(
++            text = statusText,
++            color = Color.White.copy(alpha = 0.8f),
++            fontSize = 14.sp,
++            textAlign = TextAlign.Center,
++        )
++
++        Spacer(modifier = Modifier.height(48.dp))
++
++        TextButton(onClick = onNavigateToDashboard) {
++            Text(
++                text = "Acc├⌐der ├á l'application",
++                color = Color.White.copy(alpha = 0.4f),
++                fontSize = 13.sp,
++            )
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/onboarding/InitViewModel.kt b/app/src/main/kotlin/com/mobicloud/presentation/onboarding/InitViewModel.kt
+new file mode 100644
+index 0000000..b1547f1
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/presentation/onboarding/InitViewModel.kt
+@@ -0,0 +1,49 @@
++package com.mobicloud.presentation.onboarding
++
++import androidx.lifecycle.ViewModel
++import androidx.lifecycle.viewModelScope
++import com.mobicloud.domain.repository.NetworkServiceController
++import dagger.hilt.android.lifecycle.HiltViewModel
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withTimeoutOrNull
++import javax.inject.Inject
++
++sealed class InitStep {
++    object CreatingIdentity : InitStep()
++    object SearchingMembers : InitStep()
++    object ConnectingToGroup : InitStep()
++    object Done : InitStep()
++}
++
++private const val INIT_TIMEOUT_MS = 8_000L
++private const val STEP_DELAY_MS = 2_000L
++
++@HiltViewModel
++class InitViewModel @Inject constructor(
++    private val networkServiceController: NetworkServiceController,
++) : ViewModel() {
++
++    private val _currentStep = MutableStateFlow<InitStep>(InitStep.CreatingIdentity)
++    val currentStep: StateFlow<InitStep> = _currentStep.asStateFlow()
++
++    fun startInit() {
++        viewModelScope.launch {
++            withTimeoutOrNull(INIT_TIMEOUT_MS) {
++                _currentStep.value = InitStep.CreatingIdentity
++                delay(STEP_DELAY_MS)
++
++                _currentStep.value = InitStep.SearchingMembers
++                delay(STEP_DELAY_MS)
++
++                _currentStep.value = InitStep.ConnectingToGroup
++                networkServiceController.startService()
++                delay(STEP_DELAY_MS)
++            }
++            _currentStep.value = InitStep.Done
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/onboarding/PermissionsScreen.kt b/app/src/main/kotlin/com/mobicloud/presentation/onboarding/PermissionsScreen.kt
+new file mode 100644
+index 0000000..b55a84c
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/presentation/onboarding/PermissionsScreen.kt
+@@ -0,0 +1,204 @@
++package com.mobicloud.presentation.onboarding
++
++import android.Manifest
++import android.os.Build
++import androidx.activity.compose.rememberLauncherForActivityResult
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.material3.Button
++import androidx.compose.material3.ButtonDefaults
++import androidx.compose.material3.Scaffold
++import androidx.compose.material3.SnackbarHost
++import androidx.compose.material3.SnackbarHostState
++import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.hilt.navigation.compose.hiltViewModel
++import kotlinx.coroutines.launch
++import kotlinx.serialization.Serializable
++
++@Serializable
++object PermissionsRoute
++
++private val Amber = Color(0xFFFFB300)
++
++private data class PermissionInfo(
++    val emoji: String,
++    val title: String,
++    val description: String,
++)
++
++@Composable
++fun PermissionsScreen(
++    onNavigateToInit: () -> Unit,
++    modifier: Modifier = Modifier,
++    viewModel: PermissionsViewModel = hiltViewModel(),
++) {
++    val snackbarHostState = remember { SnackbarHostState() }
++    val scope = rememberCoroutineScope()
++
++    val permissionsToRequest = buildList {
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
++            add(Manifest.permission.POST_NOTIFICATIONS)
++            add(Manifest.permission.NEARBY_WIFI_DEVICES)
++        }
++    }
++
++    val permissionInfos = buildList {
++        add(
++            PermissionInfo(
++                emoji = "≡ƒöö",
++                title = "Notifications",
++                description = "Pour vous informer lorsqu'un fichier est disponible ou qu'un transfert est termin├⌐.",
++            )
++        )
++        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
++            add(
++                PermissionInfo(
++                    emoji = "≡ƒô╢",
++                    title = "Wi-Fi de proximit├⌐",
++                    description = "Pour d├⌐couvrir et rejoindre le groupe de partage s├⌐curis├⌐ ├á proximit├⌐.",
++                )
++            )
++        }
++    }
++
++    fun completeAndNavigate() {
++        viewModel.markOnboardingCompleted()
++        onNavigateToInit()
++    }
++
++    val permissionsLauncher = rememberLauncherForActivityResult(
++        ActivityResultContracts.RequestMultiplePermissions()
++    ) { results ->
++        val allGranted = results.values.all { it }
++        if (!allGranted) {
++            scope.launch {
++                snackbarHostState.showSnackbar("Certaines fonctionnalit├⌐s seront limit├⌐es.")
++            }
++        }
++        completeAndNavigate()
++    }
++
++    Scaffold(
++        modifier = modifier,
++        containerColor = Color.Black,
++        snackbarHost = { SnackbarHost(snackbarHostState) },
++    ) { innerPadding ->
++        Column(
++            modifier = Modifier
++                .fillMaxSize()
++                .padding(innerPadding)
++                .padding(horizontal = 24.dp, vertical = 32.dp),
++            horizontalAlignment = Alignment.CenterHorizontally,
++        ) {
++            Spacer(modifier = Modifier.height(32.dp))
++
++            Text(
++                text = "Bienvenue sur MobiCloud",
++                color = Amber,
++                fontSize = 24.sp,
++                fontWeight = FontWeight.Bold,
++                textAlign = TextAlign.Center,
++            )
++
++            Spacer(modifier = Modifier.height(12.dp))
++
++            Text(
++                text = "Pour fonctionner, MobiCloud a besoin de quelques autorisations.",
++                color = Color.White.copy(alpha = 0.8f),
++                fontSize = 15.sp,
++                textAlign = TextAlign.Center,
++            )
++
++            Spacer(modifier = Modifier.height(40.dp))
++
++            permissionInfos.forEach { info ->
++                PermissionRow(info = info)
++                Spacer(modifier = Modifier.height(24.dp))
++            }
++
++            Spacer(modifier = Modifier.weight(1f))
++
++            Button(
++                onClick = {
++                    if (permissionsToRequest.isNotEmpty()) {
++                        permissionsLauncher.launch(permissionsToRequest.toTypedArray())
++                    } else {
++                        completeAndNavigate()
++                    }
++                },
++                modifier = Modifier
++                    .fillMaxWidth()
++                    .height(52.dp),
++                colors = ButtonDefaults.buttonColors(containerColor = Amber),
++            ) {
++                Text(
++                    text = "Continuer",
++                    color = Color.Black,
++                    fontWeight = FontWeight.Bold,
++                    fontSize = 16.sp,
++                )
++            }
++
++            Spacer(modifier = Modifier.height(12.dp))
++
++            TextButton(onClick = { completeAndNavigate() }) {
++                Text(
++                    text = "Passer",
++                    color = Color.White.copy(alpha = 0.5f),
++                    fontSize = 14.sp,
++                )
++            }
++        }
++    }
++}
++
++@Composable
++private fun PermissionRow(
++    info: PermissionInfo,
++    modifier: Modifier = Modifier,
++) {
++    Row(
++        modifier = modifier.fillMaxWidth(),
++        verticalAlignment = Alignment.Top,
++        horizontalArrangement = Arrangement.spacedBy(16.dp),
++    ) {
++        Text(
++            text = info.emoji,
++            fontSize = 28.sp,
++            modifier = Modifier.size(36.dp),
++        )
++        Column {
++            Text(
++                text = info.title,
++                color = Amber,
++                fontWeight = FontWeight.SemiBold,
++                fontSize = 15.sp,
++            )
++            Spacer(modifier = Modifier.height(4.dp))
++            Text(
++                text = info.description,
++                color = Color.White.copy(alpha = 0.7f),
++                fontSize = 13.sp,
++            )
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/onboarding/PermissionsViewModel.kt b/app/src/main/kotlin/com/mobicloud/presentation/onboarding/PermissionsViewModel.kt
+new file mode 100644
+index 0000000..58ed848
+--- /dev/null
++++ b/app/src/main/kotlin/com/mobicloud/presentation/onboarding/PermissionsViewModel.kt
+@@ -0,0 +1,20 @@
++package com.mobicloud.presentation.onboarding
++
++import androidx.lifecycle.ViewModel
++import androidx.lifecycle.viewModelScope
++import com.mobicloud.core.preferences.data.UserPreferencesDataSource
++import dagger.hilt.android.lifecycle.HiltViewModel
++import kotlinx.coroutines.launch
++import javax.inject.Inject
++
++@HiltViewModel
++class PermissionsViewModel @Inject constructor(
++    private val userPreferencesDataSource: UserPreferencesDataSource,
++) : ViewModel() {
++
++    fun markOnboardingCompleted() {
++        viewModelScope.launch {
++            userPreferencesDataSource.setOnboardingCompleted()
++        }
++    }
++}
+diff --git a/app/src/main/kotlin/com/mobicloud/ui/JetpackApp.kt b/app/src/main/kotlin/com/mobicloud/ui/JetpackApp.kt
+index 2fb7468..bf73ef4 100644
+--- a/app/src/main/kotlin/com/mobicloud/ui/JetpackApp.kt
++++ b/app/src/main/kotlin/com/mobicloud/ui/JetpackApp.kt
+@@ -84,6 +84,7 @@ import timber.log.Timber
+ @Composable
+ fun JetpackApp(
+     appState: JetpackAppState,
++    hasCompletedOnboarding: Boolean?,
+     modifier: Modifier = Modifier,
+     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
+ ) {
+@@ -117,6 +118,7 @@ fun JetpackApp(
+                 appState = appState,
+                 snackbarHostState = snackbarHostState,
+                 showSettingsDialog = showSettingsDialog,
++                hasCompletedOnboarding = hasCompletedOnboarding,
+                 onDismissSettings = { showSettingsDialog = false },
+                 onTopAppBarActionClick = { showSettingsDialog = true },
+                 windowAdaptiveInfo = windowAdaptiveInfo,
+@@ -141,6 +143,7 @@ private fun JetpackApp(
+     appState: JetpackAppState,
+     snackbarHostState: SnackbarHostState,
+     showSettingsDialog: Boolean,
++    hasCompletedOnboarding: Boolean?,
+     onDismissSettings: () -> Unit,
+     onTopAppBarActionClick: () -> Unit,
+     modifier: Modifier = Modifier,
+@@ -163,6 +166,7 @@ private fun JetpackApp(
+         JetpackScaffold(
+             appState = appState,
+             snackbarHostState = snackbarHostState,
++            hasCompletedOnboarding = hasCompletedOnboarding,
+             onTopAppBarActionClick = onTopAppBarActionClick,
+             modifier = modifier,
+         )
+@@ -183,6 +187,7 @@ private fun JetpackApp(
+         JetpackScaffold(
+             appState = appState,
+             snackbarHostState = snackbarHostState,
++            hasCompletedOnboarding = hasCompletedOnboarding,
+             onTopAppBarActionClick = onTopAppBarActionClick,
+             modifier = modifier,
+         )
+@@ -201,6 +206,7 @@ private fun JetpackApp(
+ private fun JetpackScaffold(
+     appState: JetpackAppState,
+     snackbarHostState: SnackbarHostState,
++    hasCompletedOnboarding: Boolean?,
+     onTopAppBarActionClick: () -> Unit,
+     modifier: Modifier = Modifier,
+ ) {
+@@ -262,22 +268,26 @@ private fun JetpackScaffold(
+ 
+                 // Resolve context once in composable scope for use in suspend callbacks
+                 // Suppressing lint because we need context in suspend callback where composables aren't allowed
+-                @Suppress("LocalContextGetResourceValueCall")
+-                JetpackNavHost(
+-                    appState = appState,
+-                    onShowSnackbar = { message, action, throwable ->
+-                        val actionPerformed = snackbarHostState.showSnackbar(
+-                            message = message,
+-                            actionLabel = context.getString(action.actionText),
+-                            duration = SnackbarDuration.Short,
+-                        ) == SnackbarResult.ActionPerformed
+-                        if (actionPerformed && action == SnackbarAction.REPORT) {
+-                            // TODO: Impl├⌐menter le syst├¿me de reporting (ex. Firebase Crashlytics ou rapport utilisateur)
+-                            Timber.w(throwable, "[REPORT] Action demand├⌐e par l'utilisateur ΓÇö reporting non impl├⌐ment├⌐")
+-                        }
+-                        actionPerformed
+-                    },
+-                )
++                // Story 13.4 ΓÇö ne pas composer NavHost tant que hasCompletedOnboarding est null (DataStore pas encore charg├⌐)
++                if (hasCompletedOnboarding != null) {
++                    @Suppress("LocalContextGetResourceValueCall")
++                    JetpackNavHost(
++                        appState = appState,
++                        hasCompletedOnboarding = hasCompletedOnboarding,
++                        onShowSnackbar = { message, action, throwable ->
++                            val actionPerformed = snackbarHostState.showSnackbar(
++                                message = message,
++                                actionLabel = context.getString(action.actionText),
++                                duration = SnackbarDuration.Short,
++                            ) == SnackbarResult.ActionPerformed
++                            if (actionPerformed && action == SnackbarAction.REPORT) {
++                                // TODO: Impl├⌐menter le syst├¿me de reporting (ex. Firebase Crashlytics ou rapport utilisateur)
++                                Timber.w(throwable, "[REPORT] Action demand├⌐e par l'utilisateur ΓÇö reporting non impl├⌐ment├⌐")
++                            }
++                            actionPerformed
++                        },
++                    )
++                }
+             }
+             // TODO: We may want to add padding or spacer when the snackbar is shown so that
+             //  content doesn't display behind it.

@@ -55,4 +55,27 @@ interface CatalogRepository {
      * Réservé au nœud propriétaire qui distribue ses propres blocs (Story 5.3).
      */
     suspend fun insertOwnerEntry(entry: CatalogEntry): Result<Unit>
+
+    // Story 13.2 — corbeille locale (non distribuée dans le DHT)
+
+    /** Observe les entrées actives (non en corbeille). */
+    fun getActiveEntriesFlow(): Flow<List<CatalogEntry>>
+
+    /** Observe les entrées en corbeille. */
+    fun getDeletedEntriesFlow(): Flow<List<CatalogEntry>>
+
+    /** Déplace une entrée vers la corbeille (soft-delete). */
+    suspend fun moveToTrash(fileHash: String): Result<Unit>
+
+    /** Restaure une entrée depuis la corbeille. */
+    suspend fun restoreFromTrash(fileHash: String): Result<Unit>
+
+    /** Supprime définitivement une entrée (catalog_entry + fragment_location). */
+    suspend fun permanentlyDelete(fileHash: String): Result<Unit>
+
+    /** Vide entièrement la corbeille. */
+    suspend fun emptyTrash(): Result<Unit>
+
+    /** Supprime les entrées dont deletedAt < (now - 30 jours). */
+    suspend fun purgeExpired(): Result<Unit>
 }

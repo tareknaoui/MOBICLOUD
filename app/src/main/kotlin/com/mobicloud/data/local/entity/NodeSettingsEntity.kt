@@ -8,5 +8,6 @@ import androidx.room.PrimaryKey
 data class NodeSettingsEntity(
     @PrimaryKey val id: Int = 0,
     @ColumnInfo(name = "allocated_storage_bytes") val allocatedStorageBytes: Long,
-    @ColumnInfo(name = "cluster_id") val clusterId: String = ""
+    @ColumnInfo(name = "cluster_id") val clusterId: String = "",
+    @ColumnInfo(name = "is_expert_mode_enabled") val isExpertModeEnabled: Boolean = false
 )

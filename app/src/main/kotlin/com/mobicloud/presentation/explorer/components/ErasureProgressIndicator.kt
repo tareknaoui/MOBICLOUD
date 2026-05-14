@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import com.mobicloud.presentation.explorer.StoreState
 @Composable
 fun ErasureProgressIndicator(
     state: StoreState.InProgress,
+    onCancel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -115,6 +117,17 @@ fun ErasureProgressIndicator(
                         fontFamily = FontFamily.Monospace
                     )
                 }
+            }
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(
+                    text = "✕ Annuler",
+                    color = Color(0xFFFF3333),
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace
+                )
             }
         }
     }

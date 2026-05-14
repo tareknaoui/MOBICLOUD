@@ -1,16 +1,20 @@
 package com.mobicloud.presentation.settings
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -18,8 +22,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.serialization.Serializable
@@ -39,10 +45,10 @@ fun SettingsScreen(
     val usedBytes by viewModel.usedStorageBytes.collectAsStateWithLifecycle()
     val freeBytes by viewModel.freeSpaceBytes.collectAsStateWithLifecycle()
     val showWarning by viewModel.showWarningDialog.collectAsStateWithLifecycle()
+    val isExpertMode by viewModel.isExpertMode.collectAsStateWithLifecycle()
 
     val minBytes = HALF_GB
     val maxBytes = ((freeBytes * 0.80f).toLong()).coerceAtLeast(minBytes)
-    // P5: coerceAtLeast(0) applied after - 1 to prevent steps = -1 on first composition (freeBytes=0)
     val steps = (((maxBytes - minBytes) / HALF_GB).toInt() - 1).coerceAtLeast(0)
 
     var sliderValue by remember(settings.allocatedStorageBytes) {
@@ -56,7 +62,7 @@ fun SettingsScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "Contribution au réseau",
+            text = "Espace que je partage",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -77,17 +83,54 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "${usedBytes.toReadable()} utilisés sur ${sliderValue.toLong().toGb()} GB alloués",
+            text = "Utilisé : ${usedBytes.toReadable()} · Plus vous partagez, plus vous pouvez sauvegarder chez vos amis.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // === Story 13.1 — Section Affichage ===
+        Text(
+            text = "AFFICHAGE",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.2.sp
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Mode Diagnostics Avancés",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Affiche les détails techniques (NodeId, logs réseau, topologie cluster).",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(12.dp))  // F3 fix: width crée l'espace dans le Row (padding sur Spacer = sans effet)
+            Switch(
+                checked = isExpertMode,
+                onCheckedChange = viewModel::updateExpertMode
+            )
+        }
     }
 
     if (showWarning) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissWarningDialog() },
-            title = { Text("Réduire le quota ?") },
-            text = { Text("Réduire ce quota supprimera des blocs hébergés du réseau") },
+            title = { Text("Réduire l'espace partagé ?") },
+            text = { Text("Si vous réduisez cet espace, certains fichiers de vos amis ne seront plus protégés chez vous.") },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmReduceQuota() }) {
                     Text("Confirmer")
@@ -101,8 +144,6 @@ fun SettingsScreen(
         )
     }
 }
-
-private fun Long.toGb(): String = "%.1f".format(this / (1024.0 * 1024 * 1024))
 
 private fun Long.toReadable(): String {
     val kb = this / 1024.0

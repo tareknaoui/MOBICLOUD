@@ -273,4 +273,10 @@ interface UserPreferencesDataSource {
      * - `useDynamicColor = true`
      */
     suspend fun resetUserPreferences()
+
+    /** Marque l'onboarding comme terminé (Story 13.4). */
+    suspend fun setOnboardingCompleted()
+
+    /** Émet `true` une fois l'onboarding complété (Story 13.4). */
+    fun observeHasCompletedOnboarding(): Flow<Boolean>
 }
