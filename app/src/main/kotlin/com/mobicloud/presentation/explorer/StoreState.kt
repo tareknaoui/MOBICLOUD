@@ -18,4 +18,5 @@ sealed class StoreState {
     }
     data class Success(val entry: CatalogEntry, val nodeCount: Int) : StoreState()
     data class Error(val message: String) : StoreState()
+    object Cancelled : StoreState()
 }

@@ -56,7 +56,7 @@ abstract class CatalogDatabase : RoomDatabase() {
     companion object {
         // Room `@Database` est en `RetentionPolicy.CLASS` → invisible à la réflexion runtime.
         // Cette constante sert de source unique consommée par l'annotation ET par les tests.
-        const val CURRENT_VERSION = 17
+        const val CURRENT_VERSION = 18
 
         // Story 1-3 — premier ajout de NodeIdentityEntity + PeerNodeEntity (sans is_super_pair).
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -275,6 +275,15 @@ abstract class CatalogDatabase : RoomDatabase() {
                 db.execSQL(
                     "ALTER TABLE node_settings ADD COLUMN is_expert_mode_enabled INTEGER NOT NULL DEFAULT 0"
                 )
+            }
+        }
+
+        // Story 13.2 — corbeille locale (soft-delete). Champs non distribués dans le DHT.
+        // is_in_trash = 0 par défaut → entrées existantes restent visibles dans l'explorateur.
+        val MIGRATION_17_18 = object : Migration(17, 18) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE catalog_entry ADD COLUMN is_in_trash INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE catalog_entry ADD COLUMN deleted_at INTEGER DEFAULT NULL")
             }
         }
     }

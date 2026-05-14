@@ -112,4 +112,7 @@ development_status:
   epic-12-retrospective: optional
   epic-13: in-progress
   13-1-refonte-ux-grand-public-semantique-humaine-et-mode-expert: review
+  13-2-corbeille-suppression-et-restauration-de-fichiers: review
+  13-3-annulation-upload-download: review
+  13-4-ecran-initialisation-p2p-et-permissions-groupees-grand-public: review
   epic-13-retrospective: optional

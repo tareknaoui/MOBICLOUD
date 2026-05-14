@@ -29,8 +29,6 @@ val currentTime: String = LocalDateTime.now().format(formatter)
 plugins {
     alias(libs.plugins.jetpack.application)
     alias(libs.plugins.jetpack.dagger.hilt)
-    alias(libs.plugins.jetpack.firebase)
-    alias(libs.plugins.gms)
     alias(libs.plugins.jetpack.dokka)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
@@ -173,15 +171,6 @@ dependencies {
     // ... Security
     implementation(libs.androidx.security.crypto)
 
-    // ... Analytics
-    implementation(project(":firebase:analytics"))
-
-    // ... Firebase BOM
-    implementation(platform(libs.firebase.bom))
-
-    // ... Firebase Realtime Database
-    implementation(libs.firebase.database.ktx)
-
     // ... Sync
     implementation(project(":sync"))
 
@@ -195,6 +184,13 @@ dependencies {
     implementation(libs.room.ktx)
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
+
+    // ... Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.crashlytics)
+    implementation(libs.firebase.perf)
+    implementation(libs.firebase.database.ktx)
 
     // ... LeakCanary
     // Désactivé — ServiceWatcher cause uid=-1 sur Android 12+ (binder UID lost in reflection proxy)

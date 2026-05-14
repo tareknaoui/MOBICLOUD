@@ -24,12 +24,15 @@ import com.mobicloud.core.extensions.stateInDelayed
 import com.mobicloud.core.preferences.data.UserPreferencesDataSource
 import com.mobicloud.core.preferences.model.UserDataPreferences
 import com.mobicloud.core.ui.utils.UiState
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 import com.mobicloud.domain.repository.IdentityRepository
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
@@ -66,4 +69,10 @@ class MainActivityViewModel @Inject constructor(
             .map { userData -> UiState(userData) }
             .catch { e -> UiState(UserDataPreferences(), error = e.asOneTimeEvent()) }
             .stateInDelayed(UiState(UserDataPreferences(), loading = true), viewModelScope)
+
+    // Story 13.4 — null tant que DataStore n'a pas émis (splash couvre ce délai)
+    val hasCompletedOnboarding: StateFlow<Boolean?> =
+        userPreferencesDataSource.getUserDataPreferences()
+            .map<UserDataPreferences, Boolean?> { it.hasCompletedOnboarding }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), null)
 }

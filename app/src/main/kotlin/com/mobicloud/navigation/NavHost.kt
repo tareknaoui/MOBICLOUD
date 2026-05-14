@@ -19,8 +19,6 @@ package com.mobicloud.navigation
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
-import com.mobicloud.ui.JetpackAppState
-import com.mobicloud.core.ui.utils.SnackbarAction
 import androidx.navigation.compose.composable
 import com.mobicloud.presentation.dashboard.DashboardRoute
 import com.mobicloud.presentation.dashboard.DashboardScreen
@@ -28,34 +26,60 @@ import com.mobicloud.presentation.explorer.ExplorerRoute
 import com.mobicloud.presentation.explorer.ExplorerScreen
 import com.mobicloud.presentation.network.NetworkRoute
 import com.mobicloud.presentation.network.NetworkScreen
+import com.mobicloud.presentation.onboarding.InitRoute
+import com.mobicloud.presentation.onboarding.InitScreen
+import com.mobicloud.presentation.onboarding.PermissionsRoute
+import com.mobicloud.presentation.onboarding.PermissionsScreen
 import com.mobicloud.presentation.settings.SettingsRoute
 import com.mobicloud.presentation.settings.SettingsScreen
+import com.mobicloud.presentation.trash.TrashRoute
+import com.mobicloud.presentation.trash.TrashScreen
+import com.mobicloud.ui.JetpackAppState
+import com.mobicloud.core.ui.utils.SnackbarAction
 
-/**
- * Composable function that sets up the navigation host for the Jetpack Compose application.
- *
- * @param appState The state of the Jetpack application, containing the navigation controller and user login status.
- * @param onShowSnackbar A lambda function to show a snackbar with a message and an action.
- * @param modifier The modifier to be applied to the NavHost.
- */
 @Composable
 fun JetpackNavHost(
     appState: JetpackAppState,
     onShowSnackbar: suspend (String, SnackbarAction, Throwable?) -> Boolean,
+    hasCompletedOnboarding: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val navController = appState.navController
-    val startDestination = DashboardRoute
+    val startDestination = if (hasCompletedOnboarding) DashboardRoute else PermissionsRoute
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
     ) {
+        composable<PermissionsRoute> {
+            PermissionsScreen(
+                onNavigateToInit = {
+                    navController.navigate(InitRoute)
+                },
+            )
+        }
+        composable<InitRoute> {
+            InitScreen(
+                onNavigateToDashboard = {
+                    navController.navigate(DashboardRoute) {
+                        popUpTo(PermissionsRoute) { inclusive = true }
+                    }
+                },
+            )
+        }
         composable<DashboardRoute> {
             DashboardScreen()
         }
         composable<ExplorerRoute> {
-            ExplorerScreen()
+            ExplorerScreen(
+                onNavigateToTrash = { navController.navigate(TrashRoute) }
+            )
+        }
+        composable<TrashRoute> {
+            TrashScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
         composable<SettingsRoute> {
             SettingsScreen()

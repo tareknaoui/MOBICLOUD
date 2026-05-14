@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -26,6 +27,7 @@ import com.mobicloud.presentation.explorer.DownloadState
 @Composable
 fun DownloadProgressIndicator(
     state: DownloadState,
+    onCancel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     if (state !is DownloadState.Downloading && state !is DownloadState.Decrypting) return
@@ -133,6 +135,17 @@ fun DownloadProgressIndicator(
                     )
                 }
 
+            }
+            TextButton(
+                onClick = onCancel,
+                modifier = Modifier.align(Alignment.End)
+            ) {
+                Text(
+                    text = "✕ Annuler",
+                    color = Color(0xFFFF3333),
+                    fontSize = 12.sp,
+                    fontFamily = FontFamily.Monospace
+                )
             }
         }
     }

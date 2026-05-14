@@ -28,9 +28,12 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -56,8 +59,16 @@ class ExplorerViewModel @Inject constructor(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
-    val catalogEntries: StateFlow<List<CatalogEntry>> = catalogRepository.getAllEntriesFlow()
+    val catalogEntries: StateFlow<List<CatalogEntry>> = catalogRepository.getActiveEntriesFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
+
+    // Story 13.2 — corbeille : fileHash émis pour déclencher la snackbar "Annuler"
+    private val _undoEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val undoEvent: SharedFlow<String> = _undoEvent.asSharedFlow()
+
+    // Story 13.3 — upload occupé : notifie l'UI quand un 2e upload est tenté pendant InProgress
+    private val _uploadBusyEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    val uploadBusyEvent: SharedFlow<Unit> = _uploadBusyEvent.asSharedFlow()
 
     private val _isRefreshing = MutableStateFlow(false)
     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
@@ -69,9 +80,15 @@ class ExplorerViewModel @Inject constructor(
     val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
 
     private var resetJob: Job? = null
+    private var storeJob: Job? = null
 
     // [Review][Patch] Tracker le job de download pour annulation en cas de relance concurrente.
     private var downloadJob: Job? = null
+
+    init {
+        // Story 13.2 — purger les entrées expirées (TTL 30 jours) à chaque ouverture de l'explorateur
+        viewModelScope.launch { catalogRepository.purgeExpired() }
+    }
 
     // [Review][Patch] P7 — tracker le job de localisation : sans ça, un vieux `localize` en cours
     // pouvait émettre `Located(fileHashA)` et écraser le state d'un download fileHashB plus récent.
@@ -89,6 +106,19 @@ class ExplorerViewModel @Inject constructor(
             } finally {
                 _isRefreshing.value = false
             }
+        }
+    }
+
+    fun moveToTrash(fileHash: String) {
+        viewModelScope.launch {
+            catalogRepository.moveToTrash(fileHash)
+            _undoEvent.emit(fileHash)
+        }
+    }
+
+    fun undoMoveToTrash(fileHash: String) {
+        viewModelScope.launch {
+            catalogRepository.restoreFromTrash(fileHash)
         }
     }
 
@@ -187,11 +217,21 @@ class ExplorerViewModel @Inject constructor(
         _downloadState.value = DownloadState.Idle
     }
 
+    fun cancelUpload() {
+        storeJob?.cancel()
+        resetJob?.cancel()
+        _storeState.value = StoreState.Cancelled
+        scheduleReset(delayMs = 3000L)
+    }
+
     fun storeFile(uri: Uri) {
-        if (_storeState.value is StoreState.InProgress) return
+        if (_storeState.value is StoreState.InProgress) {
+            _uploadBusyEvent.tryEmit(Unit)
+            return
+        }
         resetJob?.cancel()
         _storeState.value = StoreState.InProgress.Encoding  // P7: set before launch to close TOCTOU window
-        viewModelScope.launch {
+        storeJob = viewModelScope.launch {
             val (fileSizeBytes, originalFileName) = withContext(ioDispatcher) {
                 context.contentResolver.query(
                     uri,
@@ -320,9 +360,9 @@ class ExplorerViewModel @Inject constructor(
         }
     }
 
-    private fun scheduleReset() {
+    private fun scheduleReset(delayMs: Long = 5000L) {
         resetJob = viewModelScope.launch {
-            delay(5000L)  // > Snackbar Short duration to avoid cancelling in-flight snackbar
+            delay(delayMs)  // > Snackbar Short duration to avoid cancelling in-flight snackbar
             _storeState.value = StoreState.Idle
         }
     }

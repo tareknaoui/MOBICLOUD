@@ -5,6 +5,7 @@ import android.content.Intent
 import android.webkit.MimeTypeMap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,15 +16,24 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,6 +64,7 @@ object ExplorerRoute
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExplorerScreen(
+    onNavigateToTrash: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: ExplorerViewModel = hiltViewModel()
 ) {
@@ -130,6 +141,27 @@ fun ExplorerScreen(
         )
     }
 
+    // Story 13.3 — snackbar "Upload en cours" quand l'utilisateur tente un 2e upload
+    LaunchedEffect(Unit) {
+        viewModel.uploadBusyEvent.collect {
+            snackbarHostState.showSnackbar("Upload en cours, veuillez patienter")
+        }
+    }
+
+    // Story 13.2 — snackbar "Déplacé vers la corbeille" avec action "Annuler"
+    LaunchedEffect(Unit) {
+        viewModel.undoEvent.collect { fileHash ->
+            val result = snackbarHostState.showSnackbar(
+                message = "Déplacé vers la corbeille",
+                actionLabel = "Annuler",
+                duration = SnackbarDuration.Short
+            )
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoMoveToTrash(fileHash)
+            }
+        }
+    }
+
     val storeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -139,6 +171,21 @@ fun ExplorerScreen(
     Scaffold(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Mes fichiers") },
+                actions = {
+                    IconButton(onClick = onNavigateToTrash) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Corbeille",
+                            tint = Color(0xFFFFB300)
+                        )
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+            )
+        },
         floatingActionButton = {
             FloatingActionButton(onClick = { storeLauncher.launch("*/*") }) {
                 Icon(Icons.Default.Upload, contentDescription = "Stocker un fichier")
@@ -154,9 +201,19 @@ fun ExplorerScreen(
             if (inProgressState != null) {
                 ErasureProgressIndicator(
                     state = inProgressState,
+                    onCancel = { viewModel.cancelUpload() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+            if (storeState is StoreState.Cancelled) {
+                Text(
+                    text = "⊘ Upload annulé",
+                    color = Color(0xFFFF3333),
+                    fontSize = 13.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                 )
             }
 
@@ -166,6 +223,7 @@ fun ExplorerScreen(
             if (inProgressDownloadState != null) {
                 DownloadProgressIndicator(
                     state = inProgressDownloadState,
+                    onCancel = { viewModel.resetDownloadState() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp)
@@ -194,10 +252,38 @@ fun ExplorerScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(entries, key = { it.fileHash }) { entry ->
-                            CatalogEntryCard(
-                                entry = entry,
-                                onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { value ->
+                                    if (value == SwipeToDismissBoxValue.EndToStart) {
+                                        viewModel.moveToTrash(entry.fileHash)
+                                        true
+                                    } else false
+                                }
                             )
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                enableDismissFromStartToEnd = false,
+                                backgroundContent = {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .background(Color(0xFFFF3333))
+                                            .padding(end = 20.dp),
+                                        contentAlignment = Alignment.CenterEnd
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Supprimer",
+                                            tint = Color.White
+                                        )
+                                    }
+                                }
+                            ) {
+                                CatalogEntryCard(
+                                    entry = entry,
+                                    onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
+                                )
+                            }
                         }
                     }
                 }

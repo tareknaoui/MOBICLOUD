@@ -25,6 +25,7 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
@@ -112,4 +113,13 @@ internal class UserPreferencesDataSourceImpl @Inject constructor(
             datastore.updateData { UserDataPreferences() }
         }
     }
+
+    override suspend fun setOnboardingCompleted() {
+        withContext(ioDispatcher) {
+            datastore.updateData { it.copy(hasCompletedOnboarding = true) }
+        }
+    }
+
+    override fun observeHasCompletedOnboarding(): Flow<Boolean> =
+        datastore.data.map { it.hasCompletedOnboarding }.flowOn(ioDispatcher)
 }

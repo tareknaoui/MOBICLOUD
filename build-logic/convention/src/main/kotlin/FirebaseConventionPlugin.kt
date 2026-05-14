@@ -26,16 +26,23 @@ class FirebaseConventionPlugin : Plugin<Project> {
             val libs = extensions.getByType<VersionCatalogsExtension>().named("libs")
             val firebaseBom = libs.findLibrary("firebase-bom").get()
 
-            with(pluginManager) {
-                apply("com.google.gms.google-services")
-                apply("com.google.firebase.crashlytics")
+            val googleServicesJson = file("google-services.json")
+            if (googleServicesJson.exists()) {
+                with(pluginManager) {
+                    apply("com.google.gms.google-services")
+                    apply("com.google.firebase.crashlytics")
+                }
+            } else {
+                logger.warn("google-services.json not found in ${project.path}. " +
+                        "Google Services and Crashlytics plugins will not be applied.")
             }
 
             dependencies {
                 add("implementation", platform(firebaseBom))
-                "implementation"(libs.findLibrary("firebase.analytics").get())
-                "implementation"(libs.findLibrary("firebase.crashlytics").get())
-                "implementation"(libs.findLibrary("firebase.perf").get())
+                "implementation"(libs.findLibrary("firebase-analytics").get())
+                "implementation"(libs.findLibrary("firebase-crashlytics").get())
+                "implementation"(libs.findLibrary("firebase-perf").get())
+                "implementation"(libs.findLibrary("firebase-database-ktx").get())
             }
         }
     }

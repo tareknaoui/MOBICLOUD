@@ -32,5 +32,12 @@ data class CatalogEntryEntity(
     val k: Int = 4,
 
     @ColumnInfo(name = "n", defaultValue = "2")
-    val n: Int = 2
+    val n: Int = 2,
+
+    // Story 13.2 — corbeille locale (non distribuée dans le DHT)
+    @ColumnInfo(name = "is_in_trash", defaultValue = "0")
+    val isInTrash: Boolean = false,
+
+    @ColumnInfo(name = "deleted_at", defaultValue = "NULL")
+    val deletedAt: Long? = null
 )

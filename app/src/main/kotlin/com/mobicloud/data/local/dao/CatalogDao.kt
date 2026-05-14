@@ -53,4 +53,52 @@ interface CatalogDao {
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun updateCatalogEntryOnly(entry: CatalogEntryEntity)
+
+    // Story 13.2 — requêtes corbeille (soft-delete local, non distribué dans le DHT)
+
+    @Transaction
+    @Query("SELECT * FROM catalog_entry WHERE is_in_trash = 0")
+    fun getAllActiveEntriesFlow(): Flow<List<CatalogEntryWithFragments>>
+
+    @Transaction
+    @Query("SELECT * FROM catalog_entry WHERE is_in_trash = 1")
+    fun getDeletedEntriesFlow(): Flow<List<CatalogEntryWithFragments>>
+
+    @Query("UPDATE catalog_entry SET is_in_trash = 1, deleted_at = :ts WHERE file_hash = :hash")
+    suspend fun softDeleteEntry(hash: String, ts: Long)
+
+    @Query("UPDATE catalog_entry SET is_in_trash = 0, deleted_at = NULL WHERE file_hash = :hash")
+    suspend fun restoreEntry(hash: String)
+
+    @Query("DELETE FROM catalog_entry WHERE file_hash = :hash")
+    suspend fun deleteCatalogEntry(hash: String)
+
+    @Transaction
+    suspend fun permanentlyDeleteEntry(hash: String) {
+        deleteFragmentLocations(hash)
+        deleteCatalogEntry(hash)
+    }
+
+    @Transaction
+    @Query("SELECT * FROM catalog_entry WHERE is_in_trash = 1 AND deleted_at < :expiryTs")
+    suspend fun getExpiredEntries(expiryTs: Long): List<CatalogEntryWithFragments>
+
+    @Query("SELECT file_hash FROM catalog_entry WHERE is_in_trash = 1")
+    suspend fun getAllTrashHashes(): List<String>
+
+    @Transaction
+    suspend fun purgeExpiredEntries(expiryTs: Long) {
+        val expired = getExpiredEntries(expiryTs)
+        for (e in expired) {
+            permanentlyDeleteEntry(e.catalogEntry.fileHash)
+        }
+    }
+
+    @Transaction
+    suspend fun emptyTrash() {
+        val hashes = getAllTrashHashes()
+        for (h in hashes) {
+            permanentlyDeleteEntry(h)
+        }
+    }
 }

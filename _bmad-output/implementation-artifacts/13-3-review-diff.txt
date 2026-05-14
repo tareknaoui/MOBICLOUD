@@ -1,0 +1,469 @@
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerScreen.kt b/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerScreen.kt
+index 1a90280..aaeaefa 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerScreen.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerScreen.kt
+@@ -5,6 +5,7 @@ import android.content.Intent
+ import android.webkit.MimeTypeMap
+ import androidx.activity.compose.rememberLauncherForActivityResult
+ import androidx.activity.result.contract.ActivityResultContracts
++import androidx.compose.foundation.background
+ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
+@@ -15,15 +16,24 @@ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.lazy.LazyColumn
+ import androidx.compose.foundation.lazy.items
+ import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Delete
+ import androidx.compose.material.icons.filled.Upload
+ import androidx.compose.material3.ExperimentalMaterial3Api
+ import androidx.compose.material3.FloatingActionButton
+ import androidx.compose.material3.Icon
++import androidx.compose.material3.IconButton
+ import androidx.compose.material3.Scaffold
++import androidx.compose.material3.SnackbarDuration
+ import androidx.compose.material3.SnackbarHost
+ import androidx.compose.material3.SnackbarHostState
++import androidx.compose.material3.SnackbarResult
++import androidx.compose.material3.SwipeToDismissBox
++import androidx.compose.material3.SwipeToDismissBoxValue
+ import androidx.compose.material3.Text
++import androidx.compose.material3.TopAppBar
++import androidx.compose.material3.TopAppBarDefaults
+ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
++import androidx.compose.material3.rememberSwipeToDismissBoxState
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
+@@ -54,6 +64,7 @@ object ExplorerRoute
+ @OptIn(ExperimentalMaterial3Api::class)
+ @Composable
+ fun ExplorerScreen(
++    onNavigateToTrash: () -> Unit = {},
+     modifier: Modifier = Modifier,
+     viewModel: ExplorerViewModel = hiltViewModel()
+ ) {
+@@ -130,6 +141,27 @@ fun ExplorerScreen(
+         )
+     }
+ 
++    // Story 13.3 — snackbar "Upload en cours" quand l'utilisateur tente un 2e upload
++    LaunchedEffect(Unit) {
++        viewModel.uploadBusyEvent.collect {
++            snackbarHostState.showSnackbar("Upload en cours, veuillez patienter")
++        }
++    }
++
++    // Story 13.2 — snackbar "Déplacé vers la corbeille" avec action "Annuler"
++    LaunchedEffect(Unit) {
++        viewModel.undoEvent.collect { fileHash ->
++            val result = snackbarHostState.showSnackbar(
++                message = "Déplacé vers la corbeille",
++                actionLabel = "Annuler",
++                duration = SnackbarDuration.Short
++            )
++            if (result == SnackbarResult.ActionPerformed) {
++                viewModel.undoMoveToTrash(fileHash)
++            }
++        }
++    }
++
+     val storeLauncher = rememberLauncherForActivityResult(
+         ActivityResultContracts.GetContent()
+     ) { uri ->
+@@ -139,6 +171,21 @@ fun ExplorerScreen(
+     Scaffold(
+         modifier = modifier,
+         snackbarHost = { SnackbarHost(snackbarHostState) },
++        topBar = {
++            TopAppBar(
++                title = { Text("Mes fichiers") },
++                actions = {
++                    IconButton(onClick = onNavigateToTrash) {
++                        Icon(
++                            imageVector = Icons.Default.Delete,
++                            contentDescription = "Corbeille",
++                            tint = Color(0xFFFFB300)
++                        )
++                    }
++                },
++                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
++            )
++        },
+         floatingActionButton = {
+             FloatingActionButton(onClick = { storeLauncher.launch("*/*") }) {
+                 Icon(Icons.Default.Upload, contentDescription = "Stocker un fichier")
+@@ -154,11 +201,21 @@ fun ExplorerScreen(
+             if (inProgressState != null) {
+                 ErasureProgressIndicator(
+                     state = inProgressState,
++                    onCancel = { viewModel.cancelUpload() },
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .padding(horizontal = 16.dp, vertical = 8.dp)
+                 )
+             }
++            if (storeState is StoreState.Cancelled) {
++                Text(
++                    text = "⊘ Upload annulé",
++                    color = Color(0xFFFF3333),
++                    fontSize = 13.sp,
++                    fontFamily = FontFamily.Monospace,
++                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
++                )
++            }
+ 
+             val inProgressDownloadState = downloadState.takeIf {
+                 it is DownloadState.Downloading || it is DownloadState.Decrypting
+@@ -166,6 +223,7 @@ fun ExplorerScreen(
+             if (inProgressDownloadState != null) {
+                 DownloadProgressIndicator(
+                     state = inProgressDownloadState,
++                    onCancel = { viewModel.resetDownloadState() },
+                     modifier = Modifier
+                         .fillMaxWidth()
+                         .padding(horizontal = 16.dp, vertical = 4.dp)
+@@ -194,10 +252,38 @@ fun ExplorerScreen(
+                         verticalArrangement = Arrangement.spacedBy(8.dp)
+                     ) {
+                         items(entries, key = { it.fileHash }) { entry ->
+-                            CatalogEntryCard(
+-                                entry = entry,
+-                                onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
++                            val dismissState = rememberSwipeToDismissBoxState(
++                                confirmValueChange = { value ->
++                                    if (value == SwipeToDismissBoxValue.EndToStart) {
++                                        viewModel.moveToTrash(entry.fileHash)
++                                        true
++                                    } else false
++                                }
+                             )
++                            SwipeToDismissBox(
++                                state = dismissState,
++                                enableDismissFromStartToEnd = false,
++                                backgroundContent = {
++                                    Box(
++                                        modifier = Modifier
++                                            .fillMaxSize()
++                                            .background(Color(0xFFFF3333))
++                                            .padding(end = 20.dp),
++                                        contentAlignment = Alignment.CenterEnd
++                                    ) {
++                                        Icon(
++                                            imageVector = Icons.Default.Delete,
++                                            contentDescription = "Supprimer",
++                                            tint = Color.White
++                                        )
++                                    }
++                                }
++                            ) {
++                                CatalogEntryCard(
++                                    entry = entry,
++                                    onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
++                                )
++                            }
+                         }
+                     }
+                 }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt b/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt
+index faf6be1..6e0c063 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModel.kt
+@@ -28,9 +28,12 @@ import kotlinx.coroutines.CoroutineDispatcher
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.Job
+ import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.MutableSharedFlow
+ import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.SharedFlow
+ import kotlinx.coroutines.flow.SharingStarted
+ import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asSharedFlow
+ import kotlinx.coroutines.flow.asStateFlow
+ import kotlinx.coroutines.flow.stateIn
+ import kotlinx.coroutines.flow.update
+@@ -56,9 +59,17 @@ class ExplorerViewModel @Inject constructor(
+     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
+ ) : ViewModel() {
+ 
+-    val catalogEntries: StateFlow<List<CatalogEntry>> = catalogRepository.getAllEntriesFlow()
++    val catalogEntries: StateFlow<List<CatalogEntry>> = catalogRepository.getActiveEntriesFlow()
+         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
+ 
++    // Story 13.2 — corbeille : fileHash émis pour déclencher la snackbar "Annuler"
++    private val _undoEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
++    val undoEvent: SharedFlow<String> = _undoEvent.asSharedFlow()
++
++    // Story 13.3 — upload occupé : notifie l'UI quand un 2e upload est tenté pendant InProgress
++    private val _uploadBusyEvent = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
++    val uploadBusyEvent: SharedFlow<Unit> = _uploadBusyEvent.asSharedFlow()
++
+     private val _isRefreshing = MutableStateFlow(false)
+     val isRefreshing: StateFlow<Boolean> = _isRefreshing.asStateFlow()
+ 
+@@ -69,10 +80,16 @@ class ExplorerViewModel @Inject constructor(
+     val downloadState: StateFlow<DownloadState> = _downloadState.asStateFlow()
+ 
+     private var resetJob: Job? = null
++    private var storeJob: Job? = null
+ 
+     // [Review][Patch] Tracker le job de download pour annulation en cas de relance concurrente.
+     private var downloadJob: Job? = null
+ 
++    init {
++        // Story 13.2 — purger les entrées expirées (TTL 30 jours) à chaque ouverture de l'explorateur
++        viewModelScope.launch { catalogRepository.purgeExpired() }
++    }
++
+     // [Review][Patch] P7 — tracker le job de localisation : sans ça, un vieux `localize` en cours
+     // pouvait émettre `Located(fileHashA)` et écraser le state d'un download fileHashB plus récent.
+     private var locateJob: Job? = null
+@@ -92,6 +109,19 @@ class ExplorerViewModel @Inject constructor(
+         }
+     }
+ 
++    fun moveToTrash(fileHash: String) {
++        viewModelScope.launch {
++            catalogRepository.moveToTrash(fileHash)
++            _undoEvent.emit(fileHash)
++        }
++    }
++
++    fun undoMoveToTrash(fileHash: String) {
++        viewModelScope.launch {
++            catalogRepository.restoreFromTrash(fileHash)
++        }
++    }
++
+     fun initiateDownload(fileHash: String) {
+         // [Review][Patch] P6 — preemption : un utilisateur qui tape un fichier B pendant que
+         // A est `Locating` doit pouvoir basculer. On annule les deux jobs (locate + download)
+@@ -187,11 +217,21 @@ class ExplorerViewModel @Inject constructor(
+         _downloadState.value = DownloadState.Idle
+     }
+ 
++    fun cancelUpload() {
++        storeJob?.cancel()
++        resetJob?.cancel()
++        _storeState.value = StoreState.Cancelled
++        scheduleReset(delayMs = 3000L)
++    }
++
+     fun storeFile(uri: Uri) {
+-        if (_storeState.value is StoreState.InProgress) return
++        if (_storeState.value is StoreState.InProgress) {
++            _uploadBusyEvent.tryEmit(Unit)
++            return
++        }
+         resetJob?.cancel()
+         _storeState.value = StoreState.InProgress.Encoding  // P7: set before launch to close TOCTOU window
+-        viewModelScope.launch {
++        storeJob = viewModelScope.launch {
+             val (fileSizeBytes, originalFileName) = withContext(ioDispatcher) {
+                 context.contentResolver.query(
+                     uri,
+@@ -320,9 +360,9 @@ class ExplorerViewModel @Inject constructor(
+         }
+     }
+ 
+-    private fun scheduleReset() {
++    private fun scheduleReset(delayMs: Long = 5000L) {
+         resetJob = viewModelScope.launch {
+-            delay(5000L)  // > Snackbar Short duration to avoid cancelling in-flight snackbar
++            delay(delayMs)  // > Snackbar Short duration to avoid cancelling in-flight snackbar
+             _storeState.value = StoreState.Idle
+         }
+     }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/explorer/StoreState.kt b/app/src/main/kotlin/com/mobicloud/presentation/explorer/StoreState.kt
+index 53c0626..4179add 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/explorer/StoreState.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/explorer/StoreState.kt
+@@ -18,4 +18,5 @@ sealed class StoreState {
+     }
+     data class Success(val entry: CatalogEntry, val nodeCount: Int) : StoreState()
+     data class Error(val message: String) : StoreState()
++    object Cancelled : StoreState()
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/explorer/components/DownloadProgressIndicator.kt b/app/src/main/kotlin/com/mobicloud/presentation/explorer/components/DownloadProgressIndicator.kt
+index 9a94a70..80f7027 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/explorer/components/DownloadProgressIndicator.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/explorer/components/DownloadProgressIndicator.kt
+@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material3.LinearProgressIndicator
+ import androidx.compose.material3.Surface
+ import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
+ import androidx.compose.runtime.Composable
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+@@ -26,6 +27,7 @@ import com.mobicloud.presentation.explorer.DownloadState
+ @Composable
+ fun DownloadProgressIndicator(
+     state: DownloadState,
++    onCancel: () -> Unit = {},
+     modifier: Modifier = Modifier
+ ) {
+     if (state !is DownloadState.Downloading && state !is DownloadState.Decrypting) return
+@@ -134,6 +136,17 @@ fun DownloadProgressIndicator(
+                 }
+ 
+             }
++            TextButton(
++                onClick = onCancel,
++                modifier = Modifier.align(Alignment.End)
++            ) {
++                Text(
++                    text = "✕ Annuler",
++                    color = Color(0xFFFF3333),
++                    fontSize = 12.sp,
++                    fontFamily = FontFamily.Monospace
++                )
++            }
+         }
+     }
+ }
+diff --git a/app/src/main/kotlin/com/mobicloud/presentation/explorer/components/ErasureProgressIndicator.kt b/app/src/main/kotlin/com/mobicloud/presentation/explorer/components/ErasureProgressIndicator.kt
+index beb35c7..0f7a5d3 100644
+--- a/app/src/main/kotlin/com/mobicloud/presentation/explorer/components/ErasureProgressIndicator.kt
++++ b/app/src/main/kotlin/com/mobicloud/presentation/explorer/components/ErasureProgressIndicator.kt
+@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material3.LinearProgressIndicator
+ import androidx.compose.material3.Surface
+ import androidx.compose.material3.Text
++import androidx.compose.material3.TextButton
+ import androidx.compose.runtime.Composable
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+@@ -25,6 +26,7 @@ import com.mobicloud.presentation.explorer.StoreState
+ @Composable
+ fun ErasureProgressIndicator(
+     state: StoreState.InProgress,
++    onCancel: () -> Unit = {},
+     modifier: Modifier = Modifier
+ ) {
+     Surface(
+@@ -116,6 +118,17 @@ fun ErasureProgressIndicator(
+                     )
+                 }
+             }
++            TextButton(
++                onClick = onCancel,
++                modifier = Modifier.align(Alignment.End)
++            ) {
++                Text(
++                    text = "✕ Annuler",
++                    color = Color(0xFFFF3333),
++                    fontSize = 12.sp,
++                    fontFamily = FontFamily.Monospace
++                )
++            }
+         }
+     }
+ }
+warning: in the working copy of 'app/src/test/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModelCancelUploadTest.kt', LF will be replaced by CRLF the next time Git touches it
+diff --git a/app/src/test/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModelCancelUploadTest.kt b/app/src/test/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModelCancelUploadTest.kt
+new file mode 100644
+index 0000000..93193f8
+--- /dev/null
++++ b/app/src/test/kotlin/com/mobicloud/presentation/explorer/ExplorerViewModelCancelUploadTest.kt
+@@ -0,0 +1,100 @@
++package com.mobicloud.presentation.explorer
++
++import android.content.Context
++import com.mobicloud.core.security.FragmentCipherUseCase
++import com.mobicloud.domain.repository.CatalogRepository
++import com.mobicloud.domain.repository.SecurityRepository
++import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
++import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
++import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
++import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
++import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
++import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
++import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
++import io.mockk.every
++import io.mockk.mockk
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.ExperimentalCoroutinesApi
++import kotlinx.coroutines.flow.flowOf
++import kotlinx.coroutines.flow.first
++import kotlinx.coroutines.test.StandardTestDispatcher
++import kotlinx.coroutines.test.advanceTimeBy
++import kotlinx.coroutines.test.advanceUntilIdle
++import kotlinx.coroutines.test.resetMain
++import kotlinx.coroutines.test.runTest
++import kotlinx.coroutines.test.setMain
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++
++@OptIn(ExperimentalCoroutinesApi::class)
++class ExplorerViewModelCancelUploadTest {
++
++    private val testDispatcher = StandardTestDispatcher()
++    private lateinit var catalogRepository: CatalogRepository
++    private lateinit var viewModel: ExplorerViewModel
++
++    @Before
++    fun setUp() {
++        Dispatchers.setMain(testDispatcher)
++        catalogRepository = mockk(relaxed = true) {
++            every { getActiveEntriesFlow() } returns flowOf(emptyList())
++        }
++        viewModel = ExplorerViewModel(
++            catalogRepository = catalogRepository,
++            gossipSyncUseCase = mockk(relaxed = true),
++            encodeErasureFragmentsUseCase = mockk(relaxed = true),
++            fragmentCipherUseCase = mockk(relaxed = true),
++            distributeEncryptedBlocksUseCase = mockk(relaxed = true),
++            securityRepository = mockk(relaxed = true),
++            localizeFileBlocksUseCase = mockk(relaxed = true),
++            downloadFileBlocksUseCase = mockk(relaxed = true),
++            assembleDownloadedFileUseCase = mockk(relaxed = true),
++            selectOptimalPeersUseCase = mockk(relaxed = true),
++            context = mockk<Context>(relaxed = true)
++        )
++    }
++
++    @After
++    fun tearDown() {
++        Dispatchers.resetMain()
++    }
++
++    @Test
++    fun `cancelUpload passe le state a Cancelled`() = runTest {
++        // On force manuellement l'état InProgress (storeFile nécessiterait un vrai Uri)
++        // On teste directement cancelUpload depuis Idle — state doit être Cancelled immédiatement
++        viewModel.cancelUpload()
++        advanceUntilIdle()
++        assertTrue(viewModel.storeState.value is StoreState.Cancelled)
++    }
++
++    @Test
++    fun `cancelUpload scheduleReset repasse a Idle apres 3s`() = runTest {
++        viewModel.cancelUpload()
++        advanceUntilIdle()
++        assertEquals(StoreState.Cancelled, viewModel.storeState.value)
++        advanceTimeBy(3001L)
++        advanceUntilIdle()
++        assertEquals(StoreState.Idle, viewModel.storeState.value)
++    }
++
++    @Test
++    fun `uploadBusyEvent emet quand storeFile est appele pendant InProgress`() = runTest {
++        // Forcer _storeState à InProgress via reflection
++        val field = ExplorerViewModel::class.java.getDeclaredField("_storeState")
++        field.isAccessible = true
++        @Suppress("UNCHECKED_CAST")
++        val flow = field.get(viewModel) as kotlinx.coroutines.flow.MutableStateFlow<StoreState>
++        flow.value = StoreState.InProgress.Encoding
++
++        val mockUri = mockk<android.net.Uri>(relaxed = true)
++        viewModel.storeFile(mockUri)
++        advanceUntilIdle()
++
++        val event = viewModel.uploadBusyEvent.first()
++        assertEquals(Unit, event)
++    }
++}
