@@ -110,9 +110,9 @@ development_status:
   epic-12: in-progress
   12-1-suppression-gps-admission-cluster-par-charge: done
   epic-12-retrospective: optional
-  epic-13: in-progress
+  epic-13: done
   13-1-refonte-ux-grand-public-semantique-humaine-et-mode-expert: done
-  13-2-corbeille-suppression-et-restauration-de-fichiers: review
+  13-2-corbeille-suppression-et-restauration-de-fichiers: done
   13-3-annulation-upload-download: done
-  13-4-ecran-initialisation-p2p-et-permissions-groupees-grand-public: review
+  13-4-ecran-initialisation-p2p-et-permissions-groupees-grand-public: done
   epic-13-retrospective: optional

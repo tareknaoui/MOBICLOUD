@@ -5,8 +5,11 @@ import androidx.lifecycle.viewModelScope
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.repository.CatalogRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -20,12 +23,31 @@ class TrashViewModel @Inject constructor(
         catalogRepository.getDeletedEntriesFlow()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
 
+    // F8 fix: erreurs DB remontées à l'UI via un SharedFlow (message localisé)
+    private val _errorEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val errorEvent: SharedFlow<String> = _errorEvent.asSharedFlow()
+
+    init {
+        // F4 fix (AC-8): purger les entrées expirées à l'ouverture de TrashScreen aussi
+        viewModelScope.launch { catalogRepository.purgeExpired() }
+    }
+
     fun restoreEntry(fileHash: String) {
-        viewModelScope.launch { catalogRepository.restoreFromTrash(fileHash) }
+        viewModelScope.launch {
+            // F8 fix: informer l'UI si la restauration échoue
+            catalogRepository.restoreFromTrash(fileHash).onFailure {
+                _errorEvent.emit("Impossible de restaurer ce fichier.")
+            }
+        }
     }
 
     fun permanentlyDelete(fileHash: String) {
-        viewModelScope.launch { catalogRepository.permanentlyDelete(fileHash) }
+        viewModelScope.launch {
+            // F8 fix: informer l'UI si la suppression échoue
+            catalogRepository.permanentlyDelete(fileHash).onFailure {
+                _errorEvent.emit("Impossible de supprimer ce fichier.")
+            }
+        }
     }
 
     fun emptyTrash() {

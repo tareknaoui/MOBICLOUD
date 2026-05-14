@@ -76,14 +76,15 @@ fun TrashScreen(
     var showEmptyConfirm by remember { mutableStateOf(false) }
 
     // Dialogue suppression individuelle
-    if (confirmDeleteHash != null) {
+    confirmDeleteHash?.let { hashToDelete ->
         AlertDialog(
             onDismissRequest = { confirmDeleteHash = null },
             title = { Text("Supprimer définitivement ?", color = Color.White) },
             text = { Text("Ce fichier sera supprimé de façon irréversible.", color = Color(0xFFCCCCCC)) },
             confirmButton = {
                 TextButton(onClick = {
-                    viewModel.permanentlyDelete(confirmDeleteHash!!)
+                    // F2 fix: hash capturé localement, pas de force-unwrap !!
+                    viewModel.permanentlyDelete(hashToDelete)
                     confirmDeleteHash = null
                 }) {
                     Text("Supprimer", color = Color(0xFFFF3333))

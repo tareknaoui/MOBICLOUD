@@ -111,8 +111,10 @@ class ExplorerViewModel @Inject constructor(
 
     fun moveToTrash(fileHash: String) {
         viewModelScope.launch {
-            catalogRepository.moveToTrash(fileHash)
-            _undoEvent.emit(fileHash)
+            // F1 fix: émettre undoEvent uniquement si le soft-delete DB a réussi
+            catalogRepository.moveToTrash(fileHash).onSuccess {
+                _undoEvent.emit(fileHash)
+            }
         }
     }
 

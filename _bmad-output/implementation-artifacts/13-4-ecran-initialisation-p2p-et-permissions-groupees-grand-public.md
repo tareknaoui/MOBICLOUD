@@ -1,6 +1,6 @@
 # Story 13.4 : Écran d'initialisation P2P & Permissions groupées grand public
 
-Status: review
+Status: done
 
 **Epic :** 13 — Refonte UX Grand Public (V5.2 Simplified)
 **Story ID :** 13.4
@@ -302,3 +302,23 @@ Les users déjà installés auront `hasCompletedOnboarding = false` après mise 
 |------|--------|-------------|
 | 2026-05-14 | bmad-create-story | Story créée — Phase 3 onboarding P2P grand public |
 | 2026-05-14 | bmad-dev-story | Implémentation complète — BUILD SUCCESSFUL, status → review |
+
+---
+
+### Review Findings
+
+> Code review adversarial — 3 couches (Blind Hunter · Edge Case Hunter · Acceptance Auditor) — 2026-05-14
+
+**`patch` (2)**
+
+- [x] [Review][Patch] **F1 — `startInit()` sans guard → double navigation sur rotation** [`InitViewModel.kt`] — ✅ Corrigé : `@Volatile private var initStarted = false` + `if (initStarted) return` avant le launch.
+- [x] [Review][Patch] **F2 — `import kotlinx.coroutines.flow.map` dupliqué** [`MainActivityViewModel.kt`] — ✅ Corrigé : doublon supprimé.
+
+**`defer` (1)**
+
+- [x] [Review][Defer] **F5 — `SharingStarted.WhileSubscribed(5000L)` pour `hasCompletedOnboarding`** [`MainActivityViewModel.kt`] — deferred, pattern établi dans le codebase, risque de flash NavHost si > 5s background accepté pour PFE.
+
+**`dismiss` (2)**
+
+- [x] [Review][Dismiss] **F3 — `markOnboardingCompleted()` fire-and-forget avant navigation** — race condition DB extrêmement improbable (< 10ms), acceptable.
+- [x] [Review][Dismiss] **F4 — `permissionInfos` affiche Notifications sur API < 33** — techniquement correct (POST_NOTIFICATIONS auto-granted < API 33), UX acceptable.

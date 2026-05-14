@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
 import com.mobicloud.domain.repository.IdentityRepository
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**

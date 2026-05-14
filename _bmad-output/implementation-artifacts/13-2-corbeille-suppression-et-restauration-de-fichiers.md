@@ -1,6 +1,6 @@
 # Story 13.2 — Corbeille : Suppression et restauration de fichiers
 
-## Status: review
+## Status: done
 
 ## Story
 
@@ -267,3 +267,24 @@ Story 13.2 implémentée intégralement :
 |---|---|---|
 | 2026-05-14 | 1.0 | Création de la story |
 | 2026-05-14 | 1.1 | Implémentation complète — migration Room v17→v18, DAO corbeille, domain, ExplorerScreen swipe-to-delete, TrashViewModel, TrashScreen, navigation, tests |
+
+---
+
+### Review Findings
+
+> Code review adversarial — 3 couches (Blind Hunter · Edge Case Hunter · Acceptance Auditor) — 2026-05-14
+
+**`decision_needed` (1)**
+
+- [x] [Review][Decision] **F4 — AC-8 PARTIEL : purge TTL non déclenchée à l'ouverture de `TrashScreen`** — Résolu (B) : `viewModelScope.launch { catalogRepository.purgeExpired() }` ajouté dans `TrashViewModel.init {}`. [`TrashViewModel.kt`]
+
+**`patch` (3)**
+
+- [x] [Review][Patch] **F1 — `moveToTrash()` émet `undoEvent` sans vérifier le `Result`** [`ExplorerViewModel.kt`] — ✅ Corrigé : `catalogRepository.moveToTrash(fileHash).onSuccess { _undoEvent.emit(fileHash) }`.
+- [x] [Review][Patch] **F2 — `confirmDeleteHash!!` force-unwrap dans AlertDialog** [`TrashScreen.kt`] — ✅ Corrigé : `confirmDeleteHash?.let { hashToDelete -> ... viewModel.permanentlyDelete(hashToDelete) }`.
+- [x] [Review][Patch] **F8 — `restoreEntry()` / `permanentlyDelete()` ignorent `Result<Unit>` dans `TrashViewModel`** [`TrashViewModel.kt`] — ✅ Corrigé : `errorEvent: SharedFlow<String>` exposé, `onFailure { _errorEvent.emit(...) }` sur les deux méthodes.
+
+**`defer` (2)**
+
+- [x] [Review][Defer] **F3 — Snackbar "Fichier restauré" optimiste avant confirmation DB** [`TrashScreen.kt`] — deferred, UX optimiste acceptable pour MVP.
+- [x] [Review][Defer] **F6 — `undoEvent` extraBufferCapacity=1 — pré-existant** [`ExplorerViewModel.kt`] — deferred, déjà loggué W-13.3-P8 dans deferred-work.md.

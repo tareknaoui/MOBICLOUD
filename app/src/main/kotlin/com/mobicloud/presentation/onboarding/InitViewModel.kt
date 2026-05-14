@@ -30,7 +30,12 @@ class InitViewModel @Inject constructor(
     private val _currentStep = MutableStateFlow<InitStep>(InitStep.CreatingIdentity)
     val currentStep: StateFlow<InitStep> = _currentStep.asStateFlow()
 
+    // F1 fix: guard contre les appels multiples (rotation d'écran → LaunchedEffect relanċé)
+    @Volatile private var initStarted = false
+
     fun startInit() {
+        if (initStarted) return
+        initStarted = true
         viewModelScope.launch {
             withTimeoutOrNull(INIT_TIMEOUT_MS) {
                 _currentStep.value = InitStep.CreatingIdentity
