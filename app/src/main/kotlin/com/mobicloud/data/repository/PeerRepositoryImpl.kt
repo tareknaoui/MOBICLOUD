@@ -53,4 +53,7 @@ class PeerRepositoryImpl @Inject constructor(
 
     override suspend fun clearSuperPairStatus(nodeId: String): Result<Unit> =
         runCatching { peerDao.clearSuperPairStatus(nodeId) }
+
+    override suspend fun clearAllPeers(): Result<Unit> =
+        runCatching { peerDao.deleteAll() }
 }

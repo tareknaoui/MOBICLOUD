@@ -24,4 +24,6 @@ interface PeerRepository {
     ): Result<Unit>
 
     suspend fun clearSuperPairStatus(nodeId: String): Result<Unit>
+
+    suspend fun clearAllPeers(): Result<Unit>
 }

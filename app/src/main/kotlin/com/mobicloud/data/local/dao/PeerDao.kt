@@ -59,6 +59,9 @@ interface PeerDao {
     @Query("UPDATE peer_nodes SET is_super_pair = 0 WHERE node_id = :nodeId")
     suspend fun clearSuperPairStatus(nodeId: String)
 
+    @Query("DELETE FROM peer_nodes")
+    suspend fun deleteAll()
+
     @Query("SELECT * FROM peer_nodes")
     fun getAllPeers(): Flow<List<PeerNodeEntity>>
 }

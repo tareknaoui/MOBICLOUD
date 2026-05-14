@@ -169,6 +169,14 @@ class MobicloudP2PService : Service() {
         // P3: Évite de lancer plusieurs boucles P2P si START_STICKY redémarre le service
         if (!loopsStarted) {
             loopsStarted = true
+            // Purge des peers de la session précédente : les timestamps stockés peuvent utiliser
+            // System.currentTimeMillis() (unix) là où evictStalePeers/freshPeers utilisent
+            // SystemClock.elapsedRealtime() → les anciens peers ne sont jamais évincés et
+            // persistent comme "actifs" indéfiniment. La redécouverte se fait en quelques secondes.
+            serviceScope.launch {
+                peerRepository.clearAllPeers()
+                    .onFailure { Log.w(LOGTAG, "[INIT] clearAllPeers échoué : ${it.message}") }
+            }
             // Story 11.3 — purge des membres dont lastSeen > 24h (anti-fuite registres orphelins)
             serviceScope.launch {
                 val now = System.currentTimeMillis()
