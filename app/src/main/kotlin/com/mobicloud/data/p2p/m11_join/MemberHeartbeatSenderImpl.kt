@@ -29,7 +29,7 @@ class MemberHeartbeatSenderImpl @Inject constructor(
     override suspend fun send(destNodeId: ByteArray, hb: Heartbeat): Result<Unit> = runCatching {
         val payload = byteArrayOf(JoinNetworkClientImpl.JOIN_MAGIC, JoinSubType.HEARTBEAT.byte) +
             ProtoBuf.encodeToByteArray(hb)
-        val blockId = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "")
+        val blockId = "HB-" + UUID.randomUUID().toString().replace("-", "")
         relayWebSocketClient.uploadBlock(destNodeId.toHexString().lowercase(), blockId, payload).getOrThrow()
     }
 
@@ -64,7 +64,7 @@ class MemberHeartbeatSenderImpl @Inject constructor(
     override suspend fun sendLeave(spNodeId: ByteArray, leave: Leave): Result<Unit> = runCatching {
         val payload = byteArrayOf(JoinNetworkClientImpl.JOIN_MAGIC, JoinSubType.LEAVE.byte) +
             ProtoBuf.encodeToByteArray(leave)
-        val blockId = UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", "")
+        val blockId = "LV-" + UUID.randomUUID().toString().replace("-", "")
         relayWebSocketClient.uploadBlock(spNodeId.toHexString().lowercase(), blockId, payload).getOrThrow()
     }
 }

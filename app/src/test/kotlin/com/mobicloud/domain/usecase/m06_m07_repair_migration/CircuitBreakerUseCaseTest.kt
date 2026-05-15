@@ -54,6 +54,7 @@ class CircuitBreakerUseCaseTest {
             applicationScope = backgroundScope
         )
         useCase.currentTimeProvider = { testScheduler.currentTime }
+        useCase.startupTimeMs = -CircuitBreakerUseCase.STARTUP_GRACE_MS - 1L
 
         val initialPeers = createPeers(10, true)
         peersFlow.value = initialPeers
@@ -79,6 +80,7 @@ class CircuitBreakerUseCaseTest {
             applicationScope = backgroundScope
         )
         useCase.currentTimeProvider = { testScheduler.currentTime }
+        useCase.startupTimeMs = -CircuitBreakerUseCase.STARTUP_GRACE_MS - 1L
 
         val initialPeers = createPeers(10, true)
         peersFlow.value = initialPeers
@@ -101,6 +103,7 @@ class CircuitBreakerUseCaseTest {
             applicationScope = backgroundScope
         )
         useCase.currentTimeProvider = { testScheduler.currentTime }
+        useCase.startupTimeMs = -CircuitBreakerUseCase.STARTUP_GRACE_MS - 1L
 
         val initialPeers = createPeers(10, true)
         peersFlow.value = initialPeers
@@ -124,6 +127,7 @@ class CircuitBreakerUseCaseTest {
             applicationScope = backgroundScope
         )
         useCase.currentTimeProvider = { testScheduler.currentTime }
+        useCase.startupTimeMs = -CircuitBreakerUseCase.STARTUP_GRACE_MS - 1L
 
         val initialPeers = createPeers(2, true)
         peersFlow.value = initialPeers
@@ -155,6 +159,7 @@ class CircuitBreakerUseCaseTest {
             applicationScope = backgroundScope
         )
         useCase.currentTimeProvider = { testScheduler.currentTime }
+        useCase.startupTimeMs = -CircuitBreakerUseCase.STARTUP_GRACE_MS - 1L
 
         val initialPeers = createPeers(10, true)
         peersFlow.value = initialPeers

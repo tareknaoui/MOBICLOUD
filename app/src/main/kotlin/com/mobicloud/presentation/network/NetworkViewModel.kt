@@ -10,7 +10,7 @@ import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.models.TransferChannelState
 import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.repository.DiagnosticsRepository
-import com.mobicloud.domain.repository.IdentityRepository
+import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
@@ -38,7 +38,7 @@ enum class ConnectionQuality(val label: String) {
 @HiltViewModel
 class NetworkViewModel @Inject constructor(
     peerRepository: PeerRepository,
-    private val identityRepository: IdentityRepository,
+    private val securityRepository: SecurityRepository,
     private val diagnosticsRepository: DiagnosticsRepository,
     memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase,
     private val nodeSettingsRepository: NodeSettingsRepository,
@@ -46,7 +46,7 @@ class NetworkViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val localNodeIdFlow: StateFlow<String?> = flow {
-        emit(identityRepository.getIdentity().getOrNull()?.nodeId)
+        emit(securityRepository.getIdentity().getOrNull()?.nodeId)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
     val clusterTopology: StateFlow<ClusterTopologyState> = combine(

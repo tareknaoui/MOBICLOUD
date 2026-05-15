@@ -26,10 +26,22 @@ class MemberEntityMigrationTest {
     }
 
     @Test
-    fun `CatalogDatabase version est 16`() {
+    fun `MIGRATION_16_17 ajoute is_expert_mode_enabled`() {
+        assertEquals(16, CatalogDatabase.MIGRATION_16_17.startVersion)
+        assertEquals(17, CatalogDatabase.MIGRATION_16_17.endVersion)
+    }
+
+    @Test
+    fun `MIGRATION_17_18 ajoute is_in_trash et deleted_at`() {
+        assertEquals(17, CatalogDatabase.MIGRATION_17_18.startVersion)
+        assertEquals(18, CatalogDatabase.MIGRATION_17_18.endVersion)
+    }
+
+    @Test
+    fun `CatalogDatabase version est 18`() {
         // Note : `@Database` est en `RetentionPolicy.CLASS`, donc non lisible via réflexion.
         // On consomme la même constante que l'annotation pour garder le test couplé à la source.
-        assertEquals(16, CatalogDatabase.CURRENT_VERSION)
+        assertEquals(18, CatalogDatabase.CURRENT_VERSION)
     }
 
     @Test

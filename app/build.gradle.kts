@@ -120,6 +120,11 @@ android {
     // sur les méthodes du framework Android non mockées (android.util.Log, TextUtils, etc.).
     testOptions {
         unitTests.isReturnDefaultValues = true
+        unitTests.all {
+            it.maxHeapSize = "4g"
+            it.jvmArgs("-XX:+UseG1GC", "-XX:MaxMetaspaceSize=512m")
+            it.forkEvery = 20
+        }
     }
 
     namespace = "com.mobicloud.compose"

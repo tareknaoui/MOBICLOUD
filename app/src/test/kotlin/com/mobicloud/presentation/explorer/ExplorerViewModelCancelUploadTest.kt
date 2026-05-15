@@ -13,14 +13,16 @@ import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragment
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
 import io.mockk.every
 import io.mockk.mockk
+import kotlinx.coroutines.async
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
@@ -63,22 +65,28 @@ class ExplorerViewModelCancelUploadTest {
         Dispatchers.resetMain()
     }
 
+    private fun injectActiveFakeJob() {
+        val storeJobField = ExplorerViewModel::class.java.getDeclaredField("storeJob")
+        storeJobField.isAccessible = true
+        val fakeJob = kotlinx.coroutines.GlobalScope.launch { kotlinx.coroutines.delay(60_000L) }
+        storeJobField.set(viewModel, fakeJob)
+    }
+
     @Test
     fun `cancelUpload passe le state a Cancelled`() = runTest {
-        // On force manuellement l'état InProgress (storeFile nécessiterait un vrai Uri)
-        // On teste directement cancelUpload depuis Idle — state doit être Cancelled immédiatement
+        injectActiveFakeJob()
         viewModel.cancelUpload()
-        advanceUntilIdle()
+        // _storeState.value est assigné de façon synchrone dans cancelUpload()
         assertTrue(viewModel.storeState.value is StoreState.Cancelled)
     }
 
     @Test
     fun `cancelUpload scheduleReset repasse a Idle apres 3s`() = runTest {
+        injectActiveFakeJob()
         viewModel.cancelUpload()
-        advanceUntilIdle()
         assertEquals(StoreState.Cancelled, viewModel.storeState.value)
         advanceTimeBy(3001L)
-        advanceUntilIdle()
+        runCurrent()
         assertEquals(StoreState.Idle, viewModel.storeState.value)
     }
 
@@ -91,45 +99,40 @@ class ExplorerViewModelCancelUploadTest {
         val flow = field.get(viewModel) as kotlinx.coroutines.flow.MutableStateFlow<StoreState>
         flow.value = StoreState.InProgress.Encoding
 
+        // Démarrer la collection AVANT storeFile : SharedFlow replay=0, l'event serait perdu sinon.
+        val eventDeferred = async { viewModel.uploadBusyEvent.first() }
+        advanceUntilIdle()  // laisser le collector s'inscrire
+
         val mockUri = mockk<android.net.Uri>(relaxed = true)
         viewModel.storeFile(mockUri)
         advanceUntilIdle()
 
-        val event = viewModel.uploadBusyEvent.first()
+        val event = eventDeferred.await()
         assertEquals(Unit, event)
     }
 
     // [Review][Patch] P1 — guard Idle : cancelUpload() depuis Idle doit être un no-op.
-    // Avant ce patch, l'état passait à Cancelled même sans upload actif.
     @Test
     fun `cancelUpload depuis Idle est un no-op - state reste Idle`() = runTest {
-        // Précondition : aucun storeJob actif
         assertEquals(StoreState.Idle, viewModel.storeState.value)
         viewModel.cancelUpload()
         advanceUntilIdle()
-        // Le guard P1 (storeJob?.isActive != true) doit court-circuiter
         assertEquals(StoreState.Idle, viewModel.storeState.value)
     }
 
     // [Review][Patch] P2 — guard double-tap : 2e appel depuis Cancelled ne réinitialise pas le resetJob.
     @Test
     fun `cancelUpload double-tap ne bloque pas le retour a Idle`() = runTest {
-        // Forcer storeJob actif via reflection pour permettre le premier cancelUpload()
-        val storeJobField = ExplorerViewModel::class.java.getDeclaredField("storeJob")
-        storeJobField.isAccessible = true
-        val fakeJob = launch { kotlinx.coroutines.delay(10_000L) }
-        storeJobField.set(viewModel, fakeJob)
+        injectActiveFakeJob()
 
         viewModel.cancelUpload()             // 1er appel → passe à Cancelled, lance resetJob(3s)
-        advanceUntilIdle()
         assertEquals(StoreState.Cancelled, viewModel.storeState.value)
 
         viewModel.cancelUpload()             // 2e appel → guard P2 : retour immédiat, resetJob intact
-        advanceUntilIdle()
-        assertEquals(StoreState.Cancelled, viewModel.storeState.value)  // toujours Cancelled (pas bloqué)
+        assertEquals(StoreState.Cancelled, viewModel.storeState.value)
 
         advanceTimeBy(3001L)
-        advanceUntilIdle()
-        assertEquals(StoreState.Idle, viewModel.storeState.value)       // resetJob non annulé → retour à Idle
+        runCurrent()
+        assertEquals(StoreState.Idle, viewModel.storeState.value)
     }
 }

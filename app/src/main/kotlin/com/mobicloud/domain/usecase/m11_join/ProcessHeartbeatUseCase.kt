@@ -3,6 +3,7 @@ package com.mobicloud.domain.usecase.m11_join
 import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.domain.models.BULLY_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.m11_join.Heartbeat
+import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
 import com.mobicloud.domain.models.m11_join.MemberInfo
 import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.MemberUpdate
@@ -85,6 +86,15 @@ class ProcessHeartbeatUseCase @Inject constructor(
         // Re-admission d'un membre EVICTED : le relay a coupé plus de SP_TIMEOUT_MS et le membre
         // a été marqué EVICTED côté SP, mais il est toujours vivant (HB cryptographiquement valide).
         if (memberEntity.status == "EVICTED") {
+            // Guard capacité : un autre nœud a peut-être pris la place de B pendant son absence.
+            // Sans ce check, B serait réactivé même si le cluster est déjà plein (A+C=2/2 → 3/2).
+            val activeCount = memberDao.listActiveSnapshot(memberEntity.clusterId).size
+            if (activeCount >= MAX_CLUSTER_SIZE) {
+                networkEventRepository.pushEvent(
+                    "[HB-SP] EVICTED $nodeIdShort rejeté — cluster plein ($activeCount/$MAX_CLUSTER_SIZE)"
+                )
+                return Result.success(Unit)
+            }
             val reactivated = memberDao.reactivateIfEvicted(
                 nodeId = nodeIdHex,
                 lastSeen = now,

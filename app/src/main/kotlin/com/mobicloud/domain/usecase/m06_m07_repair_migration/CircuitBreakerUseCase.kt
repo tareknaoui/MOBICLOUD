@@ -24,6 +24,7 @@ class CircuitBreakerUseCase @Inject constructor(
 ) {
     // Visible for testing
     internal var currentTimeProvider: () -> Long = { System.currentTimeMillis() }
+    internal var startupTimeMs: Long = System.currentTimeMillis()
 
     private val _isCircuitOpen = MutableStateFlow(false)
     val isCircuitOpen: StateFlow<Boolean> = _isCircuitOpen.asStateFlow()
@@ -46,10 +47,8 @@ class CircuitBreakerUseCase @Inject constructor(
         // Startup grace: Room persists is_active=1 across sessions; stale peers are evicted
         // within ~1s of service start, which would immediately trigger churn > 30% on a 3-node
         // cluster. Ignore churn for the first 30s so only real instability opens the circuit.
-        internal const val STARTUP_GRACE_MS = 30_000L
+        const val STARTUP_GRACE_MS = 30_000L
     }
-
-    private val startupTimeMs: Long = System.currentTimeMillis()
 
     init {
         applicationScope.launch {
