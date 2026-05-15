@@ -4,6 +4,8 @@ import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.data.local.entity.MemberEntity
 import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.models.m11_join.LIVENESS_CHECK_INTERVAL_MS
+import com.mobicloud.domain.models.m11_join.MemberInfo
+import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.MemberUpdate
 import com.mobicloud.domain.models.m11_join.SP_TIMEOUT_MS
 import com.mobicloud.domain.repository.NetworkEventRepository
@@ -28,7 +30,13 @@ class MonitorMemberLivenessUseCaseTest {
     private lateinit var nodeSettingsRepository: NodeSettingsRepository
     private lateinit var sendMemberUpdateUseCase: SendMemberUpdateUseCase
     private lateinit var networkEventRepository: NetworkEventRepository
+    private lateinit var memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase
     private val testDispatcher = UnconfinedTestDispatcher()
+
+    private val spMember = MemberInfo(
+        nodeId = byteArrayOf(0x01), publicKey = byteArrayOf(0x02),
+        ipAddress = "127.0.0.1", port = 9000, freeBytes = 0L, role = MemberRole.SUPER_PAIR
+    )
 
     private var virtualNow = 100_000L
 
@@ -42,13 +50,14 @@ class MonitorMemberLivenessUseCaseTest {
         nodeSettingsRepository = mockk()
         sendMemberUpdateUseCase = mockk(relaxed = true)
         networkEventRepository = mockk(relaxed = true)
+        memberSnapshotCacheUseCase = mockk(relaxed = true)
         coEvery { nodeSettingsRepository.observeSettings() } returns flowOf(NodeSettings(0L, "cid"))
     }
 
     private fun makeUseCase(scope: TestScope): MonitorMemberLivenessUseCase =
         MonitorMemberLivenessUseCase(
             memberDao, nodeSettingsRepository, sendMemberUpdateUseCase,
-            networkEventRepository, scope, clock = { virtualNow }
+            networkEventRepository, memberSnapshotCacheUseCase, scope, clock = { virtualNow }
         )
 
     // 1. Aucun membre dépassé → 0 eviction
@@ -58,7 +67,7 @@ class MonitorMemberLivenessUseCaseTest {
         val freshSeen = virtualNow - 5_000L
         coEvery { memberDao.listActiveSnapshot("cid") } returns listOf(entity("aa", freshSeen))
 
-        useCase.start()
+        useCase.start(spMember)
         advanceTimeBy(LIVENESS_CHECK_INTERVAL_MS + 1)
 
         coVerify(exactly = 0) { memberDao.markEvictedIfStale(any(), any()) }
@@ -73,7 +82,7 @@ class MonitorMemberLivenessUseCaseTest {
         coEvery { memberDao.listActiveSnapshot("cid") } returns listOf(entity("dead", deadSeen))
         coEvery { memberDao.markEvictedIfStale(any(), any()) } returns 1
 
-        useCase.start()
+        useCase.start(spMember)
         advanceTimeBy(LIVENESS_CHECK_INTERVAL_MS + 1)
 
         coVerify(exactly = 1) { memberDao.markEvictedIfStale("dead", any()) }
@@ -88,7 +97,7 @@ class MonitorMemberLivenessUseCaseTest {
         val almostDead = virtualNow - (SP_TIMEOUT_MS - 1_000L)
         coEvery { memberDao.listActiveSnapshot("cid") } returns listOf(entity("alive", almostDead))
 
-        useCase.start()
+        useCase.start(spMember)
         advanceTimeBy(LIVENESS_CHECK_INTERVAL_MS + 1)
 
         coVerify(exactly = 0) { memberDao.markEvictedIfStale(any(), any()) }
@@ -101,9 +110,9 @@ class MonitorMemberLivenessUseCaseTest {
         val useCase = makeUseCase(this)
         coEvery { memberDao.listActiveSnapshot("cid") } returns emptyList()
 
-        useCase.start()
+        useCase.start(spMember)
         val firstJob = useCase.monitorJob
-        useCase.start()
+        useCase.start(spMember)
         assertTrue(firstJob === useCase.monitorJob)
         useCase.stop()
     }
@@ -114,10 +123,10 @@ class MonitorMemberLivenessUseCaseTest {
         val useCase = makeUseCase(this)
         coEvery { memberDao.listActiveSnapshot("cid") } returns emptyList()
 
-        useCase.start()
+        useCase.start(spMember)
         val firstJob = useCase.monitorJob
         useCase.stop()
-        useCase.start()
+        useCase.start(spMember)
         assertTrue(firstJob !== useCase.monitorJob)
         useCase.stop()
     }

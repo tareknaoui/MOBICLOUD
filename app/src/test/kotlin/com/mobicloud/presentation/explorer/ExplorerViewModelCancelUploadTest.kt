@@ -15,6 +15,7 @@ import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -116,7 +117,7 @@ class ExplorerViewModelCancelUploadTest {
         // Forcer storeJob actif via reflection pour permettre le premier cancelUpload()
         val storeJobField = ExplorerViewModel::class.java.getDeclaredField("storeJob")
         storeJobField.isAccessible = true
-        val fakeJob = viewModelScope.launch { kotlinx.coroutines.delay(10_000L) }
+        val fakeJob = launch { kotlinx.coroutines.delay(10_000L) }
         storeJobField.set(viewModel, fakeJob)
 
         viewModel.cancelUpload()             // 1er appel → passe à Cancelled, lance resetJob(3s)

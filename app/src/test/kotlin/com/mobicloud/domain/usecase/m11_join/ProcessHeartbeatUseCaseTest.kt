@@ -10,6 +10,7 @@ import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +26,8 @@ class ProcessHeartbeatUseCaseTest {
     private lateinit var securityRepository: SecurityRepository
     private lateinit var joinStateMachine: JoinStateMachine
     private lateinit var networkEventRepository: NetworkEventRepository
+    private lateinit var memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase
+    private lateinit var sendMemberUpdateUseCase: SendMemberUpdateUseCase
     private lateinit var useCase: ProcessHeartbeatUseCase
 
     private val nodeIdBytes = byteArrayOf(0xAA.toByte(), 0xBB.toByte())
@@ -39,6 +42,8 @@ class ProcessHeartbeatUseCaseTest {
         freeBytes = 100L, lastSeen = now - 5000L, role = "MEMBER", status = "ACTIVE"
     )
 
+    private val evictedEntity = validEntity.copy(status = "EVICTED")
+
     private fun validHb(ts: Long = now) = Heartbeat(nodeIdBytes, 100L, "1.2.3.4", 9090, ts, sig)
 
     @Before
@@ -47,7 +52,12 @@ class ProcessHeartbeatUseCaseTest {
         securityRepository = mockk()
         joinStateMachine = mockk()
         networkEventRepository = mockk(relaxed = true)
-        useCase = ProcessHeartbeatUseCase(memberDao, securityRepository, joinStateMachine, networkEventRepository)
+        memberSnapshotCacheUseCase = mockk(relaxed = true)
+        sendMemberUpdateUseCase = mockk(relaxed = true)
+        useCase = ProcessHeartbeatUseCase(
+            memberDao, securityRepository, joinStateMachine, networkEventRepository,
+            memberSnapshotCacheUseCase, sendMemberUpdateUseCase
+        )
     }
 
     // 1. Hors état SuperPair → no-op success
@@ -62,7 +72,7 @@ class ProcessHeartbeatUseCaseTest {
     @Test
     fun `membre inconnu retourne failure UnknownMemberException`() = runTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
-        coEvery { memberDao.findByNodeId(nodeIdHex) } returns null
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns null
         val result = useCase(validHb())
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is UnknownMemberException)
@@ -72,7 +82,7 @@ class ProcessHeartbeatUseCaseTest {
     @Test
     fun `signature invalide retourne failure`() = runTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
-        coEvery { memberDao.findByNodeId(nodeIdHex) } returns validEntity
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns validEntity
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(false)
         val result = useCase(validHb())
         assertTrue(result.isFailure)
@@ -82,7 +92,7 @@ class ProcessHeartbeatUseCaseTest {
     @Test
     fun `timestamp hors fenetre retourne StaleTimestampException`() = runTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
-        coEvery { memberDao.findByNodeId(nodeIdHex) } returns validEntity
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns validEntity
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         val staleTs = now - BULLY_TIMESTAMP_WINDOW_MS - 1000L
         val result = useCase(validHb(ts = staleTs))
@@ -90,11 +100,11 @@ class ProcessHeartbeatUseCaseTest {
         assertTrue(result.exceptionOrNull() is StaleTimestampException)
     }
 
-    // 5. IP vide → failure (post-fix H11/C2 : on rejette explicitement, plus de success silencieux).
+    // 5. IP vide → failure (heartbeatSignedBytes rejette l'ip invalide avant signature)
     @Test
     fun `ipAddress vide retourne failure`() = runTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
-        coEvery { memberDao.findByNodeId(nodeIdHex) } returns validEntity
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns validEntity
         val hbEmptyIp = Heartbeat(nodeIdBytes, 100L, "", 0, now, sig)
         val result = useCase(hbEmptyIp)
         assertTrue(result.isFailure)
@@ -104,7 +114,7 @@ class ProcessHeartbeatUseCaseTest {
     @Test
     fun `nominal retourne success et touch heartbeat`() = runTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
-        coEvery { memberDao.findByNodeId(nodeIdHex) } returns validEntity
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns validEntity
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         coEvery { memberDao.touchHeartbeat(any(), any(), any(), any(), any()) } returns 1
         val result = useCase(validHb())
@@ -115,7 +125,7 @@ class ProcessHeartbeatUseCaseTest {
     @Test
     fun `race condition touchHeartbeat retourne 0 lignes mais success`() = runTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
-        coEvery { memberDao.findByNodeId(nodeIdHex) } returns validEntity
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns validEntity
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         coEvery { memberDao.touchHeartbeat(any(), any(), any(), any(), any()) } returns 0
         val result = useCase(validHb())
@@ -123,24 +133,23 @@ class ProcessHeartbeatUseCaseTest {
     }
 
     // C4 régression : HB avec port=0 (convention relay-bound) DOIT appeler touchHeartbeat.
-    // Avant fix, `port !in 1..65535` rejetait silencieusement → lastSeen jamais rafraîchi.
     @Test
     fun `port zero relay-bound rafraichit lastSeen`() = runTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
-        coEvery { memberDao.findByNodeId(nodeIdHex) } returns validEntity
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns validEntity
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         coEvery { memberDao.touchHeartbeat(any(), any(), any(), any(), any()) } returns 1
         val hbPortZero = Heartbeat(nodeIdBytes, 100L, "1.2.3.4", 0, now, sig)
         val result = useCase(hbPortZero)
         assertTrue(result.isSuccess)
-        io.mockk.coVerify { memberDao.touchHeartbeat(nodeIdHex, any(), 100L, "1.2.3.4", 0) }
+        coVerify { memberDao.touchHeartbeat(nodeIdHex, any(), 100L, "1.2.3.4", 0) }
     }
 
     // C7 régression : timestamp = Long.MIN_VALUE ne doit PAS bypass la fenêtre via overflow abs().
     @Test
     fun `timestamp Long MIN VALUE rejete sans overflow`() = runTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
-        coEvery { memberDao.findByNodeId(nodeIdHex) } returns validEntity
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns validEntity
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         val result = useCase(validHb(ts = Long.MIN_VALUE))
         assertTrue(result.isFailure)
@@ -151,10 +160,35 @@ class ProcessHeartbeatUseCaseTest {
     @Test
     fun `timestamp Long MAX VALUE rejete`() = runTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
-        coEvery { memberDao.findByNodeId(nodeIdHex) } returns validEntity
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns validEntity
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         val result = useCase(validHb(ts = Long.MAX_VALUE))
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is StaleTimestampException)
+    }
+
+    // Re-admission : membre EVICTED avec HB valide → reactivateIfEvicted + snapshot + broadcast
+    @Test
+    fun `membre EVICTED readmis sur HB valide`() = runTest {
+        every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns evictedEntity
+        coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
+        coEvery { memberDao.reactivateIfEvicted(any(), any(), any(), any(), any()) } returns 1
+        val result = useCase(validHb())
+        assertTrue(result.isSuccess)
+        coVerify { memberDao.reactivateIfEvicted(nodeIdHex, any(), 100L, "1.2.3.4", 9090) }
+        coVerify { memberSnapshotCacheUseCase.applyUpdate(any()) }
+        coVerify { sendMemberUpdateUseCase.invoke(any()) }
+    }
+
+    // Re-admission : membre EVICTED avec signature invalide → rejeté, pas de reactivation
+    @Test
+    fun `membre EVICTED avec signature invalide non readmis`() = runTest {
+        every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
+        coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns evictedEntity
+        coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(false)
+        val result = useCase(validHb())
+        assertTrue(result.isFailure)
+        coVerify(exactly = 0) { memberDao.reactivateIfEvicted(any(), any(), any(), any(), any()) }
     }
 }

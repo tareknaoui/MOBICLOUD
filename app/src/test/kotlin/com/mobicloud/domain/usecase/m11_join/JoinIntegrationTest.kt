@@ -82,7 +82,7 @@ class JoinIntegrationTest {
 
         aliceProcessJoin = ProcessJoinRequestUseCase(
             aliceSecurityRepo, aliceSignalingRepo,
-            aliceMemberRegistry, aliceFsm, aliceNetworkEventRepo
+            aliceMemberRegistry, aliceFsm, aliceNetworkEventRepo, mockk(relaxed = true)
         )
 
         candidateSecurityRepo = mockk()
@@ -188,7 +188,7 @@ class JoinIntegrationTest {
 
         val fullAliceProcessJoin = ProcessJoinRequestUseCase(
             aliceSecurityRepo, aliceSignalingRepo,
-            fullRegistry, aliceFsm, aliceNetworkEventRepo
+            fullRegistry, aliceFsm, aliceNetworkEventRepo, mockk(relaxed = true)
         )
 
         val daveFsm = JoinStateMachine(

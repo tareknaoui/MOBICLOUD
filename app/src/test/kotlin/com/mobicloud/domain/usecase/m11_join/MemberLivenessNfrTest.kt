@@ -4,6 +4,8 @@ import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.data.local.entity.MemberEntity
 import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.models.m11_join.LIVENESS_CHECK_INTERVAL_MS
+import com.mobicloud.domain.models.m11_join.MemberInfo
+import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.SP_TIMEOUT_MS
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
@@ -40,6 +42,12 @@ class MemberLivenessNfrTest {
     private lateinit var settingsRepo: NodeSettingsRepository
     private lateinit var sendMemberUpdate: SendMemberUpdateUseCase
     private lateinit var networkRepo: NetworkEventRepository
+    private lateinit var memberSnapshotCache: MemberSnapshotCacheUseCase
+
+    private val spMember = MemberInfo(
+        nodeId = byteArrayOf(0x01), publicKey = byteArrayOf(0x02),
+        ipAddress = "127.0.0.1", port = 9000, freeBytes = 0L, role = MemberRole.SUPER_PAIR
+    )
 
     private var virtualNow = 1_000_000L
     private val testDispatcher = UnconfinedTestDispatcher()
@@ -50,6 +58,7 @@ class MemberLivenessNfrTest {
         settingsRepo = mockk()
         sendMemberUpdate = mockk(relaxed = true)
         networkRepo  = mockk(relaxed = true)
+        memberSnapshotCache = mockk(relaxed = true)
         coEvery { settingsRepo.observeSettings() } returns flowOf(NodeSettings(0L, CLUSTER_ID))
     }
 
@@ -67,7 +76,7 @@ class MemberLivenessNfrTest {
 
     private fun makeUseCase(scope: TestScope) = MonitorMemberLivenessUseCase(
         memberDao, settingsRepo, sendMemberUpdate, networkRepo,
-        scope, clock = { virtualNow }
+        memberSnapshotCache, scope, clock = { virtualNow }
     )
 
     /**
@@ -96,7 +105,7 @@ class MemberLivenessNfrTest {
         }
 
         val useCase = makeUseCase(this)
-        useCase.start()
+        useCase.start(spMember)
 
         // Simule 30 minutes virtuelles
         advanceTimeBy(SIMULATION_MS + LIVENESS_CHECK_INTERVAL_MS)
@@ -126,7 +135,7 @@ class MemberLivenessNfrTest {
         val useCase = makeUseCase(this)
 
         val elapsedNs = measureNanoTime {
-            useCase.start()
+            useCase.start(spMember)
             advanceTimeBy(SIMULATION_MS + LIVENESS_CHECK_INTERVAL_MS)
             useCase.stop()
         }
@@ -151,7 +160,7 @@ class MemberLivenessNfrTest {
         }
 
         val useCase = makeUseCase(this)
-        useCase.start()
+        useCase.start(spMember)
         advanceTimeBy(SIMULATION_MS + LIVENESS_CHECK_INTERVAL_MS)
         useCase.stop()
 

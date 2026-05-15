@@ -87,4 +87,12 @@ interface MemberDao {
     // pour ne pas compter des fantômes encore non purgés par la liveness.
     @Query("SELECT COUNT(*) FROM cluster_members WHERE cluster_id = :clusterId AND status = 'ACTIVE' AND last_seen > :cutoffMs")
     suspend fun countActiveByClusterId(clusterId: String, cutoffMs: Long): Int
+
+    // Re-admission d'un membre EVICTED dont le HB est valide (relay drop > SP_TIMEOUT_MS).
+    @Query("""
+        UPDATE cluster_members
+           SET status = 'ACTIVE', last_seen = :lastSeen, free_bytes = :freeBytes, ip_address = :ip, port = :port
+         WHERE node_id = :nodeId AND status = 'EVICTED'
+    """)
+    suspend fun reactivateIfEvicted(nodeId: String, lastSeen: Long, freeBytes: Long, ip: String, port: Int): Int
 }
