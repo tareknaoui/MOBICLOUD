@@ -77,9 +77,9 @@ class DashboardViewModel @Inject constructor(
     val isExpertMode: StateFlow<Boolean> = nodeSettingsRepository.observeExpertMode()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
 
-    // KPI sémantique "Communauté" — autres membres du cluster (self toujours dans le snapshot → size-1)
+    // KPI "Communauté" — total membres du cluster (self inclus, cohérent avec l'onglet Communauté)
     val communitySize: StateFlow<Int> = memberSnapshotCacheUseCase.inMemory
-        .map { members -> (members.size - 1).coerceAtLeast(0) }
+        .map { members -> members.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
 
     // KPI sémantique "Ma contribution" — quota partagé persisté en NodeSettings
