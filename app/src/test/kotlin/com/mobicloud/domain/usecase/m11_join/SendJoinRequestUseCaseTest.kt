@@ -114,11 +114,12 @@ class SendJoinRequestUseCaseTest {
     fun `prefersStickyClusterFirst - sticky alpha tente avant les autres`() = runTest(dispatcher) {
         coEvery { nodeSettingsRepository.getClusterIdOnce() } returns "alpha"
 
-        val beta  = SuperPeerHint(byteArrayOf(0xBB.toByte()), clusterId = "beta",  ipAddress = "2.2.2.2", port = 5000, currentMemberCount = 2)
-        val alpha = SuperPeerHint(byteArrayOf(0xCC.toByte()), clusterId = "alpha", ipAddress = "3.3.3.3", port = 5000, currentMemberCount = 40)
-        val gamma = SuperPeerHint(byteArrayOf(0xDD.toByte()), clusterId = "gamma", ipAddress = "4.4.4.4", port = 5000, currentMemberCount = 1)
+        // MAX_CLUSTER_SIZE=2 : tous les counts doivent être < 2 pour passer le filtre
+        val beta  = SuperPeerHint(byteArrayOf(0xBB.toByte()), clusterId = "beta",  ipAddress = "2.2.2.2", port = 5000, currentMemberCount = 1)
+        val alpha = SuperPeerHint(byteArrayOf(0xCC.toByte()), clusterId = "alpha", ipAddress = "3.3.3.3", port = 5000, currentMemberCount = 1)
+        val gamma = SuperPeerHint(byteArrayOf(0xDD.toByte()), clusterId = "gamma", ipAddress = "4.4.4.4", port = 5000, currentMemberCount = 0)
 
-        // ordre d'appel attendu : [alpha(sticky), gamma(count=1), beta(count=2)]
+        // ordre d'appel attendu : [alpha(sticky), gamma(count=0), beta(count=1, nodeId="bb" < "cc" → avant alpha si pas sticky)]
         val order = mutableListOf<ByteArray>()
         coEvery { networkClient.sendJoinRequest(any(), any()) } answers {
             order += firstArg<SuperPeerHint>().nodeId.copyOf()
@@ -137,8 +138,9 @@ class SendJoinRequestUseCaseTest {
     fun `fallsBackToLoadBased_whenStickyUnavailable - tri par memberCount si lastKnown absent`() = runTest(dispatcher) {
         coEvery { nodeSettingsRepository.getClusterIdOnce() } returns ""
 
-        val high = SuperPeerHint(byteArrayOf(0xEE.toByte()), clusterId = "x", ipAddress = "1.1.1.1", port = 5000, currentMemberCount = 30)
-        val low  = SuperPeerHint(byteArrayOf(0xFF.toByte()), clusterId = "y", ipAddress = "2.2.2.2", port = 5000, currentMemberCount = 5)
+        // MAX_CLUSTER_SIZE=2 : counts doivent être < 2 pour passer le filtre
+        val high = SuperPeerHint(byteArrayOf(0xEE.toByte()), clusterId = "x", ipAddress = "1.1.1.1", port = 5000, currentMemberCount = 1)
+        val low  = SuperPeerHint(byteArrayOf(0xFF.toByte()), clusterId = "y", ipAddress = "2.2.2.2", port = 5000, currentMemberCount = 0)
 
         var firstCalled: ByteArray? = null
         coEvery { networkClient.sendJoinRequest(any(), any()) } answers {

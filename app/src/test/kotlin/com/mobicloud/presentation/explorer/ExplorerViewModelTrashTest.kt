@@ -11,13 +11,15 @@ import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUse
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
 import android.content.Context
+import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
@@ -40,6 +42,8 @@ class ExplorerViewModelTrashTest {
         Dispatchers.setMain(testDispatcher)
         catalogRepository = mockk(relaxed = true) {
             every { getActiveEntriesFlow() } returns flowOf(emptyList())
+            coEvery { moveToTrash(any()) } returns Result.success(Unit)
+            coEvery { restoreFromTrash(any()) } returns Result.success(Unit)
         }
         viewModel = ExplorerViewModel(
             catalogRepository = catalogRepository,
@@ -70,10 +74,10 @@ class ExplorerViewModelTrashTest {
 
     @Test
     fun `moveToTrash emet un undoEvent avec le fileHash`() = runTest {
+        val deferred = async { viewModel.undoEvent.first() }
         viewModel.moveToTrash("hash-abc")
         advanceUntilIdle()
-        val emitted = viewModel.undoEvent.first()
-        assertEquals("hash-abc", emitted)
+        assertEquals("hash-abc", deferred.await())
     }
 
     @Test

@@ -88,8 +88,8 @@ class RegisterSuperPeerUseCaseTest {
         // Vérifier enregistrement initial
         coVerify(exactly = 1) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
 
-        // Avancer de 30s + 1ms pour déclencher le keepalive
-        advanceTimeBy(30_001L)
+        // Avancer de 10s + 1ms pour déclencher le premier keepalive (KEEPALIVE_INTERVAL_MS = 10s)
+        advanceTimeBy(10_001L)
 
         coVerify(exactly = 2) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
 
@@ -105,9 +105,9 @@ class RegisterSuperPeerUseCaseTest {
         }
 
         advanceTimeBy(1L)
-        advanceTimeBy(60_001L)
+        // Avancer de 20s + 1ms → 1 initial + 2 keepalives = 3 appels (KEEPALIVE_INTERVAL_MS = 10s)
+        advanceTimeBy(20_001L)
 
-        // 1 initial + 2 keepalives = 3 appels
         coVerify(exactly = 3) { signalingRepository.registerAsSuperPeer(any(), any(), any(), any(), any()) }
 
         job.cancel()

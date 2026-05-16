@@ -53,6 +53,7 @@ class MemberHeartbeatUseCaseTest {
         networkEventRepository = mockk(relaxed = true)
 
         coEvery { identityRepository.getIdentity() } returns Result.success(identity)
+        coEvery { securityRepository.getIdentity() } returns Result.success(identity)
         coEvery { nodeSettingsRepository.observeFreeSpaceBytes() } returns flowOf(1_000_000L)
         every { wifiRepository.getLocalIpAddress() } returns "192.168.1.1"
         coEvery { securityRepository.signData(any()) } returns Result.success(byteArrayOf(0x01))

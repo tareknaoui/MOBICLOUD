@@ -61,6 +61,7 @@ class SelectOptimalPeersUseCase @Inject constructor(
         // de 1 nœud sur 3. A reaugmenter (K=4) pour des deploiements en production avec >=5 nœuds.
         // Déféré 3 : guard baseK <= 0 → division par zéro évitée
         if (baseK <= 0) throw PeerSelectionException.InvalidBaseK(baseK)
+        if (fileSizeBytes < 0L) throw IllegalArgumentException("fileSizeBytes ne peut pas être négatif, reçu : $fileSizeBytes")
 
         // Déféré 1 : timeout sur peers.first() pour ne pas bloquer indéfiniment
         val activePeers = try {

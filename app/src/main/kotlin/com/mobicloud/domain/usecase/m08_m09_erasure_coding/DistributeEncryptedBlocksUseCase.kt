@@ -120,9 +120,9 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                         // l'ancien `i % size` qui faisait atterrir frag i et frag i+size sur le même pair.
                         val primaryIndex = stride(i, shuffledPeers.size, seed)
                         val primaryPeer = shuffledPeers[primaryIndex]
-                        confirmedPeer = primaryPeer
                         android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} parity=${frag.isParity} → ${primaryPeer.identity.nodeId.take(8)}@${primaryPeer.ipAddress}:${primaryPeer.port}")
                         result = blockSender.sendBlock(msg, primaryPeer, BASE_ACK_TIMEOUT_MS)
+                        if (result.isSuccess) confirmedPeer = primaryPeer
                         android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} result=${if (result.isSuccess) "OK" else "FAIL: ${result.exceptionOrNull()?.message}"}")
 
                         // Niveau 2 — fallback local (pair de cluster différent physiquement si possible).
@@ -134,20 +134,28 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                             val differentIpFallback = shuffledPeers
                                 .filterIndexed { idx, peer -> idx != primaryIndex && peer.ipAddress != primaryPeer.ipAddress }
                                 .firstOrNull()
-                            confirmedPeer = differentIpFallback
+                            val level2Peer = differentIpFallback
                                 ?: shuffledPeers[(primaryIndex + 1) % shuffledPeers.size]
-                            // Niveau 2 = cluster local — pas besoin du délai réseau étendu.
-                            result = blockSender.sendBlock(msg, confirmedPeer, BASE_ACK_TIMEOUT_MS)
+                            // Niveau 2 — spec AC#5 : timeout retry = MAX_ACK_TIMEOUT_MS (30s).
+                            result = blockSender.sendBlock(msg, level2Peer, MAX_ACK_TIMEOUT_MS)
+                            if (result.isSuccess) confirmedPeer = level2Peer
                         }
                     }
 
                     // Niveau 3 — fallback inter-cluster (Story 9.3) si local vide ou local échoue.
+                    // excludeNodeIds croît à chaque échec pour éviter de retenter un pair mort.
                     if (result.isFailure) {
-                        val candidates = requestInterClusterHostingUseCase.selectRemoteHosts(
-                            msg.ciphertext.size.toLong(),
-                            localClusterId
-                        ).take(MAX_INTER_CLUSTER_ATTEMPTS)
-                        for (remote in candidates) {
+                        val triedRemoteNodeIds = mutableSetOf<String>()
+                        var interAttempt = 0
+                        while (interAttempt < MAX_INTER_CLUSTER_ATTEMPTS && result.isFailure) {
+                            val remote = requestInterClusterHostingUseCase.selectRemoteHosts(
+                                msg.ciphertext.size.toLong(),
+                                localClusterId,
+                                excludeNodeIds = triedRemoteNodeIds
+                            ).firstOrNull() ?: break
+                            triedRemoteNodeIds += remote.nodeId
+                            interAttempt++
+
                             // [Story 10.1] Décodage de la clé publique propagée par GET_PEERS.
                             // Si vide / mal formée → ByteArray(0), la vérification ACK retournera
                             // false et la boucle passera au candidat suivant.
@@ -187,12 +195,12 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                             if (result.isSuccess) {
                                 confirmedPeer = remotePeer
                                 placedInterCluster = true
-                                break
+                            } else {
+                                android.util.Log.w(
+                                    "MobiCloud:Distribute",
+                                    "[INTER-CLUSTER] echec sur ${remote.nodeId.take(8)} : ${result.exceptionOrNull()?.message} -- candidat suivant"
+                                )
                             }
-                            android.util.Log.w(
-                                "MobiCloud:Distribute",
-                                "[INTER-CLUSTER] echec sur ${remote.nodeId.take(8)} : ${result.exceptionOrNull()?.message} -- candidat suivant"
-                            )
                         }
                     }
 

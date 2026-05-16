@@ -18,6 +18,7 @@ import javax.inject.Inject
 
 private const val TAG = "RegisterSuperPeerUC"
 private const val KEEPALIVE_INTERVAL_MS = 10_000L
+private const val MAX_INITIAL_RETRIES = 5
 
 class RegisterSuperPeerUseCase @Inject constructor(
     private val signalingRepository: SignalingRepository,
@@ -61,11 +62,17 @@ class RegisterSuperPeerUseCase @Inject constructor(
             // Avant ce fix, .getOrThrow() échouait silencieusement → la boucle keepalive
             // ne démarrait jamais → TTL 60s expirait → registeredSuperPeers = 0 → élections
             // en boucle sur les autres nœuds même si ce nœud est bien Super-Pair.
+            var retries = 0
             while (currentCoroutineContext().isActive) {
                 val reg = signalingRepository.registerAsSuperPeer(ip, tcpPort, reliabilityScore, electedAt, identity.nodeId)
                 if (reg.isSuccess) break
-                Log.w(TAG, "Initial REGISTER_PEER échoué (relay WS?), retry dans 5s: ${reg.exceptionOrNull()?.message}")
-                networkEventRepository.pushEvent("[ELECTION] REGISTER_PEER échoué — retry dans 5s (relay WS?)")
+                retries++
+                Log.w(TAG, "Initial REGISTER_PEER échoué ($retries/$MAX_INITIAL_RETRIES): ${reg.exceptionOrNull()?.message}")
+                networkEventRepository.pushEvent("[ELECTION] REGISTER_PEER échoué — retry $retries/$MAX_INITIAL_RETRIES")
+                if (retries >= MAX_INITIAL_RETRIES) {
+                    emit(Result.failure(reg.exceptionOrNull() ?: Exception("REGISTER_PEER échoué après $MAX_INITIAL_RETRIES tentatives")))
+                    return@flow
+                }
                 delay(5_000L)
             }
 

@@ -6,6 +6,7 @@ import com.mobicloud.data.p2p.tcp.BlockTransferChannel.BLOCK_NACK
 import com.mobicloud.data.p2p.tcp.BlockTransferChannel.BLOCK_TRANSFER
 import com.mobicloud.data.p2p.tcp.BlockTransferChannel.CONNECT_TIMEOUT_MS
 import com.mobicloud.data.p2p.tcp.BlockTransferChannel.MAX_ACK_PAYLOAD_BYTES
+import com.mobicloud.data.p2p.tcp.BlockTransferChannel.MAX_BLOCK_PAYLOAD_BYTES
 import com.mobicloud.domain.models.BlockAckMessage
 import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.models.Peer
@@ -42,6 +43,11 @@ class BlockTransferClient @Inject constructor(
 
             val out = DataOutputStream(socket.getOutputStream())
             val msgBytes = MobiCloudProtoBuf.encodeToByteArray(BlockTransferMessage.serializer(), block)
+            if (msgBytes.size > MAX_BLOCK_PAYLOAD_BYTES) {
+                return@withContext Result.failure(
+                    IllegalStateException("Payload trop grand: ${msgBytes.size} octets > MAX_BLOCK_PAYLOAD_BYTES=$MAX_BLOCK_PAYLOAD_BYTES")
+                )
+            }
             out.writeByte(BLOCK_TRANSFER.toInt())
             out.writeInt(msgBytes.size)
             out.write(msgBytes)

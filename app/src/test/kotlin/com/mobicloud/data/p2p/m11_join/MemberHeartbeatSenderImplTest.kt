@@ -33,7 +33,7 @@ class MemberHeartbeatSenderImplTest {
         sender = MemberHeartbeatSenderImpl(relay, mockk(relaxed = true))
     }
 
-    // 1. send() encode avec JOIN_MAGIC + HEARTBEAT.byte et blockId "HB-"
+    // 1. send() encode avec JOIN_MAGIC + HEARTBEAT.byte et blockId 64 hex chars
     @Test
     fun `send encode avec magic HEARTBEAT et blockId HB-`() = runTest {
         val blockIdSlot = slot<String>()
@@ -43,7 +43,7 @@ class MemberHeartbeatSenderImplTest {
         val hb = Heartbeat(destBytes, 1000L, "1.2.3.4", 80, ts, sig)
         sender.send(destBytes, hb)
 
-        assertTrue(blockIdSlot.captured.startsWith("HB-"))
+        assertTrue("blockId must be 64 hex chars", blockIdSlot.captured.matches(Regex("[0-9a-f]{64}")))
         assertTrue(payloadSlot.captured[0] == JoinNetworkClientImpl.JOIN_MAGIC)
         assertTrue(payloadSlot.captured[1] == JoinSubType.HEARTBEAT.byte)
     }
@@ -64,7 +64,7 @@ class MemberHeartbeatSenderImplTest {
         coVerify(exactly = 1) { relay.uploadBlock("02", any(), any()) }
     }
 
-    // 3. sendLeave() utilise blockId "LV-"
+    // 3. sendLeave() utilise blockId 64 hex chars
     @Test
     fun `sendLeave blockId prefixe LV-`() = runTest {
         val blockIdSlot = slot<String>()
@@ -73,6 +73,6 @@ class MemberHeartbeatSenderImplTest {
         val leave = Leave(destBytes, ts, sig)
         sender.sendLeave(destBytes, leave)
 
-        assertTrue(blockIdSlot.captured.startsWith("LV-"))
+        assertTrue("blockId must be 64 hex chars", blockIdSlot.captured.matches(Regex("[0-9a-f]{64}")))
     }
 }

@@ -273,13 +273,10 @@ class ExplorerViewModel @Inject constructor(
             try {
                 withContext(ioDispatcher) { tempFile.writeBytes(fileBytes) }
 
-                // MODE TEST : allowDuplicatePeers=true permet la redistribution round-robin
-                // sur les pairs disponibles si le reseau a moins de K+N pairs distincts.
-                // Casse la garantie de redondance Reed-Solomon (un pair peut detenir plusieurs
-                // fragments) -- a desactiver en production. Voir SelectOptimalPeersUseCase.
                 val optimalResult = selectOptimalPeersUseCase(
                     fileSizeBytes = fileSizeBytes ?: 0L,
-                    allowDuplicatePeers = true
+                    baseK = 2,
+                    allowDuplicatePeers = false
                 ).getOrElse { e ->
                     val userMessage = when (e) {
                         is PeerSelectionException.PeerFlowTimeout ->
@@ -288,7 +285,7 @@ class ExplorerViewModel @Inject constructor(
                             "Stockage insuffisant : seulement ${e.message?.substringAfter("Disponibles : ") ?: "0"} " +
                             "nœud(s) avec assez d'espace libre."
                         is PeerSelectionException.InsufficientRedundancyNodes ->
-                            "Réseau trop petit : impossible d'assurer la redondance minimale."
+                            "Réseau trop petit : il faut au moins 3 téléphones connectés pour garantir la redondance."
                         is PeerSelectionException.InvalidBaseK ->
                             "Paramètre K invalide (${e.message})."
                         else -> "Sélection des nœuds échouée : ${e.message ?: "erreur inconnue"}"

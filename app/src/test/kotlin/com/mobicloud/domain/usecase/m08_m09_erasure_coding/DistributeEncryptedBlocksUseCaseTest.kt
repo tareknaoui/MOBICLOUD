@@ -361,6 +361,28 @@ class DistributeEncryptedBlocksUseCaseTest {
     // -------------------------------------------------------------------------
 
     /**
+     * Test sécurité — ACK avec signature invalide rejeté par blockSender.
+     * Simule le cas où tous les sendBlock() retournent SecurityException
+     * (ce que BlockTransferClient fait quand verifySignature() retourne false).
+     * Le use case doit les traiter comme des échecs et retourner Result.failure.
+     */
+    @Test
+    fun `distribute failure - ACK avec signature invalide rejete (data block non compte)`() = runTest {
+        val peers = (1..6).map { fakePeer("node_$it", it) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val bundle = fakeBundle(k = 4, n = 2)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } returns
+            Result.failure(SecurityException("Signature ACK invalide pour bloc"))
+
+        val result = useCase.distribute(bundle, "filehash_badsig", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
+
+        assertTrue("distribute doit échouer si tous les ACK ont une signature invalide", result.isFailure)
+        assertTrue(result.exceptionOrNull() is IllegalStateException)
+        coVerify(exactly = 0) { catalogRepository.insertOwnerEntry(any()) }
+    }
+
+    /**
      * Story 9.3 Cas A (AC#3, AC#5) — cluster local vide ⇒ fallback inter-cluster invoqué ;
      * sendBlock est appelé sur le pair distant, et insertDhtEntryUseCase reçoit
      * remoteNodeId/remoteIp/remotePort.

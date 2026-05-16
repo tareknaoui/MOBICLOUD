@@ -10,6 +10,7 @@ import com.mobicloud.domain.models.m11_join.SuperPeerHint
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
+import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import io.mockk.coEvery
 import io.mockk.every
@@ -113,10 +114,14 @@ class MemberRegistryContinuityTest {
 
     private fun buildMarkSelfForBob(): MarkSelfAsSuperPairUseCase {
         val secRepo = mockk<SecurityRepository>()
+        val identityRepo = mockk<IdentityRepository>()
         val settingsRepo = mockk<NodeSettingsRepository>()
         val peerRepo = mockk<PeerRepository>(relaxed = true)
 
         coEvery { secRepo.getIdentity() } returns Result.success(
+            NodeIdentity(nodeId = "bbbb", publicKeyBytes = bobPubKey, reliabilityScore = 0.9f)
+        )
+        coEvery { identityRepo.getIdentity() } returns Result.success(
             NodeIdentity(nodeId = "bbbb", publicKeyBytes = bobPubKey, reliabilityScore = 0.9f)
         )
         every { settingsRepo.observeFreeSpaceBytes() } returns MutableStateFlow(1024L)
@@ -124,15 +129,17 @@ class MemberRegistryContinuityTest {
 
         // Le snapshot que Bob connaît : carol était dans le cluster (reçu via MEMBER_UPDATE de Alice)
         every { bobSnapshotCache.snapshot() } returns listOf(carolMember)
+        every { bobSnapshotCache.snapshotClusterId() } returns CLUSTER_ID
 
         return MarkSelfAsSuperPairUseCase(
-            securityRepository             = secRepo,
-            nodeSettingsRepository         = settingsRepo,
-            peerRepository                 = peerRepo,
-            memberRegistry                 = bobRegistry,
-            joinStateMachine               = bobFsm,
+            securityRepository               = secRepo,
+            identityRepository               = identityRepo,
+            nodeSettingsRepository           = settingsRepo,
+            peerRepository                   = peerRepo,
+            memberRegistry                   = bobRegistry,
+            joinStateMachine                 = bobFsm,
             monitorMemberLivenessUseCaseLazy = dagger.Lazy { mockk(relaxed = true) },
-            memberSnapshotCacheUseCaseLazy = dagger.Lazy { bobSnapshotCache }
+            memberSnapshotCacheUseCaseLazy   = dagger.Lazy { bobSnapshotCache }
         )
     }
 

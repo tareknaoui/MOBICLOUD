@@ -101,6 +101,26 @@ Afin que ses blocs chiffrés soient distribués automatiquement aux nœuds dispo
 - [x] [Review][Defer] Constantes timeout dupliquées entre `BlockTransferChannel` et companion object du use case — intentionnel per spec contrainte #7 (pas d'import `data/` dans le domaine) — deferred, pre-existing
 - [x] [Review][Defer] Fallback peer peut être déjà assigné en primaire pour un autre bloc — spec AC#5 = retry par bloc uniquement, comportement conforme — deferred, pre-existing
 
+#### Review 2 (2026-05-16) — Distribution complète (tous fichiers)
+
+- [x] [Review][Patch] `excludeNodeIds` jamais passé à `selectRemoteHosts()` — pair inter-cluster mort retenté pour chaque fragment [DistributeEncryptedBlocksUseCase.kt:146-149]
+- [x] [Review][Patch] Level 2 fallback timeout = `BASE_ACK_TIMEOUT_MS` (10s) au lieu de `MAX_ACK_TIMEOUT_MS` (30s) — spec AC#5 exige retry=30s [DistributeEncryptedBlocksUseCase.kt:140]
+- [x] [Review][Patch] Test manquant : ACK à signature invalide non couvert — `securityRepository.verifySignature()` toujours mocké à `true` dans les tests [DistributeEncryptedBlocksUseCaseTest.kt]
+- [x] [Review][Patch] `fileSizeBytes <= 0` non gardé dans `SelectOptimalPeersUseCase` — `fragmentSize` devient 0 ou négatif, `requiredSpace` potentiellement corrompue [SelectOptimalPeersUseCase.kt:84]
+- [x] [Review][Patch] `msgBytes.size` non validé contre `MAX_BLOCK_PAYLOAD_BYTES` avant `out.writeInt(msgBytes.size)` — récepteur peut recevoir un frame > sa limite [BlockTransferClient.kt:44-47]
+- [x] [Review][Patch] `confirmedPeer` assigné avant `sendBlock` au Level 2 — si Level 2 échoue et Level 3 échoue aussi, le log de drop indique le peer Level 2 (trompeur) [DistributeEncryptedBlocksUseCase.kt:137-140]
+- [x] [Review][Defer] `BlockSenderWithRelay` relay Priority 1 contredit contrainte "TCP direct only" de story 5.3 — décision architecturale acceptée : Epic 8 a volontairement changé l'architecture ; ACK relay = confiance implicite au serveur relay (limitation connue) — deferred, accepted architectural deviation
+- [x] [Review][Defer] `stride()` `.toInt()` overflow si poolSize > 2B — irréaliste sur mobile, constantes actuelles sûres — deferred, pre-existing
+- [x] [Review][Defer] `timeoutMs.toInt()` overflow si > Int.MAX_VALUE — 30_000L << Int.MAX_VALUE, valeurs actuelles hardcodées sûres — deferred, pre-existing
+- [x] [Review][Defer] `_transferChannelState` race sous distribution parallèle — état UI non-critique, correctness fonctionnelle non impactée — deferred, pre-existing
+- [x] [Review][Defer] `reliabilityScore` default 1.0 biaise sélection vers pairs non testés — design choice, refonte scoring hors scope — deferred, pre-existing
+- [x] [Review][Defer] `freeStorageBytes==0` inclut pairs réellement pleins — backward-compat montée de version documentée dans le code — deferred, pre-existing
+- [x] [Review][Defer] `sha256Hex` dupliqué vs `ReceiveAndHostBlockUseCase` — contrainte explicite : no cross-layer import — deferred, pre-existing
+- [x] [Review][Defer] Stride au lieu de round-robin (spec AC#2) — amélioration intentionnelle documentée (anti-collision) — deferred, accepted upgrade
+- [x] [Review][Defer] Quorum parité ⌈n/2⌉ non spécifié dans les ACs — amélioration délibérée (plus strict que le spec) — deferred, accepted upgrade
+- [x] [Review][Defer] `out.write(msgBytes)` blocking sans deadline globale — limitation JVM TCP, requiert refonte NIO — deferred, pre-existing
+- [x] [Review][Defer] Empty pubKey → TCP toujours rejeté pour pairs inter-cluster legacy — relay path compense, comportement documenté — deferred, pre-existing
+
 ## Dev Notes
 
 ### 🔴 CE QUI EXISTE DÉJÀ — NE PAS RECRÉER

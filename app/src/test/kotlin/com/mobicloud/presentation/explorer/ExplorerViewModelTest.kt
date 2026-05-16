@@ -81,12 +81,13 @@ class ExplorerViewModelTest {
         downloadFileBlocksUseCase = mockk(relaxed = true)
         assembleDownloadedFileUseCase = mockk(relaxed = true)
         selectOptimalPeersUseCase = mockk()
-        coEvery { selectOptimalPeersUseCase(any()) } returns Result.success(
+        coEvery { selectOptimalPeersUseCase(any(), any(), any()) } returns Result.success(
             OptimalPeersResult(params = ErasureParameters(), selectedPeers = emptyList())
         )
         coEvery { catalogRepository.getEntry(any()) } returns Result.success(null)
+        coEvery { catalogRepository.purgeExpired() } returns Result.success(Unit)
         context = mockk(relaxed = true)
-        every { catalogRepository.getAllEntriesFlow() } returns catalogFlow
+        every { catalogRepository.getActiveEntriesFlow() } returns catalogFlow
     }
 
     @After

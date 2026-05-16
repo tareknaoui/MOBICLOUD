@@ -4,6 +4,7 @@ import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.m11_join.JoinEvent
 import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.NodeJoinState
+import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -23,6 +24,7 @@ import org.junit.Test
 class MarkSelfAsSuperPairUseCaseTest {
 
     private lateinit var securityRepository: SecurityRepository
+    private lateinit var identityRepository: IdentityRepository
     private lateinit var nodeSettingsRepository: NodeSettingsRepository
     private lateinit var peerRepository: PeerRepository
     private lateinit var memberRegistry: MemberRegistry
@@ -34,6 +36,7 @@ class MarkSelfAsSuperPairUseCaseTest {
     @Before
     fun setup() {
         securityRepository = mockk()
+        identityRepository = mockk()
         nodeSettingsRepository = mockk(relaxed = true)
         peerRepository = mockk(relaxed = true)
         memberRegistry = RamMemberRegistry()
@@ -41,12 +44,13 @@ class MarkSelfAsSuperPairUseCaseTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.Undiscovered)
 
         coEvery { securityRepository.getIdentity() } returns Result.success(identity)
+        coEvery { identityRepository.getIdentity() } returns Result.success(identity)
 
         val monLazy = dagger.Lazy<MonitorMemberLivenessUseCase> { mockk(relaxed = true) }
         val snapLazy = dagger.Lazy<MemberSnapshotCacheUseCase> { mockk(relaxed = true) }
         useCase = MarkSelfAsSuperPairUseCase(
-            securityRepository, nodeSettingsRepository, peerRepository, memberRegistry,
-            joinStateMachine, monLazy, snapLazy
+            securityRepository, identityRepository, nodeSettingsRepository, peerRepository,
+            memberRegistry, joinStateMachine, monLazy, snapLazy
         )
     }
 

@@ -93,6 +93,7 @@ class ErasureProgressViewModelTest {
             OptimalPeersResult(params = ErasureParameters(), selectedPeers = emptyList())
         )
         coEvery { catalogRepository.getEntry(any()) } returns Result.success(null)
+        coEvery { catalogRepository.purgeExpired() } returns Result.success(Unit)
         context = mockk()
         contentResolver = mockk()
 
@@ -103,7 +104,7 @@ class ErasureProgressViewModelTest {
         every { defaultCursor.getString(0) } returns "test_file.txt"
         every { defaultCursor.close() } returns Unit
 
-        every { catalogRepository.getAllEntriesFlow() } returns catalogFlow
+        every { catalogRepository.getActiveEntriesFlow() } returns catalogFlow
         every { context.contentResolver } returns contentResolver
         every { context.cacheDir } returns File(System.getProperty("java.io.tmpdir") ?: "/tmp")
         every { contentResolver.query(any(), any(), any(), any(), any()) } returns defaultCursor
