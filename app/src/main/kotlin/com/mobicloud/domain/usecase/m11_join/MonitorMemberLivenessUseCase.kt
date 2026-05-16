@@ -10,6 +10,7 @@ import com.mobicloud.domain.models.m11_join.SP_TIMEOUT_MS
 import com.mobicloud.domain.models.m11_join.hexToByteArray
 import com.mobicloud.domain.models.m11_join.memberUpdateSignedBytes
 import com.mobicloud.domain.models.m11_join.toHexShort
+import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.repository.IMemberHeartbeatSender
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
@@ -69,7 +70,20 @@ class MonitorMemberLivenessUseCase @Inject constructor(
             while (isActive) {
                 delay(LIVENESS_CHECK_INTERVAL_MS)
                 val cutoff = clock() - SP_TIMEOUT_MS
-                val deadMembers = memberDao.listActiveSnapshot(clusterId).filter { it.lastSeen < cutoff }
+                // Rafraîchit lastSeen du SP lui-même — il ne reçoit pas de heartbeat de sa propre part
+                // et serait sinon évincé après SP_TIMEOUT_MS comme n'importe quel membre.
+                runCatching {
+                    memberDao.touchHeartbeat(
+                        nodeId = spMemberInfo.nodeId.toHexString().lowercase(),
+                        lastSeen = clock(),
+                        freeBytes = spMemberInfo.freeBytes,
+                        ip = spMemberInfo.ipAddress,
+                        port = spMemberInfo.port
+                    )
+                }
+                val spNodeIdHex = spMemberInfo.nodeId.toHexString().lowercase()
+                val deadMembers = memberDao.listActiveSnapshot(clusterId)
+                    .filter { it.lastSeen < cutoff && it.nodeId != spNodeIdHex }
                 deadMembers.forEach { dead ->
                     // H12 : protéger la coroutine contre une ligne corrompue (hex invalide, etc.) —
                     // sinon une seule row malformée tue le monitoring du cluster entier.

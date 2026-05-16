@@ -4,6 +4,7 @@ import com.mobicloud.domain.models.m11_join.JoinEvent
 import com.mobicloud.domain.models.m11_join.MemberInfo
 import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.hexToByteArray
+import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -22,6 +23,7 @@ import javax.inject.Inject
  */
 class MarkSelfAsSuperPairUseCase @Inject constructor(
     private val securityRepository: SecurityRepository,
+    private val identityRepository: IdentityRepository,
     private val nodeSettingsRepository: NodeSettingsRepository,
     private val peerRepository: PeerRepository,
     private val memberRegistry: MemberRegistry,
@@ -39,13 +41,17 @@ class MarkSelfAsSuperPairUseCase @Inject constructor(
             runCatching { nodeSettingsRepository.observeSettings().first().clusterId }.getOrDefault("")
         }
         if (clusterId.isBlank()) return
-        val identity = securityRepository.getIdentity().getOrElse { return }
+        // nodeId depuis identityRepository = nodeId utilisé pour l'auth relay → fromNodeId des messages
+        // reçus par les membres. publicKey depuis securityRepository = clé utilisée pour signer les
+        // MEMBER_UPDATE, heartbeat ACK, etc. → cohérence avec verifySignature côté ProcessMemberUpdate.
+        val identityNodeId = identityRepository.getIdentity().getOrElse { return }.nodeId.hexToByteArray()
+        val securityIdentity = securityRepository.getIdentity().getOrElse { return }
         val freeBytes = runCatching { nodeSettingsRepository.observeFreeSpaceBytes().first() }.getOrDefault(0L)
 
-        val selfNodeId = identity.nodeId.hexToByteArray()
+        val selfNodeId = identityNodeId
         val selfMember = MemberInfo(
             nodeId = selfNodeId,
-            publicKey = identity.publicKeyBytes,
+            publicKey = securityIdentity.publicKeyBytes,
             ipAddress = "",
             port = 0,
             freeBytes = freeBytes,

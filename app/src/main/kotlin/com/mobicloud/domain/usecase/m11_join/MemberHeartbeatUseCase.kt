@@ -77,7 +77,7 @@ class MemberHeartbeatUseCase @Inject constructor(
     }
 
     private suspend fun sendOnce(spNodeId: ByteArray) {
-        val identity = identityRepository.getIdentity().getOrElse {
+        val identity = securityRepository.getIdentity().getOrElse {
             lastLocalSendErrorAt = clock()
             return
         }
