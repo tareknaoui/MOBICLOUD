@@ -64,11 +64,15 @@ class SelectOptimalPeersUseCase @Inject constructor(
         if (fileSizeBytes < 0L) throw IllegalArgumentException("fileSizeBytes ne peut pas être négatif, reçu : $fileSizeBytes")
 
         // Déféré 1 : timeout sur peers.first() pour ne pas bloquer indéfiniment
+        // [P12-Fix] Attraper aussi NoSuchElementException : si le Flow se complète sans émettre,
+        // first() lève NoSuchElementException, non couverte par le catch TimeoutCancellationException.
         val activePeers = try {
             withTimeout(PEER_FLOW_TIMEOUT_MS) {
                 peerRepository.peers.first()
             }.filter { it.isActive }
         } catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+            throw PeerSelectionException.PeerFlowTimeout()
+        } catch (e: NoSuchElementException) {
             throw PeerSelectionException.PeerFlowTimeout()
         }
 
@@ -81,8 +85,16 @@ class SelectOptimalPeersUseCase @Inject constructor(
         // Filtrage defensif ici : un pair sans IP ou port n'est pas distribuable, on l'exclut.
         val reachablePeers = activePeers.filter { it.ipAddress != null && it.port != null }
 
+        // [P9-Fix] Fichier vide → fragmentSize=0 → blocs vides envoyés à l'erasure coding.
+        if (fileSizeBytes == 0L) throw IllegalArgumentException("fileSizeBytes ne peut pas être zéro : fichier vide")
+
         // Taille approximative d'un fragment
-        val fragmentSize = (fileSizeBytes + baseK - 1) / baseK
+        // [P10-Fix] Éviter l'overflow de (fileSizeBytes + baseK - 1) si fileSizeBytes ≈ Long.MAX_VALUE.
+        val fragmentSize = if (fileSizeBytes > Long.MAX_VALUE - baseK + 1) {
+            fileSizeBytes / baseK
+        } else {
+            (fileSizeBytes + baseK - 1) / baseK
+        }
 
         // Filtrer selon la capacité :
         // - Les pairs avec freeStorageBytes > 0 sont filtrés normalement (Marge 100 Mo + taille fragment).
@@ -107,10 +119,12 @@ class SelectOptimalPeersUseCase @Inject constructor(
         
         // Trier par score de fiabilité décroissant
         val sortedPeers = capablePeers.sortedByDescending { it.identity.reliabilityScore }
-        
+
         // Évaluer le Maillon Faible sur le Pool de Sélection de base (les K meilleurs nœuds)
         val coreSelection = sortedPeers.take(baseK)
-        val weakestLinkScore = coreSelection.minOf { it.identity.reliabilityScore }
+        // [P11-Fix] Borner le score dans [0f, 1f] — un score non initialisé ou négatif ferait
+        // tomber dynamicN=4 silencieusement et pourrait épuiser le pool disponible.
+        val weakestLinkScore = coreSelection.minOf { it.identity.reliabilityScore }.coerceIn(0f, 1f)
         
         // Déterminer la redondance dynamique M (n)
         val dynamicN = when {

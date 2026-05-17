@@ -121,6 +121,24 @@ Afin que ses blocs chiffrés soient distribués automatiquement aux nœuds dispo
 - [x] [Review][Defer] `out.write(msgBytes)` blocking sans deadline globale — limitation JVM TCP, requiert refonte NIO — deferred, pre-existing
 - [x] [Review][Defer] Empty pubKey → TCP toujours rejeté pour pairs inter-cluster legacy — relay path compense, comportement documenté — deferred, pre-existing
 
+#### Review 3 (2026-05-17) — Analyse adversariale 3 couches (Blind Hunter + Edge Case Hunter + Acceptance Auditor)
+
+- [x] [Review][Patch] `stride()` peut retourner un indice négatif — `% poolSize` conserve le signe sur JVM, `IndexOutOfBoundsException` possible [DistributeEncryptedBlocksUseCase.kt:315]
+- [x] [Review][Patch] Boucle `gcd` dans `stride()` potentiellement infinie — cycle sans fin pour certains `poolSize` composites [DistributeEncryptedBlocksUseCase.kt:311-313]
+- [x] [Review][Patch] Exception non catchée dans `async {}` annule toute la `coroutineScope` — tous les fragments en vol abandonnés si un seul bloc lève une exception [DistributeEncryptedBlocksUseCase.kt:98-228]
+- [x] [Review][Patch] `ack.blockHash` jamais comparé au `blockId` calculé localement — AC#4 partiellement violé : l'ACK est accepté sans vérifier que le hash correspond au bloc envoyé [DistributeEncryptedBlocksUseCase.kt:~214]
+- [x] [Review][Patch] `result.getOrThrow().receiverNodeId` peut être vide/blank — `nodeId` blank stocké dans `FragmentLocation`, lookup DHT silencieusement cassé [DistributeEncryptedBlocksUseCase.kt:216]
+- [x] [Review][Patch] `selectRemoteHosts()` appelé sans `withTimeout` — appel réseau bloquant sans deadline, peut geler l'`awaitAll()` indéfiniment [DistributeEncryptedBlocksUseCase.kt:151-155]
+- [x] [Review][Patch] `gossipSyncUseCase.runGossipCycle()` sans try/catch — exception gossip fait retourner `Result.failure` alors que le catalogue est déjà persisté (fausse alarme pour l'utilisateur) [DistributeEncryptedBlocksUseCase.kt:293]
+- [x] [Review][Patch] `onBlockResult?.invoke(...)` sans `runCatching` — exception dans le callback UI annule la coroutine courante et propage dans `awaitAll()` [DistributeEncryptedBlocksUseCase.kt:208]
+- [x] [Review][Patch] `fileSizeBytes == 0L` non gardé dans `SelectOptimalPeersUseCase` — `fragmentSize = 0`, blocs vides envoyés à l'erasure coding [SelectOptimalPeersUseCase.kt:85]
+- [x] [Review][Patch] `(fileSizeBytes + baseK - 1)` overflow arithmétique si `fileSizeBytes` proche de `Long.MAX_VALUE` — `fragmentSize` négatif, tous les pairs passent le filtre capacité [SelectOptimalPeersUseCase.kt:85]
+- [x] [Review][Patch] `weakestLinkScore` non borné à `[0f, 1f]` — score non initialisé ou négatif fait tomber `dynamicN = 4` silencieusement, peut épuiser le pool [SelectOptimalPeersUseCase.kt:113]
+- [x] [Review][Patch] `peerRepository.peers.first()` peut lever `NoSuchElementException` si le Flow se complète sans émettre — non attrapée par le catch `TimeoutCancellationException` [SelectOptimalPeersUseCase.kt:67-73]
+- [x] [Review][Defer] Entropie du seed réduite à 32 bits (`String.hashCode()`) — peut créer des points chauds sur certains pairs, amélioration mineure (utiliser 8 octets du SHA-256 hex) — deferred, pre-existing
+- [x] [Review][Defer] Sort non-déterministe sur `reliabilityScore` à égalité — risque de flakiness uniquement dans les tests, pas d'impact fonctionnel — deferred, pre-existing
+- [x] [Review][Defer] `allowDuplicatePeers=true` peut concentrer tous les fragments sur 1 pair — comportement documenté "MODE TEST UNIQUEMENT", la redondance est délibérément sacrifiée — deferred, pre-existing
+
 ## Dev Notes
 
 ### 🔴 CE QUI EXISTE DÉJÀ — NE PAS RECRÉER

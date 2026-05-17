@@ -108,6 +108,7 @@ class ExecuteMigrationPlanUseCaseTest {
 
     private fun payload(blockId: String = "a".repeat(64)) = HostedBlockPayload(
         blockId = blockId,
+        ownerId = "owner00000000001",
         fragmentIndex = 3,
         isParity = false,
         ciphertext = byteArrayOf(0x01, 0x02, 0x03, 0x04),

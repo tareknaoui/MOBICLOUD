@@ -46,8 +46,19 @@ class HostedBlockRepositoryImpl @Inject constructor(
                 try {
                     tmpFile.writeBytes(ciphertext)
                     if (!tmpFile.renameTo(blockFile)) {
-                        // renameTo échoue si la cible existe (ex: re-réception) — fallback copy
-                        tmpFile.copyTo(blockFile, overwrite = true)
+                        // renameTo échoue si la cible existe (ex: re-réception).
+                        // [P7-Fix] copyTo n'est pas atomique — on passe par un second .tmp2
+                        // pour garantir qu'un crash mid-copy ne corrompt pas blockFile.
+                        val tmp2 = File(blocksDir, "$blockId.tmp2")
+                        try {
+                            tmpFile.copyTo(tmp2, overwrite = true)
+                            if (!tmp2.renameTo(blockFile)) {
+                                tmp2.delete()
+                                throw java.io.IOException("renameTo failed for $blockId")
+                            }
+                        } finally {
+                            tmp2.delete()
+                        }
                         tmpFile.delete()
                     }
                 } catch (e: Exception) {
@@ -78,14 +89,20 @@ class HostedBlockRepositoryImpl @Inject constructor(
     }
 
     override suspend fun blockExists(blockId: String): Boolean = withContext(Dispatchers.IO) {
-        hostedBlockDao.getHostedBlock(blockId) != null
+        // [P3-Fix] Vérifier aussi l'existence physique du fichier :
+        // si le fichier est supprimé manuellement, l'entrée DB est un faux positif.
+        val entity = hostedBlockDao.getHostedBlock(blockId) ?: return@withContext false
+        File(entity.filePath).exists()
     }
 
     override suspend fun deleteBlock(blockId: String) = withContext(Dispatchers.IO) {
-        val entity = hostedBlockDao.getHostedBlock(blockId)
-        if (entity != null) {
-            runCatching { File(entity.filePath).delete() }
-            hostedBlockDao.deleteHostedBlock(blockId)
+        // [P4-Fix] Acquérir le verrou pour sérialiser avec getBlock() et saveBlock().
+        lockFor(blockId).withLock {
+            val entity = hostedBlockDao.getHostedBlock(blockId)
+            if (entity != null) {
+                runCatching { File(entity.filePath).delete() }
+                hostedBlockDao.deleteHostedBlock(blockId)
+            }
         }
     }
 
@@ -103,6 +120,13 @@ class HostedBlockRepositoryImpl @Inject constructor(
                 // `readBytes` après suppression convertissait `null` (orphan) en `Result.failure`.
                 lockFor(blockId).withLock {
                     val file = File(entity.filePath)
+                    // [P2-Fix] Vérifier que le chemin résolu reste dans blocksDir (sandbox).
+                    // Un filePath corrompu en DB pourrait sinon lire en dehors de filesDir/blocks/.
+                    val blocksDir = File(context.filesDir, "blocks")
+                    if (!file.canonicalPath.startsWith(blocksDir.canonicalPath + File.separator) &&
+                        file.canonicalPath != blocksDir.canonicalPath) {
+                        return@runCatching null
+                    }
                     if (!file.exists() || !file.isFile) return@runCatching null
                     val bytes = file.readBytes()
                     // Story 6.3 — `entity.iv` peut être la sentinelle "legacy" (12 × 0x00) sur
@@ -111,6 +135,7 @@ class HostedBlockRepositoryImpl @Inject constructor(
                     // de déchiffrement avec un IV non fourni).
                     HostedBlockPayload(
                         blockId = entity.blockId,
+                        ownerId = entity.ownerId,
                         fragmentIndex = entity.fragmentIndex,
                         isParity = entity.isParity,
                         ciphertext = bytes,

@@ -21,6 +21,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import java.security.MessageDigest
 import javax.inject.Inject
 import kotlin.random.Random
@@ -96,6 +97,9 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
         val deliveries: List<DeliveryRecord> = coroutineScope {
             encryptedBundle.encryptedFragments.mapIndexed { i, frag ->
                 async {
+                    // [P3-Fix] runCatching isole les exceptions inattendues : une exception non-catchée
+                    // dans un async{} annulerait toute la coroutineScope (et tous les fragments en vol).
+                    runCatching {
                     val blockId = sha256Hex(frag.ciphertext)
 
                     val msg = BlockTransferMessage(
@@ -148,11 +152,20 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                         val triedRemoteNodeIds = mutableSetOf<String>()
                         var interAttempt = 0
                         while (interAttempt < MAX_INTER_CLUSTER_ATTEMPTS && result.isFailure) {
-                            val remote = requestInterClusterHostingUseCase.selectRemoteHosts(
-                                msg.ciphertext.size.toLong(),
-                                localClusterId,
-                                excludeNodeIds = triedRemoteNodeIds
-                            ).firstOrNull() ?: break
+                            // [P6-Fix] withTimeout borne l'appel réseau au tracker — sans deadline,
+                            // un tracker lent gèle l'awaitAll() entier.
+                            val remote = runCatching {
+                                withTimeout(MAX_ACK_TIMEOUT_MS) {
+                                    requestInterClusterHostingUseCase.selectRemoteHosts(
+                                        msg.ciphertext.size.toLong(),
+                                        localClusterId,
+                                        excludeNodeIds = triedRemoteNodeIds
+                                    ).firstOrNull()
+                                }
+                            }.getOrElse {
+                                android.util.Log.w("MobiCloud:Distribute", "[INTER-CLUSTER] selectRemoteHosts timeout/erreur : ${it.message}")
+                                null
+                            } ?: break
                             triedRemoteNodeIds += remote.nodeId
                             interAttempt++
 
@@ -205,23 +218,40 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                     }
 
                     val success = result.isSuccess
-                    onBlockResult?.invoke(frag.index, success)
+                    // [P8-Fix] Isoler le callback UI — une exception dans onBlockResult annulerait
+                    // la coroutine courante et se propagerait dans awaitAll().
+                    runCatching { onBlockResult?.invoke(frag.index, success) }
                     if (success && confirmedPeer != null) {
-                        android.util.Log.i(
-                            "MobiCloud:Distribute",
-                            "[DIAG] fragment #${frag.index} placé ${if (placedInterCluster) "INTER-CLUSTER" else "LOCAL"} sur ${confirmedPeer.identity.nodeId.take(8)}"
-                        )
-                        DeliveryRecord(
-                            frag = frag,
-                            blockId = blockId,
-                            nodeId = result.getOrThrow().receiverNodeId,
-                            peer = confirmedPeer
-                        )
+                        val ack = result.getOrNull()!!
+                        // [P4-Fix] Vérifier que le hash de l'ACK correspond au blockId calculé localement.
+                        // [P5-Fix] Rejeter les ACK avec receiverNodeId vide — fragmente le DHT sinon.
+                        if (ack.blockHash != blockId || ack.receiverNodeId.isBlank()) {
+                            android.util.Log.w(
+                                "MobiCloud:Distribute",
+                                "[ACK] fragment #${frag.index} ACK invalide — blockHash match=${ack.blockHash == blockId} receiverNodeId non-blank=${ack.receiverNodeId.isNotBlank()}"
+                            )
+                            null
+                        } else {
+                            android.util.Log.i(
+                                "MobiCloud:Distribute",
+                                "[DIAG] fragment #${frag.index} placé ${if (placedInterCluster) "INTER-CLUSTER" else "LOCAL"} sur ${confirmedPeer.identity.nodeId.take(8)}"
+                            )
+                            DeliveryRecord(
+                                frag = frag,
+                                blockId = blockId,
+                                nodeId = ack.receiverNodeId,
+                                peer = confirmedPeer
+                            )
+                        }
                     } else {
                         android.util.Log.e(
                             "MobiCloud:Distribute",
                             "[DROP] fragment #${frag.index} parity=${frag.isParity} ÉCHEC tous niveaux : ${result.exceptionOrNull()?.message}"
                         )
+                        null
+                    }
+                    }.getOrElse { e ->
+                        android.util.Log.e("MobiCloud:Distribute", "[CRASH] fragment #${frag.index} exception inattendue : ${e.message}")
                         null
                     }
                 }
@@ -290,7 +320,10 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
             }
         }
 
-        gossipSyncUseCase.runGossipCycle()
+        // [P7-Fix] Gossip fire-and-forget — un échec gossip ne doit pas faire croire à l'appelant
+        // que la distribution a échoué alors que le catalogue est déjà persisté.
+        runCatching { gossipSyncUseCase.runGossipCycle() }
+            .onFailure { android.util.Log.w("MobiCloud:Distribute", "[GOSSIP] runGossipCycle echec (catalogue persisté, gossip sera retenté) : ${it.message}") }
 
         Result.success(catalogEntry)
     }
@@ -307,12 +340,16 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
     private fun stride(index: Int, poolSize: Int, seed: Long): Int {
         if (poolSize <= 1) return 0
         val absSeed = if (seed == Long.MIN_VALUE) Long.MAX_VALUE else if (seed < 0) -seed else seed
+        // [P2-Fix] Incrémentation linéaire bornée — garantit la terminaison pour tout poolSize.
+        // gcd(1, n)=1 toujours donc la boucle s'arrête en au plus poolSize itérations.
         var step = ((absSeed % (poolSize - 1)) + 1).toInt()
         while (gcd(step, poolSize) != 1) {
-            step = (step % (poolSize - 1)) + 1
+            step++
+            if (step >= poolSize) step = 1
         }
         val offset = ((absSeed / poolSize) % poolSize).toInt()
-        return ((index.toLong() * step + offset) % poolSize).toInt()
+        // [P1-Fix] Résultat garanti non-négatif : % JVM conserve le signe du dividende.
+        return (((index.toLong() * step + offset) % poolSize) + poolSize).toInt() % poolSize
     }
 
     private tailrec fun gcd(a: Int, b: Int): Int = if (b == 0) a else gcd(b, a % b)

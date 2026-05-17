@@ -6,6 +6,7 @@ package com.mobicloud.domain.models
  */
 data class HostedBlockPayload(
     val blockId: String,
+    val ownerId: String,
     val fragmentIndex: Int,
     val isParity: Boolean,
     val ciphertext: ByteArray,
@@ -19,6 +20,7 @@ data class HostedBlockPayload(
         if (this === other) return true
         if (other !is HostedBlockPayload) return false
         return blockId == other.blockId &&
+                ownerId == other.ownerId &&
                 fragmentIndex == other.fragmentIndex &&
                 isParity == other.isParity &&
                 ciphertext.contentEquals(other.ciphertext) &&
@@ -27,6 +29,7 @@ data class HostedBlockPayload(
 
     override fun hashCode(): Int {
         var result = blockId.hashCode()
+        result = 31 * result + ownerId.hashCode()
         result = 31 * result + fragmentIndex
         result = 31 * result + isParity.hashCode()
         result = 31 * result + ciphertext.contentHashCode()

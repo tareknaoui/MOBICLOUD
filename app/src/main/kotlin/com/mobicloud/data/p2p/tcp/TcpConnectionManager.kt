@@ -280,8 +280,11 @@ class TcpConnectionManager @Inject constructor(
                     out.write(ackBytes)
                     out.flush()
                 }
-                is ReceiveBlockResult.TooBig ->
-                    sendNack(socket, BlockTransferChannel.NACK_UNKNOWN)
+                is ReceiveBlockResult.TooBig -> {
+                    // AC#6 : fermeture immédiate sans NACK — pas de sendNack ici
+                    socket.close()
+                    return
+                }
                 is ReceiveBlockResult.StorageFull ->
                     sendNack(socket, BlockTransferChannel.NACK_STORAGE_FULL)
                 is ReceiveBlockResult.HashMismatch ->

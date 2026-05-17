@@ -48,13 +48,15 @@ class ReceiveAndHostBlockUseCase internal constructor(
             if (message.iv.size != 12) {
                 return@withContext ReceiveBlockResult.HashMismatch
             }
-            if (diskSpaceProvider() < MIN_FREE_BYTES) {
-                return@withContext ReceiveBlockResult.StorageFull
-            }
-
+            // [P6-Fix] Vérifier le hash AVANT l'espace disque pour éviter la fuite d'information :
+            // STORAGE_FULL vs HASH_MISMATCH permettrait sinon d'inférer la disponibilité disque.
             val computedHash = sha256hex(message.ciphertext)
             if (computedHash != message.blockId) {
                 return@withContext ReceiveBlockResult.HashMismatch
+            }
+
+            if (diskSpaceProvider() < MIN_FREE_BYTES) {
+                return@withContext ReceiveBlockResult.StorageFull
             }
 
             val identityResult = securityRepository.getIdentity()

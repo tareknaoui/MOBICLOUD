@@ -4,7 +4,6 @@ import android.util.Log
 import com.mobicloud.core.format.MobiCloudProtoBuf
 import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.repository.HostedBlockRepository
-import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.RelayRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +24,6 @@ import javax.inject.Singleton
 @Singleton
 class RespondToBlockRequestUseCase @Inject constructor(
     private val hostedBlockRepository: HostedBlockRepository,
-    private val identityRepository: IdentityRepository,
     private val relayRepository: RelayRepository
 ) {
     @OptIn(ExperimentalSerializationApi::class)
@@ -36,10 +34,11 @@ class RespondToBlockRequestUseCase @Inject constructor(
                 Log.i(TAG, "[INTER-CLUSTER][RESPOND] bloc absent ${blockId.take(16)}, ignoré")
                 return@withContext
             }
-            val ownerNodeId = identityRepository.getIdentity().getOrNull()?.nodeId.orEmpty()
+            // [P5-Fix] Utiliser l'ownerId original du bloc (stocké en DB) au lieu du nodeId local.
+            // L'ownerId local corrompait l'ownership metadata à chaque hop inter-cluster.
             val message = BlockTransferMessage(
                 blockId = payload.blockId,
-                ownerId = ownerNodeId,
+                ownerId = payload.ownerId,
                 fragmentIndex = payload.fragmentIndex,
                 isParity = payload.isParity,
                 ciphertext = payload.ciphertext,

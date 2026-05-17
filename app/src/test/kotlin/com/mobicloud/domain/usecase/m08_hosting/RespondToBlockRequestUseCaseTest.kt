@@ -4,9 +4,7 @@ import android.util.Log
 import com.mobicloud.core.format.MobiCloudProtoBuf
 import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.models.HostedBlockPayload
-import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.repository.HostedBlockRepository
-import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.RelayRepository
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -33,7 +31,6 @@ import org.junit.Test
 class RespondToBlockRequestUseCaseTest {
 
     private lateinit var hostedBlockRepository: HostedBlockRepository
-    private lateinit var identityRepository: IdentityRepository
     private lateinit var relayRepository: RelayRepository
 
     @Before
@@ -43,12 +40,7 @@ class RespondToBlockRequestUseCaseTest {
         every { Log.w(any(), any<String>()) } returns 0
 
         hostedBlockRepository = mockk(relaxed = true)
-        identityRepository = mockk(relaxed = true)
         relayRepository = mockk(relaxed = true)
-
-        coEvery { identityRepository.getIdentity() } returns Result.success(
-            NodeIdentity("self000000000001", ByteArray(0))
-        )
     }
 
     @After
@@ -57,7 +49,7 @@ class RespondToBlockRequestUseCaseTest {
     }
 
     private fun newUseCase() = RespondToBlockRequestUseCase(
-        hostedBlockRepository, identityRepository, relayRepository
+        hostedBlockRepository, relayRepository
     )
 
     @Test
@@ -66,6 +58,7 @@ class RespondToBlockRequestUseCaseTest {
         val fromNodeId = "requester0000001"
         val payload = HostedBlockPayload(
             blockId = blockId,
+            ownerId = "owner00000000001",
             fragmentIndex = 4,
             isParity = true,
             ciphertext = ByteArray(64) { it.toByte() },
@@ -87,7 +80,8 @@ class RespondToBlockRequestUseCaseTest {
         assertEquals(true, decoded.isParity)
         assertArrayEquals(payload.ciphertext, decoded.ciphertext)
         assertArrayEquals(payload.iv, decoded.iv)
-        assertEquals("self000000000001", decoded.ownerId)
+        // [P5-Fix] ownerId doit venir du bloc hébergé, pas de l'identité locale
+        assertEquals("owner00000000001", decoded.ownerId)
     }
 
     @Test
@@ -129,6 +123,7 @@ class RespondToBlockRequestUseCaseTest {
         val blockId = "e".repeat(64)
         val payload = HostedBlockPayload(
             blockId = blockId,
+            ownerId = "owner00000000002",
             fragmentIndex = 0,
             isParity = false,
             ciphertext = ByteArray(16),
@@ -154,17 +149,17 @@ class RespondToBlockRequestUseCaseTest {
     }
 
     @Test
-    fun `identity manquante — uploadBlock appele avec ownerNodeId vide`() = runBlocking {
+    fun `ownerId vide dans payload — transmis tel quel sans injection locale`() = runBlocking {
         val blockId = "2".repeat(64)
         val payload = HostedBlockPayload(
             blockId = blockId,
+            ownerId = "",
             fragmentIndex = 0,
             isParity = false,
             ciphertext = ByteArray(16),
             iv = ByteArray(12)
         )
         coEvery { hostedBlockRepository.getBlock(blockId) } returns Result.success(payload)
-        coEvery { identityRepository.getIdentity() } returns Result.failure(RuntimeException("no identity"))
 
         val dataSlot = slot<ByteArray>()
         coEvery { relayRepository.uploadBlock(any(), any(), capture(dataSlot)) } returns Result.success(Unit)
