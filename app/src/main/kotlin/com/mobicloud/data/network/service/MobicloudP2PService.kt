@@ -395,14 +395,24 @@ class MobicloudP2PService : Service() {
                                 // ce SP pour la résolution de conflit.
                             }
                             is NodeJoinState.SuperPair -> {
-                                if (peer.nodeId > identity.nodeId) {
-                                    // Peer has higher priority → local SP yields
-                                    Log.i(LOGTAG, "[JOIN] SP conflict: yield to ${peer.nodeId.take(8)} (higher nodeId)")
+                                // Guards anti-ghost-cluster (incident 2026-05-17) :
+                                // 1. Si le SP local a des membres réels, ne PAS abdiquer — on les
+                                //    abandonnerait à un cluster potentiellement fantôme.
+                                // 2. Si le SP distant déclare un cluster déjà saturé/anormal
+                                //    (>= MAX_CLUSTER_SIZE), c'est un fantôme du tracker — ignorer.
+                                val localMembers = memberSnapshotCacheUseCase.inMemory.value.size
+                                val remoteSaturated = peer.currentMemberCount >= com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
+                                if (localMembers > 1) {
+                                    Log.i(LOGTAG, "[JOIN] SP conflict avec ${peer.nodeId.take(8)} — local a $localMembers membres, NO abdication")
+                                    seenSuperPairIds = seenSuperPairIds + peer.nodeId
+                                } else if (remoteSaturated) {
+                                    Log.i(LOGTAG, "[JOIN] SP ${peer.nodeId.take(8)} saturé (${peer.currentMemberCount}/${com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE}) — probable ghost, NO abdication")
+                                    seenSuperPairIds = seenSuperPairIds + peer.nodeId
+                                } else if (peer.nodeId > identity.nodeId) {
+                                    Log.i(LOGTAG, "[JOIN] SP conflict: yield to ${peer.nodeId.take(8)} (higher nodeId, local solo)")
                                     abdicate()
                                     launch { abdicateSuperPeerUseCase() }
-                                    // Do NOT add to seenSuperPairIds — will be re-processed after abdication
                                 } else {
-                                    // Local SP has higher priority → remote peer should yield eventually
                                     Log.i(LOGTAG, "[JOIN] SP conflict: keeping local SP (lower nodeId wins ${peer.nodeId.take(8)})")
                                     seenSuperPairIds = seenSuperPairIds + peer.nodeId
                                 }
@@ -476,9 +486,11 @@ class MobicloudP2PService : Service() {
                         spScanJob = launch {
                             repeat(8) {
                                 delay(2_000L)
+                                // Guard anti-ghost (incident 2026-05-17) : ne pas abdiquer si on a déjà
+                                // des membres réels (snapshot.size > 1 = self + ≥1 autre).
+                                val localMembers = memberSnapshotCacheUseCase.inMemory.value.size
+                                if (localMembers > 1) return@launch
                                 // N'abdiquer que si le rival a une priorité plus haute ET de la capacité.
-                                // Si son cluster est plein, inutile d'abdiquer : on ne pourrait pas le rejoindre
-                                // et on créerait une boucle BullySolo → abdication infinie.
                                 val rival = signalingRepository.latestPeers.value
                                     .filter { it.isSuperPair
                                         && it.nodeId > identity.nodeId

@@ -35,8 +35,12 @@ internal val RELAY_SERVER_URLS = listOf(
 class RelayWebSocketClient @Inject constructor(
     private val authSigner: RelayAuthSigner
 ) {
+    // P14 (incident 2026-05-17) : pingInterval désactivé — le relais Render ne répond pas
+    // aux PING WebSocket natifs (RFC 6455) → OkHttp tuait la connexion toutes les 60s
+    // (30s interval + 30s timeout) → boucle reconnect infinie qui empêchait toute formation
+    // de cluster stable. Le trafic applicatif (REGISTER_PEER keepalive 10s, heartbeats 30s,
+    // GET_PEERS 10-30s) maintient déjà la connexion TCP vivante côté NAT/firewall.
     private val okHttpClient = OkHttpClient.Builder()
-        .pingInterval(30, java.util.concurrent.TimeUnit.SECONDS)
         .build()
 
     // Référence à la WebSocket active — thread-safe via @Volatile

@@ -45,6 +45,12 @@ class RunBullyElectionUseCase @Inject constructor(
 ) {
     companion object {
         const val MONITORING_WINDOW_MS = 20_000L
+        // P15 (incident 2026-05-17) : fallback isolation totale. Si après ce délai aucun peer
+        // ni SP n'a été découvert (ex. 3ème device sur subnet WiFi distinct + relay filtre les
+        // SPs au cluster plein), on considère le nœud "isolé légitimement" comme prévu par le
+        // commentaire original du garde-fou hasOtherKnownPeer, et on déclenche BullySolo via
+        // l'élection. Évite le blocage indéfini en état Undiscovered.
+        const val SOLO_BOOTSTRAP_TIMEOUT_MS = 45_000L
     }
 
     operator fun invoke(): Flow<Result<SuperPairElection>> = flow {
@@ -59,20 +65,30 @@ class RunBullyElectionUseCase @Inject constructor(
             return@flow
         }
 
-        peerRepository.peers
-            .map { peers ->
-                val noSuperPeer = peers.none { it.isActive && it.isSuperPair }
-                val hasOtherKnownPeer = peers.any { it.identity.nodeId != localIdentity.nodeId }
-                noSuperPeer && hasOtherKnownPeer
-            }
-            .distinctUntilChanged()
-            .transformLatest { shouldElect ->
-                if (shouldElect) {
-                    delay(MONITORING_WINDOW_MS)
-                    emit(Unit)
+        // Race entre deux conditions de déclenchement :
+        // 1. Bully classique : noSuperPeer + hasOtherKnownPeer stables pendant MONITORING_WINDOW_MS
+        // 2. Solo bootstrap : aucun peer ni SP après SOLO_BOOTSTRAP_TIMEOUT_MS — fallback isolation totale
+        val triggerReason = withTimeoutOrNull(SOLO_BOOTSTRAP_TIMEOUT_MS) {
+            peerRepository.peers
+                .map { peers ->
+                    val noSuperPeer = peers.none { it.isActive && it.isSuperPair }
+                    val hasOtherKnownPeer = peers.any { it.identity.nodeId != localIdentity.nodeId }
+                    noSuperPeer && hasOtherKnownPeer
                 }
-            }
-            .firstOrNull()
+                .distinctUntilChanged()
+                .transformLatest { shouldElect ->
+                    if (shouldElect) {
+                        delay(MONITORING_WINDOW_MS)
+                        emit(Unit)
+                    }
+                }
+                .firstOrNull()
+        }
+        // Si null (timeout) : on est isolé. On vérifie qu'aucun SP n'est apparu et on procède.
+        if (triggerReason == null && peerRepository.peers.value.any { it.isActive && it.isSuperPair }) {
+            emit(Result.failure(Exception("Election aborted: SP appeared during solo bootstrap wait.")))
+            return@flow
+        }
 
         val activeSuperPair = peerRepository.peers.value.any { it.isActive && it.isSuperPair }
         if (activeSuperPair) {
