@@ -275,7 +275,7 @@ class ExplorerViewModel @Inject constructor(
 
                 val optimalResult = selectOptimalPeersUseCase(
                     fileSizeBytes = fileSizeBytes ?: 0L,
-                    baseK = 2,
+                    baseK = 1,  // TEMP démo soutenance : RS(1,1) au lieu de RS(2,1) — 2 peers suffisent
                     allowDuplicatePeers = false
                 ).getOrElse { e ->
                     val userMessage = when (e) {

@@ -40,11 +40,16 @@ class BlockDownloaderWithRelay @Inject constructor(
         // Décision de canal — critère identique au filtre `activePeers` de LocalizeFileBlocksUseCase
         // pour cohérence cross-couches : un Peer inactif ou sans ip/port ne peut servir une réponse
         // directe, donc on bascule en relay-pull.
+        // P16 (2026-05-17) : port==0 = pas de serveur TCP local (architecture relay-only V5).
+        // Sans ce check, le download tente une connexion TCP sur port 0 → IOException →
+        // 0/k blocs valides → "Trop peu de membres". Le relay-pull est le seul canal viable
+        // quand port==0, identique à l'asymétrie de `BlockSenderWithRelay` côté upload.
         val isIntraCluster = peerRepository.peers.value.any {
             it.identity.nodeId == location.nodeId
                 && it.isActive
                 && it.ipAddress != null
                 && it.port != null
+                && it.port!! > 0
         }
 
         if (isIntraCluster) {

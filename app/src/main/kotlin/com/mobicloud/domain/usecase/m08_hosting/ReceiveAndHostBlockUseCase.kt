@@ -31,8 +31,10 @@ class ReceiveAndHostBlockUseCase internal constructor(
 
     suspend fun receive(message: BlockTransferMessage): ReceiveBlockResult =
         withContext(Dispatchers.IO) {
+            android.util.Log.i("MobiCloud:Host", "[RX] block ${message.blockId.take(8)} fragmentIdx=${message.fragmentIndex} parity=${message.isParity} size=${message.ciphertext.size}")
             // [Review][Patch] Guard taille AVANT tout travail (AC#6)
             if (message.ciphertext.size > MAX_BLOCK_PAYLOAD_BYTES) {
+                android.util.Log.w("MobiCloud:Host", "[RX] REJECT TooBig ${message.blockId.take(8)}")
                 return@withContext ReceiveBlockResult.TooBig
             }
             // [Review][Patch] Rejet ciphertext vide : sha256 de vide est une constante connue → spam trivial
@@ -79,10 +81,14 @@ class ReceiveAndHostBlockUseCase internal constructor(
                     iv = message.iv
                 )
                 if (saveResult.isFailure) {
+                    android.util.Log.w("MobiCloud:Host", "[RX] saveBlock FAILED ${message.blockId.take(8)}: ${saveResult.exceptionOrNull()?.message}")
                     return@withContext ReceiveBlockResult.IoError(
                         saveResult.exceptionOrNull() ?: RuntimeException("saveBlock failed")
                     )
                 }
+                android.util.Log.i("MobiCloud:Host", "[RX] STORED ${message.blockId.take(8)} on disk")
+            } else {
+                android.util.Log.i("MobiCloud:Host", "[RX] already exists ${message.blockId.take(8)} — idempotent")
             }
 
             // [Review][Patch] Domain separation : signer un payload structuré pour éviter l'oracle
