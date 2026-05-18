@@ -1,5 +1,5 @@
 # generated: 2026-04-13T21:26:35+02:00
-# last_updated: 2026-05-06T00:00:00+02:00
+# last_updated: 2026-05-17T00:00:00+02:00
 # project: PFE
 # project_key: NOKEY
 # tracking_system: file-system
@@ -109,4 +109,9 @@ development_status:
   epic-11-retrospective: optional
   epic-12: in-progress
   12-1-suppression-gps-admission-cluster-par-charge: done
+  12-2-tracker-load-based-discovery-serveur-nodejs: backlog
   epic-12-retrospective: optional
+  epic-14: in-progress
+  14-1-relay-server-endpoints-metriques-log-temps-reel: done
+  14-2-dashboard-web-graphe-3d-kpis-log-temps-reel: done
+  epic-14-retrospective: optional

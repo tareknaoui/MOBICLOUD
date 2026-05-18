@@ -1014,3 +1014,57 @@ Les éléments suivants sont **explicitement reportés** au-delà de V5 et docum
 **Statut :** backlog (hors scope story 12.1)
 
 **Résumé :** Tri des super-peers par `memberCount` ASC côté tracker (Render relay-server). Les changements de server.js relatifs au retrait GPS ont été inclus dans la Story 12.1 ; la logique de tri serveur et les tests Jest complets font l'objet d'une story dédiée.
+
+---
+
+## Epic 14 — Dashboard Admin Web Temps Réel
+
+**Objectif :** Fournir un tableau de bord web indépendant permettant à un administrateur de surveiller en temps réel l'état complet du système MobiCloud distribué : topologie des nœuds, KPIs cluster, métriques réseau, sécurité et stabilité.
+
+**Motivation :** L'app Android expose un dashboard tactique limité à la vue locale du nœud (Epic 2, Story 2.4). Pour la supervision globale du système (multi-cluster, multi-nœud), un outil web externe connecté au relay server HA est nécessaire — notamment pour la validation en démonstration PFE et pour la maintenance opérationnelle.
+
+**Stack technique :** React 18 + TypeScript + Vite · react-force-graph-3d (Three.js) · Recharts · Tailwind CSS · Polling REST + log circulaire côté relay.
+
+**Localisation :** `mobicloud-dashboard/` (application web séparée, déployable indépendamment).
+
+### Story 14.1 — Relay server : endpoints métriques + log circulaire temps réel
+
+**Statut :** done
+
+**Résumé :**
+- Ajout de `GET /metrics/topology` → topologie complète des nœuds (ip, port, clusterId, reliabilityScore, freeBytes, isSuperPair, isConnected) + liens actifs vers le relay
+- Ajout de `GET /metrics/events` → compteurs enrichis : authFailures, authSuccesses, electionBroadcasts, forwardedBlocks, droppedSignals, joinEvents, departures, churnRate (fenêtre 5 min), uptimeMs
+- Ajout de `GET /metrics/clusters` → vue agrégée par clusterId : Super-Peer élu + electedAt, membres, totalFreeBytes, avgReliabilityScore, connectedCount, taux de churn
+- Ajout de `GET /metrics/logs?since=<ts>` → log circulaire 200 entrées (niveau INFO/WARN/ERROR, catégorie AUTH/ELECTION/DEPART/JOIN/RELAY/GOSSIP), polling différentiel par timestamp
+- Headers CORS `Access-Control-Allow-Origin: *` sur tous les endpoints HTTP
+- Suivi churn via fenêtre glissante 5 min (`churnEvents[]`) + `recordChurn()` appelé sur TTL expiré et déconnexion WebSocket
+- Compteurs `eventCounters` enrichis : `forwardedBlocksFailed`, `droppedSignals`, `joinEvents`, `departures`
+- Instrumentation `logEvent()` sur AUTH, JOIN, DEPART, ELECTION_BROADCAST, RELAY FORWARD, GOSSIP SIGNAL
+
+**Fichiers modifiés :** `relay-server/server.js`
+
+### Story 14.2 — Application web dashboard : graphe 3D + KPIs + log temps réel
+
+**Statut :** done
+
+**Résumé :**
+- Projet Vite + React 18 + TypeScript initialisé dans `mobicloud-dashboard/`
+- **Graphe 3D interactif** (`GraphView3D`) via `react-force-graph-3d` (Three.js) : nœuds colorés par rôle (🔴 Relay, 🟡 Super-Peer, 🔵 Member, ⚫ Offline), taille proportionnelle à `freeBytes`, tooltip au clic (nodeId, reliabilityScore, freeBytes, clusterId, ip:port), `ResizeObserver` pour adaptation pleine page
+- **Layout pleine page** : graphe 3D occupe ~75% hauteur (pleine largeur), bande basse fixe 220px avec 7 colonnes
+- **4 groupes KPI** (bande basse) : Cluster · Réseau · Sécurité · Stabilité — 4 métriques chacun, alerte rouge si seuil dépassé (churn ≥ 30%, auth échouées > 0, signaux droppés > 10)
+- **NetworkPanel** : LineChart Recharts historique 60 points (sessions + blocs relay), polling 5s
+- **ClusterPanel** : vue par cluster avec Super-Peer élu, membres connectés/total, storage libre, fiabilité moyenne, indicateur churn coloré
+- **RealtimeLog** : terminal scrollable auto-scroll, coloré par niveau et catégorie, polling différentiel 1.5s via `?since=<ts>`, buffer local 300 entrées
+- **Hooks** : `useTopology` (poll 3s), `useHealth` (poll 5s + historique circulaire), `useLogs` (poll 1.5s différentiel), `useClusters` (poll 3s)
+- **Service API** : `fetchTopology()`, `fetchHealth()`, `fetchEvents()` avec base URL configurable via `VITE_RELAY_URL`
+
+**Fichiers créés :** `mobicloud-dashboard/` (app complète)
+
+**Acceptance Criteria :**
+- **Given** le relay tourne sur port 10000, **when** le dashboard s'ouvre, **then** les nœuds apparaissent dans le graphe 3D en < 5 secondes
+- **Given** un nœud est Super-Peer, **when** il apparaît dans le graphe, **then** son nœud est jaune et plus grand
+- **Given** le relay est injoignable, **when** le dashboard fetche, **then** badge rouge "Relay offline" sans crash
+- **Given** un clic sur un nœud du graphe, **then** tooltip affiche nodeId, reliabilityScore, freeBytes, clusterId
+- **Given** un événement se produit (AUTH, ELECTION, DEPART), **then** il apparaît dans le log en < 2 secondes
+- **Given** le taux de churn dépasse 30%, **then** la métrique "Stabilité" s'affiche en rouge et le header indique "⚠"
+- **Given** `npm run build`, **then** build TypeScript sans erreur
