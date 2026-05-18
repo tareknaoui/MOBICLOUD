@@ -10,8 +10,12 @@ import kotlin.math.abs
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.di.ApplicationScope
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
+import com.mobicloud.domain.util.isRoutableIpLiteral
 import com.mobicloud.domain.util.toSigHex
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -23,7 +27,8 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
     private val securityRepository: SecurityRepository,
     private val tcpConnectionManager: TcpConnectionManager,
     private val gossipSyncUseCase: GossipSyncUseCase,
-    private val networkEventRepository: NetworkEventRepository
+    private val networkEventRepository: NetworkEventRepository,
+    @ApplicationScope private val applicationScope: CoroutineScope
 ) : DepartureNoticeHandler {
 
     companion object {
@@ -48,6 +53,10 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
         }
 
         // 2) Vérification signature du NOTICE (le nœud partant signe "$nodeId:$blockIdsJoined")
+        if (notice.signatureBytes.isEmpty()) {
+            networkEventRepository.pushEvent("[MIGRATION] DEPARTURE_NOTICE avec signature vide — plan annulé")
+            return
+        }
         val departingPeer = peersSnapshot
             .firstOrNull { it.identity.nodeId == notice.senderNodeId }
         if (departingPeer == null) {
@@ -87,11 +96,12 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             return
         }
 
-        // 3) Candidats destination : actifs, hors émetteur, hors soi-même, avec ip non-blank et port valide
-        //    (défauts Protobuf ip="", port=0 et ports hors plage seraient rejetés côté exécuteur — autant filtrer ici)
+        // 3) Candidats destination : actifs, hors émetteur, hors soi-même, IP routable (rejette
+        //    loopback/any-local/link-local/multicast — un pair compromis annonçant 127.0.0.1
+        //    pourrait sinon être choisi comme destination et bloquer la migration) et port valide.
         val candidates = peersSnapshot.filter { p ->
             p.isActive &&
-            p.ipAddress?.isNotBlank() == true &&
+            p.ipAddress?.let { isRoutableIpLiteral(it) } == true &&
             (p.port ?: 0) in 1..65535 &&
             p.identity.nodeId != notice.senderNodeId &&
             p.identity.nodeId != identity.nodeId
@@ -162,8 +172,12 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
                 }
         }
 
-        // 8) AC#4 — Gossip immédiat pour propagation du nouveau propriétaire
-        gossipSyncUseCase.runGossipCycle()
-            .onFailure { networkEventRepository.pushEvent("[MIGRATION] Gossip post-migration échoué : ${it.message}") }
+        // 8) AC#4 — Gossip immédiat pour propagation du nouveau propriétaire.
+        //    Round 3 review : dispatch sur applicationScope pour ne pas bloquer le worker
+        //    connectionScope du TcpConnectionManager (gossip cycle ~secondes, fan-out réseau).
+        applicationScope.launch {
+            gossipSyncUseCase.runGossipCycle()
+                .onFailure { networkEventRepository.pushEvent("[MIGRATION] Gossip post-migration échoué : ${it.message}") }
+        }
     }
 }

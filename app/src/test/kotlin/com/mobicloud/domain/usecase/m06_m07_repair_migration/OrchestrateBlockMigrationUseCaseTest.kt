@@ -18,7 +18,10 @@ import io.mockk.every
 import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
@@ -86,7 +89,10 @@ class OrchestrateBlockMigrationUseCaseTest {
 
         useCase = OrchestrateBlockMigrationUseCase(
             peerRepository, dhtRepository, securityRepository,
-            tcpConnectionManager, gossipSyncUseCase, networkEventRepository
+            tcpConnectionManager, gossipSyncUseCase, networkEventRepository,
+            // Dispatchers.Unconfined : les launch sur applicationScope (gossip post-MAJ DHT)
+            // s'exécutent eagerly sur le thread courant — les coVerify post-call les voient.
+            CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         )
     }
 
@@ -238,5 +244,19 @@ class OrchestrateBlockMigrationUseCaseTest {
         coVerify(exactly = 1) { dhtRepository.deleteByNodeId(departingIdentity.nodeId) }
         coVerify(exactly = 1) { gossipSyncUseCase.runGossipCycle() }
         coVerify { networkEventRepository.pushEvent(match { it.contains("Timeout") }) }
+    }
+
+    @Test
+    fun `test 7 - super-pair inactif court-circuite (sub-condition isActive de AC1)`() = runTest {
+        coEvery { securityRepository.getIdentity() } returns Result.success(selfIdentity)
+        // self listé comme super-pair MAIS inactive — la garde AC#1 doit court-circuiter
+        peersFlow.value = listOf(peer(selfIdentity, isSuperPair = true, isActive = false))
+
+        useCase.onDepartureNoticeReceived(notice())
+
+        coVerify(exactly = 0) { tcpConnectionManager.sendMigrationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { dhtRepository.deleteByNodeId(any()) }
+        coVerify(exactly = 0) { dhtRepository.insertEntry(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { gossipSyncUseCase.runGossipCycle() }
     }
 }

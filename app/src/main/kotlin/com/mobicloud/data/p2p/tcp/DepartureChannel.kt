@@ -8,7 +8,10 @@ object DepartureChannel {
 
     // Story 7.2 — canal du Super-Pair vers le nœud partant (plan de migration)
     const val MIGRATION_PLAN: Byte = 0x09
-    const val MAX_MIGRATION_PLAN_BYTES = 64_000  // ~250 directives × 250 bytes
+    // Round 3 review : bump 64K → 128K. Une directive plein-format (blockId 64 chars + nodeId 64
+    // + ip 45 + port 5 + pubkeyHex ~64 + overhead Protobuf) approche ~250 bytes ; pour 250 blocs
+    // (cap NOTICE) + signature 72 + marge Protobuf, 64K était trop serré (rejet silencieux).
+    const val MAX_MIGRATION_PLAN_BYTES = 128_000
 
     // Story 7.3 — canal du Super-Pair vers un donneur (plan de réplication d'un bloc)
     const val REPLICATE_PLAN: Byte = 0x0A

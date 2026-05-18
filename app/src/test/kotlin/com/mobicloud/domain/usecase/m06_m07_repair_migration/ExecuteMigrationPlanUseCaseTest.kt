@@ -193,10 +193,14 @@ class ExecuteMigrationPlanUseCaseTest {
     }
 
     @Test
-    fun `test 5 - ownerId du BlockTransferMessage reste le noeud partant local`() = runTest {
+    fun `test 5 - ownerId du BlockTransferMessage propage l'uploader original (payload ownerId)`() = runTest {
+        // Round 3 review : convention identique à RespondToBlockRequestUseCase.kt:41 — le
+        // BlockTransferMessage doit porter l'ownerId stocké dans HostedBlockPayload (l'uploader
+        // original), pas le nodeId du nœud partant qui n'est que l'hébergeur courant.
+        val originalPayload = payload()
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
-        coEvery { hostedBlockRepository.getBlock(any()) } returns Result.success(payload())
+        coEvery { hostedBlockRepository.getBlock(any()) } returns Result.success(originalPayload)
         val msgSlot = slot<BlockTransferMessage>()
         val peerSlot = slot<Peer>()
         coEvery { blockSender.sendBlock(capture(msgSlot), capture(peerSlot), any()) } returns Result.success(
@@ -206,11 +210,38 @@ class ExecuteMigrationPlanUseCaseTest {
         useCase.onMigrationPlanReceived(plan())
 
         assertEquals(
-            "ownerId doit rester le nœud partant local (propriétaire d'origine)",
-            localIdentity.nodeId,
+            "ownerId doit être celui de l'uploader original (lu depuis HostedBlockPayload.ownerId)",
+            originalPayload.ownerId,
             msgSlot.captured.ownerId
         )
         // La destination du Peer doit correspondre à la directive
         assertEquals(destAIdentity.nodeId, peerSlot.captured.identity.nodeId)
+    }
+
+    @Test
+    fun `test 6 - plan signe vide - aucun sendBlock log informatif`() = runTest {
+        coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
+        coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
+
+        useCase.onMigrationPlanReceived(plan(directives = emptyList()))
+
+        coVerify(exactly = 0) { blockSender.sendBlock(any(), any(), any()) }
+        coVerify(exactly = 0) { hostedBlockRepository.getBlock(any()) }
+        coVerify { networkEventRepository.pushEvent(match { it.contains("Plan vide") }) }
+    }
+
+    @Test
+    fun `test 7 - directive destination egale self - ignoree sans sendBlock`() = runTest {
+        // Un SP compromis pourrait rediriger un bloc vers le nœud partant lui-même → guard anti-self.
+        coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
+        coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
+
+        val selfTargetedDirective = directive(destinationNodeId = localIdentity.nodeId)
+
+        useCase.onMigrationPlanReceived(plan(directives = listOf(selfTargetedDirective)))
+
+        coVerify(exactly = 0) { blockSender.sendBlock(any(), any(), any()) }
+        coVerify(exactly = 0) { hostedBlockRepository.getBlock(any()) }
+        coVerify { networkEventRepository.pushEvent(match { it.contains("destination == self") }) }
     }
 }

@@ -12,10 +12,13 @@ import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.util.isRoutableIpLiteral
 import com.mobicloud.domain.util.toSigHex
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.supervisorScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -31,6 +34,9 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
     companion object {
         // < 5s NFR-02, laisse marge pour MàJ DHT côté Super-Pair
         const val PER_BLOCK_TIMEOUT_MS = 4_000L
+        // Round 3 review : borne le nombre de sockets concurrents pour ne pas saturer FD/radio
+        // sur 4G en cas de plan plein (~250 directives) — NFR-02 reste tenable sous contention.
+        const val MAX_CONCURRENT_DIRECTIVES = 8
     }
 
     override suspend fun onMigrationPlanReceived(plan: MigrationPlanMessage) = supervisorScope {
@@ -44,6 +50,10 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
         }
 
         // 2) Vérification signature du plan avec la clé publique du Super-Pair annoncé
+        if (plan.signatureBytes.isEmpty()) {
+            networkEventRepository.pushEvent("[MIGRATION] Plan reçu avec signature vide — ignoré")
+            return@supervisorScope
+        }
         val superPeer = peerRepository.peers.value
             .firstOrNull { it.identity.nodeId == plan.superPeerNodeId && it.isSuperPair }
         if (superPeer == null) {
@@ -78,22 +88,32 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
             return@supervisorScope
         }
 
-        // 2) Exécution parallèle des directives — AC#2 transfert aveugle, AC#3 ACK signé vérifié par BlockSender.
-        //    supervisorScope : un throw non-Result dans une directive n'annule pas ses sœurs.
+        // 2) Exécution parallèle bornée des directives (Semaphore = max 8 sockets concurrents).
+        //    AC#2 transfert aveugle, AC#3 ACK signé vérifié par BlockSender.
+        //    supervisorScope + runCatching : un throw non-Result dans une directive n'annule
+        //    PAS awaitAll() (qui re-throw la première exception sinon) et n'annule pas ses sœurs.
+        val permits = Semaphore(MAX_CONCURRENT_DIRECTIVES)
         plan.directives.map { directive ->
             async {
-                executeDirective(directive, localId)
+                runCatching {
+                    permits.withPermit { executeDirective(directive, localId) }
+                }.onFailure { err ->
+                    networkEventRepository.pushEvent(
+                        "[MIGRATION] Directive ${directive.blockId.take(16)} interrompue : ${err.message}"
+                    )
+                }
             }
         }.awaitAll()
         Unit
     }
 
     private suspend fun executeDirective(directive: MigrateBlockDirective, localNodeId: String) {
-        // Garde défensive : port hors plage valide, IP vide, ou destination == self
-        // (plan signé par un SP compromis pouvant rediriger un bloc vers le pair lui-même).
-        if (directive.destinationIp.isBlank() || directive.destinationPort !in 1..65535) {
+        // Garde défensive : port hors plage valide, IP non-routable (loopback/any-local/link-local/
+        // multicast — un SP compromis pourrait rediriger vers 127.0.0.1 pour DoS local), ou
+        // destination == self (rediriger un bloc vers le pair lui-même).
+        if (!isRoutableIpLiteral(directive.destinationIp) || directive.destinationPort !in 1..65535) {
             networkEventRepository.pushEvent(
-                "[MIGRATION] Directive ${directive.blockId.take(16)} → ${directive.destinationNodeId.take(8)} ignorée (adresse invalide)"
+                "[MIGRATION] Directive ${directive.blockId.take(16)} → ${directive.destinationNodeId.take(8)} ignorée (adresse non-routable)"
             )
             return
         }
@@ -134,7 +154,11 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
         )
         val msg = BlockTransferMessage(
             blockId = payload.blockId,
-            ownerId = localNodeId,  // owner conservé = nœud partant (propriétaire d'origine)
+            // Round 3 review : préserver l'uploader original (lu depuis HostedBlockPayload.ownerId,
+            // peuplé à la réception initiale via ReceiveAndHostBlockUseCase). Le nœud partant n'est
+            // pas l'owner — il n'est que l'hébergeur courant. Convention identique à
+            // RespondToBlockRequestUseCase.kt:41 (`ownerId = payload.ownerId`).
+            ownerId = payload.ownerId,
             fragmentIndex = payload.fragmentIndex,
             isParity = payload.isParity,
             ciphertext = payload.ciphertext,

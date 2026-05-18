@@ -17,6 +17,9 @@ import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.slot
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertTrue
@@ -82,7 +85,8 @@ class PlansAntiReplayTest {
 
         val orchestrator = OrchestrateBlockMigrationUseCase(
             peerRepository, dhtRepository, securityRepository,
-            tcpConnectionManager, gossipSyncUseCase, networkEventRepository
+            tcpConnectionManager, gossipSyncUseCase, networkEventRepository,
+            CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         )
 
         // ATTAQUE : NOTICE rejoue (timestamp 5 min dans le passe = >> 30s window)

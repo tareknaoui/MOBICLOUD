@@ -565,6 +565,7 @@ claude-opus-4-7[1m]
 - 2026-04-23 — Story 7.2 créée (ready-for-dev) : Orchestration migration proactive par le Super-Pair — `MigrationPlanMessage` Protobuf + canal 0x09 + `OrchestrateBlockMigrationUseCase` (DepartureNoticeHandler) + `ExecuteMigrationPlanUseCase` (MigrationPlanHandler) + MàJ DHT optimiste + Gossip — réutilise `BlockSender` existant pour transfert aveugle (AC#2) et vérification ACK signé (AC#3)
 - 2026-04-23 — Story 7.2 implémentée et marquée `review` : 6 AC satisfaits, 11 tests JVM passants (6 + 5), câblage handlers TCP dans `MobicloudP2PService`. Fix hors-scope : import `kotlinx.coroutines.cancel` dans `NetworkChangeObserver.kt` (bug pré-existant bloquant la compilation depuis commit `fdda938`).
 - 2026-04-23 — Story 7.2 re-review round 2 (post-hardening) : 8 patches appliqués (garde anti-self exécuteur, filtre candidats orchestrateur renforcé, `toSigHex` sign-extend fix + consolidation dans `domain/util/HexEncoding.kt`, port upper-bound, distinction `Result.failure` vs null payload, log plan vide, test parallélisme avec destinations distinctes). 9 findings différés (versioning protocole, `withTimeout` per-directive, validation adresse, NOTICE domain-prefix, etc.). Compilation + tests 7.2 : SUCCESS.
+- 2026-05-18 — Story 7.2 multi-layer review round 3 (Blind Hunter + Edge Case Hunter + Acceptance Auditor) : AC#1–#6 tous vérifiés conformes. 8 patches appliqués (fix `ownerId = payload.ownerId` propage l'uploader original ; `Semaphore(8)` borne parallélisme ; `runCatching` wrap async ; guards `signatureBytes.isEmpty()` ; `isRoutableIpLiteral` validation IP ; gossip sur `applicationScope` ; bump `MAX_MIGRATION_PLAN_BYTES` 64K→128K ; 3 tests manquants). 15 findings différés (canonical encoding payload signé, EC-aware round-robin, NIO socket refactor, etc.). Tests : 15/15 migration. Suite complète 594/595 (failure isolée hors scope).
 
 ### Review Findings
 
@@ -600,3 +601,71 @@ claude-opus-4-7[1m]
 - [x] [Review][Defer] **Test #4 assertion `elapsed < 4_000L` fragile** [ExecuteMigrationPlanUseCaseTest.kt:184] — deferred, minor. Toute introduction d'un `withTimeout(PER_BLOCK_TIMEOUT_MS)` ferait passer le test à exactement 4_000ms → flip false. Laisser une marge (`elapsed < 4_500L`).
 - [x] [Review][Defer] **Test #6 n'assert pas la cancellation effective du send** [OrchestrateBlockMigrationUseCaseTest.kt:213-240] — deferred. Le test vérifie le log `"Timeout envoi"` mais pas que `sendMigrationPlan` est réellement annulé. Une mauvaise configuration `withTimeoutOrNull` où le send termine post-timeout ne serait pas détectée.
 - [x] [Review][Defer] **`DEPARTURE_NOTICE` signed payload sans domain-prefix tag** [OrchestrateBlockMigrationUseCase.kt:54] — deferred, pré-existant Story 7.1. Le payload `"${senderNodeId}:${blockIdsJoined}"` n'a pas de tag `"DEPARTURE_NOTICE_V1|"` — pas de collision inter-protocole aujourd'hui mais brittle aux futurs ajouts.
+
+### Review Findings — Round 3 (multi-layer adversarial, 2026-05-18)
+
+Review parallèle 3 couches (Blind Hunter + Edge Case Hunter + Acceptance Auditor) sur le diff `51d5e5a^..400ddc9`. AC#1–#6 tous vérifiés conformes par l'Acceptance Auditor — aucune violation critique. Findings additionnels :
+
+- [x] [Review][Dismiss] **`originalFileSize = 0L` perdu sur bloc migré** [ExecuteMigrationPlanUseCase.kt:228] — **faux positif** : le downloader lit `originalFileSize` depuis `catalog.originalFileSize` (CatalogEntry DHT) via `AssembleDownloadedFileUseCase.kt:84,162`, pas depuis `BlockTransferMessage`. Convention identique sur `RespondToBlockRequestUseCase.kt:46` (`0L` côté répondeur — non-bloquant). La source autoritative est la DHT propagée par CRDT merge (`MergeCatalogEntriesUseCase.kt:41`). Commentaire dev correct.
+
+- [x] [Review][Defer] **MIGRATION_PLAN accepté de n'importe quelle socket (pas de binding IP)** [TcpConnectionManager.kt:handleIncomingMigrationPlan + ExecuteMigrationPlanUseCase.kt:151] — décision : signature EC-P256 suffit comme barrière (défense en profondeur cryptographique, pas réseau). Un check IP source casserait l'inter-cluster via relais HA WebSocket (l'IP observée serait celle du relais, pas du SP émetteur).
+
+- [x] [Review][Defer] **Race cancellation : `stopServer()` annule les `sendBlock` en cours** [SendDepartureNoticeUseCase.kt:63-68 + ExecuteMigrationPlanUseCase.kt:supervisorScope] — décision : s'appuyer sur Story 7.3 (auto-réparation détection blocs sous-répliqués). Cohérent avec la conception "MAJ DHT optimiste + convergence eventuelle" déjà documentée (Constraint #2). Les blocs perdus en bordure de fenêtre seront re-distribués automatiquement.
+
+- [x] [Review][Patch] **`ownerId = localNodeId` perd l'identité de l'uploader original** [ExecuteMigrationPlanUseCase.kt:137] — bug réel, pas décision. Vérifié : `HostedBlockPayload.ownerId` stocke l'uploader d'origine (via `ReceiveAndHostBlockUseCase.kt:77`). `RespondToBlockRequestUseCase.kt:41` utilise déjà la convention correcte `ownerId = payload.ownerId`. Le commentaire ligne 137 est faux : le nœud partant n'est pas l'uploader, c'est juste l'hébergeur courant. Fix : `localNodeId` → `payload.ownerId` (1 ligne, aligne sur la convention `RespondToBlockRequestUseCase`).
+
+- [x] [Review][Patch] **Parallélisme non-borné côté exécuteur (~250 sockets concurrents)** [ExecuteMigrationPlanUseCase.kt:async+awaitAll] — un plan plein (~250 directives) lance 250 `async` simultanés → saturation FD/radio sur 4G, NFR-02 violé sous contention. Ajouter `Semaphore(8)` ou chunked dispatch.
+
+- [x] [Review][Patch] **`MAX_MIGRATION_PLAN_BYTES = 64_000` trop serré vs NOTICE 16KB** [DepartureChannel.kt:19] — un NOTICE de 250 blocIds + directive ~250 bytes/dir + pubkey hex ~64 bytes peut dépasser 64KB silencieusement. Bumper à ≥128KB ou cap explicite sur `directives.size`.
+
+- [x] [Review][Patch] **NFR-02 budget non-enforce sur la phase DHT** [OrchestrateBlockMigrationUseCase.kt:391-417] — `withTimeoutOrNull(5s)` n'enveloppe que `sendMigrationPlan`. Les N `dhtRepository.insertEntry` séquentiels + `gossipSyncUseCase.runGossipCycle()` peuvent dépasser largement 5s. Wrap full body dans `withTimeout` ou batch DHT.
+
+- [x] [Review][Patch] **`ipAddress` non-validée (0.0.0.0, loopback, link-local passent)** [OrchestrateBlockMigrationUseCase.kt:80-85, ExecuteMigrationPlanUseCase.kt:executeDirective] — filtres actuels acceptent `127.0.0.1`, `0.0.0.0`, `255.255.255.255`. Ajouter check `InetAddresses.isRoutableUnicast()`.
+
+- [x] [Review][Patch] **`awaitAll()` rethrow malgré `supervisorScope`** [ExecuteMigrationPlanUseCase.kt:async+awaitAll] — si un `async` lance un Throwable non-géré (NPE, OOM), `awaitAll` re-throw et coupe les frères. Wrapper chaque `async` dans `runCatching {}` pour garantir que toutes les directives s'exécutent.
+
+- [x] [Review][Patch] **`runGossipCycle()` bloque le `connectionScope`** [OrchestrateBlockMigrationUseCase.kt:416] — un cycle gossip prend secondes et bloque le worker TCP. Dispatcher sur `applicationScope.launch { ... }` ou scope indépendant.
+
+- [x] [Review][Patch] **`signatureBytes.isEmpty()` non-rejetée explicitement** [OrchestrateBlockMigrationUseCase.kt + ExecuteMigrationPlanUseCase.kt:vérif signature] — `verifySignature(data, byteArrayOf(), pk)` dépend de l'impl JCA. Ajouter early-reject si `signatureBytes.isEmpty()`.
+
+- [x] [Review][Patch] **`soTimeout` absent côté serveur entrant MIGRATION_PLAN (slowloris)** [TcpConnectionManager.kt:handleIncomingMigrationPlan] — `sendMigrationPlan` set `soTimeout=3000` côté client mais le handler entrant n'a pas de read deadline. Pair lent tient le worker indéfiniment. Set `socket.soTimeout` côté serveur avant `readFully`.
+
+- [x] [Review][Patch] **3 tests manquants (isActive guard, plan vide receiver, anti-self receiver)** [OrchestrateBlockMigrationUseCaseTest.kt + ExecuteMigrationPlanUseCaseTest.kt] — coverage gaps acknowledged par Acceptance Auditor : (i) Test super-peer avec `isActive=false` doit court-circuiter, (ii) Test plan reçu avec `directives=emptyList()` doit log + return, (iii) Test `destinationNodeId == localNodeId` doit ignorer la directive.
+
+- [x] [Review][Defer] **Collision payload signature via `:` / `|` (IPv6 literal `fe80::1`)** — deferred, déjà acté Round 2. Pas de risque IPv4-only ; fix durable = canonical encoding (CBOR ou Protobuf signed bytes).
+- [x] [Review][Defer] **Replay sans nonce/timestamp** — **résolu post-7.2** dans commit `b1de98a` (anti-replay sur DepartureNotice/MigrationPlan/ReplicationPlan via `timestampMs` + skew window 30s). Hors scope review du diff `400ddc9` mais déjà adressé sur HEAD.
+- [x] [Review][Defer] **Round-robin peut concentrer plusieurs fragments d'un même fichier EC sur 1 hôte** — deferred. Spec accepte round-robin déterministe ; Story 7.3 (auto-réparation) rattrape les blocs sous-répliqués. Fix durable = group-by-fileHash + spread.
+- [x] [Review][Defer] **Test 4 parallélisme repose sur `TestDispatcher` virtual time** — deferred, faux sentiment de couverture mais bug réel improbable. Remplacer par real dispatcher + CountDownLatch si refactor.
+- [x] [Review][Defer] **`Socket().connect(3000)` bloquant, non-coopératif avec coroutine cancellation** — deferred, lié à la décision NIO globale (cf. entry existante deferred-work.md round 1).
+- [x] [Review][Defer] **Test 6 timeout n'assert pas la cancellation effective de `sendMigrationPlan`** — déjà deferred Round 2.
+- [x] [Review][Defer] **Test 2 signature invalide ne stub pas `signData` (fragile sur réordonnancement)** — deferred, test brittleness mineure.
+- [x] [Review][Defer] **`@Volatile var migrationPlanHandler` réassignable / re-wiring à chaque `onStartCommand`** — deferred. Pattern identique aux autres handlers Story 7.1+ ; refactor cross-cutting.
+- [x] [Review][Defer] **`destinationPort = 0` filtré silencieusement côté orchestrateur** — deferred. Pas de log d'attrition ; ajouter diag log si bug de port-discovery suspecté.
+- [x] [Review][Defer] **`sendMigrationPlan` n'a pas de cleanup explicite sur cancel post-`withTimeoutOrNull`** — deferred, lié à la décision NIO (cf. `Socket().connect` bloquant).
+- [x] [Review][Defer] **`handleIncomingMigrationPlan` pas de skip(len) ni rate-limit per-IP sur length invalide** — deferred. Pré-existant sur tous les handlers TCP ; hardening transversal hors scope 7.2.
+- [x] [Review][Defer] **`PER_BLOCK_TIMEOUT_MS` non-enforce via `withTimeout` côté exécuteur** — déjà deferred Round 2.
+- [x] [Review][Defer] **`Peer` construit côté exécuteur sans `isActive`/`isSuperPair`** — deferred, dépendance silencieuse aux defaults du data class.
+- [x] [Review][Defer] **Round-robin déterministe = prédictible pour Sybil attaque** — deferred. Acceptable en cluster fermé PFE ; randomisation crypto si déploiement adversarial.
+
+**Round 3 — Patches appliqués (2026-05-18)** :
+- `ExecuteMigrationPlanUseCase.kt` : `ownerId = payload.ownerId` (était `localNodeId`) ; `Semaphore(MAX_CONCURRENT_DIRECTIVES = 8)` autour des `async` ; `runCatching` wrap chaque directive (empêche `awaitAll` rethrow) ; guard `signatureBytes.isEmpty()` early-reject ; `isRoutableIpLiteral(ip)` remplace `isBlank()` (rejette loopback/any-local/link-local/multicast).
+- `OrchestrateBlockMigrationUseCase.kt` : `@ApplicationScope CoroutineScope` injecté ; gossip cycle déplacé dans `applicationScope.launch` (ne bloque plus le worker `connectionScope`) ; guard `notice.signatureBytes.isEmpty()` early-reject ; filtre candidats utilise `isRoutableIpLiteral` au lieu de `isNotBlank()`.
+- `DepartureChannel.kt` : `MAX_MIGRATION_PLAN_BYTES` 64K → 128K.
+- `NetworkAddressUtil.kt` (nouveau) : helper `isRoutableIpLiteral` partagé orchestrateur/exécuteur.
+- Tests : +3 tests (super-peer inactif court-circuite ; plan signé vide ; directive destination == self) ; test 5 mis à jour pour vérifier `ownerId = payload.ownerId` (au lieu de `localNodeId`).
+- Faux positifs Round 3 reclassés dismiss : `soTimeout` côté serveur (déjà en place ligne 169 via `INCOMING_READ_TIMEOUT_MS=3000`) ; NFR-02 wrapper sur full body (casserait Constraint #2 + Test 6 explicite).
+
+Build : `:app:compileDebugKotlin` SUCCESS. Tests migration : **15/15 passés** (Orchestrate 7 + Execute 7 + PlansAntiReplay 1). Suite complète `:app:testDebugUnitTest` : 594/595 (la seule failure `RunBullyElectionUseCaseTest` est pré-existante, hors scope 7.2 — confirmé via `git stash` + re-run).
+
+**Dismissed (12)** — non-issues / intent documenté :
+- DHT update optimiste après timeout (Constraint #2 explicite, Story 7.3 = recovery)
+- selfIsSuperPair via PeerRepository (contrat vérifié : `RunBullyElectionUseCase.kt:143` enregistre self avec `isSuperPair=true`)
+- `MigrationPlanHandler?` null log-only (Constraint #11 fire-and-forget)
+- `runGossipCycle()` log-only failures (Constraint #11)
+- `peer.port!!` après filtre (filter est correct)
+- Trailing `Unit` après `awaitAll()` (cosmétique)
+- Commentaire `// 0x08/0x09 libres` stale (cosmétique)
+- `HexEncoding.internal` cross-module (projet mono-module)
+- Payload signé étendu IP/port/pubkey vs spec (durcissement Round 1 acté, plus fort que la spec)
+- `coroutineScope` → `supervisorScope` (durcissement Round 1 acté)
+- Comment trompeur `awaitAll` cancellation (subsumé par finding patch sur `runCatching`)

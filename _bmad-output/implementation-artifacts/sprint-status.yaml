@@ -35,7 +35,7 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 
 generated: 2026-04-13T21:26:35+02:00
-last_updated: 2026-05-12T23:59:00+02:00  # review R3 terminée — story 12.1 done
+last_updated: 2026-05-18T23:59:00+02:00  # code review R3 multi-layer story 7.2 — 8 patches appliqués, tests 15/15
 project: PFE
 project_key: NOKEY
 tracking_system: file-system
