@@ -1,4 +1,6 @@
-export const BASE = import.meta.env.VITE_RELAY_URL ?? 'http://localhost:10000';
+// En dev, les requêtes passent par le proxy Vite (/relay → relay server) pour éviter CORS.
+// En prod (build), VITE_RELAY_URL doit pointer directement vers le relay.
+export const BASE = import.meta.env.DEV ? '/relay' : (import.meta.env.VITE_RELAY_URL ?? 'http://localhost:10000');
 
 export interface RelayNode {
   id: string;
