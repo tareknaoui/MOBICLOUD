@@ -147,6 +147,96 @@ const signalingRegistry = new Map();
 // Map<blockId, [{ fromNodeId, destNodeId, data: Buffer, ttlTimer }]>
 const relayBuffer = new Map();
 
+// Compteurs d'événements pour le dashboard admin (réinitialisés au redémarrage du process)
+const eventCounters = {
+  authFailures: 0,
+  authSuccesses: 0,
+  electionBroadcasts: 0,
+  forwardedBlocks: 0,
+  forwardedBlocksFailed: 0,
+  signalsSent: 0,
+  droppedSignals: 0,
+  joinEvents: 0,
+  departures: 0,
+  startedAt: Date.now()
+};
+
+// ─── Log circulaire temps réel (dashboard) ───────────────────────────────────
+const MAX_LOGS = 200;
+const realtimeLogs = [];
+
+function logEvent(level, category, message, meta = {}) {
+  const { ts: _ts, level: _l, category: _c, message: _m, ...safeMeta } = meta;
+  const entry = { ts: Date.now(), level, category, message, ...safeMeta };
+  realtimeLogs.push(entry);
+  if (realtimeLogs.length > MAX_LOGS) realtimeLogs.shift();
+  const prefix = level === 'ERROR' ? '[ERR]' : level === 'WARN' ? '[WRN]' : '[INF]';
+  console.log(`${prefix}[${category}] ${message}`);
+}
+
+// ─── Suivi churn (fenêtre glissante 5 minutes) ───────────────────────────────
+const CHURN_WINDOW_MS = 5 * 60 * 1000;
+const MAX_CHURN_EVENTS = 10000;
+const churnEvents = []; // timestamps de départs
+
+function recordChurn(nodeId) {
+  const now = Date.now();
+  churnEvents.push({ ts: now, nodeId });
+  while (churnEvents.length > 0 && now - churnEvents[0].ts > CHURN_WINDOW_MS) {
+    churnEvents.shift();
+  }
+  if (churnEvents.length > MAX_CHURN_EVENTS) {
+    churnEvents.splice(0, churnEvents.length - MAX_CHURN_EVENTS);
+  }
+}
+
+function getChurnRate() {
+  const now = Date.now();
+  const recent = churnEvents.filter(e => now - e.ts <= CHURN_WINDOW_MS);
+  const uniqueDeparted = new Set(recent.map(e => e.nodeId));
+  const total = signalingRegistry.size + uniqueDeparted.size;
+  if (total === 0) return 0;
+  return Math.round((uniqueDeparted.size / total) * 100);
+}
+
+// ─── Vue agrégée par cluster ──────────────────────────────────────────────────
+function buildClusterView() {
+  const clusters = new Map(); // clusterId → { superPeer, members[], totalFreeBytes, avgReliability }
+
+  for (const [nodeId, entry] of signalingRegistry.entries()) {
+    const cid = entry.clusterId || '__no_cluster__';
+    if (!clusters.has(cid)) {
+      clusters.set(cid, { clusterId: cid, superPeer: null, members: [], totalFreeBytes: 0, reliabilitySum: 0 });
+    }
+    const c = clusters.get(cid);
+    c.members.push({
+      nodeId,
+      isSuperPair: entry.isSuperPair,
+      reliabilityScore: entry.reliabilityScore ?? 0,
+      freeBytes: entry.freeBytes ?? 0,
+      isConnected: sessions.has(nodeId),
+      lastSeen: entry.lastSeen
+    });
+    c.totalFreeBytes += entry.freeBytes ?? 0;
+    c.reliabilitySum += entry.reliabilityScore ?? 0;
+    if (entry.isSuperPair) {
+      if (!c.superPeer || (entry.reliabilityScore ?? 0) > (c.superPeer.reliabilityScore ?? 0)) {
+        c.superPeer = { nodeId, electedAt: entry.electedAt, reliabilityScore: entry.reliabilityScore };
+      }
+    }
+  }
+
+  return Array.from(clusters.values()).map(c => ({
+    clusterId: c.clusterId,
+    memberCount: c.members.length,
+    connectedCount: c.members.filter(m => m.isConnected).length,
+    superPeer: c.superPeer,
+    totalFreeBytes: c.totalFreeBytes,
+    avgReliabilityScore: c.members.length > 0 ? c.reliabilitySum / c.members.length : 0,
+    members: c.members
+  }));
+}
+
 // ─── Signaling (REGISTER_PEER / GET_PEERS) ──────────────────────────────────
 
 function handleRegisterPeer(nodeId, payload) {
@@ -218,7 +308,9 @@ function handleRegisterPeer(nodeId, payload) {
 
   const ttlTimer = setTimeout(() => {
     signalingRegistry.delete(nodeId);
-    console.log(`[SIGNALING] TTL expiré — nodeId=${nodeId.slice(0, 8)} supprimé`);
+    recordChurn(nodeId);
+    eventCounters.departures++;
+    logEvent('WARN', 'DEPART', `Nœud TTL expiré (60s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
   }, TTL_MS);
 
   signalingRegistry.set(nodeId, {
@@ -230,10 +322,10 @@ function handleRegisterPeer(nodeId, payload) {
     currentMemberCount: currentMemberCountNum,
     lastSeen: Date.now(),
     ttlTimer,
-    isSuperPair: true   // REGISTER_PEER = revendication formelle de statut Super-Pair (post-Bully)
+    isSuperPair: true
   });
 
-  console.log(`[SIGNALING] REGISTER super-peer nodeId=${nodeId.slice(0, 8)} ip=${ip}:${port} clusterId=${clusterIdStr.slice(0, 8) || '(legacy)'} freeBytes=${freeBytesNum} memberCount=${currentMemberCountNum}/${MAX_CLUSTER_SIZE_SERVER}`);
+  logEvent('INFO', 'ELECTION', `Super-Peer élu : ${nodeId.slice(0, 8)} cluster=${clusterIdStr.slice(0, 8) || 'legacy'} score=${(reliabilityScore ?? 0.5).toFixed(2)}`, { nodeId, clusterId: clusterIdStr, reliabilityScore, ip, port });
   return true;
 }
 
@@ -247,8 +339,7 @@ function handleJoin(nodeId, payload) {
     return false;
   }
 
-  const { ip, port, reliabilityScore } = entry;
-  console.log(`[JOIN-DBG] nodeId=${nodeId.slice(0,8)} ip=${ip} port=${port} typeof_port=${typeof port}`);
+  const { ip, port, reliabilityScore, clusterId: payloadClusterId, freeBytes: payloadFreeBytes } = entry;
 
   // ip/port optionnels — si présents, doivent être valides
   if (ip !== undefined && ip !== null) {
@@ -271,28 +362,43 @@ function handleJoin(nodeId, payload) {
 
   const ttlTimer = setTimeout(() => {
     signalingRegistry.delete(nodeId);
-    console.log(`[PRESENCE] TTL expiré — nodeId=${nodeId.slice(0, 8)} supprimé`);
+    recordChurn(nodeId);
+    eventCounters.departures++;
+    logEvent('WARN', 'DEPART', `Nœud TTL expiré (60s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
   }, TTL_MS);
 
-  // Préserver le statut Super-Pair si déjà élu — re-JOIN ne déclasse pas.
   const wasSuperPair = existing?.isSuperPair ?? false;
 
-  // Story 9.2 : préserver clusterId/freeBytes/currentMemberCount existants — un Super-Pair
-  // envoyant un JOIN heartbeat ne doit PAS être rétrogradé jusqu'au prochain REGISTER_PEER.
+  // clusterId : préserver l'existant (re-JOIN heartbeat) ; sinon accepter du payload si UUID v4 valide.
+  const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  let clusterIdStr = existing?.clusterId ?? '';
+  if (!clusterIdStr && typeof payloadClusterId === 'string' && UUID_V4_RE.test(payloadClusterId)) {
+    clusterIdStr = payloadClusterId;
+  }
+
+  // freeBytes : même logique — préserver l'existant, sinon lire du payload
+  let freeBytesNum = existing?.freeBytes ?? 0;
+  if (!freeBytesNum && typeof payloadFreeBytes === 'number'
+      && Number.isFinite(payloadFreeBytes) && payloadFreeBytes >= 0
+      && payloadFreeBytes <= Number.MAX_SAFE_INTEGER) {
+    freeBytesNum = Math.floor(payloadFreeBytes);
+  }
+
   signalingRegistry.set(nodeId, {
     ip: ip ?? '0.0.0.0',
     port: port ?? 0,
     reliabilityScore: reliabilityScore ?? 0.5,
     electedAt: existing?.electedAt ?? null,
-    clusterId: existing?.clusterId ?? '',
-    freeBytes: existing?.freeBytes ?? 0,
+    clusterId: clusterIdStr,
+    freeBytes: freeBytesNum,
     currentMemberCount: existing?.currentMemberCount ?? 0,
     lastSeen: Date.now(),
     ttlTimer,
     isSuperPair: wasSuperPair
   });
 
-  console.log(`[PRESENCE] JOIN nodeId=${nodeId.slice(0, 8)} ip=${ip ?? '?'}:${port ?? '?'} isSuperPair=${wasSuperPair}`);
+  eventCounters.joinEvents++;
+  logEvent('INFO', 'JOIN', `Nœud connecté : ${nodeId.slice(0, 8)} ip=${ip ?? '?'}:${port ?? '?'}${wasSuperPair ? ' [Super-Peer]' : ''} cluster=${clusterIdStr.slice(0,8) || 'none'}`, { nodeId, ip, port });
   return true;
 }
 
@@ -399,7 +505,8 @@ function handleUpload(fromNodeId, payload, senderWs) {
     Buffer.from(blockId.padEnd(64, '\0'), 'utf8').copy(forwardPayload, 16);
     data.copy(forwardPayload, 80);
     safeSend(destSession.ws, buildFrame(MSG.FORWARD, forwardPayload));
-    console.log(`[RELAY] FORWARD immédiat ${blockId.slice(0, 16)} → nodeId=${destNodeId.slice(0, 8)}`);
+    eventCounters.forwardedBlocks++;
+    logEvent('INFO', 'RELAY', `Bloc forwardé : ${blockId.slice(0, 16)}… → ${destNodeId.slice(0, 8)} (direct)`, { blockId: blockId.slice(0, 16), from: fromNodeId.slice(0, 8), to: destNodeId.slice(0, 8) });
   } else {
     // Cap buffer RAM
     if (relayBuffer.size >= MAX_RELAY_BUFFER_ENTRIES) {
@@ -431,7 +538,7 @@ function handleUpload(fromNodeId, payload, senderWs) {
 
     existing.push(newEntry);
     relayBuffer.set(blockId, existing);
-    console.log(`[RELAY] BUFFERED ${blockId.slice(0, 16)} → nodeId=${destNodeId.slice(0, 8)} (dest absent)`);
+    logEvent('WARN', 'RELAY', `Bloc bufferisé (dest absent) : ${blockId.slice(0, 16)}… → ${destNodeId.slice(0, 8)}`, { blockId: blockId.slice(0, 16), to: destNodeId.slice(0, 8) });
   }
 
   // ACK au sender
@@ -499,8 +606,11 @@ function handleSignal(fromNodeId, payload) {
     Buffer.from(fromNodeId.padEnd(16, '\0'), 'utf8').copy(out, 0);
     data.copy(out, 16);
     safeSend(destSession.ws, buildFrame(MSG.SIGNAL_RECEIVED, out));
+    eventCounters.signalsSent++;
+  } else {
+    eventCounters.droppedSignals++;
+    logEvent('WARN', 'GOSSIP', `Signal Gossip droppé (dest absent) : ${fromNodeId.slice(0,8)} → ${destNodeId.slice(0,8)}`, { from: fromNodeId.slice(0,8), to: destNodeId.slice(0,8) });
   }
-  // dest absent → signal droppé silencieusement
 }
 
 // ─── ELECTION_BROADCAST — broadcast Bully (ELECTION / ALIVE / COORDINATOR) ──
@@ -516,32 +626,124 @@ function handleElectionBroadcast(fromNodeId, payload) {
       forwarded++;
     }
   }
-  // Parse type pour le log (best-effort, pas de validation stricte ici)
+  eventCounters.electionBroadcasts++;
   let msgType = '?';
-  try { msgType = JSON.parse(payload.toString('utf8')).type ?? '?'; } catch { /* ignore */ }
-  console.log(`[ELECTION] BROADCAST type=${msgType} from=${fromNodeId.slice(0,8)} → ${forwarded} nœud(s)`);
+  let clusterId = '';
+  try { const p = JSON.parse(payload.toString('utf8')); msgType = p.type ?? '?'; clusterId = p.clusterId ?? ''; } catch { /* ignore */ }
+  logEvent('INFO', 'ELECTION', `Bully broadcast type=${msgType} depuis ${fromNodeId.slice(0,8)} → ${forwarded} nœud(s)`, { from: fromNodeId.slice(0, 8), type: msgType, clusterId: clusterId.slice(0, 8), forwarded });
 }
 
 // ─── Serveur HTTP + WebSocketServer ─────────────────────────────────────────
 
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Content-Type': 'application/json'
+};
+
+function sendJson(res, data) {
+  const body = JSON.stringify(data);
+  res.writeHead(200, CORS_HEADERS);
+  res.end(body);
+}
+
 const httpServer = http.createServer((req, res) => {
-  if (req.method === 'GET' && req.url === '/health') {
+  // Preflight CORS
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, CORS_HEADERS);
+    res.end();
+    return;
+  }
+
+  if (req.method !== 'GET') {
+    res.writeHead(405, CORS_HEADERS);
+    res.end('{"error":"Method Not Allowed"}');
+    return;
+  }
+
+  const url = req.url.split('?')[0];
+
+  if (url === '/health') {
     let superPeerCount = 0;
     for (const entry of signalingRegistry.values()) {
       if (entry.isSuperPair) superPeerCount++;
     }
-    const body = JSON.stringify({
+    sendJson(res, {
       status: 'ok',
       sessions: sessions.size,
       pendingBlocks: relayBuffer.size,
       participants: signalingRegistry.size,
       registeredSuperPeers: superPeerCount
     });
-    res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(body);
+
+  } else if (url === '/metrics/topology') {
+    const nodes = [];
+    for (const [nodeId, entry] of signalingRegistry.entries()) {
+      nodes.push({
+        id: nodeId,
+        isSuperPair: entry.isSuperPair ?? false,
+        clusterId: entry.clusterId ?? '',
+        reliabilityScore: entry.reliabilityScore ?? 0,
+        freeBytes: entry.freeBytes ?? 0,
+        ip: entry.ip ?? '',
+        port: entry.port ?? 0,
+        lastSeen: entry.lastSeen ?? 0,
+        isConnected: sessions.has(nodeId)
+      });
+    }
+    // Liens intra-cluster : full mesh entre nœuds connectés du même cluster
+    const clusterGroups = new Map();
+    for (const n of nodes) {
+      if (!n.clusterId || !n.isConnected) continue;
+      if (!clusterGroups.has(n.clusterId)) clusterGroups.set(n.clusterId, []);
+      clusterGroups.get(n.clusterId).push(n.id);
+    }
+    const links = [];
+    for (const members of clusterGroups.values()) {
+      for (let i = 0; i < members.length; i++) {
+        for (let j = i + 1; j < members.length; j++) {
+          links.push({ source: members[i], target: members[j] });
+        }
+      }
+    }
+
+    sendJson(res, { nodes, links, activeSessions: sessions.size });
+
+  } else if (url === '/metrics/events') {
+    sendJson(res, {
+      authFailures: eventCounters.authFailures,
+      authSuccesses: eventCounters.authSuccesses,
+      electionBroadcasts: eventCounters.electionBroadcasts,
+      forwardedBlocks: eventCounters.forwardedBlocks,
+      forwardedBlocksFailed: eventCounters.forwardedBlocksFailed,
+      signalsSent: eventCounters.signalsSent,
+      droppedSignals: eventCounters.droppedSignals,
+      joinEvents: eventCounters.joinEvents,
+      departures: eventCounters.departures,
+      churnRate: getChurnRate(),
+      uptimeMs: Date.now() - eventCounters.startedAt
+    });
+
+  } else if (url === '/metrics/clusters') {
+    sendJson(res, {
+      clusters: buildClusterView(),
+      totalNodes: signalingRegistry.size,
+      totalConnected: sessions.size,
+      churnRate: getChurnRate()
+    });
+
+  } else if (url === '/metrics/logs') {
+    // Paramètre ?since=timestamp pour ne récupérer que les nouveaux logs
+    const sinceParam = new URLSearchParams(req.url.split('?')[1] ?? '').get('since');
+    const sinceRaw = sinceParam ? parseInt(sinceParam, 10) : 0;
+    const since = Number.isFinite(sinceRaw) && sinceRaw > 0 ? sinceRaw : 0;
+    const filtered = since > 0 ? realtimeLogs.filter(e => e.ts > since) : realtimeLogs.slice(-50);
+    sendJson(res, { logs: filtered, serverTime: Date.now() });
+
   } else {
-    res.writeHead(404);
-    res.end('Not found');
+    res.writeHead(404, CORS_HEADERS);
+    res.end('{"error":"Not found"}');
   }
 });
 
@@ -584,10 +786,14 @@ wss.on('connection', (ws) => {
       }
       const result = verifyAuth(frame.payload);
       if (!result.ok) {
+        eventCounters.authFailures++;
+        logEvent('ERROR', 'AUTH', `Authentification échouée : ${result.reason}`, { reason: result.reason });
         sendError(ws, `AUTH échouée : ${result.reason}`);
         ws.close(1008, 'AUTH invalide');
         return;
       }
+      eventCounters.authSuccesses++;
+      logEvent('INFO', 'AUTH', `Authentification réussie : ${result.nodeId.slice(0, 8)}`, { nodeId: result.nodeId });
 
       // Fermer l'ancienne connexion si le nodeId est déjà enregistré
       const existingSession = sessions.get(result.nodeId);
@@ -667,9 +873,12 @@ wss.on('connection', (ws) => {
         if (entry) {
           clearTimeout(entry.ttlTimer);
           signalingRegistry.delete(authState.nodeId);
-          console.log(`[SIGNALING] nodeId=${authState.nodeId.slice(0, 8)} déconnecté — supprimé de l'annuaire`);
+          recordChurn(authState.nodeId);
+          eventCounters.departures++;
+          logEvent('WARN', 'DEPART', `Nœud déconnecté : ${authState.nodeId.slice(0, 8)} (${sessions.size} sessions restantes)`, { nodeId: authState.nodeId, remaining: sessions.size });
+        } else {
+          logEvent('INFO', 'WS', `Session fermée : ${authState.nodeId.slice(0, 8)} (${sessions.size} sessions restantes)`, { nodeId: authState.nodeId });
         }
-        console.log(`[WS] nodeId=${authState.nodeId.slice(0, 8)} déconnecté (${sessions.size} sessions restantes)`);
       } else {
         console.log(`[WS] nodeId=${authState.nodeId.slice(0, 8)} ancienne ws fermée — session active conservée`);
       }
@@ -687,6 +896,7 @@ function startServer() {
   httpServer.listen(PORT, () => {
     console.log(`[SERVER] MobiCloud Relay HA démarré sur port ${PORT}`);
     console.log(`[SERVER] /health → http://localhost:${PORT}/health`);
+    logEvent('INFO', 'SERVER', `Relay HA démarré sur port ${PORT}`, { port: PORT });
   });
 
   // Heartbeat global — ping toutes les ws toutes les 30s, terminate celles qui n'ont pas
