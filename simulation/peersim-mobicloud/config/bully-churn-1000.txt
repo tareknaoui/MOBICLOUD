@@ -1,0 +1,25 @@
+# Bully Election : test de re-election apres panne du super-peer
+# Le super-peer elu au cycle 20 est tue -- on mesure la re-election
+
+random.seed 1234567890
+network.size 1000
+simulation.cycles 60
+
+protocol.linkable peersim.core.IdleProtocol
+
+protocol.bully mobicloud.MobiCloudBullyElection
+protocol.bully.linkable linkable
+
+init.wire WireKOut
+init.wire.k 10
+init.wire.protocol linkable
+
+include.init wire
+
+# Tue le super-peer au cycle 20 (apres convergence initiale)
+control.killer mobicloud.SuperPeerKillerControl
+control.killer.protocol bully
+control.killer.killAtCycle 20
+
+control.observer mobicloud.BullyObserver
+control.observer.protocol bully

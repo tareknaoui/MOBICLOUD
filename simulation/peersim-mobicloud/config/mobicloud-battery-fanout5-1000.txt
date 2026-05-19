@@ -1,0 +1,30 @@
+# MobiCloud -- test consommation batterie -- fanout=5 -- 1000 noeuds
+
+random.seed 1234567890
+network.size 1000
+simulation.cycles 120
+
+protocol.linkable peersim.core.IdleProtocol
+
+protocol.battery mobicloud.BatteryProtocol
+protocol.battery.initialLevel   100.0
+protocol.battery.costPerSend    0.5
+protocol.battery.costPerReceive 0.3
+
+protocol.dht mobicloud.MobiCloudGossipDht
+protocol.dht.linkable linkable
+protocol.dht.fanout 5
+protocol.dht.battery battery
+
+init.wire WireKOut
+init.wire.k 5
+init.wire.protocol linkable
+
+init.seed mobicloud.InitialDhtSeeder
+init.seed.protocol dht
+init.seed.initialBlocks 100
+
+include.init wire seed
+
+control.observer mobicloud.BatteryObserver
+control.observer.battery battery

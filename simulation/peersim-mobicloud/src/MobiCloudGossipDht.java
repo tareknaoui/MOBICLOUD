@@ -19,14 +19,19 @@ import java.util.Map;
  *
  * Equivalent du GossipSyncUseCase.runGossipCycle() dans le code Android,
  * mais simplifie pour la simulation (pas de Bloom filter -- exchange complet).
+ *
+ * Si un protocol.battery est configure, chaque echange gossip consomme
+ * de l'energie (TX pour l'emetteur, RX pour le recepteur).
  */
 public class MobiCloudGossipDht implements CDProtocol {
 
     private static final String PAR_LINKABLE = "linkable";
-    private static final String PAR_FANOUT = "fanout";
+    private static final String PAR_FANOUT   = "fanout";
+    private static final String PAR_BATTERY  = "battery";
 
     private final int linkablePid;
     private final int fanout;
+    private final int batteryPid; // -1 si pas configure
 
     /** Entree DHT modelisee : (blockId, hostNodeId, timestamp). */
     public static class DhtEntry {
@@ -43,7 +48,8 @@ public class MobiCloudGossipDht implements CDProtocol {
 
     public MobiCloudGossipDht(String prefix) {
         linkablePid = Configuration.getPid(prefix + "." + PAR_LINKABLE);
-        fanout = Configuration.getInt(prefix + "." + PAR_FANOUT, 2);
+        fanout      = Configuration.getInt(prefix + "." + PAR_FANOUT, 2);
+        batteryPid  = Configuration.getPid(prefix + "." + PAR_BATTERY, -1);
     }
 
     @Override
@@ -59,6 +65,7 @@ public class MobiCloudGossipDht implements CDProtocol {
 
     @Override
     public void nextCycle(Node node, int protocolID) {
+        if (!node.isUp()) return;
         Linkable linkable = (Linkable) node.getProtocol(linkablePid);
         if (linkable.degree() == 0) return;
 
@@ -71,6 +78,14 @@ public class MobiCloudGossipDht implements CDProtocol {
             MobiCloudGossipDht peerDht = (MobiCloudGossipDht) peer.getProtocol(protocolID);
             mergeDht(this.dht, peerDht.dht);
             mergeDht(peerDht.dht, this.dht);
+
+            // Consommation batterie : TX pour l'emetteur, RX pour le pair
+            if (batteryPid >= 0) {
+                BatteryProtocol myBat   = (BatteryProtocol) node.getProtocol(batteryPid);
+                BatteryProtocol peerBat = (BatteryProtocol) peer.getProtocol(batteryPid);
+                myBat.deductSend(node);
+                peerBat.deductReceive(peer);
+            }
         }
     }
 

@@ -1,0 +1,32 @@
+# MobiCloud DHT sous churn 30% -- 1000 noeuds
+# Simule un reseau mobile tres volatile (30% deconnexions par step)
+
+random.seed 1234567890
+network.size 1000
+simulation.cycles 120
+
+protocol.linkable peersim.core.IdleProtocol
+
+protocol.dht mobicloud.MobiCloudGossipDht
+protocol.dht.linkable linkable
+protocol.dht.fanout 2
+
+init.wire WireKOut
+init.wire.k 5
+init.wire.protocol linkable
+
+init.seed mobicloud.InitialDhtSeeder
+init.seed.protocol dht
+init.seed.initialBlocks 100
+
+include.init wire seed
+
+# Churn : 30% de noeuds tombent tous les 5 cycles, 50% se reconnectent
+control.churn mobicloud.ChurnControl
+control.churn.churnRate 0.30
+control.churn.reviveRate 0.50
+control.churn.step 5
+
+control.observer mobicloud.ConvergenceObserver
+control.observer.protocol dht
+control.observer.targetSize 100

@@ -56,6 +56,7 @@ public class MobiCloudBullyElection implements CDProtocol {
 
     @Override
     public void nextCycle(Node node, int protocolID) {
+        if (!node.isUp()) return;
         Linkable linkable = (Linkable) node.getProtocol(linkablePid);
         if (linkable.degree() == 0) return;
 

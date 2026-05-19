@@ -3,6 +3,7 @@ package mobicloud;
 import peersim.config.Configuration;
 import peersim.core.Control;
 import peersim.core.Network;
+import peersim.core.Node;
 
 /**
  * Mesure a chaque cycle : combien de noeuds ont la DHT complete (= convergence)
@@ -25,19 +26,23 @@ public class ConvergenceObserver implements Control {
     public boolean execute() {
         long totalSize = 0;
         int convergedNodes = 0;
+        int aliveNodes = 0;
         for (int i = 0; i < Network.size(); i++) {
-            MobiCloudGossipDht dht = (MobiCloudGossipDht) Network.get(i).getProtocol(dhtPid);
+            Node node = Network.get(i);
+            if (!node.isUp()) continue;
+            aliveNodes++;
+            MobiCloudGossipDht dht = (MobiCloudGossipDht) node.getProtocol(dhtPid);
             int s = dht.size();
             totalSize += s;
             if (s >= targetSize) convergedNodes++;
         }
-        double avg = (double) totalSize / Network.size();
-        // CSV avec separateur point-virgule (compatible Excel europeen)
+        double avg = aliveNodes > 0 ? (double) totalSize / aliveNodes : 0;
+        // CSV : cycle ; avg_dht ; converged_nodes ; alive_nodes
         System.out.printf("%d;%.2f;%d;%d%n",
             peersim.core.CommonState.getTime(),
             avg,
             convergedNodes,
-            Network.size());
-        return false; // ne stoppe pas la simulation
+            aliveNodes);
+        return false;
     }
 }
