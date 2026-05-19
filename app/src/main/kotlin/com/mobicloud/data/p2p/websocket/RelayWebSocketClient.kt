@@ -64,6 +64,13 @@ class RelayWebSocketClient @Inject constructor(
     // AVANT le déclenchement de toute connexion WS.
     internal val joinIncomingFlow = MutableSharedFlow<JoinIncomingMessage>(replay = 0, extraBufferCapacity = 64)
 
+    // Bus partagé : tous les RelayEvent émis par connect() y sont broadcastés.
+    // Permet à RelayRepositoryImpl de s'abonner sans ouvrir une 2ème connexion WebSocket
+    // (deux connect() en parallèle = deux AUTH_OK = activeWebSocket race = PEERS réponses
+    // routées vers le mauvais callbackFlow → processPeerList jamais appelé → join bloqué).
+    private val _eventBus = MutableSharedFlow<RelayEvent>(replay = 0, extraBufferCapacity = 128)
+    internal val eventBus: SharedFlow<RelayEvent> = _eventBus.asSharedFlow()
+
     /**
      * Ouvre une connexion WSS persistante vers relayUrl.
      * Sur déconnexion, reconnecte avec backoff exponentiel (1s → 2s → 4s → 8s → max 30s).
@@ -82,6 +89,7 @@ class RelayWebSocketClient @Inject constructor(
             try {
                 connectSingle(currentUrl).collect { event ->
                     emit(event)
+                    _eventBus.tryEmit(event)
                     if (event is RelayEvent.Connected) {
                         attemptsOnCurrentServer = 0 // réinitialise le compteur
                     }

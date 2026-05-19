@@ -8,6 +8,7 @@ import com.mobicloud.domain.models.ClusterTopologyState
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.models.TransferChannelState
+import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.repository.DiagnosticsRepository
 import com.mobicloud.domain.repository.SecurityRepository
@@ -56,7 +57,6 @@ class NetworkViewModel @Inject constructor(
         memberSnapshotCacheUseCase.inMemory
     ) { peers, localNodeId, diagnostics, clusterMembers ->
         val now = SystemClock.elapsedRealtime()
-        val clusterMemberNodeIds = clusterMembers.map { it.nodeId.toHexString() }.toSet()
 
         val localSuperPeer = peers.firstOrNull { peer ->
             peer.isSuperPair && (
@@ -66,22 +66,49 @@ class NetworkViewModel @Inject constructor(
         } ?: peers.singleOrNull { it.isSuperPair }
 
         val freshPeers = peers.filter { peer -> (now - peer.lastSeenTimestampMs) <= 120_000L }
+        val freshPeersByNodeId = freshPeers.associateBy { it.identity.nodeId }
 
-        val localPeers = freshPeers.filter { peer ->
-            peer == localSuperPeer ||
-            (!peer.isSuperPair && peer.identity.nodeId in clusterMemberNodeIds)
-        }
+        // [P17 2026-05-19] Source de vérité = annuaire super-peer (membership logique),
+        // pas la découverte LAN (qui échoue derrière AP isolation hotspot, NAT symétrique, etc.).
+        // Pour chaque membre de l'annuaire, on enrichit depuis `peers` si dispo (chemin direct
+        // connu) ; sinon on synthétise une entrée joignable via relais — cohérent avec le fallback
+        // de `BlockDownloaderWithRelay` qui bascule relay-pull quand le pair n'est pas dans `peers`.
+        var localNodes: List<ClusterNodeInfo> = clusterMembers.map { member ->
+            val memberNodeIdHex = member.nodeId.toHexString()
+            val isSelf = memberNodeIdHex == localNodeId
+            val matchingPeer = freshPeersByNodeId[memberNodeIdHex]
+            when {
+                isSelf -> ClusterNodeInfo(
+                    nodeId           = memberNodeIdHex,
+                    isSuperPair      = member.role == MemberRole.SUPER_PAIR,
+                    isLocal          = true,
+                    batteryPercent   = diagnostics.batteryPercent,
+                    reliabilityScore = diagnostics.reliabilityScore,
+                    nodeStatus       = ClusterNodeStatus.ACTIF,
+                    channel          = "Local",
+                    lastSeenMs       = now
+                )
+                matchingPeer != null -> matchingPeer.toNodeInfo(localNodeId, diagnostics.batteryPercent, now)
+                else -> ClusterNodeInfo(
+                    nodeId           = memberNodeIdHex,
+                    isSuperPair      = member.role == MemberRole.SUPER_PAIR,
+                    isLocal          = false,
+                    batteryPercent   = null,
+                    reliabilityScore = 0f,
+                    nodeStatus       = ClusterNodeStatus.ACTIF,
+                    channel          = "Relais HA",
+                    lastSeenMs       = now
+                )
+            }
+        }.sortedWith(
+            compareByDescending<ClusterNodeInfo> { it.isSuperPair }
+                .thenByDescending { it.reliabilityScore }
+        )
 
+        // remotePeers = super-pairs vus hors cluster local (autres clusters)
         val remotePeers = freshPeers.filter { peer ->
             peer.isSuperPair && peer != localSuperPeer
         }
-
-        var localNodes = localPeers
-            .map { peer -> peer.toNodeInfo(localNodeId, diagnostics.batteryPercent, now) }
-            .sortedWith(
-                compareByDescending<ClusterNodeInfo> { it.isSuperPair }
-                    .thenByDescending { it.reliabilityScore }
-            )
 
         if (localNodeId != null && localNodes.none { it.nodeId == localNodeId }) {
             val selfNode = ClusterNodeInfo(

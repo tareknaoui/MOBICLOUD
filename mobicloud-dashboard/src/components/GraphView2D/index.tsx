@@ -240,18 +240,23 @@ export default function GraphView2D({ topology, error, theme }: Props) {
       }
     }
 
+    // Fallback cluster for members without clusterId: use the super-peer's cluster
+    // (relay only stores clusterId for REGISTER_PEER, not for JOIN members)
+    const superPeerClusterId = topology.nodes.find(n => n.isSuperPair && n.clusterId)?.clusterId ?? null;
+
     const newNodeIds: string[] = [];
 
     cy.batch(() => {
       for (const n of topology.nodes) {
         const isNew   = !known.has(n.id);
-        const color   = n.clusterId ? (colorMap.get(n.clusterId) ?? '#60a5fa') : '#60a5fa';
-        const parentId = n.clusterId ? `cluster-${n.clusterId}` : undefined;
+        const effectiveClusterId = n.clusterId || (!n.isSuperPair && superPeerClusterId ? superPeerClusterId : null);
+        const color   = effectiveClusterId ? (colorMap.get(effectiveClusterId) ?? '#60a5fa') : '#60a5fa';
+        const parentId = effectiveClusterId ? `cluster-${effectiveClusterId}` : undefined;
 
         // Ensure cluster compound node exists before adding child
-        if (n.clusterId && !cy.$(`#${parentId}`).length) {
+        if (effectiveClusterId && !cy.$(`#${parentId}`).length) {
           cy.add({
-            data: { id: parentId, color, shortLabel: n.clusterId.slice(0, 8) + '…' },
+            data: { id: parentId, color, shortLabel: effectiveClusterId.slice(0, 8) + '…' },
             classes: 'cluster',
           });
         }
@@ -260,7 +265,7 @@ export default function GraphView2D({ topology, error, theme }: Props) {
         const data = {
           id: n.id, label: n.id.slice(0, 6),
           isSuperPair: n.isSuperPair, isConnected: n.isConnected,
-          clusterId: n.clusterId, reliabilityScore: n.reliabilityScore,
+          clusterId: effectiveClusterId ?? '', reliabilityScore: n.reliabilityScore,
           freeBytes: n.freeBytes, ip: n.ip, port: n.port, color,
           parent: parentId,
         };
@@ -268,8 +273,8 @@ export default function GraphView2D({ topology, error, theme }: Props) {
         if (isNew) {
           // Position: near cluster centroid if layout is done, random otherwise
           let pos = { x: (Math.random() - 0.5) * 300, y: (Math.random() - 0.5) * 300 };
-          if (n.clusterId && layoutDoneRef.current) {
-            const siblings = cy.nodes(`[clusterId = "${n.clusterId}"]`).filter(':not(.cluster)');
+          if (effectiveClusterId && layoutDoneRef.current) {
+            const siblings = cy.nodes(`[clusterId = "${effectiveClusterId}"]`).filter(':not(.cluster)');
             if (siblings.length > 0) {
               const positions = siblings.map(m => (m as Cytoscape.NodeSingular).position());
               pos = {
@@ -294,7 +299,7 @@ export default function GraphView2D({ topology, error, theme }: Props) {
 
         known.set(n.id, {
           id: n.id, isSuperPair: n.isSuperPair, isConnected: n.isConnected,
-          clusterId: n.clusterId, reliabilityScore: n.reliabilityScore,
+          clusterId: effectiveClusterId ?? '', reliabilityScore: n.reliabilityScore,
           freeBytes: n.freeBytes, ip: n.ip, port: n.port, departedAt: null,
         });
       }

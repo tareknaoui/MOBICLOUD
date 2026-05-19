@@ -57,6 +57,16 @@ class MarkSelfAsSuperPairUseCase @Inject constructor(
             freeBytes = freeBytes,
             role = MemberRole.SUPER_PAIR
         )
+
+        // P18 (fix 2026-05-19) : persister clusterId AVANT memberRegistry.add(selfMember).
+        // RoomMemberRegistry.add() lit currentClusterId() depuis NodeSettings — si le clusterId
+        // n'est pas encore persisté (nouveau cluster UUID généré par RunBullyElection mais pas
+        // encore écrit), currentClusterId() retourne "" → add() retourne en silence sans insérer
+        // le SP. Résultat : memberRegistry vide → snapshot JOIN_ACCEPT sans SP → inMemory membre
+        // sans SUPER_PAIR → ProcessMemberUpdateUseCase ignore tous les keepalives → SP_TIMEOUT 90s.
+        val persisted = runCatching { nodeSettingsRepository.updateClusterId(clusterId) }
+        if (persisted.isFailure) return
+
         memberRegistry.add(selfMember)
 
         // Repeuplement depuis snapshot (FR-11.8) : les membres connus restent dans le cluster
@@ -68,12 +78,6 @@ class MarkSelfAsSuperPairUseCase @Inject constructor(
         if (memberSnapshotCacheUseCaseLazy.get().snapshotClusterId() == clusterId) {
             snapshot.filter { !it.nodeId.contentEquals(selfNodeId) }
                     .forEach { memberRegistry.add(it) }
-        }
-
-        val persisted = runCatching { nodeSettingsRepository.updateClusterId(clusterId) }
-        if (persisted.isFailure) {
-            memberRegistry.remove(selfMember.nodeId, clusterId)
-            return
         }
 
         // Sync inMemory : source de vérité pour NetworkViewModel côté SP.

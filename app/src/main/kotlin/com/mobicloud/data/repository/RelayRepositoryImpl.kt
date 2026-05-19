@@ -2,7 +2,6 @@ package com.mobicloud.data.repository
 
 import android.util.Log
 import com.mobicloud.core.format.MobiCloudProtoBuf
-import com.mobicloud.data.p2p.websocket.RELAY_SERVER_URLS
 import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.domain.models.BlockTransferMessage
 import com.mobicloud.domain.models.RelayEvent
@@ -51,7 +50,12 @@ class RelayRepositoryImpl @Inject constructor(
 
     init {
         repoScope.launch {
-            client.connect(RELAY_SERVER_URLS.first()).collect { event ->
+            // P-FIX dual-ws : ne pas appeler client.connect() ici — SignalingRepositoryImpl
+            // est l'unique driver du cycle de vie WebSocket. Un 2ème connect() ouvrait une 2ème
+            // connexion WebSocket ; activeWebSocket pouvait pointer vers elle → PEERS response
+            // routée dans ce callbackFlow (PeerList ignoré ici) → processPeerList jamais appelé
+            // → latestPeers vide → NewCandidateDetected jamais émis → join bloqué indéfiniment.
+            client.eventBus.collect { event ->
                 _relayEvents.tryEmit(event)
                 when (event) {
                     is RelayEvent.Connected    -> _connectionState.value = RelayConnectionState.CONNECTED
