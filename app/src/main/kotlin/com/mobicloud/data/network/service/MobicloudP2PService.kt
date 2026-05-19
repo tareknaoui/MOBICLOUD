@@ -403,8 +403,9 @@ class MobicloudP2PService : Service() {
                                 val localMembers = memberSnapshotCacheUseCase.inMemory.value.size
                                 val remoteSaturated = peer.currentMemberCount >= com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
                                 if (localMembers > 1) {
-                                    Log.i(LOGTAG, "[JOIN] SP conflict avec ${peer.nodeId.take(8)} — local a $localMembers membres, NO abdication")
-                                    seenSuperPairIds = seenSuperPairIds + peer.nodeId
+                                    Log.i(LOGTAG, "[JOIN] SP conflict avec ${peer.nodeId.take(8)} — local a $localMembers membres, NO abdication (re-évaluation possible si membres baissent)")
+                                    // Ne PAS ajouter à seenSuperPairIds : localMembers > 1 est temporaire.
+                                    // Si un membre est évincé plus tard, le prochain GET_PEERS re-évaluera ce rival.
                                 } else if (remoteSaturated) {
                                     Log.i(LOGTAG, "[JOIN] SP ${peer.nodeId.take(8)} saturé (${peer.currentMemberCount}/${com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE}) — probable ghost, NO abdication")
                                     seenSuperPairIds = seenSuperPairIds + peer.nodeId
@@ -489,7 +490,7 @@ class MobicloudP2PService : Service() {
                                 // Guard anti-ghost (incident 2026-05-17) : ne pas abdiquer si on a déjà
                                 // des membres réels (snapshot.size > 1 = self + ≥1 autre).
                                 val localMembers = memberSnapshotCacheUseCase.inMemory.value.size
-                                if (localMembers > 1) return@launch
+                                if (localMembers > 1) return@repeat
                                 // N'abdiquer que si le rival a une priorité plus haute ET de la capacité.
                                 val rival = signalingRepository.latestPeers.value
                                     .filter { it.isSuperPair
