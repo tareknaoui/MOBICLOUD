@@ -28,6 +28,37 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
+ * MobiCloud warm friendly light color scheme
+ */
+val LightWarmColorScheme = lightColorScheme(
+    primary = WarmCoral,
+    onPrimary = Color.White,
+    primaryContainer = WarmPeach,
+    onPrimaryContainer = WarmOrange10,
+    secondary = WarmBrownMid,
+    onSecondary = Color.White,
+    secondaryContainer = WarmMint,
+    onSecondaryContainer = WarmBrownDark,
+    tertiary = WarmCoralLight,
+    onTertiary = Color.White,
+    tertiaryContainer = WarmPeach,
+    onTertiaryContainer = WarmOrange10,
+    error = Red40,
+    onError = Color.White,
+    errorContainer = Red90,
+    onErrorContainer = Red10,
+    background = WarmBeige,
+    onBackground = WarmBrownDark,
+    surface = WarmBeige,
+    onSurface = WarmBrownDark,
+    surfaceVariant = WarmSurfaceVariant,
+    onSurfaceVariant = WarmBrownMid,
+    inverseSurface = WarmBrownDark,
+    inverseOnSurface = WarmBeige,
+    outline = WarmBrownLight,
+)
+
+/**
  * Light default theme color scheme
  */
 @VisibleForTesting
@@ -102,8 +133,7 @@ val DarkDefaultColorScheme = darkColorScheme(
 fun JetpackTheme(
     content: @Composable () -> Unit,
 ) {
-    // Strictly override to DarkDefaultColorScheme to enforce OLED rule
-    val colorScheme = DarkDefaultColorScheme
+    val colorScheme = LightWarmColorScheme
     
     // Gradient colors
     val gradientColors = GradientColors() // Empty

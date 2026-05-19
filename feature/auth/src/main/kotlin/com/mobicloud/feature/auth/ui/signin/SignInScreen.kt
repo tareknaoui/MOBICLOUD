@@ -18,6 +18,7 @@ package com.mobicloud.feature.auth.ui.signin
 
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -60,6 +61,8 @@ import com.mobicloud.core.ui.components.JetpackOutlinedButton
 import com.mobicloud.core.ui.components.JetpackPasswordFiled
 import com.mobicloud.core.ui.components.JetpackTextButton
 import com.mobicloud.core.ui.components.JetpackTextFiled
+import com.mobicloud.core.ui.components.MobicloudBackgroundBlobs
+import com.mobicloud.core.ui.components.MobicloudLogoHeader
 import com.mobicloud.core.ui.utils.PreviewDevices
 import com.mobicloud.core.ui.utils.PreviewThemes
 import com.mobicloud.core.ui.utils.SnackbarAction
@@ -127,7 +130,11 @@ private fun SignInScreen(
     LaunchedEffect(Unit, onSignInWithSavedCredentials) {
         activity?.run(onSignInWithSavedCredentials)
     }
-    Column(
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        MobicloudBackgroundBlobs(modifier = Modifier.fillMaxSize())
+
+        Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 40.dp)
@@ -136,7 +143,13 @@ private fun SignInScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
-        Text(stringResource(R.string.sign_in), style = MaterialTheme.typography.headlineLarge)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Cloud logo
+        MobicloudLogoHeader()
+
+        Spacer(modifier = Modifier.height(32.dp))
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -231,7 +244,8 @@ private fun SignInScreen(
             }
         }
         Spacer(modifier = Modifier.height(40.dp))
-    }
+        } // Column
+    } // Box
 }
 
 @Composable

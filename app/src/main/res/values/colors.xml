@@ -16,6 +16,6 @@
 -->
 
 <resources>
-    <color name="surface_light">#FFFCFDF6</color>
-    <color name="surface_dark">#FF1A1C19</color>
+    <color name="surface_light">#FFFBF6F1</color>
+    <color name="surface_dark">#FF1B1816</color>
 </resources>

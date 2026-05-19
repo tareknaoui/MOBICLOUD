@@ -10,17 +10,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.mobicloud.domain.models.ErasureParameters
 import com.mobicloud.presentation.explorer.DownloadState
 
@@ -30,49 +31,56 @@ fun DownloadProgressIndicator(
     onCancel: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    // [Review][Patch] P3 — AC4 : le bouton Annuler doit aussi apparaître pendant Locating.
-    // Avant ce patch, le return excluait Locating → AC4 violé.
     if (state !is DownloadState.Locating && state !is DownloadState.Downloading && state !is DownloadState.Decrypting) return
 
-    Surface(
-        modifier = modifier
-            .fillMaxWidth()
-            .border(width = 1.dp, color = Color(0xFF333333), shape = RoundedCornerShape(4.dp)),
-        color = Color(0xFF000000),
-        shape = RoundedCornerShape(4.dp),
-        shadowElevation = 0.dp
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             when (state) {
                 is DownloadState.Locating -> {
                     Text(
-                        text = "⟳ Localisation des blocs...",
-                        color = Color(0xFFE0E0E0),
-                        fontSize = 13.sp,
-                        fontFamily = FontFamily.Monospace
+                        text = "Localisation des blocs…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF1B1816)
                     )
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFF00FF41),
-                        trackColor = Color(0xFF1A1A1A)
+                        color = Color(0xFFD9633F),
+                        trackColor = Color(0xFFFFE0D1)
                     )
                 }
 
                 is DownloadState.Downloading -> {
-                    Text(
-                        text = "⬇ ${state.received}/${state.k} blocs",
-                        color = Color(0xFFE0E0E0),
-                        fontSize = 13.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Téléchargement",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1B1816)
+                        )
+                        Text(
+                            text = "${state.received}/${state.k} blocs",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF6B625B)
+                        )
+                    }
                     LinearProgressIndicator(
                         progress = { state.received.toFloat() / state.k.coerceAtLeast(1) },
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFF00FF41),
-                        trackColor = Color(0xFF1A1A1A)
+                        color = Color(0xFFD9633F),
+                        trackColor = Color(0xFFFFE0D1)
                     )
 
                     val params = ErasureParameters()
@@ -88,17 +96,22 @@ fun DownloadProgressIndicator(
                             val isData = index < params.k
                             val contribution = receivedByFragment[index]
                             val blockColor = when {
-                                index in failedFragments -> Color(0xFFFF3333)
-                                contribution != null && isData -> Color(0xFF00FF41)
-                                contribution != null && !isData -> Color(0xFFFFB300)
-                                isData -> Color(0xFF0D2B0D)
-                                else -> Color(0xFF2B2000)
+                                index in failedFragments -> Color(0xFFC62828)
+                                contribution != null && isData -> Color(0xFF4CAF50)
+                                contribution != null && !isData -> Color(0xFFD9633F)
+                                isData -> Color(0xFFD9F0E6)
+                                else -> Color(0xFFFFE0D1)
+                            }
+                            val borderColor = when {
+                                index in failedFragments -> Color(0xFFC62828)
+                                contribution != null -> Color.Transparent
+                                else -> Color(0xFF9C8D86)
                             }
                             Box(
                                 modifier = Modifier
-                                    .size(20.dp)
-                                    .background(blockColor, RoundedCornerShape(2.dp))
-                                    .border(1.dp, Color(0xFF333333), RoundedCornerShape(2.dp))
+                                    .size(18.dp)
+                                    .background(blockColor, RoundedCornerShape(3.dp))
+                                    .border(1.dp, borderColor, RoundedCornerShape(3.dp))
                             )
                         }
                     }
@@ -110,14 +123,13 @@ fun DownloadProgressIndicator(
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             for (contrib in uniqueContribs) {
                                 val label = buildString {
-                                    append("${contrib.nodeId.take(4)}... ${contrib.latencyMs}ms")
+                                    append("${contrib.nodeId.take(6)}… ${contrib.latencyMs}ms")
                                     if (contrib.isFallback) append(" (secours)")
                                 }
                                 Text(
                                     text = label,
-                                    color = Color(0xFF9E9E9E),
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFF9C8D86)
                                 )
                             }
                         }
@@ -127,10 +139,9 @@ fun DownloadProgressIndicator(
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             for (nodeId in state.slowNodeIds) {
                                 Text(
-                                    text = "⏳ ${nodeId.take(4)}... Attente",
-                                    color = Color(0xFFFFB300),
-                                    fontSize = 11.sp,
-                                    fontFamily = FontFamily.Monospace
+                                    text = "En attente : ${nodeId.take(6)}…",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFBF360C)
                                 )
                             }
                         }
@@ -138,29 +149,40 @@ fun DownloadProgressIndicator(
                 }
 
                 is DownloadState.Decrypting -> {
-                    Text(
-                        text = "🔓 Déchiffrement ${state.processed}/${state.k} blocs",
-                        color = Color(0xFFE0E0E0),
-                        fontSize = 13.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Déchiffrement",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF1B1816)
+                        )
+                        Text(
+                            text = "${state.processed}/${state.k} blocs",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF6B625B)
+                        )
+                    }
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFF00FF41),
-                        trackColor = Color(0xFF1A1A1A)
+                        color = Color(0xFFD9633F),
+                        trackColor = Color(0xFFFFE0D1)
                     )
                 }
 
             }
+
             TextButton(
                 onClick = onCancel,
                 modifier = Modifier.align(Alignment.End)
             ) {
                 Text(
-                    text = "✕ Annuler",
-                    color = Color(0xFFFF3333),
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace
+                    text = "Annuler",
+                    color = Color(0xFF9C8D86),
+                    style = MaterialTheme.typography.labelMedium
                 )
             }
         }

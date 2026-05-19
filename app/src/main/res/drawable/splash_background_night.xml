@@ -17,7 +17,7 @@
 
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <item android:drawable="@color/surface_dark" />
+    <item android:drawable="@color/surface_light" />
     <item
         android:drawable="@drawable/ic_launcher_foreground"
         android:gravity="center" />

@@ -53,10 +53,22 @@ internal val Red40 = Color(0xFFBA1A1A)
 internal val Red80 = Color(0xFFFFB4AB)
 internal val Red90 = Color(0xFFFFDAD6)
 
-// MobiCloud OLED Dark Theme Colors
+// MobiCloud OLED Dark Theme Colors (kept for reference)
 internal val TerminalGreen = Color(0xFF00FF41)
 internal val PureBlack = Color(0xFF000000)
 internal val PrimaryText = Color(0xFFE0E0E0)
 internal val SecondaryText = Color(0xFF9E9E9E)
 internal val DarkSurfaceVariant = Color(0xFF121212)
+
+// MobiCloud Warm Friendly Theme Colors
+internal val WarmBeige = Color(0xFFFBF6F1)
+internal val WarmCoral = Color(0xFFD9633F)
+internal val WarmCoralLight = Color(0xFFF08C6A)
+internal val WarmPeach = Color(0xFFFFE0D1)
+internal val WarmMint = Color(0xFFD9F0E6)
+internal val WarmBrownDark = Color(0xFF1B1816)
+internal val WarmBrownMid = Color(0xFF6B625B)
+internal val WarmBrownLight = Color(0xFF9C8D86)
+internal val WarmSurfaceVariant = Color(0xFFF3EDE8)
+internal val WarmOrange10 = Color(0xFF380D00)
 

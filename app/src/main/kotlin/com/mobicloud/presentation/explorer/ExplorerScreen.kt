@@ -10,18 +10,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Upload
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
@@ -43,10 +48,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -77,7 +81,6 @@ fun ExplorerScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    // Clé stable : ne change que sur Success/Error, pas à chaque ACK de Distributing
     val terminalState = remember(storeState) {
         storeState.takeIf { it is StoreState.Success || it is StoreState.Error }
     }
@@ -94,7 +97,6 @@ fun ExplorerScreen(
         }
     }
 
-    // Story 6.4 — Snackbar uniquement pour les erreurs ; Assembled est géré par le BottomSheet.
     val terminalDownloadState = remember(downloadState) {
         downloadState.takeIf { it is DownloadState.Error }
     }
@@ -141,14 +143,12 @@ fun ExplorerScreen(
         )
     }
 
-    // Story 13.3 — snackbar "Upload en cours" quand l'utilisateur tente un 2e upload
     LaunchedEffect(Unit) {
         viewModel.uploadBusyEvent.collect {
             snackbarHostState.showSnackbar("Upload en cours, veuillez patienter")
         }
     }
 
-    // Story 13.2 — snackbar "Déplacé vers la corbeille" avec action "Annuler"
     LaunchedEffect(Unit) {
         viewModel.undoEvent.collect { fileHash ->
             val result = snackbarHostState.showSnackbar(
@@ -171,24 +171,38 @@ fun ExplorerScreen(
     Scaffold(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = Color(0xFFFBF6F1),
         topBar = {
             TopAppBar(
-                title = { Text("Mes fichiers") },
+                title = {
+                    Text(
+                        text = "Mes fichiers",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1B1816)
+                    )
+                },
                 actions = {
                     IconButton(onClick = onNavigateToTrash) {
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Corbeille",
-                            tint = Color(0xFFFFB300)
+                            tint = Color(0xFF9C8D86)
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = Color(0xFFFBF6F1)
+                )
             )
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { storeLauncher.launch("*/*") }) {
-                Icon(Icons.Default.Upload, contentDescription = "Stocker un fichier")
+            FloatingActionButton(
+                onClick = { storeLauncher.launch("*/*") },
+                containerColor = Color(0xFFD9633F),
+                contentColor = Color.White
+            ) {
+                Icon(Icons.Default.CloudUpload, contentDescription = "Stocker un fichier")
             }
         }
     ) { innerPadding ->
@@ -209,11 +223,10 @@ fun ExplorerScreen(
             }
             if (storeState is StoreState.Cancelled) {
                 Text(
-                    text = "⊘ Upload annulé",
-                    color = Color(0xFFFF3333),
-                    fontSize = 13.sp,
-                    fontFamily = FontFamily.Monospace,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    text = "Upload annulé",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFFC62828),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
 
@@ -237,19 +250,36 @@ fun ExplorerScreen(
             ) {
                 if (entries.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "Aucun fichier partagé.\nAppuyez sur + pour commencer.",
-                            color = Color(0xFFFFB300),
-                            fontSize = 14.sp,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(16.dp)
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FolderOpen,
+                                contentDescription = null,
+                                tint = Color(0xFFFFE0D1),
+                                modifier = Modifier.size(72.dp)
+                            )
+                            Text(
+                                text = "Aucun fichier partagé",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = Color(0xFF6B625B)
+                            )
+                            Text(
+                                text = "Appuyez sur le bouton + pour commencer",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF9C8D86),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(horizontal = 32.dp)
+                            )
+                        }
                     }
                 } else {
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(entries, key = { it.fileHash }) { entry ->
                             val dismissState = rememberSwipeToDismissBoxState(
@@ -267,7 +297,7 @@ fun ExplorerScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(Color(0xFFFF3333))
+                                            .background(Color(0xFFC62828))
                                             .padding(end = 20.dp),
                                         contentAlignment = Alignment.CenterEnd
                                     ) {
@@ -285,6 +315,7 @@ fun ExplorerScreen(
                                 )
                             }
                         }
+                        item { Spacer(modifier = Modifier.height(80.dp)) }
                     }
                 }
             }

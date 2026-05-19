@@ -18,6 +18,7 @@ package com.mobicloud.feature.auth.ui.signup
 
 import android.app.Activity
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -60,6 +61,8 @@ import com.mobicloud.core.ui.components.JetpackOutlinedButton
 import com.mobicloud.core.ui.components.JetpackPasswordFiled
 import com.mobicloud.core.ui.components.JetpackTextButton
 import com.mobicloud.core.ui.components.JetpackTextFiled
+import com.mobicloud.core.ui.components.MobicloudBackgroundBlobs
+import com.mobicloud.core.ui.components.MobicloudLogoHeader
 import com.mobicloud.core.ui.utils.PreviewDevices
 import com.mobicloud.core.ui.utils.PreviewThemes
 import com.mobicloud.core.ui.utils.SnackbarAction
@@ -123,7 +126,10 @@ private fun SignUpScreen(
     val focusManager = LocalFocusManager.current
     val activity = LocalContext.current.getActivity()
 
-    Column(
+    Box(modifier = Modifier.fillMaxSize()) {
+        MobicloudBackgroundBlobs(modifier = Modifier.fillMaxSize())
+
+        Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 40.dp)
@@ -132,7 +138,9 @@ private fun SignUpScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.windowInsetsTopHeight(WindowInsets.safeDrawing))
-        Text(stringResource(id = R.string.sign_up), style = MaterialTheme.typography.headlineLarge)
+        Spacer(modifier = Modifier.height(24.dp))
+        MobicloudLogoHeader()
+        Spacer(modifier = Modifier.height(32.dp))
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.Center,
@@ -239,7 +247,8 @@ private fun SignUpScreen(
             }
         }
         Spacer(modifier = Modifier.height(40.dp))
-    }
+        } // Column
+    } // Box
 }
 
 @Composable
