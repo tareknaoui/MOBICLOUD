@@ -47,9 +47,9 @@ import com.mobicloud.domain.models.ClusterNodeStatus
 import com.mobicloud.domain.models.ClusterTopologyState
 import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
 
-private val TerminalGreen = Color(0xFF00FF41)
-private val Amber = Color(0xFFFFB300)
-private val StatusRed = Color(0xFFFF5252)
+private val MauvePrimary = Color(0xFF0A84FF)
+private val Amber = Color(0xFFFF9F0A)
+private val StatusRed = Color(0xFFFF3B30)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,7 +76,7 @@ fun ClusterTopologyCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Cluster local",
+                text = "Votre groupe",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -107,7 +107,7 @@ fun ClusterTopologyCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Aucun cluster détecté",
+                    text = "Aucun membre trouvé",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -144,7 +144,7 @@ private fun NodeListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
         leadingContent = {
             Surface(
                 color = if (node.isSuperPair)
-                    TerminalGreen.copy(alpha = 0.15f)
+                    MauvePrimary.copy(alpha = 0.15f)
                 else
                     MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                 shape = RoundedCornerShape(8.dp)
@@ -152,7 +152,7 @@ private fun NodeListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
                 Icon(
                     imageVector = if (node.isSuperPair) Icons.Filled.Star else Icons.Outlined.Circle,
                     contentDescription = null,
-                    tint = if (node.isSuperPair) TerminalGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                    tint = if (node.isSuperPair) MauvePrimary else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier
                         .padding(8.dp)
                         .size(18.dp)
@@ -186,7 +186,7 @@ private fun NodeListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
         },
         supportingContent = {
             Text(
-                text = if (node.isSuperPair) "Super-Pair élu · ${node.channel}" else node.channel,
+                text = if (node.isSuperPair) "Organisateur · ${node.channel}" else node.channel,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -211,7 +211,7 @@ private fun NodeListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
 @Composable
 private fun StatusBadge(status: ClusterNodeStatus) {
     val (label, color) = when (status) {
-        ClusterNodeStatus.ACTIF -> "Actif" to TerminalGreen
+        ClusterNodeStatus.ACTIF -> "Actif" to MauvePrimary
         ClusterNodeStatus.DEGRADED -> "Dégradé" to Amber
         ClusterNodeStatus.OFFLINE -> "Hors-ligne" to StatusRed
     }
@@ -257,7 +257,7 @@ private fun NodeDetailSheet(node: ClusterNodeInfo) {
                 clipboardManager.setText(AnnotatedString(node.nodeId))
             }
         )
-        DetailRow(label = "Rôle", value = if (node.isSuperPair) "Super-Pair élu" else "Nœud membre")
+        DetailRow(label = "Rôle", value = if (node.isSuperPair) "Organisateur du groupe" else "Membre")
         DetailRow(label = "Fiabilité", value = "${(node.reliabilityScore * 100).toInt()}%")
         if (node.batteryPercent != null) {
             DetailRow(label = "Batterie", value = "${node.batteryPercent}%")

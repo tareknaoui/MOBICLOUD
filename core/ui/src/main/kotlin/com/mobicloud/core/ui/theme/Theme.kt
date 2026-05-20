@@ -28,7 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 /**
- * MobiCloud warm friendly light color scheme
+ * MobiCloud warm friendly light color scheme (kept for reference)
  */
 val LightWarmColorScheme = lightColorScheme(
     primary = WarmCoral,
@@ -56,6 +56,68 @@ val LightWarmColorScheme = lightColorScheme(
     inverseSurface = WarmBrownDark,
     inverseOnSurface = WarmBeige,
     outline = WarmBrownLight,
+)
+
+/**
+ * MobiCloud iOS Gray+Blue — thème clair gris doux + bleu
+ */
+val IosLightColorScheme = lightColorScheme(
+    primary = IosBlue,
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFD0E8FF),
+    onPrimaryContainer = Color(0xFF003D7A),
+    secondary = IosGreen,
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFD4F5DE),
+    onSecondaryContainer = Color(0xFF003817),
+    tertiary = IosOrange,
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFFEDD0),
+    onTertiaryContainer = Color(0xFF3D2000),
+    error = IosRed,
+    onError = Color.White,
+    errorContainer = Color(0xFFFFDAD6),
+    onErrorContainer = Color(0xFF3D0000),
+    background = IosBackground,
+    onBackground = IosText1,
+    surface = IosSurface,
+    onSurface = IosText1,
+    surfaceVariant = IosSurface,
+    onSurfaceVariant = IosText2,
+    inverseSurface = IosText1,
+    inverseOnSurface = IosSurface,
+    outline = IosBorder,
+)
+
+/**
+ * MobiCloud Mauve Night — thème sombre mauve/noir (kept for reference)
+ */
+val MauveNightColorScheme = darkColorScheme(
+    primary = MauvePrimary,
+    onPrimary = Color.White,
+    primaryContainer = MauveContainer,
+    onPrimaryContainer = MauveLight,
+    secondary = MauveLight,
+    onSecondary = NightBlack,
+    secondaryContainer = NightSurfaceVariant,
+    onSecondaryContainer = MauveLight,
+    tertiary = MauveGlow,
+    onTertiary = Color(0xFF2D0038),
+    tertiaryContainer = Color(0xFF4A004E),
+    onTertiaryContainer = Color(0xFFF5D0FE),
+    error = Red80,
+    onError = Red20,
+    errorContainer = Red30,
+    onErrorContainer = Red90,
+    background = NightBlack,
+    onBackground = NightOnSurface,
+    surface = NightSurface,
+    onSurface = NightOnSurface,
+    surfaceVariant = NightSurfaceVariant,
+    onSurfaceVariant = NightOnSurfaceVariant,
+    inverseSurface = NightOnSurface,
+    inverseOnSurface = NightBlack,
+    outline = NightOutline,
 )
 
 /**
@@ -133,7 +195,7 @@ val DarkDefaultColorScheme = darkColorScheme(
 fun JetpackTheme(
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = LightWarmColorScheme
+    val colorScheme = IosLightColorScheme
     
     // Gradient colors
     val gradientColors = GradientColors() // Empty

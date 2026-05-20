@@ -20,7 +20,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -57,7 +56,7 @@ private fun MemberRow(node: ClusterNodeInfo) {
     val seenLabel = if (node.isLocal) "Vous" else "Connecté il y a ${ageSec}s"
 
     val displayName = when {
-        node.isLocal && node.isSuperPair -> "Vous (Coordinateur)"
+        node.isLocal && node.isSuperPair -> "Vous (Organisateur)"
         node.isLocal -> "Vous"
         else -> "Membre " + node.nodeId.take(4)
     }
@@ -91,22 +90,22 @@ private fun MemberRow(node: ClusterNodeInfo) {
 @Composable
 private fun MemberAvatar(isCoordinator: Boolean) {
     val gradient = if (isCoordinator) {
-        Brush.linearGradient(listOf(Color(0xFF00FF41), Color(0xFF00AA2A)))
+        Brush.linearGradient(listOf(Color(0xFF0A84FF), Color(0xFF006FD6)))
     } else {
-        Brush.linearGradient(listOf(Color(0xFF1A4A2A), Color(0xFF003311)))
+        Brush.linearGradient(listOf(Color(0xFFE5E5EA), Color(0xFFD0D0D5)))
     }
     Box(
         modifier = Modifier
             .size(38.dp)
             .clip(CircleShape)
             .background(gradient)
-            .border(1.dp, Color(0xFF333333), CircleShape),
+            .border(1.dp, Color(0xFFC7C7CC), CircleShape),
         contentAlignment = Alignment.Center
     ) {
         if (isCoordinator) {
             Text(
                 text = "★",
-                color = Color.Black,
+                color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -117,9 +116,9 @@ private fun MemberAvatar(isCoordinator: Boolean) {
 @Composable
 private fun StatusPill(status: ClusterNodeStatus) {
     val (label, color) = when (status) {
-        ClusterNodeStatus.ACTIF -> "ACTIF" to Color(0xFF00FF41)
-        ClusterNodeStatus.DEGRADED -> "DÉGRADÉ" to Color(0xFFFFB300)
-        ClusterNodeStatus.OFFLINE -> "HORS-LIGNE" to Color(0xFFFF3333)
+        ClusterNodeStatus.ACTIF -> "Actif" to Color(0xFF34C759)
+        ClusterNodeStatus.DEGRADED -> "Lent" to Color(0xFFFF9F0A)
+        ClusterNodeStatus.OFFLINE -> "Hors-ligne" to Color(0xFFFF3B30)
     }
     Box(
         modifier = Modifier
@@ -130,9 +129,8 @@ private fun StatusPill(status: ClusterNodeStatus) {
         Text(
             text = label,
             color = color,
-            fontSize = 9.sp,
-            fontFamily = FontFamily.Monospace,
-            fontWeight = FontWeight.Bold
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Medium
         )
     }
 }

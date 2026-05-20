@@ -74,9 +74,9 @@ fun CatalogEntryCard(
 ) {
     val availability = entry.availabilityState()
     val (badgeText, badgeColor, badgeBg) = when (availability) {
-        AvailabilityState.COMPLET -> Triple("Complet", Color(0xFF2E7D32), Color(0xFFE8F5E9))
-        AvailabilityState.PARTIEL -> Triple("Partiel", Color(0xFFBF360C), Color(0xFFFFE0D1))
-        AvailabilityState.DEGRADE -> Triple("Dégradé", Color(0xFFC62828), Color(0xFFFFEBEE))
+        AvailabilityState.COMPLET -> Triple("Complet", Color(0xFF34C759), Color(0xFFE8F5E9))
+        AvailabilityState.PARTIEL -> Triple("Partiel", Color(0xFFFF9F0A), Color(0xFFFFF3E0))
+        AvailabilityState.DEGRADE -> Triple("Dégradé", Color(0xFFFF3B30), Color(0xFFFFEBEE))
     }
 
     val dateFormatter = remember { SimpleDateFormat("dd/MM • HH:mm", Locale.getDefault()) }
@@ -102,13 +102,13 @@ fun CatalogEntryCard(
             Box(
                 modifier = Modifier
                     .size(44.dp)
-                    .background(Color(0xFFFFE0D1), CircleShape),
+                    .background(Color(0xFFE8EFFF), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = fileIcon,
                     contentDescription = null,
-                    tint = Color(0xFFD9633F),
+                    tint = Color(0xFF0A84FF),
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -118,7 +118,7 @@ fun CatalogEntryCard(
                     text = displayName,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1B1816),
+                    color = Color(0xFF1C1C1E),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -127,23 +127,23 @@ fun CatalogEntryCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${entry.fragmentLocations.size} blocs",
+                        text = "${entry.fragmentLocations.size} copies",
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF9C8D86)
+                        color = Color(0xFF8E8E93)
                     )
                     if (sizeText.isNotEmpty()) {
-                        Text(text = "·", color = Color(0xFF9C8D86), fontSize = 10.sp)
+                        Text(text = "·", color = Color(0xFF8E8E93), fontSize = 10.sp)
                         Text(
                             text = sizeText,
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF9C8D86)
+                            color = Color(0xFF8E8E93)
                         )
                     }
-                    Text(text = "·", color = Color(0xFF9C8D86), fontSize = 10.sp)
+                    Text(text = "·", color = Color(0xFF8E8E93), fontSize = 10.sp)
                     Text(
                         text = dateFormatted,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF9C8D86)
+                        color = Color(0xFF8E8E93)
                     )
                 }
             }
@@ -170,7 +170,7 @@ fun CatalogEntryCard(
                     Icon(
                         imageVector = Icons.Default.Download,
                         contentDescription = "Télécharger",
-                        tint = Color(0xFFD9633F),
+                        tint = Color(0xFF0A84FF),
                         modifier = Modifier.size(20.dp)
                     )
                 }

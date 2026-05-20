@@ -40,7 +40,7 @@ fun AssembledBottomSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = Color(0xFFFBF6F1)
+        containerColor = Color(0xFFFFFFFF)
     ) {
         Column(
             modifier = Modifier
@@ -52,24 +52,24 @@ fun AssembledBottomSheet(
             Icon(
                 imageVector = Icons.Default.CheckCircle,
                 contentDescription = null,
-                tint = Color(0xFF4CAF50),
+                tint = Color(0xFF34C759),
                 modifier = Modifier.size(48.dp)
             )
             Text(
                 text = "Fichier récupéré",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = Color(0xFF1B1816)
+                color = Color(0xFF1C1C1E)
             )
             Text(
-                text = "En ${state.durationMs}ms depuis ${state.nodeCount} nœud${if (state.nodeCount > 1) "s" else ""}",
+                text = "Récupéré en ${state.durationMs}ms depuis ${state.nodeCount} membre${if (state.nodeCount > 1) "s" else ""}",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF6B625B)
+                color = Color(0xFF8E8E93)
             )
             Text(
                 text = state.filePath.takeLast(48),
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF9C8D86),
+                color = Color(0xFF8E8E93),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -84,14 +84,14 @@ fun AssembledBottomSheet(
                 ) {
                     Text(
                         text = "Fermer",
-                        color = Color(0xFF9C8D86)
+                        color = Color(0xFF8E8E93)
                     )
                 }
                 Button(
                     onClick = { onOpen(state.filePath) },
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFFD9633F),
+                        containerColor = Color(0xFF0A84FF),
                         contentColor = Color.White
                     )
                 ) {

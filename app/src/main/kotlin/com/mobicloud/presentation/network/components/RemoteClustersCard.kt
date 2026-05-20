@@ -42,10 +42,10 @@ import androidx.compose.ui.unit.sp
 import com.mobicloud.domain.models.ClusterNodeInfo
 import com.mobicloud.domain.models.ClusterNodeStatus
 
-private val TerminalGreen = Color(0xFF00FF41)
-private val Amber = Color(0xFFFFB300)
-private val StatusRed = Color(0xFFFF5252)
-private val CyanAccent = Color(0xFF4DD0E1)
+private val MauvePrimary = Color(0xFF0A84FF)
+private val Amber = Color(0xFFFF9F0A)
+private val StatusRed = Color(0xFFFF3B30)
+private val MauveAccent = Color(0xFF0A84FF)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -72,18 +72,18 @@ fun RemoteClustersCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Clusters distants",
+                text = "Autres groupes",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Surface(
-                color = CyanAccent.copy(alpha = 0.15f),
+                color = MauveAccent.copy(alpha = 0.15f),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
                     text = "${remoteSuperPeers.size} cluster${if (remoteSuperPeers.size > 1) "s" else ""}",
                     style = MaterialTheme.typography.labelSmall,
-                    color = CyanAccent,
+                    color = MauveAccent,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                 )
             }
@@ -102,7 +102,7 @@ fun RemoteClustersCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Aucun cluster distant détecté",
+                    text = "Aucun autre groupe détecté",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -138,13 +138,13 @@ private fun RemoteClusterListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
         modifier = Modifier.clickable(onClick = onClick),
         leadingContent = {
             Surface(
-                color = CyanAccent.copy(alpha = 0.12f),
+                color = MauveAccent.copy(alpha = 0.12f),
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Icon(
                     imageVector = Icons.Filled.Hub,
                     contentDescription = null,
-                    tint = CyanAccent,
+                    tint = MauveAccent,
                     modifier = Modifier
                         .padding(8.dp)
                         .size(18.dp)
@@ -161,7 +161,7 @@ private fun RemoteClusterListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
         },
         supportingContent = {
             Text(
-                text = "Super-Pair · ${node.channel}",
+                text = "Organisateur · ${node.channel}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -184,7 +184,7 @@ private fun RemoteClusterListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
 @Composable
 private fun RemoteStatusBadge(status: ClusterNodeStatus) {
     val (label, color) = when (status) {
-        ClusterNodeStatus.ACTIF -> "Actif" to TerminalGreen
+        ClusterNodeStatus.ACTIF -> "Actif" to MauvePrimary
         ClusterNodeStatus.DEGRADED -> "Dégradé" to Amber
         ClusterNodeStatus.OFFLINE -> "Hors-ligne" to StatusRed
     }
@@ -217,7 +217,7 @@ private fun RemoteClusterDetailSheet(node: ClusterNodeInfo) {
             .padding(bottom = 32.dp)
     ) {
         Text(
-            text = "Cluster distant",
+            text = "Autre groupe",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
         )

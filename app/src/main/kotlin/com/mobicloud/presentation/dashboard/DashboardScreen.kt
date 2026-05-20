@@ -1,6 +1,10 @@
 package com.mobicloud.presentation.dashboard
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,18 +13,27 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BatteryFull
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -46,36 +59,34 @@ fun DashboardScreen(
     modifier: Modifier = Modifier,
     viewModel: DashboardViewModel = hiltViewModel()
 ) {
-    val diagnostics by viewModel.diagnostics.collectAsStateWithLifecycle()
-    val networkEvents by viewModel.networkEvents.collectAsStateWithLifecycle()
-    val hasActivePeers by viewModel.hasActivePeers.collectAsStateWithLifecycle()
-    val nodeRole by viewModel.nodeRole.collectAsStateWithLifecycle()
+    val diagnostics     by viewModel.diagnostics.collectAsStateWithLifecycle()
+    val networkEvents   by viewModel.networkEvents.collectAsStateWithLifecycle()
+    val hasActivePeers  by viewModel.hasActivePeers.collectAsStateWithLifecycle()
+    val nodeRole        by viewModel.nodeRole.collectAsStateWithLifecycle()
     val isNetworkUnstable by viewModel.isNetworkUnstable.collectAsStateWithLifecycle()
-    val relayState by viewModel.relayState.collectAsStateWithLifecycle()
+    val relayState      by viewModel.relayState.collectAsStateWithLifecycle()
 
-    val isExpertMode by viewModel.isExpertMode.collectAsStateWithLifecycle()
-    val communitySize by viewModel.communitySize.collectAsStateWithLifecycle()
-    val allocatedBytes by viewModel.allocatedStorageBytes.collectAsStateWithLifecycle()
+    val isExpertMode    by viewModel.isExpertMode.collectAsStateWithLifecycle()
+    val communitySize   by viewModel.communitySize.collectAsStateWithLifecycle()
+    val allocatedBytes  by viewModel.allocatedStorageBytes.collectAsStateWithLifecycle()
     val hostedBlockCount by viewModel.hostedBlockCount.collectAsStateWithLifecycle()
 
     val uptimeFormatted = formatUptime(diagnostics.uptimeMs)
     val networkLabel = when (diagnostics.networkType) {
-        NetworkType.WIFI -> "Wifi"
+        NetworkType.WIFI     -> "Wifi"
         NetworkType.CELLULAR -> "4G"
-        NetworkType.UNKNOWN -> "—"
+        NetworkType.UNKNOWN  -> "—"
     }
 
-    // Story 13.1 — Calcul du HealthState — F1 fix: remember sans clés + derivedStateOf trackent les State lus
     val healthState by remember {
         derivedStateOf {
             val reliability = (diagnostics.reliabilityScore * 100).toInt()
-            val peerCount = diagnostics.activePeerCount
+            val peerCount   = diagnostics.activePeerCount
             when {
-                !hasActivePeers -> HealthState.Searching
-                reliability < 40 || isNetworkUnstable -> HealthState.Degraded(peerCount)
-                reliability >= 70 && relayState == TransferChannelState.DIRECT ->
-                    HealthState.Healthy(peerCount, networkLabel)
-                else -> HealthState.Slow(peerCount, networkLabel)
+                !hasActivePeers                                                  -> HealthState.Searching
+                reliability < 40 || isNetworkUnstable                           -> HealthState.Degraded(peerCount)
+                reliability >= 70 && relayState == TransferChannelState.DIRECT  -> HealthState.Healthy(peerCount, networkLabel)
+                else                                                             -> HealthState.Slow(peerCount, networkLabel)
             }
         }
     }
@@ -87,62 +98,47 @@ fun DashboardScreen(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // === Story 13.1 — Bannière santé (Mode Simple uniquement) ===
+        // ── Health banner (Mode Simple uniquement) ──
         if (!isExpertMode) {
             Spacer(Modifier.height(4.dp))
             HealthBanner(state = healthState)
+            Spacer(Modifier.height(12.dp))
         }
 
-        // === Jauge de fiabilité — TOUJOURS visible (Simple + Expert) ===
-        ReliabilityGauge(
-            score = diagnostics.reliabilityScore,
-            modifier = Modifier.padding(vertical = 12.dp)
+        // ── Hero gradient card ──
+        DashboardHero(
+            score        = diagnostics.reliabilityScore,
+            nodeRole     = nodeRole,
+            relayState   = relayState,
+            isExpertMode = isExpertMode,
+            isUnstable   = isNetworkUnstable
         )
 
-        // === Badge rôle — sémantique humaine (Story 13.1 AC2) ===
-        Text(
-            text = if (nodeRole == NodeRole.SUPER_PAIR) "★ Coordinateur de Réseau" else "● Membre actif",
-            style = MaterialTheme.typography.labelLarge,
-            color = if (nodeRole == NodeRole.SUPER_PAIR) Color(0xFF00FF41) else MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
+        Spacer(Modifier.height(20.dp))
 
-        CloudRelayBadge(
-            state = relayState,
-            modifier = Modifier.padding(bottom = 4.dp)
-        )
-
-        // Alerte "Connexion lente" — Expert uniquement (en Simple, la bannière s'en charge)
-        if (isExpertMode && isNetworkUnstable) {
-            Text(
-                text = "⚠ Connexion lente",
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-        }
-
-        Spacer(Modifier.height(16.dp))
-
-        // === Section "Aperçu" — 4 KPIs sémantiques (Story 13.1 AC4) ===
+        // ── Section Aperçu ──
         SectionLabel("Aperçu")
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(10.dp))
 
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             KpiDiagnosticCard(
-                label = "BATTERIE",
-                value = "${diagnostics.batteryPercent}%",
-                hint = "Impact app : minime",
-                modifier = Modifier.weight(1f)
+                label       = "Batterie",
+                value       = "${diagnostics.batteryPercent}%",
+                hint        = "Impact app : minime",
+                icon        = Icons.Filled.BatteryFull,
+                accentColor = Color(0xFF0A84FF),
+                modifier    = Modifier.weight(1f)
             )
             KpiDiagnosticCard(
-                label = "COMMUNAUTÉ",
-                value = "$communitySize/$MAX_CLUSTER_SIZE",
-                hint = "Membres connectés",
-                modifier = Modifier.weight(1f)
+                label       = "Mon groupe",
+                value       = "$communitySize/$MAX_CLUSTER_SIZE",
+                hint        = "Membres connectés",
+                icon        = Icons.Filled.Group,
+                accentColor = Color(0xFF34C759),
+                modifier    = Modifier.weight(1f)
             )
         }
         Spacer(Modifier.height(8.dp))
@@ -151,62 +147,65 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             KpiDiagnosticCard(
-                label = "MA CONTRIBUTION",
-                value = formatBytesShort(allocatedBytes),
-                hint = "Espace que je partage",
-                modifier = Modifier.weight(1f)
+                label       = "Ma contribution",
+                value       = formatBytesShort(allocatedBytes),
+                hint        = "Espace que je partage",
+                icon        = Icons.Filled.Storage,
+                accentColor = Color(0xFF0A84FF),
+                modifier    = Modifier.weight(1f)
             )
             KpiDiagnosticCard(
-                label = "FICHIERS PROTÉGÉS",
-                value = "$hostedBlockCount",
-                hint = "Sauvegardés ✓",
-                modifier = Modifier.weight(1f)
+                label       = "Fichiers protégés",
+                value       = "$hostedBlockCount",
+                hint        = "Sauvegardés",
+                icon        = Icons.Filled.Folder,
+                accentColor = Color(0xFF34C759),
+                modifier    = Modifier.weight(1f)
             )
         }
 
         Spacer(Modifier.height(16.dp))
 
-        // === Toggle Détails techniques (Story 13.1 AC5) ===
-        OutlinedButton(
-            onClick = { viewModel.toggleExpertMode() },
+        // ── Toggle détails avancés ──
+        TextButton(
+            onClick  = { viewModel.toggleExpertMode() },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = if (isExpertMode) "▴ MASQUER DÉTAILS TECHNIQUES" else "▾ DÉTAILS TECHNIQUES",
-                fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text  = if (isExpertMode) "↑ Masquer les infos avancées" else "→ Infos avancées",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFF0A84FF)
             )
         }
 
-        // === Mode Expert : KPIs techniques + RadarLog (Story 13.1 AC5) ===
+        // ── Mode Expert ──
         if (isExpertMode) {
             Spacer(Modifier.height(20.dp))
-            SectionLabel("Diagnostic technique")
-            Spacer(Modifier.height(8.dp))
+            SectionLabel("Infos avancées")
+            Spacer(Modifier.height(10.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 KpiDiagnosticCard(
-                    label = "UPTIME",
-                    value = uptimeFormatted,
+                    label    = "Durée de session",
+                    value    = uptimeFormatted,
                     modifier = Modifier.weight(1f)
                 )
                 KpiDiagnosticCard(
-                    label = "RÉSEAU",
-                    value = networkLabel,
+                    label    = "Réseau utilisé",
+                    value    = networkLabel,
                     modifier = Modifier.weight(1f)
                 )
             }
 
             Spacer(Modifier.height(20.dp))
-            SectionLabel("Activité réseau")
-            Spacer(Modifier.height(8.dp))
+            SectionLabel("Activité récente")
+            Spacer(Modifier.height(10.dp))
 
             RadarLogConsole(
-                events = networkEvents,
+                events   = networkEvents,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -215,23 +214,97 @@ fun DashboardScreen(
     }
 }
 
+// ── Hero gradient card ────────────────────────────────────────────────────────
+
+@Composable
+private fun DashboardHero(
+    score: Float,
+    nodeRole: NodeRole,
+    relayState: TransferChannelState,
+    isExpertMode: Boolean,
+    isUnstable: Boolean
+) {
+    val isSuperPair = nodeRole == NodeRole.SUPER_PAIR
+    val roleColor   = if (isSuperPair) Color(0xFF0A84FF) else MaterialTheme.colorScheme.onSurfaceVariant
+    val roleLabel   = if (isSuperPair) "Vous organisez ce groupe" else "Membre du groupe"
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, Color(0xFFE5E5EA), RoundedCornerShape(20.dp))
+            .padding(vertical = 28.dp, horizontal = 20.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text          = "Protection de vos fichiers",
+                style         = MaterialTheme.typography.labelMedium,
+                color         = MaterialTheme.colorScheme.onSurfaceVariant,
+                letterSpacing = 0.5.sp
+            )
+            Spacer(Modifier.height(16.dp))
+
+            ReliabilityGauge(score = score, size = 152.dp)
+
+            Spacer(Modifier.height(20.dp))
+
+            Surface(
+                color  = roleColor.copy(alpha = 0.12f),
+                shape  = RoundedCornerShape(20.dp),
+                border = BorderStroke(1.dp, roleColor.copy(alpha = 0.28f))
+            ) {
+                Text(
+                    text       = roleLabel,
+                    color      = roleColor,
+                    style      = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier   = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+            CloudRelayBadge(state = relayState)
+
+            if (isExpertMode && isUnstable) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    text  = "Connexion instable",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+        }
+    }
+}
+
+// ── Section label avec divider ────────────────────────────────────────────────
+
 @Composable
 private fun SectionLabel(text: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        modifier              = Modifier.fillMaxWidth(),
+        verticalAlignment     = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Text(
-            text = text.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            letterSpacing = 1.sp
+            text          = text.uppercase(),
+            style         = MaterialTheme.typography.labelSmall,
+            color         = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.5.sp
+        )
+        HorizontalDivider(
+            modifier = Modifier.weight(1f),
+            color    = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
         )
     }
 }
 
+// ── Formatters ────────────────────────────────────────────────────────────────
+
 private fun formatUptime(uptimeMs: Long): String {
-    val hours = TimeUnit.MILLISECONDS.toHours(uptimeMs)
+    val hours   = TimeUnit.MILLISECONDS.toHours(uptimeMs)
     val minutes = TimeUnit.MILLISECONDS.toMinutes(uptimeMs) % 60
     return "%02d:%02d".format(hours, minutes)
 }
@@ -242,6 +315,6 @@ private fun formatBytesShort(bytes: Long): String {
     return when {
         gb >= 1.0 -> "%.1f GB".format(gb)
         mb >= 1.0 -> "%.0f MB".format(mb)
-        else -> "$bytes B"
+        else      -> "$bytes B"
     }
 }

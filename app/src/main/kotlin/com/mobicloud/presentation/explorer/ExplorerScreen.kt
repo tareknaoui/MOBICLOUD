@@ -171,7 +171,7 @@ fun ExplorerScreen(
     Scaffold(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color(0xFFFBF6F1),
+        containerColor = Color(0xFFF0F2F5),
         topBar = {
             TopAppBar(
                 title = {
@@ -179,7 +179,7 @@ fun ExplorerScreen(
                         text = "Mes fichiers",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF1B1816)
+                        color = Color(0xFF1C1C1E)
                     )
                 },
                 actions = {
@@ -187,7 +187,7 @@ fun ExplorerScreen(
                         Icon(
                             imageVector = Icons.Default.Delete,
                             contentDescription = "Corbeille",
-                            tint = Color(0xFF9C8D86)
+                            tint = Color(0xFF8E8E93)
                         )
                     }
                 },
@@ -199,7 +199,7 @@ fun ExplorerScreen(
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { storeLauncher.launch("*/*") },
-                containerColor = Color(0xFFD9633F),
+                containerColor = Color(0xFF0A84FF),
                 contentColor = Color.White
             ) {
                 Icon(Icons.Default.CloudUpload, contentDescription = "Stocker un fichier")
@@ -225,7 +225,7 @@ fun ExplorerScreen(
                 Text(
                     text = "Upload annulé",
                     style = MaterialTheme.typography.labelMedium,
-                    color = Color(0xFFC62828),
+                    color = Color(0xFFFF3B30),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
                 )
             }
@@ -257,19 +257,19 @@ fun ExplorerScreen(
                             Icon(
                                 imageVector = Icons.Default.FolderOpen,
                                 contentDescription = null,
-                                tint = Color(0xFFFFE0D1),
+                                tint = Color(0xFFC7C7CC),
                                 modifier = Modifier.size(72.dp)
                             )
                             Text(
                                 text = "Aucun fichier partagé",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Medium,
-                                color = Color(0xFF6B625B)
+                                color = Color(0xFF8E8E93)
                             )
                             Text(
                                 text = "Appuyez sur le bouton + pour commencer",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF9C8D86),
+                                color = Color(0xFF8E8E93),
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(horizontal = 32.dp)
                             )
@@ -297,7 +297,7 @@ fun ExplorerScreen(
                                     Box(
                                         modifier = Modifier
                                             .fillMaxSize()
-                                            .background(Color(0xFFC62828))
+                                            .background(Color(0xFFFF3B30))
                                             .padding(end = 20.dp),
                                         contentAlignment = Alignment.CenterEnd
                                     ) {

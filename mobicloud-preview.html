@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MobiCloud — Aperçu UI v6</title>
+<style>
+  :root {
+    --acc:  #0A84FF;
+    --grn:  #34C759;
+    --amb:  #FF9F0A;
+    --red:  #FF3B30;
+    --bg:   #F0F2F5;
+    --surf: #FFFFFF;
+    --tx1:  #1C1C1E;
+    --tx2:  #8E8E93;
+    --sep:  #E5E5EA;
+    --brd:  #C7C7CC;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    background:#E4E6EB;
+    font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+    color:var(--tx1);
+    display:flex;gap:24px;padding:32px;
+    justify-content:center;flex-wrap:wrap;min-height:100vh;
+    align-items:flex-start;
+  }
+
+  .phone{
+    width:370px;background:var(--bg);border-radius:44px;
+    border:1px solid rgba(0,0,0,0.08);overflow:hidden;
+    box-shadow:0 12px 48px rgba(0,0,0,0.12),0 2px 6px rgba(0,0,0,0.06);
+    display:flex;flex-direction:column;
+  }
+  .phone-tag{
+    text-align:center;font-size:10px;letter-spacing:2px;
+    color:var(--tx2);padding:10px 0 0;text-transform:uppercase;
+  }
+  .sb{display:flex;justify-content:space-between;padding:10px 22px 6px;font-size:11px;color:var(--tx2)}
+
+  .tb{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:6px 18px 12px;background:var(--surf);border-bottom:1px solid var(--sep);
+  }
+  .tb-title{font-size:20px;font-weight:700;letter-spacing:-.4px;color:var(--tx1)}
+  .tb-ico{
+    width:34px;height:34px;background:var(--bg);
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--sep);color:var(--tx2);
+  }
+
+  .sc{padding:12px 14px 20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px;max-height:720px}
+
+  /* Health Banner */
+  .hb{
+    display:flex;align-items:center;gap:14px;
+    border-radius:16px;padding:14px 16px;background:var(--surf);
+  }
+  .hb.ok  {border-left:4px solid var(--grn)}
+  .hb.slow{border-left:4px solid var(--amb)}
+  .hb.srch{border-left:4px solid var(--acc)}
+  .hb-ico{
+    width:40px;height:40px;border-radius:12px;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .hb.ok   .hb-ico{background:rgba(52,199,89,.12);color:#248A3D}
+  .hb.slow .hb-ico{background:rgba(255,159,10,.12);color:#C05600}
+  .hb.srch .hb-ico{background:rgba(10,132,255,.1); color:var(--acc)}
+  .hb-title{font-size:13px;font-weight:600;color:var(--tx1)}
+  .hb-sub{font-size:11px;color:var(--tx2);margin-top:2px}
+
+  /* Hero */
+  .hero{
+    width:100%;border-radius:20px;background:var(--surf);
+    border:1px solid var(--sep);padding:24px 20px;
+    display:flex;flex-direction:column;align-items:center;
+    box-shadow:0 1px 4px rgba(0,0,0,0.05);
+  }
+  .hero-label{font-size:13px;font-weight:600;color:var(--tx1);text-align:center}
+  .gauge-wrap{position:relative;width:148px;height:148px;margin:14px 0 0}
+  .gauge-wrap svg.ring{position:absolute;inset:0;transform:rotate(-90deg)}
+  .gauge-center{
+    position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;
+  }
+  .gauge-pct{font-size:32px;font-weight:700;color:var(--acc);line-height:1}
+  .gauge-sub{font-size:11px;color:#248A3D;margin-top:3px;font-weight:600}
+
+  .role-chip{
+    display:inline-flex;align-items:center;gap:6px;
+    background:rgba(10,132,255,.1);border-radius:20px;padding:7px 16px;
+    font-size:12px;font-weight:600;color:var(--acc);margin-top:18px;
+  }
+  .relay-badge{
+    display:inline-flex;align-items:center;gap:6px;
+    border-radius:20px;padding:5px 12px;
+    font-size:11px;margin-top:8px;font-weight:500;
+  }
+  .relay-badge.direct{background:rgba(52,199,89,.1);color:#248A3D}
+  .relay-badge.relay {background:rgba(10,132,255,.1);color:var(--acc)}
+
+  .sl{display:flex;align-items:center;gap:10px;width:100%}
+  .sl-text{font-size:11px;font-weight:600;color:var(--tx2);white-space:nowrap}
+  .sl-line{flex:1;height:1px;background:var(--sep)}
+
+  .kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%}
+  .kpi{
+    background:var(--surf);border-radius:16px;padding:14px;
+    border:1px solid var(--sep);display:flex;flex-direction:column;min-height:88px;
+    box-shadow:0 1px 3px rgba(0,0,0,0.04);
+  }
+  .kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .kpi-label{font-size:10px;color:var(--tx2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kpi-ico{
+    width:28px;height:28px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .kpi-ico.blue{background:rgba(10,132,255,.1); color:var(--acc)}
+  .kpi-ico.grn {background:rgba(52,199,89,.1);  color:#248A3D}
+  .kpi-val{font-size:22px;font-weight:700;color:var(--tx1);margin:8px 0 0;line-height:1}
+  .kpi-hint{font-size:10px;color:var(--tx2);margin-top:3px}
+
+  .btn-link{
+    width:100%;background:transparent;border:none;
+    color:var(--acc);font-size:12px;cursor:pointer;
+    font-family:inherit;text-align:center;padding:4px;
+  }
+
+  .card{
+    background:var(--surf);border-radius:16px;overflow:hidden;
+    border:1px solid var(--sep);box-shadow:0 1px 3px rgba(0,0,0,0.04);
+  }
+  .card-hdr{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:12px 16px;border-bottom:1px solid var(--sep);
+  }
+  .card-title{font-size:13px;color:var(--tx1);font-weight:600}
+  .chip{font-size:10px;border-radius:20px;padding:3px 10px;font-weight:600}
+  .chip-blue{background:rgba(10,132,255,.1);color:var(--acc)}
+  .chip-grn {background:rgba(52,199,89,.1); color:#248A3D}
+
+  .com-card{
+    background:var(--surf);border-radius:16px;padding:16px;text-align:center;
+    border:1px solid var(--sep);border-top:4px solid var(--grn);
+    box-shadow:0 1px 3px rgba(0,0,0,0.04);
+  }
+  .com-title{font-size:15px;font-weight:700;color:var(--tx1)}
+  .com-sub{font-size:11px;color:var(--tx2);margin-top:4px}
+
+  .li{display:flex;align-items:center;gap:12px;padding:11px 14px;background:var(--surf)}
+  .li+.li{border-top:1px solid var(--sep)}
+  .li-ico{
+    width:36px;height:36px;border-radius:10px;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .li-ico.org{background:rgba(10,132,255,.12);color:var(--acc)}
+  .li-ico.mem{background:#F2F2F7;color:var(--tx2)}
+  .li-ico.grp{background:rgba(52,199,89,.1); color:#248A3D}
+  .li-main{flex:1;min-width:0}
+  .li-name{font-size:13px;color:var(--tx1);display:flex;align-items:center;gap:6px;font-weight:500}
+  .li-sub{font-size:10px;color:var(--tx2);margin-top:2px}
+  .li-trail{text-align:right;flex-shrink:0}
+
+  .pill{font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px}
+  .pill.actif  {background:rgba(52,199,89,.12); color:#248A3D}
+  .pill.degrade{background:rgba(255,159,10,.12);color:#C05600}
+  .pill.offline{background:rgba(255,59,48,.1);  color:#C0392B}
+  .pill.moi    {background:rgba(10,132,255,.12); color:var(--acc)}
+
+  .rlog{
+    background:var(--surf);border:1px solid var(--sep);
+    border-radius:14px;padding:12px;font-size:11px;
+  }
+  .rlog-row{padding:3px 0;display:flex;gap:8px;align-items:baseline}
+  .rlog-ts{color:var(--brd);font-size:10px;flex-shrink:0;font-variant-numeric:tabular-nums}
+  .rlog-ok{color:#248A3D}
+  .rlog-wn{color:#C05600}
+  .rlog-if{color:var(--tx2)}
+
+  .bnav{display:flex;border-top:1px solid var(--sep);background:var(--surf)}
+  .bnav-i{
+    flex:1;display:flex;flex-direction:column;align-items:center;
+    padding:10px 4px;font-size:9px;letter-spacing:.3px;gap:3px;
+    color:var(--tx2);cursor:pointer;
+  }
+  .bnav-i.on{color:var(--acc)}
+  .bnav-ico{display:flex;align-items:center;justify-content:center;width:22px;height:22px}
+</style>
+</head>
+<body>
+
+<!-- ════════ SCREEN 1 : Accueil (Mode Simple) ════════ -->
+<div class="phone">
+  <div class="phone-tag">Accueil · Mode Simple</div>
+  <div class="sb"><span>09:41</span><span>78% ▪ 4G</span></div>
+  <div class="tb">
+    <div class="tb-title">MobiCloud</div>
+    <div class="tb-ico">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+      </svg>
+    </div>
+  </div>
+  <div class="sc">
+
+    <div class="hb ok">
+      <div class="hb-ico">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+        </svg>
+      </div>
+      <div>
+        <div class="hb-title">Tout fonctionne</div>
+        <div class="hb-sub">Connecté à 3 membres · Wifi</div>
+      </div>
+    </div>
+
+    <div class="hero">
+      <div class="hero-label">Vos fichiers sont bien protégés</div>
+      <div class="gauge-wrap">
+        <svg class="ring" viewBox="0 0 148 148" width="148" height="148">
+          <circle cx="74" cy="74" r="58" fill="none" stroke="#E5E5EA" stroke-width="12"
+            stroke-dasharray="364.4" stroke-dashoffset="91.1" stroke-linecap="round"/>
+          <circle cx="74" cy="74" r="58" fill="none" stroke="#0A84FF" stroke-width="12"
+            stroke-dasharray="364.4" stroke-dashoffset="163.9" stroke-linecap="round"/>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-pct">80%</div>
+          <div class="gauge-sub">Excellent</div>
+        </div>
+      </div>
+      <div class="role-chip">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Organisateur du groupe
+      </div>
+      <div class="relay-badge direct">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        Connexion directe
+      </div>
+    </div>
+
+    <div class="sl"><div class="sl-text">Aperçu</div><div class="sl-line"></div></div>
+
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-top">
+          <div class="kpi-label">Batterie</div>
+          <div class="kpi-ico blue">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg>
+          </div>
+        </div>
+        <div class="kpi-val">78%</div>
+        <div class="kpi-hint">Impact app : minime</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top">
+          <div class="kpi-label">Communauté</div>
+          <div class="kpi-ico blue">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+          </div>
+        </div>
+        <div class="kpi-val">4/8</div>
+        <div class="kpi-hint">Membres connectés</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top">
+          <div class="kpi-label">Ma contribution</div>
+          <div class="kpi-ico grn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M2 20h20v-4H2v4zm2-3h2v2H4v-2zM2 4v4h20V4H2zm4 3H4V5h2v2zm-4 7h20v-4H2v4zm2-3h2v2H4v-2z"/></svg>
+          </div>
+        </div>
+        <div class="kpi-val">512 MB</div>
+        <div class="kpi-hint">Espace que je partage</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top">
+          <div class="kpi-label">Fichiers protégés</div>
+          <div class="kpi-ico grn">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+          </div>
+        </div>
+        <div class="kpi-val">23</div>
+        <div class="kpi-hint">Sauvegardés</div>
+      </div>
+    </div>
+
+    <button class="btn-link">→ Infos avancées</button>
+
+  </div>
+  <div class="bnav">
+    <div class="bnav-i on">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></div>
+      Accueil
+    </div>
+    <div class="bnav-i">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+      Groupe
+    </div>
+    <div class="bnav-i">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
+      Fichiers
+    </div>
+    <div class="bnav-i">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg></div>
+      Plus
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════ SCREEN 2 : Groupe ════════ -->
+<div class="phone">
+  <div class="phone-tag">Groupe</div>
+  <div class="sb"><span>09:41</span><span>78% ▪ 4G</span></div>
+  <div class="tb">
+    <div class="tb-title">MobiCloud</div>
+    <div class="tb-ico">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+    </div>
+  </div>
+  <div class="sc">
+
+    <div class="com-card">
+      <div class="com-title">Connexion excellente</div>
+      <div class="com-sub">4 membres à proximité · Vous organisez le groupe</div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-title">Votre groupe</div>
+        <div class="chip chip-blue">4 / 8 membres</div>
+      </div>
+      <div class="li">
+        <div class="li-ico org">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        </div>
+        <div class="li-main">
+          <div class="li-name">Vous <span class="pill moi">MOI</span></div>
+          <div class="li-sub">Organisateur · 78% batterie</div>
+        </div>
+        <div class="li-trail"><div class="pill actif">ACTIF</div></div>
+      </div>
+      <div class="li">
+        <div class="li-ico mem">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        </div>
+        <div class="li-main">
+          <div class="li-name">Riad B.</div>
+          <div class="li-sub">Connecté il y a 4s · 62% batterie</div>
+        </div>
+        <div class="li-trail"><div class="pill actif">ACTIF</div></div>
+      </div>
+      <div class="li">
+        <div class="li-ico mem">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        </div>
+        <div class="li-main">
+          <div class="li-name">Lina K.</div>
+          <div class="li-sub">Connectée il y a 18s · batterie inconnue</div>
+        </div>
+        <div class="li-trail"><div class="pill degrade">DÉGRADÉ</div></div>
+      </div>
+      <div class="li">
+        <div class="li-ico mem">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        </div>
+        <div class="li-main">
+          <div class="li-name">Omar S.</div>
+          <div class="li-sub">Hors de portée</div>
+        </div>
+        <div class="li-trail"><div class="pill offline">HORS-LIGNE</div></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-hdr">
+        <div class="card-title">Autres groupes proches</div>
+        <div class="chip chip-grn">2 groupes</div>
+      </div>
+      <div class="li">
+        <div class="li-ico grp">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+        </div>
+        <div class="li-main">
+          <div class="li-name">Groupe Nord</div>
+          <div class="li-sub">Groupe actif</div>
+        </div>
+        <div class="li-trail"><div class="pill actif">ACTIF</div></div>
+      </div>
+      <div class="li">
+        <div class="li-ico grp">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+        </div>
+        <div class="li-main">
+          <div class="li-name">Groupe Est</div>
+          <div class="li-sub">Connexion instable</div>
+        </div>
+        <div class="li-trail"><div class="pill degrade">DÉGRADÉ</div></div>
+      </div>
+    </div>
+
+  </div>
+  <div class="bnav">
+    <div class="bnav-i">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></div>
+      Accueil
+    </div>
+    <div class="bnav-i on">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+      Groupe
+    </div>
+    <div class="bnav-i">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
+      Fichiers
+    </div>
+    <div class="bnav-i">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg></div>
+      Plus
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════ SCREEN 3 : Accueil Mode Expert ════════ -->
+<div class="phone">
+  <div class="phone-tag">Accueil · Mode Expert</div>
+  <div class="sb"><span>09:41</span><span>78% ▪ 4G</span></div>
+  <div class="tb">
+    <div class="tb-title">MobiCloud</div>
+    <div class="tb-ico">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+      </svg>
+    </div>
+  </div>
+  <div class="sc">
+
+    <div class="hero">
+      <div class="hero-label">Vos fichiers sont bien protégés</div>
+      <div class="gauge-wrap">
+        <svg class="ring" viewBox="0 0 148 148" width="148" height="148">
+          <circle cx="74" cy="74" r="58" fill="none" stroke="#E5E5EA" stroke-width="12"
+            stroke-dasharray="364.4" stroke-dashoffset="91.1" stroke-linecap="round"/>
+          <circle cx="74" cy="74" r="58" fill="none" stroke="#0A84FF" stroke-width="12"
+            stroke-dasharray="364.4" stroke-dashoffset="163.9" stroke-linecap="round"/>
+        </svg>
+        <div class="gauge-center">
+          <div class="gauge-pct">80%</div>
+          <div class="gauge-sub">Excellent</div>
+        </div>
+      </div>
+      <div class="role-chip">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        Organisateur du groupe
+      </div>
+      <div class="relay-badge direct">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        Connexion directe
+      </div>
+    </div>
+
+    <div class="sl"><div class="sl-text">Aperçu</div><div class="sl-line"></div></div>
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-top">
+          <div class="kpi-label">Batterie</div>
+          <div class="kpi-ico blue"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M15.67 4H14V2h-4v2H8.33C7.6 4 7 4.6 7 5.33v15.33C7 21.4 7.6 22 8.33 22h7.33c.74 0 1.34-.6 1.34-1.33V5.33C17 4.6 16.4 4 15.67 4z"/></svg></div>
+        </div>
+        <div class="kpi-val">78%</div>
+        <div class="kpi-hint">Impact app : minime</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top">
+          <div class="kpi-label">Communauté</div>
+          <div class="kpi-ico blue"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+        </div>
+        <div class="kpi-val">4/8</div>
+        <div class="kpi-hint">Membres connectés</div>
+      </div>
+    </div>
+
+    <button class="btn-link">↑ Masquer les infos avancées</button>
+
+    <div class="sl"><div class="sl-text">Diagnostic technique</div><div class="sl-line"></div></div>
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-top"><div class="kpi-label">Durée de session</div></div>
+        <div class="kpi-val" style="font-size:20px">03:42</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-top"><div class="kpi-label">Réseau utilisé</div></div>
+        <div class="kpi-val" style="font-size:20px">4G</div>
+      </div>
+    </div>
+
+    <div class="sl"><div class="sl-text">Activité récente</div><div class="sl-line"></div></div>
+    <div class="rlog">
+      <div class="rlog-row"><span class="rlog-ts">09:38:14</span> <span class="rlog-ok">▶ Riad B. est toujours connecté</span></div>
+      <div class="rlog-row"><span class="rlog-ts">09:38:09</span> <span class="rlog-if">  Lina K. a rejoint le groupe</span></div>
+      <div class="rlog-row"><span class="rlog-ts">09:38:05</span> <span class="rlog-wn">⚠ Connexion indirecte activée</span></div>
+      <div class="rlog-row"><span class="rlog-ts">09:37:55</span> <span class="rlog-ok">▶ Vous êtes devenu organisateur</span></div>
+      <div class="rlog-row"><span class="rlog-ts">09:37:50</span> <span class="rlog-if">  Annuaire contacté (142 ms)</span></div>
+      <div class="rlog-row"><span class="rlog-ts">09:37:44</span> <span class="rlog-ok">▶ Bloc #7 sauvegardé</span></div>
+    </div>
+
+  </div>
+  <div class="bnav">
+    <div class="bnav-i on">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></div>
+      Accueil
+    </div>
+    <div class="bnav-i">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg></div>
+      Groupe
+    </div>
+    <div class="bnav-i">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></div>
+      Fichiers
+    </div>
+    <div class="bnav-i">
+      <div class="bnav-ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M6 10c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm12 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm-6 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg></div>
+      Plus
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

@@ -46,15 +46,15 @@ fun DownloadProgressIndicator(
             when (state) {
                 is DownloadState.Locating -> {
                     Text(
-                        text = "Localisation des blocs…",
+                        text = "Recherche du fichier…",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF1B1816)
+                        color = Color(0xFF1C1C1E)
                     )
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFD9633F),
-                        trackColor = Color(0xFFFFE0D1)
+                        color = Color(0xFF0A84FF),
+                        trackColor = Color(0xFFE5E5EA)
                     )
                 }
 
@@ -68,19 +68,19 @@ fun DownloadProgressIndicator(
                             text = "Téléchargement",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1B1816)
+                            color = Color(0xFF1C1C1E)
                         )
                         Text(
-                            text = "${state.received}/${state.k} blocs",
+                            text = "${state.received}/${state.k} reçus",
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF6B625B)
+                            color = Color(0xFF8E8E93)
                         )
                     }
                     LinearProgressIndicator(
                         progress = { state.received.toFloat() / state.k.coerceAtLeast(1) },
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFD9633F),
-                        trackColor = Color(0xFFFFE0D1)
+                        color = Color(0xFF0A84FF),
+                        trackColor = Color(0xFFE5E5EA)
                     )
 
                     val params = ErasureParameters()
@@ -96,14 +96,14 @@ fun DownloadProgressIndicator(
                             val isData = index < params.k
                             val contribution = receivedByFragment[index]
                             val blockColor = when {
-                                index in failedFragments -> Color(0xFFC62828)
-                                contribution != null && isData -> Color(0xFF4CAF50)
-                                contribution != null && !isData -> Color(0xFFD9633F)
-                                isData -> Color(0xFFD9F0E6)
-                                else -> Color(0xFFFFE0D1)
+                                index in failedFragments -> Color(0xFFFF3B30)
+                                contribution != null && isData -> Color(0xFF34C759)
+                                contribution != null && !isData -> Color(0xFF0A84FF)
+                                isData -> Color(0xFFD0D0D5)
+                                else -> Color(0xFFE5E5EA)
                             }
                             val borderColor = when {
-                                index in failedFragments -> Color(0xFFC62828)
+                                index in failedFragments -> Color(0xFFFF3B30)
                                 contribution != null -> Color.Transparent
                                 else -> Color(0xFF9C8D86)
                             }
@@ -141,7 +141,7 @@ fun DownloadProgressIndicator(
                                 Text(
                                     text = "En attente : ${nodeId.take(6)}…",
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFBF360C)
+                                    color = Color(0xFF8E8E93)
                                 )
                             }
                         }
@@ -158,18 +158,18 @@ fun DownloadProgressIndicator(
                             text = "Déchiffrement",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1B1816)
+                            color = Color(0xFF1C1C1E)
                         )
                         Text(
                             text = "${state.processed}/${state.k} blocs",
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF6B625B)
+                            color = Color(0xFF8E8E93)
                         )
                     }
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFD9633F),
-                        trackColor = Color(0xFFFFE0D1)
+                        color = Color(0xFF0A84FF),
+                        trackColor = Color(0xFFE5E5EA)
                     )
                 }
 

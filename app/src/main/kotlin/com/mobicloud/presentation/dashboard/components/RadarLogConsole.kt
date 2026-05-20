@@ -33,7 +33,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val TerminalGreen = Color(0xFF00FF41)
+private val MauvePrimary = Color(0xFF0A84FF)
 
 @Composable
 fun RadarLogConsole(
@@ -57,12 +57,12 @@ fun RadarLogConsole(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Journal réseau",
+                    text = "Activité récente",
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Surface(
-                    color = TerminalGreen.copy(alpha = 0.15f),
+                    color = MauvePrimary.copy(alpha = 0.15f),
                     shape = RoundedCornerShape(8.dp)
                 ) {
                     Row(
@@ -73,13 +73,13 @@ fun RadarLogConsole(
                         Icon(
                             imageVector = Icons.Filled.Circle,
                             contentDescription = null,
-                            tint = TerminalGreen,
+                            tint = MauvePrimary,
                             modifier = Modifier.size(6.dp)
                         )
                         Text(
                             text = "Actif",
                             style = MaterialTheme.typography.labelSmall,
-                            color = TerminalGreen
+                            color = MauvePrimary
                         )
                     }
                 }

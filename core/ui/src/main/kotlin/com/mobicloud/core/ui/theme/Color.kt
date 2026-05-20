@@ -72,3 +72,30 @@ internal val WarmBrownLight = Color(0xFF9C8D86)
 internal val WarmSurfaceVariant = Color(0xFFF3EDE8)
 internal val WarmOrange10 = Color(0xFF380D00)
 
+// MobiCloud Mauve Night Theme — palette principale mauve/noir (kept for reference)
+internal val MauvePrimary   = Color(0xFF9D5CFF)
+internal val MauveLight     = Color(0xFFC084FC)
+internal val MauveDark      = Color(0xFF6D28D9)
+internal val MauveContainer = Color(0xFF2D1B69)
+internal val MauveGlow      = Color(0xFFE879F9)
+internal val NightBlack     = Color(0xFF080810)
+internal val NightSurface   = Color(0xFF110F1E)
+internal val NightSurfaceVariant = Color(0xFF1C1830)
+internal val NightOnSurface = Color(0xFFEDE9FE)
+internal val NightOnSurfaceVariant = Color(0xFFA78BFA)
+internal val NightOutline   = Color(0xFF4C4470)
+internal val NightTrack     = Color(0xFF2A2540)
+
+// MobiCloud iOS Gray+Blue Theme — palette gris doux + bleu
+internal val IosBlue        = Color(0xFF0A84FF)   // bleu principal
+internal val IosGreen       = Color(0xFF34C759)   // vert succès
+internal val IosOrange      = Color(0xFFFF9F0A)   // orange avertissement
+internal val IosRed         = Color(0xFFFF3B30)   // rouge erreur
+internal val IosBackground  = Color(0xFFF0F2F5)   // fond app
+internal val IosSurface     = Color(0xFFFFFFFF)   // cartes
+internal val IosText1       = Color(0xFF1C1C1E)   // texte principal
+internal val IosText2       = Color(0xFF8E8E93)   // texte secondaire
+internal val IosSeparator   = Color(0xFFE5E5EA)   // séparateur
+internal val IosBorder      = Color(0xFFC7C7CC)   // bordures
+internal val IosTrack       = Color(0xFFE5E5EA)   // piste gauge
+

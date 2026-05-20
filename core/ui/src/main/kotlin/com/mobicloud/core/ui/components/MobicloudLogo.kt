@@ -67,7 +67,7 @@ private fun MobicloudCloudIcon() {
     Canvas(modifier = Modifier.size(120.dp, 80.dp)) {
         val w = size.width
         val h = size.height
-        val coral = Color(0xFFD9633F)
+        val mauve = Color(0xFF0A84FF)
 
         val cloud = Path().apply {
             moveTo(w * 0.14f, h * 0.78f)
@@ -80,7 +80,7 @@ private fun MobicloudCloudIcon() {
             quadraticTo(w * 0.97f, h * 0.78f, w * 0.84f, h * 0.78f)
             close()
         }
-        drawPath(cloud, coral)
+        drawPath(cloud, mauve)
 
         val checkStroke = Stroke(
             width = 7.dp.toPx(),
@@ -104,14 +104,19 @@ private fun MobicloudCloudIcon() {
 fun MobicloudBackgroundBlobs(modifier: Modifier = Modifier) {
     Canvas(modifier = modifier) {
         drawCircle(
-            color = Color(0x99FFE0D1),
+            color = Color(0x220A84FF),
             radius = 180.dp.toPx(),
             center = Offset(-60.dp.toPx(), -60.dp.toPx()),
         )
         drawCircle(
-            color = Color(0x99D9F0E6),
+            color = Color(0x1534C759),
             radius = 220.dp.toPx(),
             center = Offset(size.width + 80.dp.toPx(), size.height + 80.dp.toPx()),
+        )
+        drawCircle(
+            color = Color(0x110A84FF),
+            radius = 140.dp.toPx(),
+            center = Offset(size.width * 0.8f, size.height * 0.3f),
         )
     }
 }

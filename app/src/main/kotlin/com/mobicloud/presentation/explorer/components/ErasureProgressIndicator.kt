@@ -43,29 +43,29 @@ fun ErasureProgressIndicator(
             when (state) {
                 is StoreState.InProgress.Encoding -> {
                     Text(
-                        text = "Encodage du fichier…",
+                        text = "Préparation du fichier…",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF1B1816)
+                        color = Color(0xFF1C1C1E)
                     )
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFD9633F),
-                        trackColor = Color(0xFFFFE0D1)
+                        color = Color(0xFF0A84FF),
+                        trackColor = Color(0xFFE5E5EA)
                     )
                 }
 
                 is StoreState.InProgress.Encrypting -> {
                     Text(
-                        text = "Chiffrement AES-256…",
+                        text = "Sécurisation du fichier…",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = Color(0xFF1B1816)
+                        color = Color(0xFF1C1C1E)
                     )
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFD9633F),
-                        trackColor = Color(0xFFFFE0D1)
+                        color = Color(0xFF0A84FF),
+                        trackColor = Color(0xFFE5E5EA)
                     )
                 }
 
@@ -79,19 +79,19 @@ fun ErasureProgressIndicator(
                             text = "Distribution en cours",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
-                            color = Color(0xFF1B1816)
+                            color = Color(0xFF1C1C1E)
                         )
                         Text(
-                            text = "${state.confirmed}/${state.total} blocs",
+                            text = "${state.confirmed}/${state.total} envoyés",
                             style = MaterialTheme.typography.labelMedium,
-                            color = Color(0xFF6B625B)
+                            color = Color(0xFF8E8E93)
                         )
                     }
                     LinearProgressIndicator(
                         progress = { state.confirmed.toFloat() / state.total.coerceAtLeast(1) },
                         modifier = Modifier.fillMaxWidth(),
-                        color = Color(0xFFD9633F),
-                        trackColor = Color(0xFFFFE0D1)
+                        color = Color(0xFF0A84FF),
+                        trackColor = Color(0xFFE5E5EA)
                     )
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -103,14 +103,14 @@ fun ErasureProgressIndicator(
                             val isConfirmed = !isFailed && index in state.confirmedIndices
 
                             val blockColor = when {
-                                isFailed -> Color(0xFFC62828)
-                                isConfirmed && isData -> Color(0xFF4CAF50)
-                                isConfirmed && !isData -> Color(0xFFD9633F)
-                                isData -> Color(0xFFD9F0E6)
-                                else -> Color(0xFFFFE0D1)
+                                isFailed -> Color(0xFFFF3B30)
+                                isConfirmed && isData -> Color(0xFF34C759)
+                                isConfirmed && !isData -> Color(0xFF0A84FF)
+                                isData -> Color(0xFFD0D0D5)
+                                else -> Color(0xFFE5E5EA)
                             }
                             val borderColor = when {
-                                isFailed -> Color(0xFFC62828)
+                                isFailed -> Color(0xFFFF3B30)
                                 isConfirmed -> Color.Transparent
                                 else -> Color(0xFF9C8D86)
                             }
