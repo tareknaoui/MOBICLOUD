@@ -12,7 +12,7 @@ import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
-import com.mobicloud.domain.util.isRoutableIpLiteral
+import android.util.Log
 import com.mobicloud.domain.util.toSigHex
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -40,6 +40,7 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
     }
 
     override suspend fun onMigrationPlanReceived(plan: MigrationPlanMessage) = supervisorScope {
+        Log.i("MobiCloud:Migrate", "[MIGRATION] Plan recu de ${plan.superPeerNodeId.take(8)} — ${plan.directives.size} directive(s)")
         // 1) Anti-replay : rejeter les plans hors fenetre +/-30s.
         val skewMs = abs(System.currentTimeMillis() - plan.timestampMs)
         if (skewMs > PLAN_TIMESTAMP_WINDOW_MS) {
@@ -108,15 +109,7 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
     }
 
     private suspend fun executeDirective(directive: MigrateBlockDirective, localNodeId: String) {
-        // Garde défensive : port hors plage valide, IP non-routable (loopback/any-local/link-local/
-        // multicast — un SP compromis pourrait rediriger vers 127.0.0.1 pour DoS local), ou
-        // destination == self (rediriger un bloc vers le pair lui-même).
-        if (!isRoutableIpLiteral(directive.destinationIp) || directive.destinationPort !in 1..65535) {
-            networkEventRepository.pushEvent(
-                "[MIGRATION] Directive ${directive.blockId.take(16)} → ${directive.destinationNodeId.take(8)} ignorée (adresse non-routable)"
-            )
-            return
-        }
+        // Relay route par nodeId — pas de garde IP/port (BlockSenderWithRelay utilise relay-first)
         if (directive.destinationNodeId == localNodeId) {
             networkEventRepository.pushEvent(
                 "[MIGRATION] Directive ${directive.blockId.take(16)} ignorée — destination == self"
@@ -168,14 +161,14 @@ class ExecuteMigrationPlanUseCase @Inject constructor(
         // AC#3 : BlockSender.sendBlock (impl BlockTransferClient) vérifie la signature de l'ACK
         blockSender.sendBlock(msg, destPeer, PER_BLOCK_TIMEOUT_MS)
             .onSuccess { ack ->
-                networkEventRepository.pushEvent(
-                    "[MIGRATION] ${payload.blockId.take(16)} → ${ack.receiverNodeId.take(8)} confirmé"
-                )
+                val msg2 = "[MIGRATION] Bloc ${payload.blockId.take(16)} migre vers ${ack.receiverNodeId.take(8)}"
+                networkEventRepository.pushEvent(msg2)
+                Log.i("MobiCloud:Migrate", msg2)
             }
             .onFailure {
-                networkEventRepository.pushEvent(
-                    "[MIGRATION] ${payload.blockId.take(16)} → ${directive.destinationNodeId.take(8)} échec : ${it.message}"
-                )
+                val msg2 = "[MIGRATION] ${payload.blockId.take(16)} → ${directive.destinationNodeId.take(8)} echec : ${it.message}"
+                networkEventRepository.pushEvent(msg2)
+                Log.w("MobiCloud:Migrate", msg2)
             }
     }
 }

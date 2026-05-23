@@ -30,6 +30,7 @@ import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.ExecuteMigrationPlanUseCase
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.ExecuteReplicationPlanUseCase
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.OrchestrateBlockMigrationUseCase
+import com.mobicloud.domain.usecase.m06_m07_repair_migration.SendDepartureNoticeUseCase
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.TriggerAutoRepairUseCase
 import com.mobicloud.domain.usecase.m08_hosting.ReceiveAndHostBlockUseCase
 import com.mobicloud.core.network.NetworkChangeObserver
@@ -62,6 +63,7 @@ import com.mobicloud.domain.usecase.m11_join.ProcessLeaveUseCase
 import com.mobicloud.domain.usecase.m11_join.ProcessMemberUpdateUseCase
 import com.mobicloud.domain.usecase.m11_join.SendLeaveUseCase
 import dagger.hilt.android.AndroidEntryPoint
+import kotlin.math.abs
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.decodeFromByteArray
 import kotlinx.serialization.protobuf.ProtoBuf
@@ -105,6 +107,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var networkChangeObserver: NetworkChangeObserver
     @Inject lateinit var orchestrateBlockMigrationUseCase: OrchestrateBlockMigrationUseCase
     @Inject lateinit var executeMigrationPlanUseCase: ExecuteMigrationPlanUseCase
+    @Inject lateinit var sendDepartureNoticeUseCase: SendDepartureNoticeUseCase
     @Inject lateinit var triggerAutoRepairUseCase: TriggerAutoRepairUseCase
     @Inject lateinit var executeReplicationPlanUseCase: ExecuteReplicationPlanUseCase
     @Inject lateinit var localDiscoveryRepository: LocalDiscoveryRepository
@@ -148,9 +151,27 @@ class MobicloudP2PService : Service() {
     // P3: Guard contre les appels multiples de onStartCommand (START_STICKY)
     @Volatile private var loopsStarted = false
 
+    // Test M06 : BroadcastReceiver pour déclencher le départ gracieux depuis ADB
+    private val simulateDepartureReceiver = object : android.content.BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context?, intent: android.content.Intent?) {
+            if (intent?.action == "com.mobicloud.SIMULATE_DEPARTURE") {
+                serviceScope.launch {
+                    Log.i(LOGTAG, "[TEST] SIMULATE_DEPARTURE reçu — déclenchement departure notice")
+                    sendDepartureNoticeUseCase.invoke()
+                }
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        val filter = android.content.IntentFilter("com.mobicloud.SIMULATE_DEPARTURE")
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(simulateDepartureReceiver, filter, android.content.Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(simulateDepartureReceiver, filter)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -219,6 +240,43 @@ class MobicloudP2PService : Service() {
 
             // Architecture relay-only : handler Gossip câblé sur le canal relay (plus de TCP).
             gossipRelayChannel.gossipHandler = gossipSyncUseCase
+
+            // Story 13.2 — révocation distante : vérification signature + ownerId + deleteBlock
+            gossipRelayChannel.revokeHandler = handler@{ msg ->
+                val timestampMs = msg.timestampMs
+                if (abs(System.currentTimeMillis() - timestampMs) > 30_000L) {
+                    Log.w(LOGTAG, "[REVOKE] hors fenêtre temporelle — ignoré")
+                    return@handler
+                }
+                val blockIdRegex = Regex("^[0-9a-f]{64}$")
+                if (!blockIdRegex.matches(msg.blockId)) {
+                    Log.w(LOGTAG, "[REVOKE] blockId invalide — ignoré")
+                    return@handler
+                }
+                val payload = "revoke:${msg.blockId}|ts=$timestampMs".toByteArray()
+                val valid = securityRepository.verifySignature(payload, msg.signatureBytes, msg.ownerPublicKeyBytes)
+                    .getOrDefault(false)
+                if (!valid) {
+                    Log.w(LOGTAG, "[REVOKE] signature invalide — ignoré")
+                    return@handler
+                }
+                val block = hostedBlockRepository.getBlock(msg.blockId).getOrNull() ?: return@handler
+                if (block.ownerId != msg.ownerNodeId) {
+                    Log.w(LOGTAG, "[REVOKE] ownerId mismatch — ignoré")
+                    return@handler
+                }
+                hostedBlockRepository.deleteBlock(msg.blockId)
+                Log.i(LOGTAG, "[REVOKE] bloc ${msg.blockId.take(16)} supprimé sur demande de ${msg.ownerNodeId.take(8)}")
+            }
+
+            // M06 — migration proactive : DEPARTURE_NOTICE → super-pair orchestre, MIGRATION_PLAN → partant exécute
+            gossipRelayChannel.departureNoticeHandler = { notice ->
+                orchestrateBlockMigrationUseCase.onDepartureNoticeReceived(notice)
+            }
+            gossipRelayChannel.migrationPlanHandler = { plan ->
+                executeMigrationPlanUseCase.onMigrationPlanReceived(plan)
+            }
+
             gossipRelayChannel.startIncomingDispatch()
 
             // Bully election — écoute les messages entrants ELECTION/ALIVE/COORDINATOR via relay.
@@ -683,12 +741,18 @@ class MobicloudP2PService : Service() {
         runCatching {
             kotlinx.coroutines.runBlocking {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.NonCancellable) {
+                    // M06 — départ gracieux : envoyer DEPARTURE_NOTICE et attendre le plan de migration
+                    // avant de fermer le scope (8s = 1s envoi + 5s fenêtre migration + 2s marge transfert)
+                    kotlinx.coroutines.withTimeoutOrNull(8_000L) {
+                        sendDepartureNoticeUseCase.invoke()
+                    }
                     kotlinx.coroutines.withTimeoutOrNull(1500L) {
                         sendLeaveUseCase.invoke()
                     }
                 }
             }
         }
+        runCatching { unregisterReceiver(simulateDepartureReceiver) }
         localDiscoveryRepository.stop()
         networkChangeObserver.unregister()
         tcpConnectionManager.stopServer()

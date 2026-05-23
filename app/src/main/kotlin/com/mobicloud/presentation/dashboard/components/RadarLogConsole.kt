@@ -57,7 +57,7 @@ fun RadarLogConsole(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Activité récente",
+                    text = "Recent activity",
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -77,7 +77,7 @@ fun RadarLogConsole(
                             modifier = Modifier.size(6.dp)
                         )
                         Text(
-                            text = "Actif",
+                            text = "Active",
                             style = MaterialTheme.typography.labelSmall,
                             color = MauvePrimary
                         )
@@ -89,7 +89,7 @@ fun RadarLogConsole(
 
             if (events.isEmpty()) {
                 Text(
-                    text = "En attente d'événements réseau…",
+                    text = "Waiting for network events…",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

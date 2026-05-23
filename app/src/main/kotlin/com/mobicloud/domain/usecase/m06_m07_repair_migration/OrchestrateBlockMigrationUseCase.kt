@@ -1,6 +1,7 @@
 package com.mobicloud.domain.usecase.m06_m07_repair_migration
 
-import com.mobicloud.data.p2p.tcp.TcpConnectionManager
+import android.util.Log
+import com.mobicloud.data.p2p.relay.GossipRelayChannel
 import com.mobicloud.domain.models.DepartureNoticeMessage
 import com.mobicloud.domain.models.MigrateBlockDirective
 import com.mobicloud.domain.models.MigrationPlanMessage
@@ -12,7 +13,6 @@ import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.di.ApplicationScope
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
-import com.mobicloud.domain.util.isRoutableIpLiteral
 import com.mobicloud.domain.util.toSigHex
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -25,7 +25,7 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
     private val peerRepository: PeerRepository,
     private val dhtRepository: DhtRepository,
     private val securityRepository: SecurityRepository,
-    private val tcpConnectionManager: TcpConnectionManager,
+    private val gossipRelayChannel: GossipRelayChannel,
     private val gossipSyncUseCase: GossipSyncUseCase,
     private val networkEventRepository: NetworkEventRepository,
     @ApplicationScope private val applicationScope: CoroutineScope
@@ -33,6 +33,7 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
 
     companion object {
         const val NFR02_BUDGET_MS = 5_000L
+        private const val LOGTAG = "MobiCloud:Migrate"
     }
 
     override suspend fun onDepartureNoticeReceived(notice: DepartureNoticeMessage) {
@@ -41,18 +42,16 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             return
         }
 
-        // Snapshot unique de peerRepository.peers pour cohérence des étapes 1→3
         val peersSnapshot = peerRepository.peers.value
 
-        // 1) Le nœud courant DOIT être Super-Pair pour orchestrer (sinon le NOTICE a été mal-routé)
         val selfIsSuperPair = peersSnapshot
             .any { it.identity.nodeId == identity.nodeId && it.isSuperPair && it.isActive }
         if (!selfIsSuperPair) {
-            networkEventRepository.pushEvent("[MIGRATION] DEPARTURE_NOTICE ignoré — nœud local non Super-Pair")
+            networkEventRepository.pushEvent("[MIGRATION] DEPARTURE_NOTICE ignore — noeud local non Super-Pair")
             return
         }
+        Log.i(LOGTAG, "[MIGRATION] DEPARTURE_NOTICE recu de ${notice.senderNodeId.take(8)} (${notice.hostedBlockIds.size} blocs)")
 
-        // 2) Vérification signature du NOTICE (le nœud partant signe "$nodeId:$blockIdsJoined")
         if (notice.signatureBytes.isEmpty()) {
             networkEventRepository.pushEvent("[MIGRATION] DEPARTURE_NOTICE avec signature vide — plan annulé")
             return
@@ -63,7 +62,6 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             networkEventRepository.pushEvent("[MIGRATION] Émetteur ${notice.senderNodeId.take(8)} inconnu — plan annulé")
             return
         }
-        // Anti-replay : rejeter les NOTICE hors fenetre +/-30s.
         val skewMs = abs(System.currentTimeMillis() - notice.timestampMs)
         if (skewMs > PLAN_TIMESTAMP_WINDOW_MS) {
             networkEventRepository.pushEvent(
@@ -82,8 +80,6 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             return
         }
 
-        // Dedup défensif : un NOTICE conforme (HostedBlockDao.getAllBlockIds = DISTINCT PK) ne contient pas
-        // de doublons ; s'en trouver indique un pair compromis ou un bug. On préserve l'ordre de première apparition.
         val uniqueBlockIds = notice.hostedBlockIds.distinct()
         if (uniqueBlockIds.size < notice.hostedBlockIds.size) {
             networkEventRepository.pushEvent(
@@ -96,13 +92,9 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             return
         }
 
-        // 3) Candidats destination : actifs, hors émetteur, hors soi-même, IP routable (rejette
-        //    loopback/any-local/link-local/multicast — un pair compromis annonçant 127.0.0.1
-        //    pourrait sinon être choisi comme destination et bloquer la migration) et port valide.
+        // Candidats : actifs, hors émetteur et hors soi-même — relay route par nodeId, IP/port non requis
         val candidates = peersSnapshot.filter { p ->
             p.isActive &&
-            p.ipAddress?.let { isRoutableIpLiteral(it) } == true &&
-            (p.port ?: 0) in 1..65535 &&
             p.identity.nodeId != notice.senderNodeId &&
             p.identity.nodeId != identity.nodeId
         }
@@ -111,20 +103,17 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             return
         }
 
-        // 4) Round-robin sur blockIds (ordre stable préservé du NOTICE)
         val directives = uniqueBlockIds.mapIndexed { i, blockId ->
             val dest = candidates[i % candidates.size]
             MigrateBlockDirective(
                 blockId = blockId,
                 destinationNodeId = dest.identity.nodeId,
-                destinationIp = dest.ipAddress!!,
-                destinationPort = dest.port!!,
+                destinationIp = dest.ipAddress ?: "",
+                destinationPort = dest.port ?: 0,
                 destinationPublicKeyBytes = dest.identity.publicKeyBytes
             )
         }
 
-        // 5) Signature du plan (domain separation — payload durci : inclut IP/port/pubkey des destinations
-        //    pour empêcher une réécriture MITM qui redirigerait le transfert opaque vers un pair contrôlé)
         val planTimestampMs = System.currentTimeMillis()
         val planSigPayload = "${identity.nodeId}|${directives.joinToString("|") {
             "${it.blockId}:${it.destinationNodeId}:${it.destinationIp}:${it.destinationPort}:${it.destinationPublicKeyBytes.toSigHex()}"
@@ -141,26 +130,25 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
             timestampMs = planTimestampMs
         )
 
-        // 6) Transmission du plan au nœud partant — AC#5 budget NFR-02 5s global
-        val departingIp = departingPeer.ipAddress
-        val departingPort = departingPeer.port
-        if (departingIp == null || departingPort == null) {
-            networkEventRepository.pushEvent("[MIGRATION] Adresse partant ${notice.senderNodeId.take(8)} inconnue — plan annulé")
-            return
-        }
+        // Transmission du plan au nœud partant via relay (pas d'IP/port requis)
         withTimeoutOrNull(NFR02_BUDGET_MS) {
-            tcpConnectionManager.sendMigrationPlan(plan, departingIp, departingPort)
+            gossipRelayChannel.sendMigrationPlan(notice.senderNodeId, plan)
                 .onSuccess {
-                    networkEventRepository.pushEvent(
-                        "[MIGRATION] Plan envoyé à ${notice.senderNodeId.take(8)} — ${directives.size} directive(s)"
-                    )
+                    val msg = "[MIGRATION] Plan envoye a ${notice.senderNodeId.take(8)} — ${directives.size} directive(s)"
+                    networkEventRepository.pushEvent(msg)
+                    Log.i(LOGTAG, msg)
                 }
                 .onFailure {
-                    networkEventRepository.pushEvent("[MIGRATION] Envoi du plan échoué : ${it.message}")
+                    val msg = "[MIGRATION] Envoi du plan echoue : ${it.message}"
+                    networkEventRepository.pushEvent(msg)
+                    Log.w(LOGTAG, msg)
                 }
-        } ?: networkEventRepository.pushEvent("[MIGRATION] Timeout envoi du plan (> 5s)")
+        } ?: run {
+            val msg = "[MIGRATION] Timeout envoi du plan (> 5s)"
+            networkEventRepository.pushEvent(msg)
+            Log.w(LOGTAG, msg)
+        }
 
-        // 7) AC#4 — MàJ DHT optimiste : supprimer entrées du nœud partant AVANT d'insérer les nouvelles
         dhtRepository.deleteByNodeId(notice.senderNodeId)
             .onFailure { networkEventRepository.pushEvent("[MIGRATION] Suppression DHT partant échouée : ${it.message}") }
         directives.forEach { d ->
@@ -172,9 +160,6 @@ class OrchestrateBlockMigrationUseCase @Inject constructor(
                 }
         }
 
-        // 8) AC#4 — Gossip immédiat pour propagation du nouveau propriétaire.
-        //    Round 3 review : dispatch sur applicationScope pour ne pas bloquer le worker
-        //    connectionScope du TcpConnectionManager (gossip cycle ~secondes, fan-out réseau).
         applicationScope.launch {
             gossipSyncUseCase.runGossipCycle()
                 .onFailure { networkEventRepository.pushEvent("[MIGRATION] Gossip post-migration échoué : ${it.message}") }

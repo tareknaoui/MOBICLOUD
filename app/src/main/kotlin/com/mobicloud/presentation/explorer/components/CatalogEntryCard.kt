@@ -74,9 +74,9 @@ fun CatalogEntryCard(
 ) {
     val availability = entry.availabilityState()
     val (badgeText, badgeColor, badgeBg) = when (availability) {
-        AvailabilityState.COMPLET -> Triple("Complet", Color(0xFF34C759), Color(0xFFE8F5E9))
-        AvailabilityState.PARTIEL -> Triple("Partiel", Color(0xFFFF9F0A), Color(0xFFFFF3E0))
-        AvailabilityState.DEGRADE -> Triple("Dégradé", Color(0xFFFF3B30), Color(0xFFFFEBEE))
+        AvailabilityState.COMPLET -> Triple("Complete", Color(0xFF34C759), Color(0xFFE8F5E9))
+        AvailabilityState.PARTIEL -> Triple("Partial", Color(0xFFFF9F0A), Color(0xFFFFF3E0))
+        AvailabilityState.DEGRADE -> Triple("Degraded", Color(0xFFFF3B30), Color(0xFFFFEBEE))
     }
 
     val dateFormatter = remember { SimpleDateFormat("dd/MM • HH:mm", Locale.getDefault()) }
@@ -169,7 +169,7 @@ fun CatalogEntryCard(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Download,
-                        contentDescription = "Télécharger",
+                        contentDescription = "Download",
                         tint = Color(0xFF0A84FF),
                         modifier = Modifier.size(20.dp)
                     )

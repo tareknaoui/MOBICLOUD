@@ -56,13 +56,13 @@ fun AssembledBottomSheet(
                 modifier = Modifier.size(48.dp)
             )
             Text(
-                text = "Fichier récupéré",
+                text = "File retrieved",
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 color = Color(0xFF1C1C1E)
             )
             Text(
-                text = "Récupéré en ${state.durationMs}ms depuis ${state.nodeCount} membre${if (state.nodeCount > 1) "s" else ""}",
+                text = "Retrieved in ${state.durationMs}ms from ${state.nodeCount} member${if (state.nodeCount > 1) "s" else ""}",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF8E8E93)
             )
@@ -83,7 +83,7 @@ fun AssembledBottomSheet(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = "Fermer",
+                        text = "Close",
                         color = Color(0xFF8E8E93)
                     )
                 }
@@ -95,7 +95,7 @@ fun AssembledBottomSheet(
                         contentColor = Color.White
                     )
                 ) {
-                    Text(text = "Ouvrir")
+                    Text(text = "Open")
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))

@@ -89,8 +89,8 @@ fun ReliabilityGauge(
             Spacer(Modifier.height(2.dp))
             val qualityLabel = when {
                 score > 0.6f -> "Excellent"
-                score > 0.3f -> "Correct"
-                else         -> "Faible"
+                score > 0.3f -> "Good"
+                else         -> "Poor"
             }
             Text(
                 text = qualityLabel,

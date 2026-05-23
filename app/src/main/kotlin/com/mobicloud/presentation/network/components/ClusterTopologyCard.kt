@@ -76,7 +76,7 @@ fun ClusterTopologyCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Votre groupe",
+                text = "Your group",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -86,7 +86,7 @@ fun ClusterTopologyCard(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Text(
-                    text = "${state.nodes.size} / $MAX_CLUSTER_SIZE membres",
+                    text = "${state.nodes.size} / $MAX_CLUSTER_SIZE members",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -107,7 +107,7 @@ fun ClusterTopologyCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Aucun membre trouvé",
+                    text = "No members found",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -186,7 +186,7 @@ private fun NodeListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
         },
         supportingContent = {
             Text(
-                text = if (node.isSuperPair) "Organisateur · ${node.channel}" else node.channel,
+                text = if (node.isSuperPair) "Organizer · ${node.channel}" else node.channel,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -211,9 +211,9 @@ private fun NodeListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
 @Composable
 private fun StatusBadge(status: ClusterNodeStatus) {
     val (label, color) = when (status) {
-        ClusterNodeStatus.ACTIF -> "Actif" to MauvePrimary
-        ClusterNodeStatus.DEGRADED -> "Dégradé" to Amber
-        ClusterNodeStatus.OFFLINE -> "Hors-ligne" to StatusRed
+        ClusterNodeStatus.ACTIF -> "Active" to MauvePrimary
+        ClusterNodeStatus.DEGRADED -> "Degraded" to Amber
+        ClusterNodeStatus.OFFLINE -> "Offline" to StatusRed
     }
     Surface(
         color = color.copy(alpha = 0.15f),
@@ -234,8 +234,8 @@ private fun NodeDetailSheet(node: ClusterNodeInfo) {
     val clipboardManager = LocalClipboardManager.current
     val now = SystemClock.elapsedRealtime()
     val sinceMs = now - node.lastSeenMs
-    val lastSeenLabel = if (sinceMs < 60_000L) "il y a ${sinceMs / 1000} s"
-    else "il y a ${sinceMs / 60_000} min"
+    val lastSeenLabel = if (sinceMs < 60_000L) "${sinceMs / 1000}s ago"
+    else "${sinceMs / 60_000}min ago"
 
     Column(
         modifier = Modifier
@@ -244,26 +244,26 @@ private fun NodeDetailSheet(node: ClusterNodeInfo) {
             .padding(bottom = 32.dp)
     ) {
         Text(
-            text = "Détails du nœud",
+            text = "Node details",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(16.dp))
 
         DetailRow(
-            label = "Identifiant",
+            label = "ID",
             value = node.nodeId,
             valueModifier = Modifier.clickable {
                 clipboardManager.setText(AnnotatedString(node.nodeId))
             }
         )
-        DetailRow(label = "Rôle", value = if (node.isSuperPair) "Organisateur du groupe" else "Membre")
-        DetailRow(label = "Fiabilité", value = "${(node.reliabilityScore * 100).toInt()}%")
+        DetailRow(label = "Role", value = if (node.isSuperPair) "Group organizer" else "Member")
+        DetailRow(label = "Reliability", value = "${(node.reliabilityScore * 100).toInt()}%")
         if (node.batteryPercent != null) {
-            DetailRow(label = "Batterie", value = "${node.batteryPercent}%")
+            DetailRow(label = "Battery", value = "${node.batteryPercent}%")
         }
-        DetailRow(label = "Canal", value = node.channel)
-        DetailRow(label = "Dernier heartbeat", value = lastSeenLabel)
+        DetailRow(label = "Channel", value = node.channel)
+        DetailRow(label = "Last heartbeat", value = lastSeenLabel)
     }
 }
 

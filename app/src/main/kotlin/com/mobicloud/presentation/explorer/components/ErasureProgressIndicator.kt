@@ -43,7 +43,7 @@ fun ErasureProgressIndicator(
             when (state) {
                 is StoreState.InProgress.Encoding -> {
                     Text(
-                        text = "Préparation du fichier…",
+                        text = "Preparing file…",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFF1C1C1E)
@@ -57,7 +57,7 @@ fun ErasureProgressIndicator(
 
                 is StoreState.InProgress.Encrypting -> {
                     Text(
-                        text = "Sécurisation du fichier…",
+                        text = "Securing file…",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFF1C1C1E)
@@ -76,13 +76,13 @@ fun ErasureProgressIndicator(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Distribution en cours",
+                            text = "Distributing…",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFF1C1C1E)
                         )
                         Text(
-                            text = "${state.confirmed}/${state.total} envoyés",
+                            text = "${state.confirmed}/${state.total} sent",
                             style = MaterialTheme.typography.labelMedium,
                             color = Color(0xFF8E8E93)
                         )
@@ -131,7 +131,7 @@ fun ErasureProgressIndicator(
                 modifier = Modifier.align(Alignment.End)
             ) {
                 Text(
-                    text = "Annuler",
+                    text = "Cancel",
                     color = Color(0xFF9C8D86),
                     style = MaterialTheme.typography.labelMedium
                 )

@@ -28,9 +28,9 @@ fun CloudRelayBadge(
     modifier: Modifier = Modifier
 ) {
     val (icon, tint, label) = when (state) {
-        TransferChannelState.DIRECT   -> Triple(Icons.Default.CheckCircle, Color(0xFF34C759), "Connexion directe")
-        TransferChannelState.RELAY_HA -> Triple(Icons.Default.Cloud,       Color(0xFF0A84FF), "Via serveur")
-        TransferChannelState.OFFLINE  -> Triple(Icons.Default.Warning,     Color(0xFFFF3B30), "Hors-ligne")
+        TransferChannelState.DIRECT   -> Triple(Icons.Default.CheckCircle, Color(0xFF34C759), "Direct connection")
+        TransferChannelState.RELAY_HA -> Triple(Icons.Default.Cloud,       Color(0xFF0A84FF), "Via server")
+        TransferChannelState.OFFLINE  -> Triple(Icons.Default.Warning,     Color(0xFFFF3B30), "Offline")
     }
 
     Surface(
@@ -45,7 +45,7 @@ fun CloudRelayBadge(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = "Canal : $label",
+                contentDescription = "Channel: $label",
                 tint = tint,
                 modifier = Modifier.size(14.dp)
             )

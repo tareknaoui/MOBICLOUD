@@ -4,6 +4,9 @@ import android.util.Log
 import com.mobicloud.core.format.MobiCloudProtoBuf
 import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.di.ApplicationScope
+import com.mobicloud.domain.models.DepartureNoticeMessage
+import com.mobicloud.domain.models.MigrationPlanMessage
+import com.mobicloud.domain.models.RevokeBlockMessage
 import com.mobicloud.domain.models.gossip.BloomFilterGossip
 import com.mobicloud.domain.models.gossip.DeltaSyncRequest
 import com.mobicloud.domain.models.gossip.DeltaSyncResponse
@@ -29,12 +32,25 @@ class GossipRelayChannel @Inject constructor(
 
     var gossipHandler: GossipIncomingHandler? = null
 
+    // Story 13.2 — handler branché par le service pour exécuter la révocation reçue
+    @Volatile
+    var revokeHandler: (suspend (RevokeBlockMessage) -> Unit)? = null
+
+    // M06 — handlers migration branchés par le service
+    @Volatile
+    var departureNoticeHandler: (suspend (DepartureNoticeMessage) -> Unit)? = null
+    @Volatile
+    var migrationPlanHandler: (suspend (MigrationPlanMessage) -> Unit)? = null
+
     private val pendingDeltaResps = ConcurrentHashMap<String, CompletableDeferred<DeltaSyncResponse>>()
 
     companion object {
         private const val GOSSIP_BLOOM: Byte = 0x01
         private const val GOSSIP_DELTA_REQ: Byte = 0x02
         private const val GOSSIP_DELTA_RESP: Byte = 0x03
+        private const val REVOKE_BLOCK: Byte = 0x04
+        private const val DEPARTURE_NOTICE: Byte = 0x05
+        private const val MIGRATION_PLAN: Byte = 0x06
         private const val DELTA_TIMEOUT_MS = 3000L
         private const val LOGTAG = "MobiCloud:Gossip"
     }
@@ -66,6 +82,21 @@ class GossipRelayChannel @Inject constructor(
                         val response = MobiCloudProtoBuf.decodeFromByteArray(DeltaSyncResponse.serializer(), payload)
                         pendingDeltaResps[fromNodeId]?.complete(response)
                     }.onFailure { Log.w(LOGTAG, "[RELAY] GOSSIP_DELTA_RESP decode échoué depuis ${fromNodeId.take(8)}", it) }
+
+                    REVOKE_BLOCK -> runCatching {
+                        val msg = MobiCloudProtoBuf.decodeFromByteArray(RevokeBlockMessage.serializer(), payload)
+                        revokeHandler?.invoke(msg)
+                    }.onFailure { Log.w(LOGTAG, "[RELAY] REVOKE_BLOCK traitement échoué depuis ${fromNodeId.take(8)}", it) }
+
+                    DEPARTURE_NOTICE -> runCatching {
+                        val msg = MobiCloudProtoBuf.decodeFromByteArray(DepartureNoticeMessage.serializer(), payload)
+                        departureNoticeHandler?.invoke(msg)
+                    }.onFailure { Log.w(LOGTAG, "[RELAY] DEPARTURE_NOTICE traitement échoué depuis ${fromNodeId.take(8)}", it) }
+
+                    MIGRATION_PLAN -> runCatching {
+                        val msg = MobiCloudProtoBuf.decodeFromByteArray(MigrationPlanMessage.serializer(), payload)
+                        migrationPlanHandler?.invoke(msg)
+                    }.onFailure { Log.w(LOGTAG, "[RELAY] MIGRATION_PLAN traitement échoué depuis ${fromNodeId.take(8)}", it) }
                 }
             }
         }
@@ -88,6 +119,21 @@ class GossipRelayChannel @Inject constructor(
         } finally {
             pendingDeltaResps.remove(targetNodeId)
         }
+    }
+
+    suspend fun sendRevokeBlock(targetNodeId: String, msg: RevokeBlockMessage): Result<Unit> {
+        val bytes = MobiCloudProtoBuf.encodeToByteArray(RevokeBlockMessage.serializer(), msg)
+        return relayWsClient.sendSignal(targetNodeId, buildSignalData(REVOKE_BLOCK, bytes))
+    }
+
+    suspend fun sendDepartureNotice(targetNodeId: String, msg: DepartureNoticeMessage): Result<Unit> {
+        val bytes = MobiCloudProtoBuf.encodeToByteArray(DepartureNoticeMessage.serializer(), msg)
+        return relayWsClient.sendSignal(targetNodeId, buildSignalData(DEPARTURE_NOTICE, bytes))
+    }
+
+    suspend fun sendMigrationPlan(targetNodeId: String, msg: MigrationPlanMessage): Result<Unit> {
+        val bytes = MobiCloudProtoBuf.encodeToByteArray(MigrationPlanMessage.serializer(), msg)
+        return relayWsClient.sendSignal(targetNodeId, buildSignalData(MIGRATION_PLAN, bytes))
     }
 
     private fun buildSignalData(type: Byte, payload: ByteArray): ByteArray {

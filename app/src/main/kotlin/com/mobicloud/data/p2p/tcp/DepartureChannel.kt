@@ -16,4 +16,9 @@ object DepartureChannel {
     // Story 7.3 — canal du Super-Pair vers un donneur (plan de réplication d'un bloc)
     const val REPLICATE_PLAN: Byte = 0x0A
     const val MAX_REPLICATE_PLAN_BYTES = 2_000  // 1 directive × ~250 bytes + signature 72 bytes + marge
+
+    // Story 13.2 — révocation distante d'un bloc hébergé (owner → hoster)
+    const val REVOKE_BLOCK: Byte = 0x0B
+    // blockId 64 + ownerNodeId 64 + pubkey ~65 + sig ~72 + timestamp 8 + protobuf overhead = ~300
+    const val MAX_REVOKE_PAYLOAD_BYTES = 1_000
 }

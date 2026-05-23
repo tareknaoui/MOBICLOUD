@@ -52,13 +52,13 @@ fun MemberListCard(
 private fun MemberRow(node: ClusterNodeInfo) {
     val now = SystemClock.elapsedRealtime()  // F2 fix: même horloge que lastSeenMs (elapsedRealtime dans NetworkViewModel)
     val ageSec = ((now - node.lastSeenMs) / 1000L).coerceAtLeast(0L)
-    val battery = node.batteryPercent?.let { "$it% batterie" } ?: "batterie inconnue"
-    val seenLabel = if (node.isLocal) "Vous" else "Connecté il y a ${ageSec}s"
+    val battery = node.batteryPercent?.let { "$it% battery" } ?: "unknown battery"
+    val seenLabel = if (node.isLocal) "You" else "Connected ${ageSec}s ago"
 
     val displayName = when {
-        node.isLocal && node.isSuperPair -> "Vous (Organisateur)"
-        node.isLocal -> "Vous"
-        else -> "Membre " + node.nodeId.take(4)
+        node.isLocal && node.isSuperPair -> "You (Organizer)"
+        node.isLocal -> "You"
+        else -> "Member " + node.nodeId.take(4)
     }
 
     Row(
@@ -116,9 +116,9 @@ private fun MemberAvatar(isCoordinator: Boolean) {
 @Composable
 private fun StatusPill(status: ClusterNodeStatus) {
     val (label, color) = when (status) {
-        ClusterNodeStatus.ACTIF -> "Actif" to Color(0xFF34C759)
-        ClusterNodeStatus.DEGRADED -> "Lent" to Color(0xFFFF9F0A)
-        ClusterNodeStatus.OFFLINE -> "Hors-ligne" to Color(0xFFFF3B30)
+        ClusterNodeStatus.ACTIF -> "Active" to Color(0xFF34C759)
+        ClusterNodeStatus.DEGRADED -> "Slow" to Color(0xFFFF9F0A)
+        ClusterNodeStatus.OFFLINE -> "Offline" to Color(0xFFFF3B30)
     }
     Box(
         modifier = Modifier

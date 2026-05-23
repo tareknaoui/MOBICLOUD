@@ -37,10 +37,10 @@ fun CommunitySummaryCard(
 ) {
     val accent = Color(0xFF34C759)
     val subtitle = buildString {
-        append("$memberCount membre${if (memberCount > 1) "s" else ""} dans votre groupe · ")
+        append("$memberCount member${if (memberCount > 1) "s" else ""} in your group · ")
         append(
-            if (isCoordinator) "Vous organisez ce groupe"
-            else "Organisateur : ${coordinatorAlias ?: "—"}"
+            if (isCoordinator) "You manage this group"
+            else "Organizer: ${coordinatorAlias ?: "—"}"
         )
     }
 

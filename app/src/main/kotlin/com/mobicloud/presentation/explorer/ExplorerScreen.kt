@@ -87,11 +87,11 @@ fun ExplorerScreen(
     LaunchedEffect(terminalState) {
         when (terminalState) {
             is StoreState.Success -> snackbarHostState.showSnackbar(
-                "Sauvegardé chez ${terminalState.nodeCount} membres"
+                "Saved across ${terminalState.nodeCount} member${if (terminalState.nodeCount > 1) "s" else ""}"
             )
             is StoreState.Error -> {
                 android.util.Log.d("MobiCloud:Explorer", "[STORE-ERROR] ${terminalState.message}")
-                snackbarHostState.showSnackbar("Une erreur est survenue. Réessayez.")
+                snackbarHostState.showSnackbar("An error occurred. Please try again.")
             }
             else -> Unit
         }
@@ -104,9 +104,9 @@ fun ExplorerScreen(
         val s = terminalDownloadState as? DownloadState.Error ?: return@LaunchedEffect
         android.util.Log.d("MobiCloud:Explorer", "[DOWNLOAD-ERROR] ${s.message}")
         val friendlyMessage = if (s.message.contains("blocs valides") || s.message.contains("nœuds actifs"))
-            "Trop peu de membres en ligne pour reconstituer ce fichier"
+            "Not enough members online to retrieve this file"
         else
-            "Une erreur est survenue. Réessayez."
+            "An error occurred. Please try again."
         snackbarHostState.showSnackbar(friendlyMessage)
     }
 
@@ -132,11 +132,11 @@ fun ExplorerScreen(
                         viewModel.resetDownloadState()
                     } catch (e: ActivityNotFoundException) {
                         android.util.Log.w("MobiCloud:Open", "[DIAG] ActivityNotFound mime=$mimeType", e)
-                        scope.launch { snackbarHostState.showSnackbar("Aucune application n'est installée pour ouvrir ce type de fichier.") }
+                        scope.launch { snackbarHostState.showSnackbar("No app installed to open this file type.") }
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("MobiCloud:Open", "[DIAG] FileProvider échoué path=$filePath", e)
-                    scope.launch { snackbarHostState.showSnackbar("Impossible d'ouvrir le fichier. Réessayez.") }
+                    scope.launch { snackbarHostState.showSnackbar("Could not open the file. Please try again.") }
                 }
             },
             onDismiss = { viewModel.resetDownloadState() }
@@ -145,15 +145,15 @@ fun ExplorerScreen(
 
     LaunchedEffect(Unit) {
         viewModel.uploadBusyEvent.collect {
-            snackbarHostState.showSnackbar("Upload en cours, veuillez patienter")
+            snackbarHostState.showSnackbar("Upload in progress, please wait")
         }
     }
 
     LaunchedEffect(Unit) {
         viewModel.undoEvent.collect { fileHash ->
             val result = snackbarHostState.showSnackbar(
-                message = "Déplacé vers la corbeille",
-                actionLabel = "Annuler",
+                message = "Moved to trash",
+                actionLabel = "Undo",
                 duration = SnackbarDuration.Short
             )
             if (result == SnackbarResult.ActionPerformed) {
@@ -176,7 +176,7 @@ fun ExplorerScreen(
             TopAppBar(
                 title = {
                     Text(
-                        text = "Mes fichiers",
+                        text = "My files",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = Color(0xFF1C1C1E)
@@ -186,7 +186,7 @@ fun ExplorerScreen(
                     IconButton(onClick = onNavigateToTrash) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Corbeille",
+                            contentDescription = "Trash",
                             tint = Color(0xFF8E8E93)
                         )
                     }
@@ -202,7 +202,7 @@ fun ExplorerScreen(
                 containerColor = Color(0xFF0A84FF),
                 contentColor = Color.White
             ) {
-                Icon(Icons.Default.CloudUpload, contentDescription = "Stocker un fichier")
+                Icon(Icons.Default.CloudUpload, contentDescription = "Store a file")
             }
         }
     ) { innerPadding ->
@@ -223,7 +223,7 @@ fun ExplorerScreen(
             }
             if (storeState is StoreState.Cancelled) {
                 Text(
-                    text = "Upload annulé",
+                    text = "Upload cancelled",
                     style = MaterialTheme.typography.labelMedium,
                     color = Color(0xFFFF3B30),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
@@ -261,13 +261,13 @@ fun ExplorerScreen(
                                 modifier = Modifier.size(72.dp)
                             )
                             Text(
-                                text = "Aucun fichier partagé",
+                                text = "No shared files",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Medium,
                                 color = Color(0xFF8E8E93)
                             )
                             Text(
-                                text = "Appuyez sur le bouton + pour commencer",
+                                text = "Tap the + button to get started",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = Color(0xFF8E8E93),
                                 textAlign = TextAlign.Center,
@@ -303,7 +303,7 @@ fun ExplorerScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Delete,
-                                            contentDescription = "Supprimer",
+                                            contentDescription = "Delete",
                                             tint = Color.White
                                         )
                                     }

@@ -72,7 +72,7 @@ fun RemoteClustersCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Autres groupes",
+                text = "Other groups",
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -102,7 +102,7 @@ fun RemoteClustersCard(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "Aucun autre groupe détecté",
+                    text = "No other groups detected",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -161,7 +161,7 @@ private fun RemoteClusterListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
         },
         supportingContent = {
             Text(
-                text = "Organisateur · ${node.channel}",
+                text = "Organizer · ${node.channel}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -184,9 +184,9 @@ private fun RemoteClusterListItem(node: ClusterNodeInfo, onClick: () -> Unit) {
 @Composable
 private fun RemoteStatusBadge(status: ClusterNodeStatus) {
     val (label, color) = when (status) {
-        ClusterNodeStatus.ACTIF -> "Actif" to MauvePrimary
-        ClusterNodeStatus.DEGRADED -> "Dégradé" to Amber
-        ClusterNodeStatus.OFFLINE -> "Hors-ligne" to StatusRed
+        ClusterNodeStatus.ACTIF -> "Active" to MauvePrimary
+        ClusterNodeStatus.DEGRADED -> "Degraded" to Amber
+        ClusterNodeStatus.OFFLINE -> "Offline" to StatusRed
     }
     Surface(
         color = color.copy(alpha = 0.15f),
@@ -207,8 +207,8 @@ private fun RemoteClusterDetailSheet(node: ClusterNodeInfo) {
     val clipboardManager = LocalClipboardManager.current
     val now = System.currentTimeMillis()
     val sinceMs = now - node.lastSeenMs
-    val lastSeenLabel = if (sinceMs < 60_000L) "il y a ${sinceMs / 1000} s"
-    else "il y a ${sinceMs / 60_000} min"
+    val lastSeenLabel = if (sinceMs < 60_000L) "${sinceMs / 1000}s ago"
+    else "${sinceMs / 60_000}min ago"
 
     Column(
         modifier = Modifier
@@ -217,23 +217,23 @@ private fun RemoteClusterDetailSheet(node: ClusterNodeInfo) {
             .padding(bottom = 32.dp)
     ) {
         Text(
-            text = "Autre groupe",
+            text = "Other group",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
         Spacer(Modifier.height(16.dp))
 
         RemoteDetailRow(
-            label = "ID Super-Pair",
+            label = "Super-Peer ID",
             value = node.nodeId,
             valueModifier = Modifier.clickable {
                 clipboardManager.setText(AnnotatedString(node.nodeId))
             }
         )
-        RemoteDetailRow(label = "Canal", value = node.channel)
-        RemoteDetailRow(label = "Fiabilité", value = "${(node.reliabilityScore * 100).toInt()}%")
-        RemoteDetailRow(label = "Dernier heartbeat", value = lastSeenLabel)
-        RemoteDetailRow(label = "Membres", value = "Accès limité au super-pair")
+        RemoteDetailRow(label = "Channel", value = node.channel)
+        RemoteDetailRow(label = "Reliability", value = "${(node.reliabilityScore * 100).toInt()}%")
+        RemoteDetailRow(label = "Last heartbeat", value = lastSeenLabel)
+        RemoteDetailRow(label = "Members", value = "Limited access to super-peer")
     }
 }
 

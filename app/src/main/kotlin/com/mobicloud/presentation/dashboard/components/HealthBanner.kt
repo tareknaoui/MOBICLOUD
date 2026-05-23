@@ -32,23 +32,23 @@ import androidx.compose.ui.unit.sp
  */
 sealed class HealthState(val title: String, val subtitle: String, val color: Color) {
     data class Healthy(val peerCount: Int, val network: String) : HealthState(
-        title    = "Vos fichiers sont bien protégés",
-        subtitle = "Connecté à $peerCount membres · $network",
+        title    = "Your files are well protected",
+        subtitle = "Connected to $peerCount member${if (peerCount > 1) "s" else ""} · $network",
         color    = Color(0xFF34C759)
     )
     data class Slow(val peerCount: Int, val network: String) : HealthState(
-        title    = "Connexion un peu lente",
-        subtitle = "$peerCount membres · $network",
+        title    = "Connection a bit slow",
+        subtitle = "$peerCount member${if (peerCount > 1) "s" else ""} · $network",
         color    = Color(0xFFFF9F0A)
     )
     data object Searching : HealthState(
-        title    = "Recherche de membres…",
-        subtitle = "Votre appareil cherche des appareils à proximité",
+        title    = "Looking for members…",
+        subtitle = "Your device is searching for nearby devices",
         color    = Color(0xFF0A84FF)
     )
     data class Degraded(val peerCount: Int) : HealthState(
-        title    = "Protection limitée",
-        subtitle = "Seulement $peerCount membre${if (peerCount > 1) "s" else ""} disponible${if (peerCount > 1) "s" else ""}",
+        title    = "Limited protection",
+        subtitle = "Only $peerCount member${if (peerCount > 1) "s" else ""} available",
         color    = Color(0xFFFF3B30)
     )
 }

@@ -4,19 +4,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.repository.CatalogRepository
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.RevokeFileBlocksUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class TrashViewModel @Inject constructor(
-    private val catalogRepository: CatalogRepository
+    private val catalogRepository: CatalogRepository,
+    private val revokeFileBlocksUseCase: RevokeFileBlocksUseCase
 ) : ViewModel() {
 
     val deletedEntries: StateFlow<List<CatalogEntry>> =
@@ -43,7 +46,7 @@ class TrashViewModel @Inject constructor(
 
     fun permanentlyDelete(fileHash: String) {
         viewModelScope.launch {
-            // F8 fix: informer l'UI si la suppression échoue
+            revokeFileBlocksUseCase(fileHash)
             catalogRepository.permanentlyDelete(fileHash).onFailure {
                 _errorEvent.emit("Impossible de supprimer ce fichier.")
             }
@@ -51,6 +54,10 @@ class TrashViewModel @Inject constructor(
     }
 
     fun emptyTrash() {
-        viewModelScope.launch { catalogRepository.emptyTrash() }
+        viewModelScope.launch {
+            val entries = catalogRepository.getDeletedEntriesFlow().first()
+            entries.forEach { revokeFileBlocksUseCase(it.fileHash) }
+            catalogRepository.emptyTrash()
+        }
     }
 }

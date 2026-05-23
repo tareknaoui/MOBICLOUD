@@ -54,7 +54,7 @@ fun MobicloudLogoHeader(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
-            text = "À l'abri, partout, toujours.",
+            text = "Safe. Everywhere. Always.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

@@ -13,7 +13,10 @@ import com.mobicloud.domain.models.DepartureNoticeMessage
 import com.mobicloud.domain.models.DhtLookupRequestMessage
 import com.mobicloud.domain.models.DhtLookupResponseMessage
 import com.mobicloud.domain.models.MigrationPlanMessage
+import com.mobicloud.domain.models.PLAN_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.ReplicationPlanMessage
+import com.mobicloud.domain.models.RevokeBlockMessage
+import kotlin.math.abs
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.DepartureNoticeHandler
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.MigrationPlanHandler
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.ReplicationPlanHandler
@@ -182,6 +185,7 @@ class TcpConnectionManager @Inject constructor(
                 DepartureChannel.DEPARTURE_NOTICE -> handleIncomingDepartureNotice(pushback)
                 DepartureChannel.MIGRATION_PLAN -> handleIncomingMigrationPlan(pushback)
                 DepartureChannel.REPLICATE_PLAN -> handleIncomingReplicationPlan(pushback)
+                DepartureChannel.REVOKE_BLOCK -> handleIncomingRevokeBlock(pushback)
                 else -> {
                     // Legacy handshake — remettre le byte et traiter normalement
                     pushback.unread(firstByte)
@@ -578,6 +582,75 @@ class TcpConnectionManager @Inject constructor(
                 val out = DataOutputStream(socket.getOutputStream())
                 val bytes = MobiCloudProtoBuf.encodeToByteArray(ReplicationPlanMessage.serializer(), plan)
                 out.writeByte(DepartureChannel.REPLICATE_PLAN.toInt())
+                out.writeInt(bytes.size)
+                out.write(bytes)
+                out.flush()
+            }
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun handleIncomingRevokeBlock(inp: InputStream) {
+        try {
+            val data = DataInputStream(inp)
+            val len = data.readInt()
+            if (len <= 0 || len > DepartureChannel.MAX_REVOKE_PAYLOAD_BYTES) {
+                Log.w("MobiCloud:TCP", "REVOKE_BLOCK taille invalide: $len — ignoré")
+                return
+            }
+            val bytes = ByteArray(len).also { data.readFully(it) }
+            val msg = MobiCloudProtoBuf.decodeFromByteArray(RevokeBlockMessage.serializer(), bytes)
+
+            // Anti-replay ±30s
+            if (abs(System.currentTimeMillis() - msg.timestampMs) > PLAN_TIMESTAMP_WINDOW_MS) {
+                Log.w("MobiCloud:TCP", "REVOKE_BLOCK hors fenêtre temporelle — ignoré")
+                return
+            }
+            if (!BLOCK_ID_REGEX.matches(msg.blockId)) {
+                Log.w("MobiCloud:TCP", "REVOKE_BLOCK blockId invalide — ignoré")
+                return
+            }
+
+            // Vérification signature : "revoke:<blockId>|ts=<timestamp>"
+            val payload = "revoke:${msg.blockId}|ts=${msg.timestampMs}".toByteArray()
+            val valid = securityRepository.verifySignature(
+                data = payload,
+                signature = msg.signatureBytes,
+                publicKey = msg.ownerPublicKeyBytes
+            ).getOrDefault(false)
+            if (!valid) {
+                Log.w("MobiCloud:TCP", "REVOKE_BLOCK signature invalide — ignoré")
+                return
+            }
+
+            val provider = hostedBlockProvider ?: return
+            // Vérifier que le bloc appartient bien à cet owner avant de supprimer
+            val block = provider.getBlock(msg.blockId).getOrNull() ?: return
+            if (block.ownerId != msg.ownerNodeId) {
+                Log.w("MobiCloud:TCP", "REVOKE_BLOCK ownerId mismatch — ignoré")
+                return
+            }
+
+            provider.deleteBlock(msg.blockId)
+            Log.i("MobiCloud:TCP", "REVOKE_BLOCK exécuté — bloc ${msg.blockId.take(16)} supprimé")
+        } catch (e: Exception) {
+            Log.e("MobiCloud:TCP", "Erreur lecture REVOKE_BLOCK", e)
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    suspend fun sendRevokeBlock(
+        msg: RevokeBlockMessage,
+        ip: String,
+        port: Int
+    ): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(ip, port), 3_000)
+                socket.soTimeout = 3_000
+                val out = DataOutputStream(socket.getOutputStream())
+                val bytes = MobiCloudProtoBuf.encodeToByteArray(RevokeBlockMessage.serializer(), msg)
+                out.writeByte(DepartureChannel.REVOKE_BLOCK.toInt())
                 out.writeInt(bytes.size)
                 out.write(bytes)
                 out.flush()

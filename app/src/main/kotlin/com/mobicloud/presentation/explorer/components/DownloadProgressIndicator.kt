@@ -46,7 +46,7 @@ fun DownloadProgressIndicator(
             when (state) {
                 is DownloadState.Locating -> {
                     Text(
-                        text = "Recherche du fichier…",
+                        text = "Searching for file…",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFF1C1C1E)
@@ -65,13 +65,13 @@ fun DownloadProgressIndicator(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Téléchargement",
+                            text = "Downloading",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFF1C1C1E)
                         )
                         Text(
-                            text = "${state.received}/${state.k} reçus",
+                            text = "${state.received}/${state.k} received",
                             style = MaterialTheme.typography.labelMedium,
                             color = Color(0xFF8E8E93)
                         )
@@ -124,7 +124,7 @@ fun DownloadProgressIndicator(
                             for (contrib in uniqueContribs) {
                                 val label = buildString {
                                     append("${contrib.nodeId.take(6)}… ${contrib.latencyMs}ms")
-                                    if (contrib.isFallback) append(" (secours)")
+                                    if (contrib.isFallback) append(" (fallback)")
                                 }
                                 Text(
                                     text = label,
@@ -139,7 +139,7 @@ fun DownloadProgressIndicator(
                         Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             for (nodeId in state.slowNodeIds) {
                                 Text(
-                                    text = "En attente : ${nodeId.take(6)}…",
+                                    text = "Waiting: ${nodeId.take(6)}…",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color(0xFF8E8E93)
                                 )
@@ -155,13 +155,13 @@ fun DownloadProgressIndicator(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = "Déchiffrement",
+                            text = "Decrypting",
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Medium,
                             color = Color(0xFF1C1C1E)
                         )
                         Text(
-                            text = "${state.processed}/${state.k} blocs",
+                            text = "${state.processed}/${state.k} blocks",
                             style = MaterialTheme.typography.labelMedium,
                             color = Color(0xFF8E8E93)
                         )
@@ -180,7 +180,7 @@ fun DownloadProgressIndicator(
                 modifier = Modifier.align(Alignment.End)
             ) {
                 Text(
-                    text = "Annuler",
+                    text = "Cancel",
                     color = Color(0xFF9C8D86),
                     style = MaterialTheme.typography.labelMedium
                 )

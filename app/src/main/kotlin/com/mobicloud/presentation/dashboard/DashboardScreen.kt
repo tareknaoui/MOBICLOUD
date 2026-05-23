@@ -117,7 +117,7 @@ fun DashboardScreen(
         Spacer(Modifier.height(20.dp))
 
         // ── Section Aperçu ──
-        SectionLabel("Aperçu")
+        SectionLabel("Overview")
         Spacer(Modifier.height(10.dp))
 
         Row(
@@ -125,17 +125,17 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             KpiDiagnosticCard(
-                label       = "Batterie",
+                label       = "Battery",
                 value       = "${diagnostics.batteryPercent}%",
-                hint        = "Impact app : minime",
+                hint        = "App impact: minimal",
                 icon        = Icons.Filled.BatteryFull,
                 accentColor = Color(0xFF0A84FF),
                 modifier    = Modifier.weight(1f)
             )
             KpiDiagnosticCard(
-                label       = "Mon groupe",
+                label       = "My group",
                 value       = "$communitySize/$MAX_CLUSTER_SIZE",
-                hint        = "Membres connectés",
+                hint        = "Connected members",
                 icon        = Icons.Filled.Group,
                 accentColor = Color(0xFF34C759),
                 modifier    = Modifier.weight(1f)
@@ -147,17 +147,17 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             KpiDiagnosticCard(
-                label       = "Ma contribution",
+                label       = "My contribution",
                 value       = formatBytesShort(allocatedBytes),
-                hint        = "Espace que je partage",
+                hint        = "Space I share",
                 icon        = Icons.Filled.Storage,
                 accentColor = Color(0xFF0A84FF),
                 modifier    = Modifier.weight(1f)
             )
             KpiDiagnosticCard(
-                label       = "Fichiers protégés",
+                label       = "Protected files",
                 value       = "$hostedBlockCount",
-                hint        = "Sauvegardés",
+                hint        = "Saved",
                 icon        = Icons.Filled.Folder,
                 accentColor = Color(0xFF34C759),
                 modifier    = Modifier.weight(1f)
@@ -172,7 +172,7 @@ fun DashboardScreen(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text  = if (isExpertMode) "↑ Masquer les infos avancées" else "→ Infos avancées",
+                text  = if (isExpertMode) "↑ Hide advanced info" else "→ Advanced info",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF0A84FF)
             )
@@ -181,7 +181,7 @@ fun DashboardScreen(
         // ── Mode Expert ──
         if (isExpertMode) {
             Spacer(Modifier.height(20.dp))
-            SectionLabel("Infos avancées")
+            SectionLabel("Advanced info")
             Spacer(Modifier.height(10.dp))
 
             Row(
@@ -189,19 +189,19 @@ fun DashboardScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 KpiDiagnosticCard(
-                    label    = "Durée de session",
+                    label    = "Session duration",
                     value    = uptimeFormatted,
                     modifier = Modifier.weight(1f)
                 )
                 KpiDiagnosticCard(
-                    label    = "Réseau utilisé",
+                    label    = "Network used",
                     value    = networkLabel,
                     modifier = Modifier.weight(1f)
                 )
             }
 
             Spacer(Modifier.height(20.dp))
-            SectionLabel("Activité récente")
+            SectionLabel("Recent activity")
             Spacer(Modifier.height(10.dp))
 
             RadarLogConsole(
@@ -226,7 +226,7 @@ private fun DashboardHero(
 ) {
     val isSuperPair = nodeRole == NodeRole.SUPER_PAIR
     val roleColor   = if (isSuperPair) Color(0xFF0A84FF) else MaterialTheme.colorScheme.onSurfaceVariant
-    val roleLabel   = if (isSuperPair) "Vous organisez ce groupe" else "Membre du groupe"
+    val roleLabel   = if (isSuperPair) "You manage this group" else "Group member"
 
     Box(
         modifier = Modifier
@@ -239,7 +239,7 @@ private fun DashboardHero(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text          = "Protection de vos fichiers",
+                text          = "Your file protection",
                 style         = MaterialTheme.typography.labelMedium,
                 color         = MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 0.5.sp
@@ -270,7 +270,7 @@ private fun DashboardHero(
             if (isExpertMode && isUnstable) {
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    text  = "Connexion instable",
+                    text  = "Unstable connection",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.error
                 )
