@@ -276,6 +276,9 @@ class MobicloudP2PService : Service() {
             gossipRelayChannel.migrationPlanHandler = { plan ->
                 executeMigrationPlanUseCase.onMigrationPlanReceived(plan)
             }
+            gossipRelayChannel.replicationPlanHandler = { plan ->
+                executeReplicationPlanUseCase.onReplicationPlanReceived(plan)
+            }
 
             gossipRelayChannel.startIncomingDispatch()
 

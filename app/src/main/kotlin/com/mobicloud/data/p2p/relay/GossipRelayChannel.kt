@@ -6,6 +6,7 @@ import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.di.ApplicationScope
 import com.mobicloud.domain.models.DepartureNoticeMessage
 import com.mobicloud.domain.models.MigrationPlanMessage
+import com.mobicloud.domain.models.ReplicationPlanMessage
 import com.mobicloud.domain.models.RevokeBlockMessage
 import com.mobicloud.domain.models.gossip.BloomFilterGossip
 import com.mobicloud.domain.models.gossip.DeltaSyncRequest
@@ -42,6 +43,10 @@ class GossipRelayChannel @Inject constructor(
     @Volatile
     var migrationPlanHandler: (suspend (MigrationPlanMessage) -> Unit)? = null
 
+    // M07 — handler réplication branché par le service
+    @Volatile
+    var replicationPlanHandler: (suspend (ReplicationPlanMessage) -> Unit)? = null
+
     private val pendingDeltaResps = ConcurrentHashMap<String, CompletableDeferred<DeltaSyncResponse>>()
 
     companion object {
@@ -51,6 +56,7 @@ class GossipRelayChannel @Inject constructor(
         private const val REVOKE_BLOCK: Byte = 0x04
         private const val DEPARTURE_NOTICE: Byte = 0x05
         private const val MIGRATION_PLAN: Byte = 0x06
+        private const val REPLICATE_PLAN: Byte = 0x07
         private const val DELTA_TIMEOUT_MS = 3000L
         private const val LOGTAG = "MobiCloud:Gossip"
     }
@@ -97,6 +103,11 @@ class GossipRelayChannel @Inject constructor(
                         val msg = MobiCloudProtoBuf.decodeFromByteArray(MigrationPlanMessage.serializer(), payload)
                         migrationPlanHandler?.invoke(msg)
                     }.onFailure { Log.w(LOGTAG, "[RELAY] MIGRATION_PLAN traitement échoué depuis ${fromNodeId.take(8)}", it) }
+
+                    REPLICATE_PLAN -> runCatching {
+                        val msg = MobiCloudProtoBuf.decodeFromByteArray(ReplicationPlanMessage.serializer(), payload)
+                        replicationPlanHandler?.invoke(msg)
+                    }.onFailure { Log.w(LOGTAG, "[RELAY] REPLICATE_PLAN traitement échoué depuis ${fromNodeId.take(8)}", it) }
                 }
             }
         }
@@ -134,6 +145,11 @@ class GossipRelayChannel @Inject constructor(
     suspend fun sendMigrationPlan(targetNodeId: String, msg: MigrationPlanMessage): Result<Unit> {
         val bytes = MobiCloudProtoBuf.encodeToByteArray(MigrationPlanMessage.serializer(), msg)
         return relayWsClient.sendSignal(targetNodeId, buildSignalData(MIGRATION_PLAN, bytes))
+    }
+
+    suspend fun sendReplicationPlan(targetNodeId: String, msg: ReplicationPlanMessage): Result<Unit> {
+        val bytes = MobiCloudProtoBuf.encodeToByteArray(ReplicationPlanMessage.serializer(), msg)
+        return relayWsClient.sendSignal(targetNodeId, buildSignalData(REPLICATE_PLAN, bytes))
     }
 
     private fun buildSignalData(type: Byte, payload: ByteArray): ByteArray {

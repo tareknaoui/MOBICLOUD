@@ -1,6 +1,7 @@
 package com.mobicloud.domain.usecase.m06_m07_repair_migration
 
-import com.mobicloud.data.p2p.tcp.TcpConnectionManager
+import android.util.Log
+import com.mobicloud.data.p2p.relay.GossipRelayChannel
 import com.mobicloud.domain.models.MigrateBlockDirective
 import com.mobicloud.domain.models.RepairRequest
 import com.mobicloud.domain.models.ReplicationPlanMessage
@@ -26,7 +27,7 @@ class TriggerAutoRepairUseCase @Inject constructor(
     private val peerRepository: PeerRepository,
     private val dhtRepository: DhtRepository,
     private val securityRepository: SecurityRepository,
-    private val tcpConnectionManager: TcpConnectionManager,
+    private val gossipRelayChannel: GossipRelayChannel,
     private val gossipSyncUseCase: GossipSyncUseCase,
     private val circuitBreakerUseCase: CircuitBreakerUseCase,
     private val localRepairBuffer: LocalRepairBuffer,
@@ -34,13 +35,8 @@ class TriggerAutoRepairUseCase @Inject constructor(
 ) {
 
     companion object {
-        /**
-         * MVP : seuil effectif = 1. Un bloc devient "sous-répliqué" dès qu'aucun
-         * nœud ACTIVE ne l'héberge. Le modèle actuel de Story 5.3 ne crée qu'UNE
-         * copie par blockId (round-robin) ; ce seuil pourra être augmenté à K≥2
-         * quand la distribution multi-réplica sera introduite (Epic futur).
-         */
         const val UNDER_REPLICATION_THRESHOLD = 1
+        private const val LOGTAG = "MobiCloud:Migrate"
     }
 
     /**
@@ -91,8 +87,9 @@ class TriggerAutoRepairUseCase @Inject constructor(
                     .getOrElse { emptyList() }
                 val activeHosts = hostNodeIds.filter { it in activeNodeIds }
 
-                if (activeHosts.size >= threshold) continue  // OK, pas sous-répliqué
+                if (activeHosts.size >= threshold) continue
 
+                Log.i(LOGTAG, "[REPAIR] Bloc sous-replique ${entry.blockId.take(16)} — hotes actifs=${activeHosts.size}")
                 if (activeHosts.isEmpty()) {
                     networkEventRepository.pushEvent(
                         "[REPAIR] ${entry.blockId.take(16)} PERDU — aucun hôte actif (nœud ${inactive.identity.nodeId.take(8)} INACTIVE)"
@@ -109,24 +106,19 @@ class TriggerAutoRepairUseCase @Inject constructor(
                     continue
                 }
                 val donor = activePeers.firstOrNull { it.identity.nodeId == donorNodeId }
-                if (donor == null ||
-                    donor.ipAddress?.isNotBlank() != true ||
-                    (donor.port ?: 0) !in 1..65535
-                ) {
+                if (donor == null) {
                     networkEventRepository.pushEvent(
-                        "[REPAIR] Donneur ${donorNodeId.take(8)} sans ip/port valide — ${entry.blockId.take(16)} ignoré"
+                        "[REPAIR] Donneur ${donorNodeId.take(8)} introuvable — ${entry.blockId.take(16)} ignoré"
                     )
                     continue
                 }
 
-                // Sélection destination : actif, hors donneur, hors soi-même, pas déjà hôte,
-                // avec ip non-blank et port valide (filtre aligné sur hardening 7.2).
+                // Sélection destination : actif, hors donneur, hors soi-même, pas déjà hôte.
+                // Relay route par nodeId — IP/port non requis.
                 val destination = activePeers.firstOrNull { p ->
                     p.identity.nodeId !in hostNodeIds &&
                     p.identity.nodeId != identity.nodeId &&
-                    p.identity.nodeId != donorNodeId &&
-                    p.ipAddress?.isNotBlank() == true &&
-                    (p.port ?: 0) in 1..65535
+                    p.identity.nodeId != donorNodeId
                 }
                 if (destination == null) {
                     networkEventRepository.pushEvent(
@@ -199,14 +191,12 @@ class TriggerAutoRepairUseCase @Inject constructor(
                     timestampMs = planTimestampMs
                 )
 
-                // AC#4 — MàJ DHT optimiste UNIQUEMENT si l'émission TCP a réussi.
-                // Sur échec, Constraint #11 : le scan suivant retentera (DHT non polluée
-                // d'une fausse confirmation qui bloquerait la détection de sous-réplication).
-                tcpConnectionManager.sendReplicationPlan(plan, donor.ipAddress!!, donor.port!!)
+                Log.i(LOGTAG, "[REPAIR] Plan → donneur=${donorNodeId.take(8)} dest=${destination.identity.nodeId.take(8)} bloc=${entry.blockId.take(16)}")
+                gossipRelayChannel.sendReplicationPlan(donorNodeId, plan)
                     .onSuccess {
-                        networkEventRepository.pushEvent(
-                            "[REPAIR] ${entry.blockId.take(16)} donneur=${donorNodeId.take(8)} → dest=${destination.identity.nodeId.take(8)}"
-                        )
+                        val repairMsg = "[REPAIR] ${entry.blockId.take(16)} donneur=${donorNodeId.take(8)} → dest=${destination.identity.nodeId.take(8)}"
+                        networkEventRepository.pushEvent(repairMsg)
+                        Log.i(LOGTAG, repairMsg)
                         dhtRepository.insertEntry(
                             directive.blockId,
                             directive.destinationNodeId,

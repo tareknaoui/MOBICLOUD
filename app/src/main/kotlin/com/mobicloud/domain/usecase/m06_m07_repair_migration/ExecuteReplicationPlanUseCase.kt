@@ -11,6 +11,7 @@ import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import android.util.Log
 import com.mobicloud.domain.util.toSigHex
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -29,10 +30,12 @@ class ExecuteReplicationPlanUseCase @Inject constructor(
 ) : ReplicationPlanHandler {
 
     companion object {
-        const val PER_BLOCK_TIMEOUT_MS = 4_000L  // cohérent avec Story 7.2
+        const val PER_BLOCK_TIMEOUT_MS = 4_000L
+        private const val LOGTAG = "MobiCloud:Migrate"
     }
 
     override suspend fun onReplicationPlanReceived(plan: ReplicationPlanMessage) {
+        Log.i(LOGTAG, "[REPAIR] Plan recu de ${plan.superPeerNodeId.take(8)} — bloc ${plan.directive.blockId.take(16)}")
         // 1) Anti-replay : rejeter les plans hors fenetre +/-30s.
         val skewMs = abs(System.currentTimeMillis() - plan.timestampMs)
         if (skewMs > PLAN_TIMESTAMP_WINDOW_MS) {
@@ -73,16 +76,7 @@ class ExecuteReplicationPlanUseCase @Inject constructor(
             return
         }
 
-        // 3) Validation destination (défensive, aligne Story 7.2 round-2 hardening)
-        //    Port doit être dans 1..65535 — sinon InetSocketAddress throw IllegalArgumentException non catchée.
-        if (d.destinationIp.isBlank() || d.destinationPort !in 1..65535) {
-            networkEventRepository.pushEvent(
-                "[REPAIR] ${d.blockId.take(16)} — destination invalide (ip/port) — ignoré"
-            )
-            return
-        }
-
-        // 4) Garde anti-self : un SP compromis ne doit pas pouvoir ordonner à un donneur de
+        // 3) Garde anti-self : un SP compromis ne doit pas pouvoir ordonner à un donneur de
         //    s'auto-copier un bloc (self-connect + pollution DHT après gossip).
         val localId = securityRepository.getIdentity().getOrElse { return }.nodeId
         if (d.destinationNodeId == localId) {
@@ -122,21 +116,20 @@ class ExecuteReplicationPlanUseCase @Inject constructor(
         )
         blockSender.sendBlock(msg, destPeer, PER_BLOCK_TIMEOUT_MS)
             .onSuccess { ack ->
-                // Vérifie que l'ACK provient bien de la destination annoncée (pas d'un attaquant à même IP/port).
                 if (ack.receiverNodeId != d.destinationNodeId) {
                     networkEventRepository.pushEvent(
                         "[REPAIR] ${payload.blockId.take(16)} ACK émetteur ${ack.receiverNodeId.take(8)} ≠ destination ${d.destinationNodeId.take(8)} — suspect"
                     )
                 } else {
-                    networkEventRepository.pushEvent(
-                        "[REPAIR] ${payload.blockId.take(16)} → ${ack.receiverNodeId.take(8)} confirmé"
-                    )
+                    val msg2 = "[REPAIR] Bloc ${payload.blockId.take(16)} replique vers ${ack.receiverNodeId.take(8)}"
+                    networkEventRepository.pushEvent(msg2)
+                    Log.i(LOGTAG, msg2)
                 }
             }
             .onFailure {
-                networkEventRepository.pushEvent(
-                    "[REPAIR] ${payload.blockId.take(16)} → ${d.destinationNodeId.take(8)} échec : ${it.message}"
-                )
+                val msg2 = "[REPAIR] ${payload.blockId.take(16)} → ${d.destinationNodeId.take(8)} échec : ${it.message}"
+                networkEventRepository.pushEvent(msg2)
+                Log.w(LOGTAG, msg2)
             }
     }
 }
