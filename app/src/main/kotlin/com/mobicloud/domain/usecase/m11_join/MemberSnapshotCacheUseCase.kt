@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
@@ -28,6 +30,7 @@ class MemberSnapshotCacheUseCase @Inject constructor(
 ) {
     private val _inMemory = MutableStateFlow<List<MemberInfo>>(emptyList())
     val inMemory: StateFlow<List<MemberInfo>> = _inMemory.asStateFlow()
+    private val updateMutex = Mutex()
 
     private var _inMemoryClusterId: String = ""
 
@@ -51,18 +54,21 @@ class MemberSnapshotCacheUseCase @Inject constructor(
     }
 
     suspend fun applyUpdate(update: MemberUpdate) {
-        val current = _inMemory.value
-        val updated = when (update.event) {
-            MemberUpdateEvent.JOINED -> {
-                val m = update.member ?: return
-                current.filterNot { it.nodeId.contentEquals(m.nodeId) } + m
+        val updated = updateMutex.withLock {
+            val current = _inMemory.value
+            val next = when (update.event) {
+                MemberUpdateEvent.JOINED -> {
+                    val m = update.member ?: return@withLock null
+                    current.filterNot { it.nodeId.contentEquals(m.nodeId) } + m
+                }
+                MemberUpdateEvent.LEFT -> {
+                    if (update.leftNodeId.isEmpty()) return@withLock null
+                    current.filterNot { it.nodeId.contentEquals(update.leftNodeId) }
+                }
             }
-            MemberUpdateEvent.LEFT -> {
-                if (update.leftNodeId.isEmpty()) return
-                current.filterNot { it.nodeId.contentEquals(update.leftNodeId) }
-            }
-        }
-        _inMemory.value = updated
+            _inMemory.value = next
+            next
+        } ?: return
         scope.launch {
             // Récupère le clusterId courant via NodeSettings (un seul cluster par device V5).
             val clusterId = runCatching {

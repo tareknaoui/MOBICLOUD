@@ -35,6 +35,10 @@ class MonitorMemberLivenessUseCase @Inject constructor(
     val clock: () -> Long = { System.currentTimeMillis() }
 ) {
     internal var monitorJob: Job? = null
+    // Ghost-member fix : nodeIdHex → timestamp d'éviction. Répétés comme LEFT dans le keepalive
+    // pendant SP_TIMEOUT_MS × 3 (4.5 min = 6 cycles) pour atteindre les pairs qui ont raté
+    // le LEFT initial (blip relay transitoire).
+    private val recentlyEvicted = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     fun start(spMemberInfo: MemberInfo) {
         if (monitorJob?.isActive == true) return
@@ -67,6 +71,23 @@ class MonitorMemberLivenessUseCase @Inject constructor(
                         runCatching { sendMemberUpdateUseCase.invoke(update) }
                             .onFailure {
                                 networkEventRepository.pushEvent("[HB-SP-MON] WARN keepalive ${m.nodeId.toHexShort()} échoué: ${it.message}")
+                            }
+                    }
+                    // Ghost-member fix : répéter LEFT pour les membres évincés récemment afin que
+                    // les pairs qui ont raté le LEFT initial puissent purger leur inMemory.
+                    val evictionTtl = SP_TIMEOUT_MS * 3L
+                    recentlyEvicted.entries.removeIf { now - it.value >= evictionTtl }
+                    for ((nodeIdHex, _) in recentlyEvicted) {
+                        val leftUpdate = MemberUpdate(
+                            event = MemberUpdateEvent.LEFT,
+                            member = null,
+                            leftNodeId = nodeIdHex.hexToByteArray(),
+                            timestampMs = clock(),
+                            signatureBytes = byteArrayOf()
+                        )
+                        runCatching { sendMemberUpdateUseCase.invoke(leftUpdate) }
+                            .onFailure {
+                                networkEventRepository.pushEvent("[HB-SP-MON] WARN keepalive LEFT ${nodeIdHex.take(8)} échoué: ${it.message}")
                             }
                     }
                 }
@@ -111,6 +132,8 @@ class MonitorMemberLivenessUseCase @Inject constructor(
                             sendMemberUpdateUseCase.invoke(leftUpdate)
                             // Sync inMemory pour que NetworkViewModel reflète l'éviction côté SP.
                             runCatching { memberSnapshotCacheUseCase.applyUpdate(leftUpdate) }
+                            // Ghost-member fix : mémoriser l'éviction pour la répéter dans le keepalive.
+                            recentlyEvicted[dead.nodeId] = clock()
                         }
                     }.onFailure {
                         networkEventRepository.pushEvent(
