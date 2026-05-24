@@ -1,6 +1,6 @@
 package com.mobicloud.domain.usecase.m11_join
 
-import com.mobicloud.domain.models.BULLY_TIMESTAMP_WINDOW_MS
+import com.mobicloud.domain.models.m11_join.MEMBER_UPDATE_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.MemberUpdate
 import com.mobicloud.domain.models.m11_join.MemberUpdateEvent
@@ -18,7 +18,7 @@ import javax.inject.Inject
  * Trois branches d'ignorance silencieuse (log + retour `Ignored`) :
  *  1. `fromNodeId` n'est pas un SUPER_PAIR connu de `inMemoryRegistry` (anti-bypass H3 + C11).
  *  2. Signature EC P-256 invalide vs la pubkey du SP émetteur.
- *  3. Timestamp hors fenêtre `±BULLY_TIMESTAMP_WINDOW_MS` (anti-replay).
+ *  3. Timestamp hors fenêtre `±MEMBER_UPDATE_TIMESTAMP_WINDOW_MS` (anti-replay, 90s vs 30s élection).
  *
  * Un retour `Applied` indique que le caller doit appliquer l'update + `markSpSeen()`.
  */
@@ -69,6 +69,18 @@ class ProcessMemberUpdateUseCase @Inject constructor(
             ?: update.leftNodeId.takeIf { it.isNotEmpty() }?.toHexString()
             ?: return Result.Ignored("target nodeId absent")
 
+        // Timestamp O(1) vérifié AVANT la crypto EC P-256 (coûteuse) pour rejeter les replays bon marché.
+        // MEMBER_UPDATE_TIMESTAMP_WINDOW_MS (90s) > BULLY_TIMESTAMP_WINDOW_MS (30s) : le relay Render
+        // peut introduire 10-40s de latence queue — un window de 30s rejetait les keepalives légitimes
+        // comme "stale", empêchant markSpSeen() → faux SpTimeoutDetected → Bully → cluster éclaté.
+        val now = clock()
+        if (update.timestampMs < now - MEMBER_UPDATE_TIMESTAMP_WINDOW_MS
+            || update.timestampMs > now + MEMBER_UPDATE_TIMESTAMP_WINDOW_MS
+        ) {
+            networkEventRepository.pushEvent("[MEMBER-UPDATE-RX] Timestamp stale — ignoré")
+            return Result.Ignored("timestamp stale")
+        }
+
         val signedBytes = memberUpdateSignedBytes(
             senderNodeId = fromHex.hexToByteArray(),
             event = update.event,
@@ -80,14 +92,6 @@ class ProcessMemberUpdateUseCase @Inject constructor(
         if (!valid) {
             networkEventRepository.pushEvent("[MEMBER-UPDATE-RX] Signature invalide — ignoré")
             return Result.Ignored("signature invalide")
-        }
-
-        val now = clock()
-        if (update.timestampMs < now - BULLY_TIMESTAMP_WINDOW_MS
-            || update.timestampMs > now + BULLY_TIMESTAMP_WINDOW_MS
-        ) {
-            networkEventRepository.pushEvent("[MEMBER-UPDATE-RX] Timestamp stale — ignoré")
-            return Result.Ignored("timestamp stale")
         }
 
         networkEventRepository.pushEvent(

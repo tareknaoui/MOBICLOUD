@@ -86,6 +86,14 @@ class MobicloudP2PService : Service() {
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    // S9 (stabilité) : PARTIAL_WAKE_LOCK pris pour toute la durée du service. Sans ça,
+    // quand l'écran s'éteint, Android met le CPU en deep-sleep → les delay() des coroutines
+    // (HB 30s, keepalive 45s) sont repoussés/groupés par AlarmManager → le SP voit "0s ago"
+    // qui s'incrémente → éviction injuste. Le foreground service NE protège PAS le CPU,
+    // seulement la priorité du process. Coût batterie minime (CPU réveillé en burst < 100ms
+    // par cycle 30s) vs criticité protocole P2P.
+    private var wakeLock: android.os.PowerManager.WakeLock? = null
+
     @Inject lateinit var securityRepository: SecurityRepository
     @Inject lateinit var identityRepository: IdentityRepository
     @Inject lateinit var calculateReliabilityScoreUseCase: CalculateReliabilityScoreUseCase
@@ -172,6 +180,17 @@ class MobicloudP2PService : Service() {
         } else {
             registerReceiver(simulateDepartureReceiver, filter)
         }
+        // S9 : acquire wake lock pour garder le CPU réveillé tant que le service tourne.
+        // Sans ça, les heartbeats sont repoussés quand l'écran s'éteint → "0s ago" augmente.
+        val pm = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        wakeLock = pm.newWakeLock(
+            android.os.PowerManager.PARTIAL_WAKE_LOCK,
+            "MobiCloud:P2PServiceWakeLock"
+        ).apply {
+            setReferenceCounted(false)
+            acquire()
+        }
+        Log.i(LOGTAG, "[WAKE-LOCK] acquired — CPU reste éveillé pendant écran off")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -285,9 +304,20 @@ class MobicloudP2PService : Service() {
             // Bully election — écoute les messages entrants ELECTION/ALIVE/COORDINATOR via relay.
             // ProcessIncomingElectionEventUseCase répond ALIVE si score local > émetteur,
             // et gère COORDINATOR → JoinEvent.CoordinatorReceived → FSM Joining → rejoint le cluster.
+            // S5 (stabilité) : retry loop — si le flow upstream throw (rare mais possible : exception
+            // dans transformLatest, decode fail), on relance après backoff au lieu de mourir → sans ça
+            // plus aucun COORDINATOR n'est traité, FSM reste Undiscovered indéfiniment.
             launch {
-                processIncomingElectionEventUseCase().collect { result ->
-                    result.onFailure { Log.d(LOGTAG, "[ELECTION-IN] ${it.message}") }
+                while (isActive) {
+                    runCatching {
+                        processIncomingElectionEventUseCase().collect { result ->
+                            result.onFailure { Log.d(LOGTAG, "[ELECTION-IN] ${it.message}") }
+                        }
+                    }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        Log.w(LOGTAG, "[ELECTION-IN] collector throw — restart in 2s", it)
+                        delay(2_000L)
+                    }
                 }
             }
 
@@ -390,6 +420,16 @@ class MobicloudP2PService : Service() {
 
                 // Hook : sur reconnexion WebSocket, refait JOIN + GET_PEERS immédiatement.
                 // Si ce nœud est SP actif, renvoie aussi REGISTER_PEER sans attendre le keepalive 10s.
+                // S11 (stabilité critique) : sur RECONNEXION (pas premier connect), rafraîchit tous
+                // les timestamps pour éviter le faux SP_TIMEOUT / fausse éviction. Quand le relay
+                // drop pendant 10-60s (Render free cold start, NAT timeout), les HBs/keepalives ne
+                // passent pas. Sans refresh, après reconnect :
+                //  - SP voit `lastSeen` stale → évince ses membres (alors qu'ils étaient juste muets)
+                //  - Membres voient `lastSpSignalAt` stale → SpTimeoutDetected → "Recovering connection"
+                // Avec refresh : on accorde une fenêtre de grâce = 1 cycle HB pour qu'ils prouvent
+                // qu'ils sont vivants. Symptôme corrigé : SP "Searching" + membres "Recovering"
+                // ~10-15 min après démarrage (correspond au cycle sleep Render free tier).
+                var onConnectedCount = 0
                 (signalingRepository as? com.mobicloud.data.repository.SignalingRepositoryImpl)
                     ?.onConnectedHook = {
                         joinAndFetch()
@@ -403,10 +443,44 @@ class MobicloudP2PService : Service() {
                                 nodeId = identity.nodeId
                             ).onFailure { Log.w(LOGTAG, "[RECONNECT] re-register SP échoué : ${it.message}") }
                         }
+                        onConnectedCount++
+                        if (onConnectedCount > 1) {
+                            // Reconnexion détectée — rafraîchit les timestamps pour grace period
+                            networkEventRepository.pushEvent("[RECONNECT] Relay reconnecté — refresh timestamps (grace period)")
+                            val now = System.currentTimeMillis()
+                            // 1) Membre : reset le timer SP_TIMEOUT
+                            runCatching { memberHeartbeatUseCase.markSpSeen() }
+                            // 2) SP : touch lastSeen de tous les membres actifs du cluster
+                            runCatching {
+                                val clusterId = nodeSettingsRepository.getClusterIdOnce()
+                                if (clusterId.isNotBlank()) {
+                                    memberDao.listActiveSnapshot(clusterId).forEach { m ->
+                                        memberDao.touchHeartbeat(m.nodeId, now, m.freeBytes, m.ipAddress, m.port)
+                                    }
+                                }
+                            }
+                            // 3) Tous : refresh peerRepository pour éviter !hasActivePeers
+                            runCatching {
+                                val nowElapsed = SystemClock.elapsedRealtime()
+                                peerRepository.peers.value.filter { it.isActive }.forEach { p ->
+                                    peerRepository.registerOrUpdatePeer(
+                                        identity = p.identity,
+                                        timestampMs = nowElapsed,
+                                        isSuperPair = p.isSuperPair
+                                    )
+                                }
+                            }
+                        }
                     }
 
+                // S6 (stabilité) : protection iteration. Si getLocalIpAddress() throw (WifiManager
+                // NPE possible) ou joinAsParticipant() throw, la boucle ne meurt plus → le relay
+                // continue de nous voir grâce au prochain cycle.
                 while (isActive) {
-                    joinAndFetch()
+                    runCatching { joinAndFetch() }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        Log.w(LOGTAG, "[RELAY-REG] joinAndFetch cycle throw — retry next tick: ${it.message}")
+                    }
                     delay(30_000L)
                 }
             }
@@ -418,23 +492,16 @@ class MobicloudP2PService : Service() {
                     .onFailure { Log.w(LOGTAG, "[CRDT] Purge tombstones échouée : ${it.message}") }
             }
 
-            // Discovery périodique via Relais HA — déclenche GET_PEERS toutes les 30s
-            launch {
-                delay(3_000L) // laisser la connexion WSS s'établir avant le premier GET_PEERS
-                while (isActive) {
-                    signalingRepository.fetchActiveSuperPeers()
-                        .onSuccess { networkEventRepository.pushEvent("[HA] GET_PEERS envoyé — réponse attendue") }
-                        .onFailure { Log.w("MobicloudP2PService", "fetchActiveSuperPeers échoué", it) }
-                    delay(30_000L)
-                }
-            }
-
             // Fix SP conflict cross-réseau : quand deux SPs se découvrent via relay,
             // celui dont le nodeId est inférieur abdique et rejoint l'autre cluster.
             // Pour Undiscovered/Isolated : émet simplement NewCandidateDetected.
             launch {
                 var seenSuperPairIds = emptySet<String>()
+                // S7 (stabilité) : protection par peers — si transition() throw sur un peer, on
+                // continue avec les autres peers et les prochains émissions de latestPeers.
+                // Sans ça : 1 exception = SP conflict detection morte = split brain permanent.
                 signalingRepository.latestPeers.collect { peers ->
+                    runCatching {
                     val currentSuperPeers = peers.filter { it.isSuperPair }
                     val currentIds = currentSuperPeers.map { it.nodeId }.toSet()
                     currentSuperPeers.filter { it.nodeId !in seenSuperPairIds }.forEach { peer ->
@@ -483,6 +550,10 @@ class MobicloudP2PService : Service() {
                         }
                     }
                     seenSuperPairIds = seenSuperPairIds intersect currentIds
+                    }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        Log.w(LOGTAG, "[JOIN] SP conflict cycle throw — skip cycle: ${it.message}")
+                    }
                 }
             }
 
@@ -491,9 +562,13 @@ class MobicloudP2PService : Service() {
             // En entrant en SuperPair : vérifier immédiatement si un autre SP de nodeId
             // supérieur est déjà connu (cas race Bully où seenSuperPairIds l'avait déjà vu
             // pendant l'état Undiscovered et l'avait écarté du filtre de conflit).
+            // S8 (stabilité) : protection iteration FSM observer — sans ça, un throw dans
+            // transition() ou registerSuperPeerUseCase tue le collector → plus de transition
+            // post-abdication, plus de re-register SP via BullySolo path.
             launch {
                 var spScanJob: Job? = null
                 joinStateMachine.currentState.collect { state ->
+                    runCatching {
                     if (state is NodeJoinState.Undiscovered) {
                         spScanJob?.cancel()
                         spScanJob = null
@@ -529,6 +604,14 @@ class MobicloudP2PService : Service() {
                                         delay(30_000L)
                                     }
                                 }
+                                // S10 (stabilité) : auto-abdication 30 min DÉSACTIVÉE. Causait le bug
+                                // "SP affiche Searching après ~30 min" : forçait rotation du rôle SP
+                                // même quand le cluster était sain → churn inutile, perte temporaire
+                                // de cohérence (members → Rejoining → re-Bully → reconvergence).
+                                // Promotabilité préservée via : SP conflict resolution (cross-network),
+                                // Bully forcé si SP meurt, abdication manuelle utilisateur.
+                                // Pour ré-activer rotation équitable : décommenter le bloc ci-dessous.
+                                /*
                                 launch {
                                     Log.i(LOGTAG, "Timer d'abdication BullySolo démarré (${ABDICATION_DELAY_MS / 60_000}min)")
                                     delay(ABDICATION_DELAY_MS)
@@ -538,6 +621,7 @@ class MobicloudP2PService : Service() {
                                     networkEventRepository.pushEvent("[ELECTION] Abdication automatique après ${ABDICATION_DELAY_MS / 60_000}min")
                                     abdicate()
                                 }
+                                */
                             }
                         }
                         // Polling 2s × 8 = 16s pour laisser le GET_PEERS (intervalle 10s) retourner
@@ -569,6 +653,10 @@ class MobicloudP2PService : Service() {
                                 }
                             }
                         }
+                    }
+                    }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        Log.w(LOGTAG, "[JOIN-FSM-OBS] state observer throw — skip cycle: ${it.message}")
                     }
                 }
             }
@@ -681,6 +769,9 @@ class MobicloudP2PService : Service() {
                                             delay(30_000L)
                                         }
                                     }
+                                    // S10 (stabilité) : auto-abdication 30 min DÉSACTIVÉE — voir
+                                    // commentaire dans le bloc BullySolo path ci-dessus.
+                                    /*
                                     launch {
                                         Log.i(LOGTAG, "Timer d'abdication démarré (${ABDICATION_DELAY_MS / 60_000}min)")
                                         delay(ABDICATION_DELAY_MS)
@@ -691,6 +782,7 @@ class MobicloudP2PService : Service() {
                                         networkEventRepository.pushEvent("[ELECTION] Abdication automatique après ${ABDICATION_DELAY_MS / 60_000}min")
                                         abdicate() // Annule superPeerJob (keepalive Relais HA)
                                     }
+                                    */
                                 }
                             }
                             .onFailure { Log.d(LOGTAG, "Cycle d'élection terminé : ${it.message}") }
@@ -764,6 +856,9 @@ class MobicloudP2PService : Service() {
         tcpConnectionManager.stopServer()
         joinStateMachine.close()
         serviceScope.cancel()
+        // S9 : release wake lock — sans ça, fuite CPU même après mort du service.
+        runCatching { wakeLock?.takeIf { it.isHeld }?.release() }
+        wakeLock = null
         super.onDestroy()
     }
 

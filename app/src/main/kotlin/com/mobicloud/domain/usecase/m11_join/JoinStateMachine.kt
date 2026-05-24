@@ -93,6 +93,25 @@ class JoinStateMachine @Inject constructor(
                 }
             }
 
+            // Joining + BullyVictory : SP mort pendant la tentative JOIN → ce nœud a gagné l'élection.
+            // On transite en SuperPair directement. Le flow sendJoinRequest orphelin expire seul
+            // (AllCandidatesExhausted → else → ignoré depuis SuperPair).
+            state is NodeJoinState.Joining && event is JoinEvent.BullyVictory -> {
+                val newState = NodeJoinState.SuperPair(event.clusterId)
+                _currentState.value = newState
+                logStateChange(state, newState, event)
+            }
+
+            // Joining + CoordinatorReceived : nouveau SP annoncé pendant JOIN → mettre à jour la cible.
+            // On ne relance pas sendJoinRequest (évite deux flows concurrents) ; le SP courant
+            // sera découvert via latestPeers → NewCandidateDetected si JOIN_ACCEPT n'arrive pas.
+            state is NodeJoinState.Joining && event is JoinEvent.CoordinatorReceived -> {
+                val hint = event.toSuperPeerHint()
+                val newState = NodeJoinState.Joining(hint, state.attemptIndex + 1)
+                _currentState.value = newState
+                logStateChange(state, newState, event)
+            }
+
             // Joining + JoinRedirectReceived → Joining (next) ou Isolated
             // SendJoinRequestUseCase gère les alternatives dans sa boucle while interne —
             // pas besoin de relancer invoke() ici (ce serait une double tentative concurrente).

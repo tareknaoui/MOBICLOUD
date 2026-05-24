@@ -62,6 +62,7 @@ import androidx.navigation.NavDestination.Companion.hierarchy
 import com.mobicloud.ui.JetpackAppState
 import com.mobicloud.compose.R
 import com.mobicloud.navigation.JetpackNavHost
+import com.mobicloud.presentation.join.JoinOverlay
 import com.mobicloud.navigation.TopLevelDestination
 import com.mobicloud.core.ui.components.AppBackground
 import com.mobicloud.core.ui.components.AppGradientBackground
@@ -287,6 +288,12 @@ private fun JetpackScaffold(
                             actionPerformed
                         },
                     )
+
+                    // Overlay de reconnexion — visible uniquement après onboarding,
+                    // disparaît en fondu dès que le nœud atteint Member ou SuperPair.
+                    if (hasCompletedOnboarding) {
+                        JoinOverlay(modifier = Modifier.fillMaxSize())
+                    }
                 }
             }
             // TODO: We may want to add padding or spacer when the snackbar is shown so that

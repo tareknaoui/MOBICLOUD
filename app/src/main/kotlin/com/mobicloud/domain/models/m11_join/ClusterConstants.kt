@@ -27,3 +27,10 @@ const val ISOLATION_BACKOFF_MS = 20_000L
 // 15s = 1/6 de SP_TIMEOUT_MS — granularité d'éviction acceptable (max 105s détection mort réelle),
 // et 4× moins de scans que toutes les 5s.
 const val LIVENESS_CHECK_INTERVAL_MS = 15_000L
+
+// Fenêtre anti-replay spécifique aux MEMBER_UPDATE (keepalive + eviction).
+// Distincte de BULLY_TIMESTAMP_WINDOW_MS (30s, pour les messages d'élection) : les keepalives
+// partent toutes les 45s via le relay Render qui peut introduire 10-40s de latence queue —
+// avec 30s le message arrivait "stale" et markSpSeen() n'était jamais appelé → SpTimeoutDetected.
+// 90s = SP_TIMEOUT_MS : tout message plus vieux que le timeout lui-même peut être ignoré sans risque.
+const val MEMBER_UPDATE_TIMESTAMP_WINDOW_MS = 90_000L

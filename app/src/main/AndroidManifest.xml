@@ -23,6 +23,12 @@
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <!-- S9 : maintient le CPU réveillé pendant que le service P2P tourne — sans ça,
+         écran éteint = HBs/keepalives repoussés → "0s ago" qui s'incrémente → éviction. -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <!-- Permet de demander l'exemption d'optimisation batterie (constructeurs agressifs
+         comme Xiaomi/Huawei qui tuent les foreground services après ~5 min écran off). -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 

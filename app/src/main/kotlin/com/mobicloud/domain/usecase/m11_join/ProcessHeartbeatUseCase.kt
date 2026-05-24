@@ -1,8 +1,8 @@
 package com.mobicloud.domain.usecase.m11_join
 
 import com.mobicloud.data.local.dao.MemberDao
-import com.mobicloud.domain.models.BULLY_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.m11_join.Heartbeat
+import com.mobicloud.domain.models.m11_join.MEMBER_UPDATE_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
 import com.mobicloud.domain.models.m11_join.MemberInfo
 import com.mobicloud.domain.models.m11_join.MemberRole
@@ -53,9 +53,10 @@ class ProcessHeartbeatUseCase @Inject constructor(
         // l'opération la plus coûteuse (~ms vs ns pour un compare Long). Sur un cluster
         // soumis à du bruit/replay attacker, c'est un order-of-magnitude moins de CPU.
         val now = System.currentTimeMillis()
-        // (now - W) et (now + W) ne peuvent pas overflow (now ~ 10^13, W = 30s).
-        // Comparer ts contre des bornes pré-calculées évite l'overflow de `abs(Long.MIN_VALUE)`.
-        if (hb.timestampMs < now - BULLY_TIMESTAMP_WINDOW_MS || hb.timestampMs > now + BULLY_TIMESTAMP_WINDOW_MS) {
+        // S4 (stabilité) : MEMBER_UPDATE_TIMESTAMP_WINDOW_MS (90s) au lieu de BULLY_TIMESTAMP_WINDOW_MS
+        // (30s). Le relay Render peut introduire 10-40s de latence — un HB rejeté ici cause éviction
+        // injuste du membre après SP_TIMEOUT_MS. Symétrique du fix MEMBER_UPDATE côté membre.
+        if (hb.timestampMs < now - MEMBER_UPDATE_TIMESTAMP_WINDOW_MS || hb.timestampMs > now + MEMBER_UPDATE_TIMESTAMP_WINDOW_MS) {
             networkEventRepository.pushEvent(
                 "[HB-SP] Heartbeat invalide (timestamp stale ts=${hb.timestampMs} now=$now) de $nodeIdShort"
             )

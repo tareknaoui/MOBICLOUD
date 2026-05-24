@@ -28,7 +28,8 @@ class ProcessJoinRequestUseCase @Inject constructor(
     private val memberRegistry: MemberRegistry,
     private val joinStateMachine: JoinStateMachine,
     private val networkEventRepository: NetworkEventRepository,
-    private val memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase
+    private val memberSnapshotCacheUseCase: MemberSnapshotCacheUseCase,
+    private val sendMemberUpdateUseCase: SendMemberUpdateUseCase
 ) {
     suspend operator fun invoke(request: JoinRequest): JoinResponse {
         val localIdentity = securityRepository.getIdentity().getOrThrow()
@@ -95,16 +96,17 @@ class ProcessJoinRequestUseCase @Inject constructor(
             return signedRedirect(JoinRedirectReason.CLUSTER_FULL, alts, selfNodeIdBytes)
         }
 
-        // Sync inMemory pour que NetworkViewModel reflète immédiatement le nouveau membre côté SP.
-        runCatching {
-            memberSnapshotCacheUseCase.applyUpdate(MemberUpdate(
-                event = MemberUpdateEvent.JOINED,
-                member = newMember,
-                leftNodeId = byteArrayOf(),
-                timestampMs = System.currentTimeMillis(),
-                signatureBytes = byteArrayOf()
-            ))
-        }
+        // Sync inMemory + broadcast immédiat aux membres existants — sans ça, les pairs
+        // qui ont rejoint avant ce nouveau membre ne l'apprennent qu'au keepalive 45s.
+        val joinedUpdate = MemberUpdate(
+            event = MemberUpdateEvent.JOINED,
+            member = newMember,
+            leftNodeId = byteArrayOf(),
+            timestampMs = System.currentTimeMillis(),
+            signatureBytes = byteArrayOf()
+        )
+        runCatching { memberSnapshotCacheUseCase.applyUpdate(joinedUpdate) }
+        runCatching { sendMemberUpdateUseCase.invoke(joinedUpdate) }
 
         val snapshot = memberRegistry.list()
         val acceptTimestampMs = System.currentTimeMillis()

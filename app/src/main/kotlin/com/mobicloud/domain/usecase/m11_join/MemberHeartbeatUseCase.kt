@@ -67,10 +67,20 @@ class MemberHeartbeatUseCase @Inject constructor(
             lastSpSignalAt = clock()
             lastLocalSendErrorAt = 0L
             heartbeatJob = scope.launch {
+                // S2 (stabilité long-terme) : chaque ITÉRATION wrapée. Sans ça, une exception
+                // de `observeFreeSpaceBytes().first()` (DataStore) ou `getLocalIpAddress()`
+                // (WifiManager null en mode avion) tuait la boucle → plus de HB → SP évince
+                // le membre après 90s → membre orphelin sans qu'il le sache.
                 while (isActive) {
                     delay(HEARTBEAT_INTERVAL_MS)
-                    sendOnce(superPairNodeId)
-                    checkSpTimeout(superPairNodeId)
+                    runCatching {
+                        sendOnce(superPairNodeId)
+                        checkSpTimeout(superPairNodeId)
+                    }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        lastLocalSendErrorAt = clock()
+                        networkEventRepository.pushEvent("[HB-MEM] WARN cycle HB échoué: ${it.message} — retry next tick")
+                    }
                 }
             }
         }

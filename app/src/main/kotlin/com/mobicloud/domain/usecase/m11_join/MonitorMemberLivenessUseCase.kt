@@ -55,61 +55,72 @@ class MonitorMemberLivenessUseCase @Inject constructor(
             // Keepalive SP→membres : ré-émet le MemberInfo de TOUS les membres actifs toutes les
             // SP_TIMEOUT_MS/2 (45s). Cela permet aux pairs qui ont raté un MEMBER_UPDATE (reconnexion
             // relay transitoire) de resynchroniser leur inMemory sans quitter/rejoindre le cluster.
+            // S1 (stabilité long-terme) : chaque ITÉRATION wrapée dans runCatching — sans ça, une
+            // exception transitoire (DB I/O, NPE) tuait la boucle pour toujours → cluster figé.
             launch {
                 while (isActive) {
                     delay(SP_TIMEOUT_MS / 2L)
-                    val now = clock()
-                    val allMembers = memberSnapshotCacheUseCase.snapshot()
-                    for (m in allMembers) {
-                        val update = MemberUpdate(
-                            event = MemberUpdateEvent.JOINED,
-                            member = m,
-                            leftNodeId = byteArrayOf(),
-                            timestampMs = now,
-                            signatureBytes = byteArrayOf()
-                        )
-                        runCatching { sendMemberUpdateUseCase.invoke(update) }
-                            .onFailure {
-                                networkEventRepository.pushEvent("[HB-SP-MON] WARN keepalive ${m.nodeId.toHexShort()} échoué: ${it.message}")
-                            }
-                    }
-                    // Ghost-member fix : répéter LEFT pour les membres évincés récemment afin que
-                    // les pairs qui ont raté le LEFT initial puissent purger leur inMemory.
-                    val evictionTtl = SP_TIMEOUT_MS * 3L
-                    recentlyEvicted.entries.removeIf { now - it.value >= evictionTtl }
-                    for ((nodeIdHex, _) in recentlyEvicted) {
-                        val leftUpdate = MemberUpdate(
-                            event = MemberUpdateEvent.LEFT,
-                            member = null,
-                            leftNodeId = nodeIdHex.hexToByteArray(),
-                            timestampMs = clock(),
-                            signatureBytes = byteArrayOf()
-                        )
-                        runCatching { sendMemberUpdateUseCase.invoke(leftUpdate) }
-                            .onFailure {
-                                networkEventRepository.pushEvent("[HB-SP-MON] WARN keepalive LEFT ${nodeIdHex.take(8)} échoué: ${it.message}")
-                            }
+                    runCatching {
+                        val now = clock()
+                        val allMembers = memberSnapshotCacheUseCase.snapshot()
+                        for (m in allMembers) {
+                            val update = MemberUpdate(
+                                event = MemberUpdateEvent.JOINED,
+                                member = m,
+                                leftNodeId = byteArrayOf(),
+                                timestampMs = now,
+                                signatureBytes = byteArrayOf()
+                            )
+                            runCatching { sendMemberUpdateUseCase.invoke(update) }
+                                .onFailure {
+                                    networkEventRepository.pushEvent("[HB-SP-MON] WARN keepalive ${m.nodeId.toHexShort()} échoué: ${it.message}")
+                                }
+                        }
+                        // Ghost-member fix : répéter LEFT pour les membres évincés récemment afin que
+                        // les pairs qui ont raté le LEFT initial puissent purger leur inMemory.
+                        val evictionTtl = SP_TIMEOUT_MS * 3L
+                        recentlyEvicted.entries.removeIf { now - it.value >= evictionTtl }
+                        for ((nodeIdHex, _) in recentlyEvicted) {
+                            val leftUpdate = MemberUpdate(
+                                event = MemberUpdateEvent.LEFT,
+                                member = null,
+                                leftNodeId = nodeIdHex.hexToByteArray(),
+                                timestampMs = clock(),
+                                signatureBytes = byteArrayOf()
+                            )
+                            runCatching { sendMemberUpdateUseCase.invoke(leftUpdate) }
+                                .onFailure {
+                                    networkEventRepository.pushEvent("[HB-SP-MON] WARN keepalive LEFT ${nodeIdHex.take(8)} échoué: ${it.message}")
+                                }
+                        }
+                    }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
+                        networkEventRepository.pushEvent("[HB-SP-MON] WARN cycle keepalive échoué: ${it.message} — retry next tick")
                     }
                 }
             }
+            // S1 (stabilité long-terme) : idem pour la boucle d'éviction — l'ancien code laissait
+            // `memberDao.listActiveSnapshot()` hors runCatching → 1 exception Room = monitor mort →
+            // cluster accumule des ghost members à l'infini.
             while (isActive) {
                 delay(LIVENESS_CHECK_INTERVAL_MS)
-                val cutoff = clock() - SP_TIMEOUT_MS
-                // Rafraîchit lastSeen du SP lui-même — il ne reçoit pas de heartbeat de sa propre part
-                // et serait sinon évincé après SP_TIMEOUT_MS comme n'importe quel membre.
                 runCatching {
-                    memberDao.touchHeartbeat(
-                        nodeId = spMemberInfo.nodeId.toHexString().lowercase(),
-                        lastSeen = clock(),
-                        freeBytes = spMemberInfo.freeBytes,
-                        ip = spMemberInfo.ipAddress,
-                        port = spMemberInfo.port
-                    )
-                }
-                val spNodeIdHex = spMemberInfo.nodeId.toHexString().lowercase()
-                val deadMembers = memberDao.listActiveSnapshot(clusterId)
-                    .filter { it.lastSeen < cutoff && it.nodeId != spNodeIdHex }
-                deadMembers.forEach { dead ->
+                    val cutoff = clock() - SP_TIMEOUT_MS
+                    // Rafraîchit lastSeen du SP lui-même — il ne reçoit pas de heartbeat de sa propre part
+                    // et serait sinon évincé après SP_TIMEOUT_MS comme n'importe quel membre.
+                    runCatching {
+                        memberDao.touchHeartbeat(
+                            nodeId = spMemberInfo.nodeId.toHexString().lowercase(),
+                            lastSeen = clock(),
+                            freeBytes = spMemberInfo.freeBytes,
+                            ip = spMemberInfo.ipAddress,
+                            port = spMemberInfo.port
+                        )
+                    }
+                    val spNodeIdHex = spMemberInfo.nodeId.toHexString().lowercase()
+                    val deadMembers = memberDao.listActiveSnapshot(clusterId)
+                        .filter { it.lastSeen < cutoff && it.nodeId != spNodeIdHex }
+                    deadMembers.forEach { dead ->
                     // H12 : protéger la coroutine contre une ligne corrompue (hex invalide, etc.) —
                     // sinon une seule row malformée tue le monitoring du cluster entier.
                     runCatching {
@@ -136,10 +147,15 @@ class MonitorMemberLivenessUseCase @Inject constructor(
                             recentlyEvicted[dead.nodeId] = clock()
                         }
                     }.onFailure {
+                        if (it is kotlinx.coroutines.CancellationException) throw it
                         networkEventRepository.pushEvent(
                             "[HB-SP-MON] WARN éviction ${dead.nodeId.take(8)} échouée: ${it.message}"
                         )
                     }
+                }
+                }.onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    networkEventRepository.pushEvent("[HB-SP-MON] WARN cycle éviction échoué: ${it.message} — retry next tick")
                 }
             }
         }

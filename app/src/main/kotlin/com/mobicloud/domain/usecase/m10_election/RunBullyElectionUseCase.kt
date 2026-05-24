@@ -40,7 +40,7 @@ class RunBullyElectionUseCase @Inject constructor(
     private val networkClient: IElectionNetworkClient,
     private val electionStateManager: ElectionStateManager,
     private val nodeSettingsRepository: NodeSettingsRepository,
-    private val markSelfAsSuperPairUseCase: MarkSelfAsSuperPairUseCase? = null,
+    private val markSelfAsSuperPairUseCase: MarkSelfAsSuperPairUseCase,
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     companion object {
@@ -146,7 +146,7 @@ class RunBullyElectionUseCase @Inject constructor(
                 isSuperPair = true
             )
 
-            markSelfAsSuperPairUseCase?.invoke(localClusterId)
+            markSelfAsSuperPairUseCase.invoke(localClusterId)
 
             emit(Result.success(SuperPairElection(localIdentity)))
         }

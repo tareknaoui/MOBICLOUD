@@ -1,5 +1,7 @@
 package com.mobicloud.presentation.dashboard
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,15 +14,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BatteryFull
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,6 +36,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -70,6 +75,7 @@ fun DashboardScreen(
     val communitySize   by viewModel.communitySize.collectAsStateWithLifecycle()
     val allocatedBytes  by viewModel.allocatedStorageBytes.collectAsStateWithLifecycle()
     val hostedBlockCount by viewModel.hostedBlockCount.collectAsStateWithLifecycle()
+    val hostedBytes      by viewModel.hostedStorageBytes.collectAsStateWithLifecycle()
 
     val uptimeFormatted = formatUptime(diagnostics.uptimeMs)
     val networkLabel = when (diagnostics.networkType) {
@@ -142,27 +148,12 @@ fun DashboardScreen(
             )
         }
         Spacer(Modifier.height(8.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            KpiDiagnosticCard(
-                label       = "My contribution",
-                value       = formatBytesShort(allocatedBytes),
-                hint        = "Space I share",
-                icon        = Icons.Filled.Storage,
-                accentColor = Color(0xFF0A84FF),
-                modifier    = Modifier.weight(1f)
-            )
-            KpiDiagnosticCard(
-                label       = "Protected files",
-                value       = "$hostedBlockCount",
-                hint        = "Saved",
-                icon        = Icons.Filled.Folder,
-                accentColor = Color(0xFF34C759),
-                modifier    = Modifier.weight(1f)
-            )
-        }
+        StorageCard(
+            usedBytes      = hostedBytes,
+            allocatedBytes = allocatedBytes,
+            blockCount     = hostedBlockCount,
+            modifier       = Modifier.fillMaxWidth()
+        )
 
         Spacer(Modifier.height(16.dp))
 
@@ -286,6 +277,111 @@ private fun SectionLabel(text: String) {
             modifier = Modifier.weight(1f),
             color    = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
         )
+    }
+}
+
+// ── Storage card ──────────────────────────────────────────────────────────────
+
+@Composable
+private fun StorageCard(
+    usedBytes: Long,
+    allocatedBytes: Long,
+    blockCount: Int,
+    modifier: Modifier = Modifier,
+) {
+    val progress = if (allocatedBytes > 0L) (usedBytes.toFloat() / allocatedBytes).coerceIn(0f, 1f) else 0f
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 900),
+        label = "storageProgress",
+    )
+    val blue   = Color(0xFF0A84FF)
+    val green  = Color(0xFF34C759)
+    val barColor = if (progress > 0.85f) Color(0xFFFF9F0A) else blue
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surface)
+            .border(1.dp, Color(0xFFE5E5EA), RoundedCornerShape(16.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp)
+    ) {
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.Storage,
+                        contentDescription = null,
+                        tint = blue,
+                        modifier = Modifier.size(18.dp),
+                    )
+                    Text(
+                        text  = "Storage shared",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                Text(
+                    text  = "${formatBytesShort(usedBytes)} / ${formatBytesShort(allocatedBytes)}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+
+            Spacer(Modifier.height(12.dp))
+
+            // Progress bar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFFE5E5EA))
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(animatedProgress)
+                        .height(8.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(barColor.copy(alpha = 0.7f), barColor)
+                            )
+                        )
+                )
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Icon(
+                        imageVector = Icons.Filled.FolderOpen,
+                        contentDescription = null,
+                        tint = green,
+                        modifier = Modifier.size(14.dp),
+                    )
+                    Text(
+                        text  = "$blockCount block${if (blockCount != 1) "s" else ""} hosted",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Text(
+                    text  = "${(progress * 100).toInt()}% used",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (progress > 0.85f) Color(0xFFFF9F0A) else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
     }
 }
 

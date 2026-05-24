@@ -91,6 +91,10 @@ class DashboardViewModel @Inject constructor(
     val hostedBlockCount: StateFlow<Int> = hostedBlockRepository.observeHostedBlockCount()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
 
+    // Octets réellement hébergés (vs quota alloué)
+    val hostedStorageBytes: StateFlow<Long> = hostedBlockRepository.observeTotalHostedBytes()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0L)
+
     fun toggleExpertMode() = viewModelScope.launch {
         // F9 fix: lecture atomique depuis le repo (source de vérité DB) évite la race condition double-tap
         val current = nodeSettingsRepository.getSettings().isExpertModeEnabled

@@ -30,6 +30,8 @@ import com.mobicloud.presentation.onboarding.InitRoute
 import com.mobicloud.presentation.onboarding.InitScreen
 import com.mobicloud.presentation.onboarding.PermissionsRoute
 import com.mobicloud.presentation.onboarding.PermissionsScreen
+import com.mobicloud.presentation.onboarding.WelcomeRoute
+import com.mobicloud.presentation.onboarding.WelcomeScreen
 import com.mobicloud.presentation.settings.SettingsRoute
 import com.mobicloud.presentation.settings.SettingsScreen
 import com.mobicloud.presentation.trash.TrashRoute
@@ -45,13 +47,22 @@ fun JetpackNavHost(
     modifier: Modifier = Modifier,
 ) {
     val navController = appState.navController
-    val startDestination = if (hasCompletedOnboarding) DashboardRoute else PermissionsRoute
+    val startDestination = if (hasCompletedOnboarding) DashboardRoute else WelcomeRoute
 
     NavHost(
         navController = navController,
         startDestination = startDestination,
         modifier = modifier,
     ) {
+        composable<WelcomeRoute> {
+            WelcomeScreen(
+                onFinish = {
+                    navController.navigate(PermissionsRoute) {
+                        popUpTo(WelcomeRoute) { inclusive = true }
+                    }
+                },
+            )
+        }
         composable<PermissionsRoute> {
             PermissionsScreen(
                 onNavigateToInit = {
