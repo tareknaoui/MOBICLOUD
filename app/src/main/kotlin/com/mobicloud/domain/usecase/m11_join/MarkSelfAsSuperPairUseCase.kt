@@ -2,6 +2,7 @@ package com.mobicloud.domain.usecase.m11_join
 
 import com.mobicloud.domain.models.m11_join.JoinEvent
 import com.mobicloud.domain.models.m11_join.MemberInfo
+import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.hexToByteArray
 import com.mobicloud.domain.repository.IdentityRepository
@@ -89,6 +90,11 @@ class MarkSelfAsSuperPairUseCase @Inject constructor(
 
         joinStateMachine.transition(JoinEvent.BullyVictory(clusterId))
 
-        monitorMemberLivenessUseCaseLazy.get().start(selfMember)
+        // Guard : ne démarrer le monitor que si la FSM est effectivement passée en SuperPair.
+        // Si BullyVictory a été ignoré (ex. FSM en Joining car un COORDINATOR concurrent est arrivé),
+        // démarrer le monitor créerait un monitor fantôme actif sur un nœud non-SP.
+        if (joinStateMachine.currentState.value is NodeJoinState.SuperPair) {
+            monitorMemberLivenessUseCaseLazy.get().start(selfMember)
+        }
     }
 }

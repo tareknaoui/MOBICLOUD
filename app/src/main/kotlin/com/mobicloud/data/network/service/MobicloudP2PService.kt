@@ -546,6 +546,9 @@ class MobicloudP2PService : Service() {
                         // Guard : annule le scan précédent si FSM re-entre SuperPair (abdication + re-victoire).
                         spScanJob?.cancel()
                         spScanJob = launch {
+                            // Rafraîchit immédiatement latestPeers pour détecter un rival SP
+                            // sans attendre le prochain GET_PEERS périodique (jusqu'à 10s de délai).
+                            signalingRepository.fetchActiveSuperPeers()
                             repeat(8) {
                                 delay(2_000L)
                                 // Guard anti-ghost (incident 2026-05-17) : ne pas abdiquer si on a déjà

@@ -16,6 +16,7 @@ import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.repository.WifiNetworkRepository
 import com.mobicloud.domain.models.m11_join.JoinEvent
+import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.LocalRepairBuffer
 import com.mobicloud.domain.usecase.m11_join.JoinStateMachine
 import kotlinx.coroutines.flow.Flow
@@ -74,7 +75,18 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
         return when (payload.type) {
 
             ElectionMessageType.ELECTION -> {
-                if (electionStateManager.isInCooldown()) {
+                val localSPState = joinStateMachine?.currentState?.value
+                if (localSPState is NodeJoinState.SuperPair) {
+                    // Bully standard : un SP qui reçoit ELECTION répond COORDINATOR pour stopper
+                    // l'élection du demandeur et l'orienter vers notre cluster existant.
+                    // Sans ça, un challenger sans réponse se déclare COORDINATOR → double SP.
+                    val localClusterId = runCatching { nodeSettingsRepository.getSettings().clusterId }.getOrDefault("")
+                    val coordinatorPayload = createPayload(localIdentity, localScore, ElectionMessageType.COORDINATOR, localClusterId)
+                        .getOrElse { error -> throw Exception("Failed to sign COORDINATOR payload", error) }
+                    networkClient.broadcastElectionMessage(coordinatorPayload)
+                        .getOrElse { error -> throw Exception("Failed to broadcast COORDINATOR", error) }
+                    Result.success(ElectionEvent.Ignored)
+                } else if (electionStateManager.isInCooldown()) {
                     Result.success(ElectionEvent.Ignored)
                 } else if (isHigherPriority(localScore, localIdentity.nodeId, payload.reliabilityScore, payload.senderNodeId)) {
                     val alivePayload = createPayload(localIdentity, localScore, ElectionMessageType.ALIVE)
@@ -166,10 +178,11 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
     private suspend fun createPayload(
         identity: NodeIdentity,
         score: Float,
-        type: ElectionMessageType
+        type: ElectionMessageType,
+        clusterId: String = ""
     ): Result<ElectionPayload> {
         val timestampMs = System.currentTimeMillis()
-        val dataToSign = electionSignedBytes(type, identity.nodeId, score, "", timestampMs)
+        val dataToSign = electionSignedBytes(type, identity.nodeId, score, clusterId, timestampMs)
         val signature = securityRepository.signData(dataToSign).getOrElse { error ->
             return Result.failure(Exception("Failed to sign ${type.name} payload", error))
         }
@@ -179,6 +192,7 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                 type = type,
                 reliabilityScore = score,
                 signatureBytes = signature,
+                clusterId = clusterId,
                 timestampMs = timestampMs
             )
         )
