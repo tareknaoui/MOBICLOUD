@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -46,6 +49,8 @@ fun SettingsScreen(
     val freeBytes by viewModel.freeSpaceBytes.collectAsStateWithLifecycle()
     val showWarning by viewModel.showWarningDialog.collectAsStateWithLifecycle()
     val isExpertMode by viewModel.isExpertMode.collectAsStateWithLifecycle()
+    val showLeaveDialog by viewModel.showLeaveDialog.collectAsStateWithLifecycle()
+    val isLeaving by viewModel.isLeaving.collectAsStateWithLifecycle()
 
     val minBytes = HALF_GB
     val maxBytes = ((freeBytes * 0.80f).toLong()).coerceAtLeast(minBytes)
@@ -62,7 +67,7 @@ fun SettingsScreen(
             .padding(16.dp)
     ) {
         Text(
-            text = "Espace que je partage",
+            text = "Space I share",
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -83,7 +88,7 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Utilisé : ${usedBytes.toReadable()} · Plus vous partagez, plus vous pouvez sauvegarder chez vos amis.",
+            text = "Used: ${usedBytes.toReadable()} · The more you share, the more you can save with your friends.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -92,7 +97,7 @@ fun SettingsScreen(
 
         // === Story 13.1 — Section Affichage ===
         Text(
-            text = "AFFICHAGE",
+            text = "DISPLAY",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             letterSpacing = 1.2.sp
@@ -107,13 +112,13 @@ fun SettingsScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Mode Diagnostics Avancés",
+                    text = "Advanced Diagnostics Mode",
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "Affiche les détails techniques (NodeId, logs réseau, topologie cluster).",
+                    text = "Shows technical details (NodeId, network logs, cluster topology).",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -124,21 +129,81 @@ fun SettingsScreen(
                 onCheckedChange = viewModel::updateExpertMode
             )
         }
+
+        Spacer(modifier = Modifier.height(36.dp))
+
+        Text(
+            text = "NETWORK",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            letterSpacing = 1.2.sp
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Button(
+            onClick = viewModel::requestLeaveCluster,
+            enabled = !isLeaving,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.error
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            if (isLeaving) {
+                CircularProgressIndicator(
+                    color = MaterialTheme.colorScheme.onError,
+                    strokeWidth = 2.dp,
+                    modifier = Modifier
+                        .height(18.dp)
+                        .width(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Migrating...")
+            } else {
+                Text("Leave the cluster")
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = "Your hosted blocks will be migrated to other nodes before disconnecting.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+
+    if (showLeaveDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissLeaveDialog,
+            title = { Text("Leave the cluster?") },
+            text = { Text("Your hosted blocks will be migrated to other nodes. This operation takes a few seconds.") },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmLeaveCluster) {
+                    Text("Leave", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissLeaveDialog) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showWarning) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissWarningDialog() },
-            title = { Text("Réduire l'espace partagé ?") },
-            text = { Text("Si vous réduisez cet espace, certains fichiers de vos amis ne seront plus protégés chez vous.") },
+            title = { Text("Reduce shared space?") },
+            text = { Text("If you reduce this space, some of your friends' files will no longer be protected on your device.") },
             confirmButton = {
                 TextButton(onClick = { viewModel.confirmReduceQuota() }) {
-                    Text("Confirmer")
+                    Text("Confirm")
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissWarningDialog() }) {
-                    Text("Annuler")
+                    Text("Cancel")
                 }
             }
         )

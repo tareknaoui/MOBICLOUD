@@ -166,18 +166,6 @@ fun DashboardScreen(
 
         Spacer(Modifier.height(16.dp))
 
-        // ── Toggle détails avancés ──
-        TextButton(
-            onClick  = { viewModel.toggleExpertMode() },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text  = if (isExpertMode) "↑ Hide advanced info" else "→ Advanced info",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF0A84FF)
-            )
-        }
-
         // ── Mode Expert ──
         if (isExpertMode) {
             Spacer(Modifier.height(20.dp))

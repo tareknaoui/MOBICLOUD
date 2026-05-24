@@ -9,12 +9,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -66,19 +64,6 @@ fun NetworkScreen(
             )
             MemberListCard(members = topology.nodes)
             Spacer(Modifier.height(12.dp))
-        }
-
-        // === Story 13.1 — Toggle Diagnostics Avancés (AC8) ===
-        OutlinedButton(
-            onClick = { viewModel.toggleExpertMode() },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(
-                text = if (isExpertMode) "▴ MASQUER DIAGNOSTICS" else "▾ DIAGNOSTICS AVANCÉS",
-                fontFamily = FontFamily.Monospace,
-                fontSize = 12.sp,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
 
         // === Mode Expert : topologie technique + clusters distants (AC8) ===

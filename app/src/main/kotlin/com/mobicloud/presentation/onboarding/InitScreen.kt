@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,10 +47,10 @@ fun InitScreen(
     }
 
     val statusText = when (currentStep) {
-        is InitStep.CreatingIdentity -> "Création de votre identité sécurisée…"
-        is InitStep.SearchingMembers -> "Recherche de membres à proximité…"
-        is InitStep.ConnectingToGroup -> "Connexion au groupe de partage…"
-        is InitStep.Done -> "Prêt !"
+        is InitStep.CreatingIdentity -> "Creating your secure identity…"
+        is InitStep.SearchingMembers -> "Searching for nearby members…"
+        is InitStep.ConnectingToGroup -> "Connecting to your group…"
+        is InitStep.Done -> "Ready!"
     }
 
     Column(
@@ -94,13 +93,5 @@ fun InitScreen(
         )
 
         Spacer(modifier = Modifier.height(48.dp))
-
-        TextButton(onClick = onNavigateToDashboard) {
-            Text(
-                text = "Accéder à l'application",
-                color = Color.White.copy(alpha = 0.4f),
-                fontSize = 13.sp,
-            )
-        }
     }
 }

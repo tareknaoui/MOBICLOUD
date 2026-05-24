@@ -48,23 +48,27 @@ class MonitorMemberLivenessUseCase @Inject constructor(
                 networkEventRepository.pushEvent("[HB-SP-MON] WARN clusterId vide au start — monitor inactif")
                 return@launch
             }
-            // Keepalive SP→membres : ré-émet le MemberInfo du SP toutes les SP_TIMEOUT_MS/2 (45s)
-            // pour que les membres appellent markSpSeen() et ne déclenchent pas BullySolo solo
-            // faute de signal SP. Sans ça, le SP ne répond qu'aux JOINED/LEFT — silence 90s → Bully.
+            // Keepalive SP→membres : ré-émet le MemberInfo de TOUS les membres actifs toutes les
+            // SP_TIMEOUT_MS/2 (45s). Cela permet aux pairs qui ont raté un MEMBER_UPDATE (reconnexion
+            // relay transitoire) de resynchroniser leur inMemory sans quitter/rejoindre le cluster.
             launch {
                 while (isActive) {
                     delay(SP_TIMEOUT_MS / 2L)
-                    val keepalive = MemberUpdate(
-                        event = MemberUpdateEvent.JOINED,
-                        member = spMemberInfo,
-                        leftNodeId = byteArrayOf(),
-                        timestampMs = clock(),
-                        signatureBytes = byteArrayOf()
-                    )
-                    runCatching { sendMemberUpdateUseCase.invoke(keepalive) }
-                        .onFailure {
-                            networkEventRepository.pushEvent("[HB-SP-MON] WARN keepalive broadcast échoué: ${it.message}")
-                        }
+                    val now = clock()
+                    val allMembers = memberSnapshotCacheUseCase.snapshot()
+                    for (m in allMembers) {
+                        val update = MemberUpdate(
+                            event = MemberUpdateEvent.JOINED,
+                            member = m,
+                            leftNodeId = byteArrayOf(),
+                            timestampMs = now,
+                            signatureBytes = byteArrayOf()
+                        )
+                        runCatching { sendMemberUpdateUseCase.invoke(update) }
+                            .onFailure {
+                                networkEventRepository.pushEvent("[HB-SP-MON] WARN keepalive ${m.nodeId.toHexShort()} échoué: ${it.message}")
+                            }
+                    }
                 }
             }
             while (isActive) {

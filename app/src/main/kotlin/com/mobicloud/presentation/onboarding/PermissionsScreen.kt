@@ -151,7 +151,7 @@ fun PermissionsScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = Amber),
             ) {
                 Text(
-                    text = "Continuer",
+                    text = "Continue",
                     color = Color.Black,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
@@ -162,7 +162,7 @@ fun PermissionsScreen(
 
             TextButton(onClick = { completeAndNavigate() }) {
                 Text(
-                    text = "Passer",
+                    text = "Skip",
                     color = Color.White.copy(alpha = 0.5f),
                     fontSize = 14.sp,
                 )

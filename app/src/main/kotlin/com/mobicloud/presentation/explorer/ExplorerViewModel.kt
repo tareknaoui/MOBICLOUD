@@ -254,7 +254,7 @@ class ExplorerViewModel @Inject constructor(
                 } ?: Pair(null, "")
             }
             if (fileSizeBytes != null && fileSizeBytes > MAX_FILE_SIZE_BYTES) {
-                _storeState.value = StoreState.Error("Fichier trop volumineux (max ${MAX_FILE_SIZE_MB} Mo)")
+                _storeState.value = StoreState.Error("File too large (max ${MAX_FILE_SIZE_MB} MB)")
                 scheduleReset()
                 return@launch
             }
@@ -262,7 +262,7 @@ class ExplorerViewModel @Inject constructor(
             val fileBytes = withContext(ioDispatcher) {
                 context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             } ?: run {
-                _storeState.value = StoreState.Error("Impossible de lire le fichier")
+                _storeState.value = StoreState.Error("Could not read the file")
                 scheduleReset()
                 return@launch
             }
@@ -280,15 +280,15 @@ class ExplorerViewModel @Inject constructor(
                 ).getOrElse { e ->
                     val userMessage = when (e) {
                         is PeerSelectionException.PeerFlowTimeout ->
-                            "Réseau indisponible : impossible de joindre les nœuds dans les délais."
+                            "Network unavailable: unable to reach nodes in time."
                         is PeerSelectionException.InsufficientCapableNodes ->
-                            "Stockage insuffisant : seulement ${e.message?.substringAfter("Disponibles : ") ?: "0"} " +
-                            "nœud(s) avec assez d'espace libre."
+                            "Insufficient storage: only ${e.message?.substringAfter("Disponibles : ") ?: "0"} " +
+                            "node(s) with enough free space."
                         is PeerSelectionException.InsufficientRedundancyNodes ->
-                            "Réseau trop petit : il faut au moins 3 téléphones connectés pour garantir la redondance."
+                            "Network too small: at least 3 connected devices needed to guarantee redundancy."
                         is PeerSelectionException.InvalidBaseK ->
-                            "Paramètre K invalide (${e.message})."
-                        else -> "Sélection des nœuds échouée : ${e.message ?: "erreur inconnue"}"
+                            "Invalid K parameter (${e.message})."
+                        else -> "Node selection failed: ${e.message ?: "unknown error"}"
                     }
                     _storeState.value = StoreState.Error(userMessage)
                     scheduleReset()
@@ -299,7 +299,7 @@ class ExplorerViewModel @Inject constructor(
 
                 val fragments = encodeErasureFragmentsUseCase(tempFile, params)
                     .getOrElse { e ->
-                        _storeState.value = StoreState.Error("Échec encodage: ${e.message ?: "erreur inconnue"}")
+                        _storeState.value = StoreState.Error("Encoding failed: ${e.message ?: "unknown error"}")
                         scheduleReset()
                         return@launch
                     }
@@ -312,14 +312,14 @@ class ExplorerViewModel @Inject constructor(
                 // Story 6.3 Contrainte #1 pour la justification.
                 val encryptionIdentity = securityRepository.getEncryptionIdentity()
                     .getOrElse { e ->
-                        _storeState.value = StoreState.Error("Identité chiffrement indisponible: ${e.message ?: "erreur inconnue"}")
+                        _storeState.value = StoreState.Error("Encryption identity unavailable: ${e.message ?: "unknown error"}")
                         scheduleReset()
                         return@launch
                     }
 
                 val bundle = fragmentCipherUseCase.encrypt(fragments, encryptionIdentity.publicKeyBytes)
                     .getOrElse { e ->
-                        _storeState.value = StoreState.Error("Échec chiffrement: ${e.message ?: "erreur inconnue"}")
+                        _storeState.value = StoreState.Error("Encryption failed: ${e.message ?: "unknown error"}")
                         scheduleReset()
                         return@launch
                     }
@@ -348,7 +348,7 @@ class ExplorerViewModel @Inject constructor(
                         scheduleReset()
                     }
                     .onFailure { e ->
-                        _storeState.value = StoreState.Error("Échec distribution: ${e.message ?: "erreur inconnue"}")
+                        _storeState.value = StoreState.Error("Distribution failed: ${e.message ?: "unknown error"}")
                         scheduleReset()
                     }
 
@@ -356,7 +356,7 @@ class ExplorerViewModel @Inject constructor(
                 throw e
             } catch (e: Exception) {
                 if (_storeState.value is StoreState.InProgress) {
-                    _storeState.value = StoreState.Error("Erreur inattendue: ${e.message ?: "erreur inconnue"}")
+                    _storeState.value = StoreState.Error("Unexpected error: ${e.message ?: "unknown error"}")
                     scheduleReset()
                 }
             } finally {

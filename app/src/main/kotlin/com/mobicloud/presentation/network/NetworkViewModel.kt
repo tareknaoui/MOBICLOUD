@@ -31,9 +31,9 @@ import javax.inject.Named
  * Story 13.1 — Qualité de connexion humanisée pour l'écran Communauté (Mode Simple).
  */
 enum class ConnectionQuality(val label: String) {
-    EXCELLENT("Connexion excellente"),
-    STABLE("Connexion stable"),
-    LIMITED("Connexion limitée")
+    EXCELLENT("Excellent connection"),
+    STABLE("Stable connection"),
+    LIMITED("Limited connection")
 }
 
 @HiltViewModel

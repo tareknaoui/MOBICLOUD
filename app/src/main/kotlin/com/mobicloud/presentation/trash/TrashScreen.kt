@@ -87,12 +87,12 @@ fun TrashScreen(
                     viewModel.permanentlyDelete(hashToDelete)
                     confirmDeleteHash = null
                 }) {
-                    Text("Supprimer", color = Color(0xFFFF3333))
+                    Text("Delete", color = Color(0xFFFF3333))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { confirmDeleteHash = null }) {
-                    Text("Annuler", color = Color(0xFFFFB300))
+                    Text("Cancel", color = Color(0xFFFFB300))
                 }
             },
             containerColor = Color(0xFF1A1A1A)
@@ -103,19 +103,19 @@ fun TrashScreen(
     if (showEmptyConfirm) {
         AlertDialog(
             onDismissRequest = { showEmptyConfirm = false },
-            title = { Text("Vider la corbeille ?", color = Color.White) },
-            text = { Text("Tous les fichiers seront supprimés définitivement. Cette action est irréversible.", color = Color(0xFFCCCCCC)) },
+            title = { Text("Empty trash?", color = Color.White) },
+            text = { Text("All files will be permanently deleted. This action cannot be undone.", color = Color(0xFFCCCCCC)) },
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.emptyTrash()
                     showEmptyConfirm = false
                 }) {
-                    Text("Vider", color = Color(0xFFFF3333))
+                    Text("Empty", color = Color(0xFFFF3333))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showEmptyConfirm = false }) {
-                    Text("Annuler", color = Color(0xFFFFB300))
+                    Text("Cancel", color = Color(0xFFFFB300))
                 }
             },
             containerColor = Color(0xFF1A1A1A)
@@ -128,12 +128,12 @@ fun TrashScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("Corbeille", color = Color.White) },
+                title = { Text("Trash", color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Retour",
+                            contentDescription = "Back",
                             tint = Color.White
                         )
                     }
@@ -143,7 +143,7 @@ fun TrashScreen(
                         IconButton(onClick = { showEmptyConfirm = true }) {
                             Icon(
                                 imageVector = Icons.Default.DeleteForever,
-                                contentDescription = "Vider la corbeille",
+                                contentDescription = "Empty trash",
                                 tint = Color(0xFFFF3333)
                             )
                         }
@@ -168,7 +168,7 @@ fun TrashScreen(
                         modifier = Modifier.size(64.dp)
                     )
                     Text(
-                        text = "Votre corbeille est vide",
+                        text = "Your trash is empty",
                         color = Color(0xFF888888),
                         fontSize = 16.sp,
                         textAlign = TextAlign.Center,
@@ -189,7 +189,7 @@ fun TrashScreen(
                         entry = entry,
                         onRestore = {
                             viewModel.restoreEntry(entry.fileHash)
-                            scope.launch { snackbarHostState.showSnackbar("Fichier restauré") }
+                            scope.launch { snackbarHostState.showSnackbar("File restored") }
                         },
                         onDelete = { confirmDeleteHash = entry.fileHash }
                     )
