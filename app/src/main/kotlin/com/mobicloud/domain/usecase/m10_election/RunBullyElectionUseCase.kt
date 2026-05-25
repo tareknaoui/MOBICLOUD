@@ -117,12 +117,21 @@ class RunBullyElectionUseCase @Inject constructor(
         val timeoutMillis = 3_000L
         val higherAliveReceived = withTimeoutOrNull(timeoutMillis) {
             networkClient.incomingMessages.firstOrNull { msg ->
-                msg.type == ElectionMessageType.ALIVE && isHigherPriority(
-                    otherScore = msg.reliabilityScore,
-                    otherId = msg.senderNodeId,
-                    localScore = localScore,
-                    localId = localIdentity.nodeId
-                )
+                when (msg.type) {
+                    // Standard Bully : céder à un nœud de priorité supérieure.
+                    ElectionMessageType.ALIVE -> isHigherPriority(
+                        otherScore = msg.reliabilityScore,
+                        otherId = msg.senderNodeId,
+                        localScore = localScore,
+                        localId = localIdentity.nodeId
+                    )
+                    // SP existant répond COORDINATOR à notre ELECTION (ProcessIncomingElectionEventUseCase
+                    // l.80-87) : il s'affirme déjà leader → on cède sans attendre la fin du timeout.
+                    // Sans ça : 7a0cd8ff ignore le COORDINATOR de a487f978, attend 3s, se déclare vainqueur
+                    // → split-brain oscillant toutes les ~7s.
+                    ElectionMessageType.COORDINATOR -> msg.senderNodeId != localIdentity.nodeId
+                    else -> false
+                }
             }
         }
 

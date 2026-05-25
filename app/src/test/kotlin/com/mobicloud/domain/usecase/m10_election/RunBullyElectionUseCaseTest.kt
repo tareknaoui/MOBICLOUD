@@ -186,6 +186,47 @@ class RunBullyElectionUseCaseTest {
         }
     }
 
+    // Régression split-brain oscillant (2026-05-25) :
+    // Un SP existant répond COORDINATOR (pas ALIVE) à notre ELECTION.
+    // Sans le fix, RunBullyElectionUseCase ignorait le COORDINATOR et se déclarait vainqueur après 3s.
+    @Test
+    fun `when existing SP responds COORDINATOR to ELECTION within 3s, election is lost`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+
+        val peersFlow = noSuperPairFlow()
+        every { peerRepository.peers } returns peersFlow
+
+        val incomingMessagesFlow = incomingFlow()
+        every { networkClient.incomingMessages } returns incomingMessagesFlow
+        coEvery { networkClient.broadcastElectionMessage(any()) } returns Result.success(Unit)
+
+        val flowResult = buildUseCase(testDispatcher)()
+
+        var finalResult: Result<*>? = null
+        val job = launch(testDispatcher) {
+            finalResult = flowResult.first()
+        }
+
+        advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS + 1L)
+
+        // SP existant répond COORDINATOR à notre ELECTION (ProcessIncomingElectionEventUseCase l.80-87)
+        incomingMessagesFlow.emit(
+            ElectionPayload(
+                senderNodeId = "existingSuperPeer",
+                type = ElectionMessageType.COORDINATOR,
+                reliabilityScore = 0.5f,
+                signatureBytes = ByteArray(0)
+            )
+        )
+
+        job.join()
+
+        assertTrue(finalResult?.isFailure == true)
+        coVerify(exactly = 0) {
+            networkClient.broadcastElectionMessage(match { it.type == ElectionMessageType.COORDINATOR })
+        }
+    }
+
     @Test
     fun `when superpair appears during monitoring window, election is aborted`() = runTest {
         val testDispatcher = UnconfinedTestDispatcher(testScheduler)
