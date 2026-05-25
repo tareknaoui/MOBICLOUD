@@ -251,4 +251,98 @@ class JoinIntegrationTest {
         val newClusterId = java.util.UUID.randomUUID().toString()
         assertNotEquals("cluster-alice", newClusterId)
     }
+
+    // ---- T=5 : scénario bug 30 minutes — SP timeout → Rejoining → Member via CoordinatorReceived ----
+    // Reproduit exactement le scénario qui causait un deadlock à ~20-30 min d'utilisation :
+    // 1. Bob est Member d'Alice
+    // 2. Alice perd la connexion relay → SP_TIMEOUT → Bob passe en Rejoining
+    // 3. Un nouveau SP (Carol) gagne Bully et envoie COORDINATOR au même clusterId
+    // AVANT le fix : CoordinatorReceived en Rejoining était ignoré → Bob bloqué indéfiniment
+    // APRÈS le fix : Bob passe en Member(Carol) et les heartbeats reprennent
+
+    @Test
+    fun `T5 regression 30min - Rejoining + CoordinatorReceived same cluster → Member recovered`() = runTest(dispatcher) {
+        val spNodeId = byteArrayOf(0xAA.toByte())
+        val newSpNodeId = byteArrayOf(0xCC.toByte())
+        val clusterId = "cluster-alice"
+        val hint = SuperPeerHint(spNodeId, clusterId = clusterId, ipAddress = "192.168.1.1", port = 5000, reliabilityScore = 0.9f)
+
+        // Étape 1 : Bob démarre en Undiscovered, découvre Alice (SP), passe en Joining puis Member
+        candidateFsm.transition(JoinEvent.NewCandidateDetected(hint))
+        assertTrue("Doit être Joining après NewCandidateDetected",
+            candidateFsm.currentState.value is NodeJoinState.Joining)
+
+        val accept = JoinResponse.JoinAccept(
+            clusterId = clusterId,
+            superPairNodeId = spNodeId,
+            memberSnapshot = emptyList(),
+            timestampMs = System.currentTimeMillis(),
+            signatureBytes = byteArrayOf(0xFF.toByte())
+        )
+        candidateFsm.transition(JoinEvent.JoinAcceptReceived(accept))
+        assertTrue("Doit être Member après JoinAccept",
+            candidateFsm.currentState.value is NodeJoinState.Member)
+        assertEquals(clusterId, (candidateFsm.currentState.value as NodeJoinState.Member).clusterId)
+
+        // Étape 2 : Alice disparaît — SP_TIMEOUT → Rejoining (clusterId préservé)
+        candidateFsm.transition(JoinEvent.SpTimeoutDetected(spNodeId))
+        val rejoining = candidateFsm.currentState.value
+        assertTrue("Doit être Rejoining après SpTimeoutDetected", rejoining is NodeJoinState.Rejoining)
+        assertEquals("clusterId doit être préservé en Rejoining",
+            clusterId, (rejoining as NodeJoinState.Rejoining).clusterId)
+
+        // Étape 3 : Carol gagne Bully et envoie COORDINATOR (même clusterId)
+        // AVANT le fix : cet événement était ignoré → Bob restait bloqué en Rejoining
+        // APRÈS le fix : Bob passe en Member(Carol)
+        candidateFsm.transition(JoinEvent.CoordinatorReceived(senderNodeId = newSpNodeId, clusterId = clusterId))
+
+        val recovered = candidateFsm.currentState.value
+        assertTrue("Bob doit être Member après CoordinatorReceived (fix bug 30 min)",
+            recovered is NodeJoinState.Member)
+        assertEquals("clusterId doit être préservé", clusterId,
+            (recovered as NodeJoinState.Member).clusterId)
+        assertTrue("superPairNodeId doit pointer vers le nouveau SP (Carol)",
+            recovered.superPairNodeId.contentEquals(newSpNodeId))
+    }
+
+    // ---- T=6 : Rejoining + relay packet drop → NewCandidateDetected → Joining (fallback) ----
+    // Si le COORDINATOR relay est perdu (UDP/WebSocket drop), le nœud en Rejoining
+    // détecte le nouveau SP via le tracker et tente un JOIN direct.
+    // AVANT le fix : le nœud restait bloqué en Rejoining sans sortie possible.
+
+    @Test
+    fun `T6 regression relay drop - Rejoining + NewCandidateDetected → Joining fallback`() = runTest(dispatcher) {
+        val spNodeId = byteArrayOf(0xAA.toByte())
+        val newSpNodeId = byteArrayOf(0xCC.toByte())
+        val clusterId = "cluster-alice"
+        val hint = SuperPeerHint(spNodeId, clusterId = clusterId, ipAddress = "192.168.1.1", port = 5000, reliabilityScore = 0.9f)
+        val newHint = SuperPeerHint(newSpNodeId, clusterId = clusterId, ipAddress = "192.168.1.5", port = 5001, reliabilityScore = 0.85f)
+
+        // Bob devient Member
+        candidateFsm.transition(JoinEvent.NewCandidateDetected(hint))
+        val accept = JoinResponse.JoinAccept(
+            clusterId = clusterId,
+            superPairNodeId = spNodeId,
+            memberSnapshot = emptyList(),
+            timestampMs = System.currentTimeMillis(),
+            signatureBytes = byteArrayOf(0xFF.toByte())
+        )
+        candidateFsm.transition(JoinEvent.JoinAcceptReceived(accept))
+        assertTrue(candidateFsm.currentState.value is NodeJoinState.Member)
+
+        // SP timeout → Rejoining
+        candidateFsm.transition(JoinEvent.SpTimeoutDetected(spNodeId))
+        assertTrue(candidateFsm.currentState.value is NodeJoinState.Rejoining)
+
+        // COORDINATOR perdu via relay — mais le tracker signale un nouveau SP
+        // AVANT le fix : NewCandidateDetected en Rejoining était ignoré
+        // APRÈS le fix : Bob passe en Joining vers le nouveau SP
+        candidateFsm.transition(JoinEvent.NewCandidateDetected(newHint))
+
+        val fallback = candidateFsm.currentState.value
+        assertTrue("Doit être Joining après NewCandidateDetected en Rejoining (fallback relay drop)",
+            fallback is NodeJoinState.Joining)
+        val joining = fallback as NodeJoinState.Joining
+        assertEquals("Doit cibler le nouveau SP", newHint, joining.targetSuperPair)
+    }
 }
