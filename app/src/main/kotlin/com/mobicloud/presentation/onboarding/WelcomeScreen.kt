@@ -1,5 +1,9 @@
 package com.mobicloud.presentation.onboarding
 
+import android.Manifest
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
@@ -42,6 +46,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
@@ -85,10 +90,34 @@ private val pages = listOf(
 fun WelcomeScreen(
     onFinish: () -> Unit,
     modifier: Modifier = Modifier,
+    viewModel: PermissionsViewModel = hiltViewModel(),
 ) {
     val pagerState = rememberPagerState(pageCount = { pages.size })
     val scope = rememberCoroutineScope()
     val isLastPage = pagerState.currentPage == pages.lastIndex
+
+    val permissionsToRequest = buildList {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            add(Manifest.permission.POST_NOTIFICATIONS)
+            add(Manifest.permission.NEARBY_WIFI_DEVICES)
+        }
+    }
+
+    val permissionsLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) {
+        viewModel.markOnboardingCompleted()
+        onFinish()
+    }
+
+    fun complete() {
+        if (permissionsToRequest.isNotEmpty()) {
+            permissionsLauncher.launch(permissionsToRequest.toTypedArray())
+        } else {
+            viewModel.markOnboardingCompleted()
+            onFinish()
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -121,7 +150,7 @@ fun WelcomeScreen(
                 Button(
                     onClick = {
                         if (isLastPage) {
-                            onFinish()
+                            complete()
                         } else {
                             scope.launch {
                                 pagerState.animateScrollToPage(pagerState.currentPage + 1)
@@ -143,7 +172,7 @@ fun WelcomeScreen(
                 }
 
                 if (!isLastPage) {
-                    TextButton(onClick = onFinish) {
+                    TextButton(onClick = { complete() }) {
                         Text(
                             text = "Skip",
                             color = IosText2,
