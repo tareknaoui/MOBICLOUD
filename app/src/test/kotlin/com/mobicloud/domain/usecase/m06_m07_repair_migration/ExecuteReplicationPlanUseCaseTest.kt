@@ -145,23 +145,25 @@ class ExecuteReplicationPlanUseCaseTest {
     }
 
     @Test
-    fun `test 3 - destination invalide ip vide - aucun sendBlock`() = runTest {
+    fun `test 3 - destination invalide ip vide - aucun sendBlock si bloc absent`() = runTest {
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
+        coEvery { hostedBlockRepository.getBlock(any()) } returns Result.success(null)
 
         useCase.onReplicationPlanReceived(plan(d = directive(ip = "")))
 
         coVerify(exactly = 0) { blockSender.sendBlock(any(), any(), any()) }
-        coVerify { networkEventRepository.pushEvent(match { it.contains("destination invalide") }) }
+        coVerify { networkEventRepository.pushEvent(match { it.contains("absent localement") }) }
     }
 
     @Test
-    fun `test 3b - destination invalide port negatif - aucun sendBlock`() = runTest {
+    fun `test 3b - destination invalide port negatif - aucun sendBlock si bloc absent`() = runTest {
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
+        coEvery { hostedBlockRepository.getBlock(any()) } returns Result.success(null)
 
         useCase.onReplicationPlanReceived(plan(d = directive(port = -1)))
 
         coVerify(exactly = 0) { blockSender.sendBlock(any(), any(), any()) }
-        coVerify { networkEventRepository.pushEvent(match { it.contains("destination invalide") }) }
+        coVerify { networkEventRepository.pushEvent(match { it.contains("absent localement") }) }
     }
 
     @Test
@@ -205,7 +207,7 @@ class ExecuteReplicationPlanUseCaseTest {
 
         useCase.onReplicationPlanReceived(plan())
 
-        coVerify { networkEventRepository.pushEvent(match { it.contains("confirmé") }) }
+        coVerify { networkEventRepository.pushEvent(match { it.contains("replique vers") }) }
     }
 
     @Test

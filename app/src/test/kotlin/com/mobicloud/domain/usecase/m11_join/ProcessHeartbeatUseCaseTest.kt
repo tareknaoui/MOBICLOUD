@@ -2,8 +2,8 @@ package com.mobicloud.domain.usecase.m11_join
 
 import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.data.local.entity.MemberEntity
-import com.mobicloud.domain.models.BULLY_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
+import com.mobicloud.domain.models.m11_join.MEMBER_UPDATE_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.m11_join.Heartbeat
 import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.models.m11_join.heartbeatSignedBytes
@@ -95,7 +95,7 @@ class ProcessHeartbeatUseCaseTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
         coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns validEntity
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
-        val staleTs = now - BULLY_TIMESTAMP_WINDOW_MS - 1000L
+        val staleTs = now - MEMBER_UPDATE_TIMESTAMP_WINDOW_MS - 1000L
         val result = useCase(validHb(ts = staleTs))
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is StaleTimestampException)
@@ -201,10 +201,9 @@ class ProcessHeartbeatUseCaseTest {
         every { joinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cid"))
         coEvery { memberDao.findByNodeIdAnyStatus(nodeIdHex) } returns evictedEntity
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
-        // Cluster plein : 2 membres ACTIVE (A + C)
-        val otherEntity1 = validEntity.copy(nodeId = "aaaaaa", status = "ACTIVE")
-        val otherEntity2 = validEntity.copy(nodeId = "cccccc", status = "ACTIVE")
-        coEvery { memberDao.listActiveSnapshot("cid") } returns listOf(otherEntity1, otherEntity2)
+        // Cluster plein : MAX_CLUSTER_SIZE membres ACTIVE
+        val fullCluster = (1..MAX_CLUSTER_SIZE).map { validEntity.copy(nodeId = "node%04d".format(it), status = "ACTIVE") }
+        coEvery { memberDao.listActiveSnapshot("cid") } returns fullCluster
         val result = useCase(validHb())
         assertTrue(result.isSuccess)
         coVerify(exactly = 0) { memberDao.reactivateIfEvicted(any(), any(), any(), any(), any()) }

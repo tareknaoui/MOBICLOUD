@@ -183,6 +183,19 @@ class JoinStateMachine @Inject constructor(
                 // RunBullyElectionUseCase est déclenché par le service — pas de dépendance directe ici
             }
 
+            // Rejoining + NewCandidateDetected → Joining
+            // Fallback : le COORDINATOR du nouveau SP a été perdu via relay. Le nœud trouve
+            // le nouveau SP dans le tracker (latestPeers) et tente un JOIN direct plutôt que
+            // d'attendre un second COORDINATOR qui ne viendra peut-être jamais.
+            state is NodeJoinState.Rejoining && event is JoinEvent.NewCandidateDetected -> {
+                cancelIsolationTimer()
+                val newState = NodeJoinState.Joining(event.hint, 0)
+                _currentState.value = newState
+                logStateChange(state, newState, event)
+                memberHeartbeatUseCaseLazy.get().stop()
+                scope.launch { sendJoinRequestUseCaseLazy.get().invoke(listOf(event.hint)).collect {} }
+            }
+
             // Rejoining + BullyVictory → SuperPair
             // markSelf est appelé par RunBullyElectionUseCase AVANT d'émettre BullyVictory
             // (idem BullySoloElectionUseCase) ; rappeler markSelf ici provoquerait un re-entry
@@ -203,7 +216,26 @@ class JoinStateMachine @Inject constructor(
                 memberHeartbeatUseCaseLazy.get().stop()
             }
 
+            // Rejoining + CoordinatorReceived (même cluster) → Member
+            // Cas : un autre nœud a gagné Bully pendant que ce nœud était en Rejoining.
+            // BullyLost n'est jamais émis par Loop 7 (RunBullyElectionUseCase émet seulement
+            // Result.failure). Ce chemin via CoordinatorReceived est la vraie sortie de Rejoining
+            // quand le nœud perd l'élection — sans ça, le nœud reste bloqué en Rejoining indéfiniment.
+            state is NodeJoinState.Rejoining && event is JoinEvent.CoordinatorReceived
+                && event.clusterId == state.clusterId -> {
+                val newState = NodeJoinState.Member(state.clusterId, event.senderNodeId)
+                _currentState.value = newState
+                logStateChange(state, newState, event)
+                memberHeartbeatUseCaseLazy.get().stop()
+                memberHeartbeatUseCaseLazy.get().start(event.senderNodeId)
+                memberHeartbeatUseCaseLazy.get().markSpSeen()
+                networkEventRepository.pushEvent(
+                    "[JOIN-FSM] Rejoining → Member via COORDINATOR ${event.senderNodeId.toHexString().take(8)} (nouveau SP élu)"
+                )
+            }
+
             // Rejoining + BullyLost → Member (nouveau SP, clusterId restauré depuis Rejoining)
+            // Conservé pour compatibilité si BullyLost est émis à l'avenir.
             state is NodeJoinState.Rejoining && event is JoinEvent.BullyLost -> {
                 val memberId = event.newSuperPairNodeId
                 val newState = NodeJoinState.Member(state.clusterId, memberId)

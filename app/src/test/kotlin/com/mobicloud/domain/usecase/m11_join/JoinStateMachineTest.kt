@@ -239,6 +239,45 @@ class JoinStateMachineTest {
         assertTrue(fsm.currentState.value is NodeJoinState.Joining)
     }
 
+    // ---- Fix D1 : Rejoining + CoordinatorReceived → Member ----
+    // BullyLost n'est jamais émis en pratique — la sortie réelle de Rejoining quand on perd
+    // l'élection passe par CoordinatorReceived du gagnant.
+
+    @Test
+    fun `L11b Rejoining + CoordinatorReceived meme cluster → Member avec nouveau SP`() = runTest(dispatcher) {
+        goToRejoiningState()
+        val newSpId = byteArrayOf(0xEE.toByte())
+        fsm.transition(JoinEvent.CoordinatorReceived(senderNodeId = newSpId, clusterId = clusterId))
+        val state = fsm.currentState.value
+        assertTrue("Doit être Member", state is NodeJoinState.Member)
+        assertTrue(
+            "superPairNodeId doit être le nouveau SP",
+            (state as NodeJoinState.Member).superPairNodeId.contentEquals(newSpId)
+        )
+        assertEquals("clusterId doit être préservé", clusterId, state.clusterId)
+    }
+
+    @Test
+    fun `L11c Rejoining + CoordinatorReceived cluster different → ignore (reste Rejoining)`() = runTest(dispatcher) {
+        goToRejoiningState()
+        val newSpId = byteArrayOf(0xEE.toByte())
+        fsm.transition(JoinEvent.CoordinatorReceived(senderNodeId = newSpId, clusterId = "autre-cluster"))
+        assertTrue("Doit rester Rejoining (cluster différent ignoré)", fsm.currentState.value is NodeJoinState.Rejoining)
+    }
+
+    // ---- Fix D2 : Rejoining + NewCandidateDetected → Joining (fallback COORDINATOR perdu) ----
+
+    @Test
+    fun `L11d Rejoining + NewCandidateDetected → Joining fallback relay`() = runTest(dispatcher) {
+        goToRejoiningState()
+        val newHint = SuperPeerHint(byteArrayOf(0xFF.toByte()), ipAddress = "9.8.7.6", port = 9999, reliabilityScore = 0.8f)
+        fsm.transition(JoinEvent.NewCandidateDetected(newHint))
+        val state = fsm.currentState.value
+        assertTrue("Doit être Joining (fallback JOIN direct)", state is NodeJoinState.Joining)
+        val joiningState = state as NodeJoinState.Joining
+        assertEquals("Doit cibler le nouveau SP", newHint, joiningState.targetSuperPair)
+    }
+
     // ---- Helpers ----
 
     private suspend fun goToMemberState() {

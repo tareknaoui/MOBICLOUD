@@ -70,8 +70,8 @@ class RelayRepositoryImplTest {
         mockRespondUseCase = mockk(relaxed = true)
         respondProvider = Provider { mockRespondUseCase }
 
-        // client.connect() retourne notre flow contrôlé
-        every { mockClient.connect(any()) } returns eventFlow
+        // client.eventBus est le bus interne que le repo collecte dans son init block
+        every { mockClient.eventBus } returns eventFlow
     }
 
     @After

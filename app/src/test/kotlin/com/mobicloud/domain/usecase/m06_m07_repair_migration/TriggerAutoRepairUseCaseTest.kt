@@ -1,6 +1,5 @@
 package com.mobicloud.domain.usecase.m06_m07_repair_migration
 
-import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.domain.models.DhtEntry
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
@@ -33,7 +32,7 @@ class TriggerAutoRepairUseCaseTest {
     private lateinit var peerRepository: PeerRepository
     private lateinit var dhtRepository: DhtRepository
     private lateinit var securityRepository: SecurityRepository
-    private lateinit var tcpConnectionManager: TcpConnectionManager
+    private lateinit var gossipRelayChannel: com.mobicloud.data.p2p.relay.GossipRelayChannel
     private lateinit var gossipSyncUseCase: GossipSyncUseCase
     private lateinit var circuitBreakerUseCase: CircuitBreakerUseCase
     private lateinit var localRepairBuffer: LocalRepairBuffer
@@ -84,7 +83,7 @@ class TriggerAutoRepairUseCaseTest {
         peerRepository = mockk()
         dhtRepository = mockk()
         securityRepository = mockk()
-        tcpConnectionManager = mockk()
+        gossipRelayChannel = mockk()
         gossipSyncUseCase = mockk()
         circuitBreakerUseCase = mockk()
         localRepairBuffer = mockk()
@@ -101,12 +100,12 @@ class TriggerAutoRepairUseCaseTest {
         coEvery { dhtRepository.insertEntry(any(), any(), any(), any()) } returns Result.success(Unit)
         coEvery { dhtRepository.deleteByNodeId(any()) } returns Result.success(Unit)
         coEvery { gossipSyncUseCase.runGossipCycle() } returns Result.success(Unit)
-        coEvery { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) } returns Result.success(Unit)
+        coEvery { gossipRelayChannel.sendReplicationPlan(any(), any()) } returns Result.success(Unit)
         coEvery { localRepairBuffer.enqueue(any()) } returns null
 
         useCase = TriggerAutoRepairUseCase(
             peerRepository, dhtRepository, securityRepository,
-            tcpConnectionManager, gossipSyncUseCase, circuitBreakerUseCase,
+            gossipRelayChannel, gossipSyncUseCase, circuitBreakerUseCase,
             localRepairBuffer, networkEventRepository
         )
     }
@@ -118,7 +117,7 @@ class TriggerAutoRepairUseCaseTest {
         val result = useCase.scanAndRepair()
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 0) { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         coVerify(exactly = 0) { dhtRepository.insertEntry(any(), any(), any(), any()) }
         coVerify(exactly = 0) { localRepairBuffer.enqueue(any()) }
         coVerify(exactly = 0) { gossipSyncUseCase.runGossipCycle() }
@@ -136,7 +135,7 @@ class TriggerAutoRepairUseCaseTest {
 
         assertTrue(result.isSuccess)
         coVerify(exactly = 0) { dhtRepository.findByNodeId(any()) }
-        coVerify(exactly = 0) { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         coVerify(exactly = 0) { gossipSyncUseCase.runGossipCycle() }
     }
 
@@ -155,7 +154,7 @@ class TriggerAutoRepairUseCaseTest {
         val result = useCase.scanAndRepair()
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 0) { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         coVerify(exactly = 0) { localRepairBuffer.enqueue(any()) }
         coVerify { networkEventRepository.pushEvent(match { it.contains("PERDU") }) }
         // La purge DHT et le gossip unique doivent tout de même être effectués
@@ -181,7 +180,7 @@ class TriggerAutoRepairUseCaseTest {
 
         assertTrue(result.isSuccess)
         // MVP threshold=1 et 1 hôte actif => bloc considéré comme OK => skip
-        coVerify(exactly = 0) { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         coVerify(exactly = 0) { localRepairBuffer.enqueue(any()) }
         coVerify(exactly = 0) { securityRepository.signData(any()) }
         // Mais la purge et le gossip ont lieu
@@ -207,7 +206,7 @@ class TriggerAutoRepairUseCaseTest {
 
         assertTrue(result.isSuccess)
         coVerify { networkEventRepository.pushEvent(match { it.contains("Circuit-Breaker OPEN") }) }
-        coVerify(exactly = 0) { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
     }
 
     @Test
@@ -237,7 +236,7 @@ class TriggerAutoRepairUseCaseTest {
         val result = useCase.scanAndRepair()
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 0) { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         coVerify(exactly = 0) { dhtRepository.findByNodeId(any()) }
     }
 
@@ -249,7 +248,7 @@ class TriggerAutoRepairUseCaseTest {
         // Donc la branche sendReplicationPlan n'est atteinte QUE si threshold >= 2 (futur multi-replica).
         val planSlot = slot<ReplicationPlanMessage>()
         coEvery {
-            tcpConnectionManager.sendReplicationPlan(capture(planSlot), any(), any())
+            gossipRelayChannel.sendReplicationPlan(any(), capture(planSlot))
         } returns Result.success(Unit)
 
         val blockA = "a".repeat(64)
@@ -311,13 +310,13 @@ class TriggerAutoRepairUseCaseTest {
 
         val planSlot = slot<ReplicationPlanMessage>()
         coEvery {
-            tcpConnectionManager.sendReplicationPlan(capture(planSlot), "10.0.0.2", 6002)
+            gossipRelayChannel.sendReplicationPlan(any(), capture(planSlot))
         } returns Result.success(Unit)
 
         useCase.scanAndRepair()
 
         // Plan émis vers le donneur, structure directive conforme.
-        coVerify(exactly = 1) { tcpConnectionManager.sendReplicationPlan(any(), "10.0.0.2", 6002) }
+        coVerify(exactly = 1) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         assertTrue(planSlot.isCaptured)
         val plan = planSlot.captured
         assertEquals(selfIdentity.nodeId, plan.superPeerNodeId)
@@ -357,7 +356,7 @@ class TriggerAutoRepairUseCaseTest {
         useCase.scanAndRepair()
 
         // AC#3 — directive enfilée, aucun envoi TCP.
-        coVerify(exactly = 0) { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         coVerify(exactly = 1) { localRepairBuffer.enqueue(any()) }
         assertTrue(reqSlot.isCaptured)
         assertEquals(blockA, reqSlot.captured.blockId)
@@ -392,7 +391,7 @@ class TriggerAutoRepairUseCaseTest {
         useCase.scanAndRepair()
 
         coVerify { networkEventRepository.pushEvent(match { it.contains("aucune destination libre") }) }
-        coVerify(exactly = 0) { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         coVerify(exactly = 0) { localRepairBuffer.enqueue(any()) }
         coVerify(exactly = 0) { dhtRepository.insertEntry(any(), any(), any(), any()) }
     }
@@ -412,14 +411,14 @@ class TriggerAutoRepairUseCaseTest {
             Result.success(listOf(entry(blockA, inactiveIdentity.nodeId)))
         coEvery { dhtRepository.findHostNodeIdsByBlockId(blockA) } returns
             Result.success(listOf(inactiveIdentity.nodeId, donorIdentity.nodeId))
-        coEvery { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) } returns
+        coEvery { gossipRelayChannel.sendReplicationPlan(any(), any()) } returns
             Result.failure(RuntimeException("Connection refused"))
 
         useCase.scanAndRepair()
 
         // Send échoué → pas de pollution DHT par une fausse confirmation.
         // Constraint #11 : le prochain scan détectera que le bloc est toujours sous-répliqué.
-        coVerify(exactly = 1) { tcpConnectionManager.sendReplicationPlan(any(), any(), any()) }
+        coVerify(exactly = 1) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         coVerify(exactly = 0) { dhtRepository.insertEntry(any(), any(), any(), any()) }
         coVerify { networkEventRepository.pushEvent(match { it.contains("Envoi plan") && it.contains("échoué") }) }
     }
@@ -445,13 +444,14 @@ class TriggerAutoRepairUseCaseTest {
             Result.success(listOf(selfIdentity.nodeId, donorIdentity.nodeId, inactiveIdentity.nodeId))
 
         coEvery {
-            tcpConnectionManager.sendReplicationPlan(any(), any(), any())
+            gossipRelayChannel.sendReplicationPlan(any(), any())
         } returns Result.success(Unit)
 
         useCase.scanAndRepair()
 
         // Le donneur choisi doit être donorIdentity (le self est exclu par filtre firstOrNull).
-        coVerify(exactly = 1) { tcpConnectionManager.sendReplicationPlan(any(), "10.0.0.2", 6002) }
-        coVerify(exactly = 0) { tcpConnectionManager.sendReplicationPlan(any(), "10.0.0.1", 6001) }
+        // Via relay, le routage se fait par nodeId — on vérifie que le plan cible donorIdentity via la directive.
+        coVerify(exactly = 1) { gossipRelayChannel.sendReplicationPlan(donorIdentity.nodeId, any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(selfIdentity.nodeId, any()) }
     }
 }

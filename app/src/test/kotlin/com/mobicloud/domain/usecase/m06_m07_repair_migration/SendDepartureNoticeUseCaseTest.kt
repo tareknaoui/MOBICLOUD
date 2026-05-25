@@ -1,6 +1,5 @@
 package com.mobicloud.domain.usecase.m06_m07_repair_migration
 
-import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.NodeIdentity
 import com.mobicloud.domain.models.Peer
@@ -29,7 +28,7 @@ class SendDepartureNoticeUseCaseTest {
     private lateinit var hostedBlockRepository: HostedBlockRepository
     private lateinit var securityRepository: SecurityRepository
     private lateinit var peerRepository: PeerRepository
-    private lateinit var tcpConnectionManager: TcpConnectionManager
+    private lateinit var gossipRelayChannel: com.mobicloud.data.p2p.relay.GossipRelayChannel
     private lateinit var networkEventRepository: NetworkEventRepository
     private lateinit var useCase: SendDepartureNoticeUseCase
 
@@ -58,7 +57,7 @@ class SendDepartureNoticeUseCaseTest {
         hostedBlockRepository = mockk()
         securityRepository = mockk()
         peerRepository = mockk()
-        tcpConnectionManager = mockk(relaxed = true)
+        gossipRelayChannel = mockk(relaxed = true)
         networkEventRepository = mockk()
 
         peersFlow = MutableStateFlow(emptyList())
@@ -69,7 +68,7 @@ class SendDepartureNoticeUseCaseTest {
             hostedBlockRepository = hostedBlockRepository,
             securityRepository = securityRepository,
             peerRepository = peerRepository,
-            tcpConnectionManager = tcpConnectionManager,
+            gossipRelayChannel = gossipRelayChannel,
             networkEventRepository = networkEventRepository
         )
     }
@@ -84,16 +83,15 @@ class SendDepartureNoticeUseCaseTest {
         coEvery { hostedBlockRepository.getAllBlockIds() } returns Result.success(blockIds)
         coEvery { securityRepository.signData(any()) } returns Result.success(byteArrayOf(0x01, 0x02))
         peersFlow.value = listOf(superPeer)
-        coEvery { tcpConnectionManager.sendDepartureNotice(any(), any(), any()) } returns Result.success(Unit)
+        coEvery { gossipRelayChannel.sendDepartureNotice(any(), any()) } returns Result.success(Unit)
 
         val result = useCase()
 
         assertTrue(result.isSuccess)
         coVerify {
-            tcpConnectionManager.sendDepartureNotice(
-                match { it.hostedBlockIds.size == 2 },
-                "192.168.1.1",
-                9000
+            gossipRelayChannel.sendDepartureNotice(
+                any(),
+                match { it.hostedBlockIds.size == 2 }
             )
         }
     }
@@ -108,7 +106,7 @@ class SendDepartureNoticeUseCaseTest {
         val result = useCase()
 
         assertTrue(result.isSuccess)
-        coVerify(exactly = 0) { tcpConnectionManager.sendDepartureNotice(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendDepartureNotice(any(), any()) }
     }
 
     @Test
@@ -117,16 +115,15 @@ class SendDepartureNoticeUseCaseTest {
         coEvery { hostedBlockRepository.getAllBlockIds() } returns Result.success(emptyList())
         coEvery { securityRepository.signData(any()) } returns Result.success(byteArrayOf())
         peersFlow.value = listOf(superPeer)
-        coEvery { tcpConnectionManager.sendDepartureNotice(any(), any(), any()) } returns Result.success(Unit)
+        coEvery { gossipRelayChannel.sendDepartureNotice(any(), any()) } returns Result.success(Unit)
 
         val result = useCase()
 
         assertTrue(result.isSuccess)
         coVerify {
-            tcpConnectionManager.sendDepartureNotice(
-                match { it.hostedBlockIds.isEmpty() },
+            gossipRelayChannel.sendDepartureNotice(
                 any(),
-                any()
+                match { it.hostedBlockIds.isEmpty() }
             )
         }
     }

@@ -1,6 +1,5 @@
 package com.mobicloud.domain.usecase.m06_m07_repair_migration
 
-import com.mobicloud.data.p2p.tcp.TcpConnectionManager
 import com.mobicloud.domain.models.DepartureNoticeMessage
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.MigrationPlanMessage
@@ -39,7 +38,7 @@ class OrchestrateBlockMigrationUseCaseTest {
     private lateinit var peerRepository: PeerRepository
     private lateinit var dhtRepository: DhtRepository
     private lateinit var securityRepository: SecurityRepository
-    private lateinit var tcpConnectionManager: TcpConnectionManager
+    private lateinit var gossipRelayChannel: com.mobicloud.data.p2p.relay.GossipRelayChannel
     private lateinit var gossipSyncUseCase: GossipSyncUseCase
     private lateinit var networkEventRepository: NetworkEventRepository
     private lateinit var useCase: OrchestrateBlockMigrationUseCase
@@ -79,7 +78,6 @@ class OrchestrateBlockMigrationUseCaseTest {
         peerRepository = mockk()
         dhtRepository = mockk()
         securityRepository = mockk()
-        tcpConnectionManager = mockk()
         gossipSyncUseCase = mockk()
         networkEventRepository = mockk()
 
@@ -87,9 +85,10 @@ class OrchestrateBlockMigrationUseCaseTest {
         every { peerRepository.peers } returns peersFlow
         every { networkEventRepository.pushEvent(any()) } just Runs
 
+        gossipRelayChannel = mockk(relaxed = true)
         useCase = OrchestrateBlockMigrationUseCase(
             peerRepository, dhtRepository, securityRepository,
-            tcpConnectionManager, gossipSyncUseCase, networkEventRepository,
+            gossipRelayChannel, gossipSyncUseCase, networkEventRepository,
             // Dispatchers.Unconfined : les launch sur applicationScope (gossip post-MAJ DHT)
             // s'exécutent eagerly sur le thread courant — les coVerify post-call les voient.
             CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
@@ -111,7 +110,7 @@ class OrchestrateBlockMigrationUseCaseTest {
 
         useCase.onDepartureNoticeReceived(notice())
 
-        coVerify(exactly = 0) { tcpConnectionManager.sendMigrationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendMigrationPlan(any(), any()) }
         coVerify(exactly = 0) { dhtRepository.deleteByNodeId(any()) }
         coVerify(exactly = 0) { dhtRepository.insertEntry(any(), any(), any(), any()) }
         coVerify(exactly = 0) { gossipSyncUseCase.runGossipCycle() }
@@ -128,7 +127,7 @@ class OrchestrateBlockMigrationUseCaseTest {
 
         useCase.onDepartureNoticeReceived(notice())
 
-        coVerify(exactly = 0) { tcpConnectionManager.sendMigrationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendMigrationPlan(any(), any()) }
         coVerify(exactly = 0) { dhtRepository.deleteByNodeId(any()) }
     }
 
@@ -144,7 +143,7 @@ class OrchestrateBlockMigrationUseCaseTest {
 
         useCase.onDepartureNoticeReceived(notice())
 
-        coVerify(exactly = 0) { tcpConnectionManager.sendMigrationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendMigrationPlan(any(), any()) }
         coVerify(exactly = 0) { dhtRepository.deleteByNodeId(any()) }
     }
 
@@ -161,7 +160,7 @@ class OrchestrateBlockMigrationUseCaseTest {
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         coEvery { securityRepository.signData(any()) } returns Result.success(byteArrayOf(0xFF.toByte()))
         val planSlot = slot<MigrationPlanMessage>()
-        coEvery { tcpConnectionManager.sendMigrationPlan(capture(planSlot), any(), any()) } returns Result.success(Unit)
+        coEvery { gossipRelayChannel.sendMigrationPlan(any(), capture(planSlot)) } returns Result.success(Unit)
         coEvery { dhtRepository.deleteByNodeId(any()) } returns Result.success(Unit)
         coEvery { dhtRepository.insertEntry(any(), any(), any(), any()) } returns Result.success(Unit)
         coEvery { gossipSyncUseCase.runGossipCycle() } returns Result.success(Unit)
@@ -191,7 +190,7 @@ class OrchestrateBlockMigrationUseCaseTest {
         )
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         coEvery { securityRepository.signData(any()) } returns Result.success(byteArrayOf(0xFF.toByte()))
-        coEvery { tcpConnectionManager.sendMigrationPlan(any(), any(), any()) } returns Result.success(Unit)
+        coEvery { gossipRelayChannel.sendMigrationPlan(any(), any()) } returns Result.success(Unit)
         coEvery { dhtRepository.deleteByNodeId(any()) } returns Result.success(Unit)
         coEvery { dhtRepository.insertEntry(any(), any(), any(), any()) } returns Result.success(Unit)
         coEvery { gossipSyncUseCase.runGossipCycle() } returns Result.success(Unit)
@@ -217,7 +216,7 @@ class OrchestrateBlockMigrationUseCaseTest {
         coEvery { securityRepository.verifySignature(any(), any(), any()) } returns Result.success(true)
         coEvery { securityRepository.signData(any()) } returns Result.success(byteArrayOf(0xFF.toByte()))
         // Bloque > 5s => withTimeoutOrNull doit annuler
-        coEvery { tcpConnectionManager.sendMigrationPlan(any(), any(), any()) } coAnswers {
+        coEvery { gossipRelayChannel.sendMigrationPlan(any(), any()) } coAnswers {
             delay(10_000L)
             Result.success(Unit)
         }
@@ -254,7 +253,7 @@ class OrchestrateBlockMigrationUseCaseTest {
 
         useCase.onDepartureNoticeReceived(notice())
 
-        coVerify(exactly = 0) { tcpConnectionManager.sendMigrationPlan(any(), any(), any()) }
+        coVerify(exactly = 0) { gossipRelayChannel.sendMigrationPlan(any(), any()) }
         coVerify(exactly = 0) { dhtRepository.deleteByNodeId(any()) }
         coVerify(exactly = 0) { dhtRepository.insertEntry(any(), any(), any(), any()) }
         coVerify(exactly = 0) { gossipSyncUseCase.runGossipCycle() }

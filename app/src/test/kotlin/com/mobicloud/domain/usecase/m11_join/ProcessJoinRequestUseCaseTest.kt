@@ -55,7 +55,8 @@ class ProcessJoinRequestUseCaseTest {
 
         useCase = ProcessJoinRequestUseCase(
             securityRepository, signalingRepository,
-            memberRegistry, joinStateMachine, networkEventRepository, mockk(relaxed = true)
+            memberRegistry, joinStateMachine, networkEventRepository,
+            mockk(relaxed = true), mockk(relaxed = true)
         )
     }
 

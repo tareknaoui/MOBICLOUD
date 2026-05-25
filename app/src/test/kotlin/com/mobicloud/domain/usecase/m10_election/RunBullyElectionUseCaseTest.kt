@@ -73,6 +73,7 @@ class RunBullyElectionUseCaseTest {
         networkClient = networkClient,
         electionStateManager = ElectionStateManager(),
         nodeSettingsRepository = nodeSettingsRepository,
+        markSelfAsSuperPairUseCase = mockk(relaxed = true),
         defaultDispatcher = testDispatcher
     )
 
@@ -238,6 +239,7 @@ class RunBullyElectionUseCaseTest {
 
         val peersFlow = MutableStateFlow(emptyList<Peer>())
         every { peerRepository.peers } returns peersFlow
+        coEvery { peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any()) } returns Result.success(Unit)
 
         val incomingMessagesFlow = incomingFlow()
         every { networkClient.incomingMessages } returns incomingMessagesFlow
@@ -250,10 +252,12 @@ class RunBullyElectionUseCaseTest {
             finalResult = flowResult.first()
         }
 
-        // Avancer largement au-delà de la fenêtre de monitoring sans peupler peerRepository
-        advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS * 3)
+        // Avancer en-dessous du délai solo-bootstrap (SOLO_BOOTSTRAP_TIMEOUT_MS=45s) pour
+        // tester uniquement le garde-fou classique Bully (hasOtherKnownPeer) sans déclencher
+        // le fallback isolation totale qui permettrait une élection solo.
+        advanceTimeBy(RunBullyElectionUseCase.SOLO_BOOTSTRAP_TIMEOUT_MS - 5_000L)
 
-        // Le flow doit toujours attendre — aucun broadcast envoyé
+        // Le flow doit toujours attendre — aucun broadcast envoyé dans la fenêtre Bully classique
         assertTrue(job.isActive)
         job.cancel()
 

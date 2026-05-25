@@ -311,6 +311,25 @@ class MobicloudP2PService : Service() {
                 while (isActive) {
                     runCatching {
                         processIncomingElectionEventUseCase().collect { result ->
+                            result.onSuccess { event ->
+                                // D1 : AbdicationReceived était silencieusement ignoré ici —
+                                // les membres attendaient SP_TIMEOUT_MS (90s) pour détecter l'absence
+                                // de leur SP au lieu de réagir immédiatement. Fix : si le SP qui abdique
+                                // est notre SP actuel, on déclenche Bully sans délai.
+                                if (event is com.mobicloud.domain.models.ElectionEvent.AbdicationReceived) {
+                                    val fsmState = joinStateMachine.currentState.value
+                                    if (fsmState is NodeJoinState.Member
+                                        && fsmState.superPairNodeId.toHexString().lowercase() == event.senderNodeId.lowercase()
+                                    ) {
+                                        networkEventRepository.pushEvent(
+                                            "[ELECTION-IN] SP ${event.senderNodeId.take(8)} abdiqué — Bully immédiat (pas d'attente 90s)"
+                                        )
+                                        memberHeartbeatUseCase.stop()
+                                        joinStateMachine.transition(JoinEvent.SpTimeoutDetected(fsmState.superPairNodeId))
+                                        launch { runBullyElectionUseCase().collect {} }
+                                    }
+                                }
+                            }
                             result.onFailure { Log.d(LOGTAG, "[ELECTION-IN] ${it.message}") }
                         }
                     }.onFailure {
@@ -507,10 +526,12 @@ class MobicloudP2PService : Service() {
                     currentSuperPeers.filter { it.nodeId !in seenSuperPairIds }.forEach { peer ->
                         val hint = peer.toSuperPeerHint()
                         when (val fsmState = joinStateMachine.currentState.value) {
-                            is NodeJoinState.Undiscovered, is NodeJoinState.Isolated -> {
+                            is NodeJoinState.Undiscovered, is NodeJoinState.Isolated, is NodeJoinState.Rejoining -> {
                                 // En Isolated : ignorer les SPs pleins pour laisser le timer d'isolation
                                 // expirer → BullySolo. Sans ça, GET_PEERS toutes les 10s remet le timer
                                 // à zéro et BullySolo ne démarre jamais.
+                                // En Rejoining : fallback si le COORDINATOR a été perdu via relay —
+                                // le nœud trouve le nouveau SP dans le tracker et envoie JOIN directement.
                                 if (fsmState is NodeJoinState.Isolated &&
                                     hint.currentMemberCount >= com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE) {
                                     Log.i(LOGTAG, "[JOIN] SP ${peer.nodeId.take(8)} plein (${hint.currentMemberCount}/${ com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE}) — Isolated timer préservé")
@@ -523,17 +544,22 @@ class MobicloudP2PService : Service() {
                                 // ce SP pour la résolution de conflit.
                             }
                             is NodeJoinState.SuperPair -> {
-                                // Guards anti-ghost-cluster (incident 2026-05-17) :
-                                // 1. Si le SP local a des membres réels, ne PAS abdiquer — on les
-                                //    abandonnerait à un cluster potentiellement fantôme.
-                                // 2. Si le SP distant déclare un cluster déjà saturé/anormal
-                                //    (>= MAX_CLUSTER_SIZE), c'est un fantôme du tracker — ignorer.
                                 val localMembers = memberSnapshotCacheUseCase.inMemory.value.size
                                 val remoteSaturated = peer.currentMemberCount >= com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
-                                if (localMembers > 1) {
+                                // Split-brain intra-cluster : même clusterId → abdication obligatoire
+                                // même si on a des membres. Deux SPs du même cluster avec chacun des
+                                // membres = deadlock permanent sans ce cas prioritaire.
+                                if (peer.clusterId.isNotBlank() && peer.clusterId == fsmState.clusterId && peer.nodeId > identity.nodeId) {
+                                    Log.i(LOGTAG, "[JOIN] SP split-brain (latestPeers, same cluster ${peer.clusterId.take(8)}): yield to ${peer.nodeId.take(8)}")
+                                    abdicate()
+                                    launch { abdicateSuperPeerUseCase() }
+                                // Guards anti-ghost-cluster (incident 2026-05-17) :
+                                // 1. Si le SP local a des membres réels et rival dans un autre cluster,
+                                //    ne PAS abdiquer — on les abandonnerait à un cluster potentiellement fantôme.
+                                // 2. Si le SP distant déclare un cluster saturé/anormal, c'est un fantôme.
+                                } else if (localMembers > 1) {
                                     Log.i(LOGTAG, "[JOIN] SP conflict avec ${peer.nodeId.take(8)} — local a $localMembers membres, NO abdication (re-évaluation possible si membres baissent)")
                                     // Ne PAS ajouter à seenSuperPairIds : localMembers > 1 est temporaire.
-                                    // Si un membre est évincé plus tard, le prochain GET_PEERS re-évaluera ce rival.
                                 } else if (remoteSaturated) {
                                     Log.i(LOGTAG, "[JOIN] SP ${peer.nodeId.take(8)} saturé (${peer.currentMemberCount}/${com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE}) — probable ghost, NO abdication")
                                     seenSuperPairIds = seenSuperPairIds + peer.nodeId
@@ -633,18 +659,35 @@ class MobicloudP2PService : Service() {
                             // Rafraîchit immédiatement latestPeers pour détecter un rival SP
                             // sans attendre le prochain GET_PEERS périodique (jusqu'à 10s de délai).
                             signalingRepository.fetchActiveSuperPeers()
+                            val myClusterId = state.clusterId
                             repeat(8) {
                                 delay(2_000L)
+                                val peers = signalingRepository.latestPeers.value
+                                // Split-brain intra-cluster : rival dans le MÊME cluster → abdication
+                                // obligatoire même si on a des membres (règle Bully : nodeId le plus
+                                // bas cède, peu importe l'état). Sans ça, deux SPs gardent chacun
+                                // leurs membres et le deadlock est permanent.
+                                val sameClusterRival = peers.firstOrNull { p ->
+                                    p.isSuperPair
+                                        && p.clusterId == myClusterId
+                                        && p.nodeId > identity.nodeId
+                                }
+                                if (sameClusterRival != null) {
+                                    Log.i(LOGTAG, "[JOIN] SP split-brain (same cluster): yield to ${sameClusterRival.nodeId.take(8)}")
+                                    abdicate()
+                                    launch { abdicateSuperPeerUseCase() }
+                                    return@launch
+                                }
                                 // Guard anti-ghost (incident 2026-05-17) : ne pas abdiquer si on a déjà
-                                // des membres réels (snapshot.size > 1 = self + ≥1 autre).
+                                // des membres réels et que le rival est dans un cluster différent.
                                 val localMembers = memberSnapshotCacheUseCase.inMemory.value.size
                                 if (localMembers > 1) return@repeat
-                                // N'abdiquer que si le rival a une priorité plus haute ET de la capacité.
-                                val rival = signalingRepository.latestPeers.value
-                                    .filter { it.isSuperPair
-                                        && it.nodeId > identity.nodeId
-                                        && it.currentMemberCount < com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE }
-                                    .firstOrNull()
+                                // Rival hors cluster : n'abdiquer que si priorité plus haute ET capacité.
+                                val rival = peers.firstOrNull { p ->
+                                    p.isSuperPair
+                                        && p.nodeId > identity.nodeId
+                                        && p.currentMemberCount < com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
+                                }
                                 if (rival != null) {
                                     Log.i(LOGTAG, "[JOIN] SP conflict (on SuperPair entry): yield to ${rival.nodeId.take(8)}")
                                     abdicate()

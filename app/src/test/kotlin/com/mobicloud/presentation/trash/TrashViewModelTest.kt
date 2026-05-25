@@ -1,6 +1,7 @@
 package com.mobicloud.presentation.trash
 
 import com.mobicloud.domain.repository.CatalogRepository
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.RevokeFileBlocksUseCase
 import io.mockk.coVerify
 import io.mockk.every
 import io.mockk.mockk
@@ -21,6 +22,7 @@ class TrashViewModelTest {
 
     private val testDispatcher = StandardTestDispatcher()
     private lateinit var catalogRepository: CatalogRepository
+    private lateinit var revokeFileBlocksUseCase: RevokeFileBlocksUseCase
     private lateinit var viewModel: TrashViewModel
 
     @Before
@@ -29,7 +31,8 @@ class TrashViewModelTest {
         catalogRepository = mockk(relaxed = true) {
             every { getDeletedEntriesFlow() } returns flowOf(emptyList())
         }
-        viewModel = TrashViewModel(catalogRepository)
+        revokeFileBlocksUseCase = mockk(relaxed = true)
+        viewModel = TrashViewModel(catalogRepository, revokeFileBlocksUseCase)
     }
 
     @After

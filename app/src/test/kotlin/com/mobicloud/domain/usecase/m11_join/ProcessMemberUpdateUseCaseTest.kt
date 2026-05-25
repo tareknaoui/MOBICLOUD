@@ -1,6 +1,6 @@
 package com.mobicloud.domain.usecase.m11_join
 
-import com.mobicloud.domain.models.BULLY_TIMESTAMP_WINDOW_MS
+import com.mobicloud.domain.models.m11_join.MEMBER_UPDATE_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.m11_join.MemberInfo
 import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.MemberUpdate
@@ -126,7 +126,7 @@ class ProcessMemberUpdateUseCaseTest {
         coEvery { memberSnapshotCacheUseCase.inMemory } returns MutableStateFlow(listOf(spMember))
         coEvery { securityRepository.verifySignature(any(), any(), spPubKey) } returns Result.success(true)
 
-        val staleTs = virtualNow - BULLY_TIMESTAMP_WINDOW_MS - 1_000L
+        val staleTs = virtualNow - MEMBER_UPDATE_TIMESTAMP_WINDOW_MS - 1_000L
         val outcome = useCase(spHex, joinedUpdate(ts = staleTs))
 
         assertTrue(outcome is ProcessMemberUpdateUseCase.Result.Ignored)

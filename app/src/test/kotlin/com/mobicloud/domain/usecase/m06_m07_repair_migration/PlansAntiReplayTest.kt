@@ -57,7 +57,7 @@ class PlansAntiReplayTest {
     fun `R1 - DEPARTURE_NOTICE avec timestamp ancien est rejete`() = runTest {
         val peerRepository = mockk<PeerRepository>()
         val securityRepository = mockk<SecurityRepository>()
-        val tcpConnectionManager = mockk<com.mobicloud.data.p2p.tcp.TcpConnectionManager>(relaxed = true)
+        val gossipRelayChannel = mockk<com.mobicloud.data.p2p.relay.GossipRelayChannel>(relaxed = true)
         val dhtRepository = mockk<com.mobicloud.domain.repository.DhtRepository>(relaxed = true)
         val gossipSyncUseCase = mockk<com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase>(relaxed = true)
         val networkEventRepository = mockk<NetworkEventRepository>(relaxed = true)
@@ -85,7 +85,7 @@ class PlansAntiReplayTest {
 
         val orchestrator = OrchestrateBlockMigrationUseCase(
             peerRepository, dhtRepository, securityRepository,
-            tcpConnectionManager, gossipSyncUseCase, networkEventRepository,
+            gossipRelayChannel, gossipSyncUseCase, networkEventRepository,
             CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
         )
 
@@ -102,7 +102,7 @@ class PlansAntiReplayTest {
 
         // Aucun plan envoye, aucune signature verifiee, message d'erreur "hors fenetre"
         coVerify(exactly = 0) {
-            tcpConnectionManager.sendMigrationPlan(any(), any(), any())
+            gossipRelayChannel.sendMigrationPlan(any(), any())
         }
         // L'event reseau doit signaler le replay
         val capturedEvent = slot<String>()
