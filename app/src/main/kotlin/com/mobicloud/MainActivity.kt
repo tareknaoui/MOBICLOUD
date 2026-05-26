@@ -17,8 +17,13 @@
 package com.mobicloud
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -159,6 +164,21 @@ class MainActivity : AppCompatActivity() {
             result.onFailure { e ->
                 Log.e("MainActivity", "[P2P-SERVICE] Échec démarrage service: ${e.message}", e)
             }
+        }
+
+        requestBatteryOptimizationExemption()
+    }
+
+    private fun requestBatteryOptimizationExemption() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+        if (pm.isIgnoringBatteryOptimizations(packageName)) return
+        runCatching {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                data = Uri.parse("package:$packageName")
+            })
+        }.onFailure {
+            Log.w("MainActivity", "[BATTERY] Impossible d'ouvrir la page d'exemption batterie: ${it.message}")
         }
     }
 }

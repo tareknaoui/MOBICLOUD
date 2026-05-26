@@ -11,9 +11,10 @@ const val JOIN_PROTOCOL_VERSION = 2
 // (3 heartbeats manqués = SP_TIMEOUT_MS = 90 s) sans surcharger la radio 4G en permanence.
 const val HEARTBEAT_INTERVAL_MS = 30_000L
 
-// 3 heartbeats manqués = mort réelle du membre. Anti-flap 4G↔WiFi : le handover
-// peut couper 10-20 s sans que le nœud soit réellement mort — 90 s absorbe 2 handovers.
-const val SP_TIMEOUT_MS = 90_000L
+// 4 heartbeats manqués = mort réelle du membre. Anti-flap 4G↔WiFi + latence relay
+// Render (10-40s documentée) : 120s absorbe le worst-case (HB 30s + 40s relay = 70s gap)
+// avec 50s de marge, contre 20s seulement avec 90s. Remplacé 90_000L le 2026-05-26.
+const val SP_TIMEOUT_MS = 120_000L
 
 // NFR-08 : admission ≤ 5 s end-to-end via relai HA (RTT 4G ≈ 100 ms, traitement SP ≈ 10 ms,
 // 2 allers-retours = 420 ms ; 5 s laisse 10× la marge pour les pics réseau transitoires).
@@ -30,7 +31,7 @@ const val LIVENESS_CHECK_INTERVAL_MS = 15_000L
 
 // Fenêtre anti-replay spécifique aux MEMBER_UPDATE (keepalive + eviction).
 // Distincte de BULLY_TIMESTAMP_WINDOW_MS (30s, pour les messages d'élection) : les keepalives
-// partent toutes les 45s via le relay Render qui peut introduire 10-40s de latence queue —
-// avec 30s le message arrivait "stale" et markSpSeen() n'était jamais appelé → SpTimeoutDetected.
-// 90s = SP_TIMEOUT_MS : tout message plus vieux que le timeout lui-même peut être ignoré sans risque.
-const val MEMBER_UPDATE_TIMESTAMP_WINDOW_MS = 90_000L
+// partent toutes les 60s (SP_TIMEOUT_MS/2 = 120/2) via le relay Render qui peut introduire
+// 10-40s de latence queue — la fenêtre doit être ≥ SP_TIMEOUT_MS pour ne pas rejeter des
+// heartbeats retardés valides. Mis à jour avec SP_TIMEOUT_MS le 2026-05-26.
+const val MEMBER_UPDATE_TIMESTAMP_WINDOW_MS = 120_000L
