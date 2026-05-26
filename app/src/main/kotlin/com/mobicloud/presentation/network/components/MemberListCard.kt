@@ -117,7 +117,7 @@ private fun MemberAvatar(isCoordinator: Boolean) {
 private fun StatusPill(status: ClusterNodeStatus) {
     val (label, color) = when (status) {
         ClusterNodeStatus.ACTIF -> "Active" to Color(0xFF34C759)
-        ClusterNodeStatus.DEGRADED -> "Slow" to Color(0xFFFF9F0A)
+        ClusterNodeStatus.DEGRADED -> "Degraded" to Color(0xFFFF9F0A)
         ClusterNodeStatus.OFFLINE -> "Offline" to Color(0xFFFF3B30)
     }
     Box(

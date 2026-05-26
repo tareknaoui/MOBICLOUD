@@ -111,7 +111,7 @@ class TcpConnectionManager @Inject constructor(
 
     /**
      * Démarre le serveur ServerSocket sur un port disponible et l'écoute en arrière-plan.
-     * @return Le port assigné pour annoncer sur Firebase.
+     * @return Le port assigné (annonce via relai HA, ou 0 en V5 architecture relay-only).
      */
     suspend fun startServer(): Result<Int> = withContext(Dispatchers.IO) {
         try {
@@ -434,7 +434,7 @@ class TcpConnectionManager @Inject constructor(
     }
 
     /**
-     * Initie une connexion TCP avec un Pair distant (dont l'IP/Port ont été récupérés par Firebase).
+     * Initie une connexion TCP avec un Pair distant (IP/Port récupérés via le relai HA).
      *
      * F-04 [Review][Patch]: Même pattern getOrElse que handleIncomingConnection — cohérence unifiée.
      */

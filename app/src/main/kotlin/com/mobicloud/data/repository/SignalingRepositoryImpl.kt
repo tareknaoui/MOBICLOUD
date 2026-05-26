@@ -97,11 +97,10 @@ class SignalingRepositoryImpl @Inject constructor(
                 Log.w(TAG, "[DIAG] pair ${peer.nodeId.take(8)} ignoré : c'est moi")
                 return@forEach
             }
-            val ageMs = maxOf(0L, now - peer.lastSeen)
-            if (ageMs > RELAY_TTL_MS) {
-                Log.w(TAG, "[DIAG] pair ${peer.nodeId.take(8)} ignoré : trop ancien ($ageMs ms > $RELAY_TTL_MS)")
-                return@forEach
-            }
+            // TTL enforced cote serveur (60s via setTimeout dans signalingRegistry).
+            // Ne PAS refiltrer ici : la comparaison `now - peer.lastSeen` mélange l'horloge
+            // locale du téléphone avec l'horodatage serveur → désynchronisation NTP de quelques
+            // secondes suffit à éjecter des pairs valides ("serveur voit 4, téléphone voit 3").
 
             // Story 10.1 -- decoder la cle publique transportee par le relay (SPKI-DER Base64).
             // Sans cette cle, toutes les verifications de signature Bully (ELECTION/ALIVE/COORDINATOR/

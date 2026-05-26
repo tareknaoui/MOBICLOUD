@@ -27,7 +27,8 @@ import javax.inject.Singleton
 /**
  * Machine à états centrale du protocole JOIN Epic 11.
  *
- * L'état initial au boot est `Undiscovered` (TODO Story 11.3 : calculer depuis Room cluster_members).
+ * L'état initial au boot est `Undiscovered` (perspective : restaurer l'etat precedent depuis
+ * Room cluster_members pour accelerer le rejoin apres redemarrage app — non implemente en V5).
  * Le dispatcher injecté permet l'injection d'un TestDispatcher dans les tests (coroutines-test).
  */
 @Singleton

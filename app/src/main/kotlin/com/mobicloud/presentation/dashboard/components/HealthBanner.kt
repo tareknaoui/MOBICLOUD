@@ -36,9 +36,9 @@ sealed class HealthState(val title: String, val subtitle: String, val color: Col
         subtitle = "Connected to $peerCount member${if (peerCount > 1) "s" else ""} · $network",
         color    = Color(0xFF34C759)
     )
-    data class Slow(val peerCount: Int, val network: String) : HealthState(
-        title    = "Connection a bit slow",
-        subtitle = "$peerCount member${if (peerCount > 1) "s" else ""} · $network",
+    data class Slow(val peerCount: Int, val network: String, val reliabilityPct: Int) : HealthState(
+        title    = "Reliability building up",
+        subtitle = "Score $reliabilityPct% · $peerCount member${if (peerCount > 1) "s" else ""} · $network",
         color    = Color(0xFFFF9F0A)
     )
     data object Searching : HealthState(

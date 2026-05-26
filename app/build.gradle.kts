@@ -190,12 +190,8 @@ dependencies {
     implementation(libs.room.runtime)
     ksp(libs.room.compiler)
 
-    // ... Firebase
-    implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.analytics)
-    implementation(libs.firebase.crashlytics)
-    implementation(libs.firebase.perf)
-    implementation(libs.firebase.database.ktx)
+    // Firebase deps retirees en V5 (pivot Zero-Firebase 2026-05-09 — signaling + transport
+    // unifies via Serveurs Relais HA WebSocket). Le google-services.json reste pour OAuth.
 
     // ... LeakCanary
     // Désactivé — ServiceWatcher cause uid=-1 sur Android 12+ (binder UID lost in reflection proxy)

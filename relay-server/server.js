@@ -313,6 +313,10 @@ function handleRegisterPeer(nodeId, payload) {
     logEvent('WARN', 'DEPART', `Nœud TTL expiré (60s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
   }, TTL_MS);
 
+  // Story stabilite — preserve pubKeyB64 (existing ou depuis sessions) pour que
+  // GET_PEERS reste fonctionnel meme apres fermeture WS pendant la fenetre TTL.
+  const pubKeyB64 = existing?.pubKeyB64 ?? sessions.get(nodeId)?.pubKeyB64 ?? '';
+
   signalingRegistry.set(nodeId, {
     ip, port,
     reliabilityScore: reliabilityScore ?? 0.5,
@@ -322,7 +326,8 @@ function handleRegisterPeer(nodeId, payload) {
     currentMemberCount: currentMemberCountNum,
     lastSeen: Date.now(),
     ttlTimer,
-    isSuperPair: true
+    isSuperPair: true,
+    pubKeyB64
   });
 
   logEvent('INFO', 'ELECTION', `Super-Peer élu : ${nodeId.slice(0, 8)} cluster=${clusterIdStr.slice(0, 8) || 'legacy'} score=${(reliabilityScore ?? 0.5).toFixed(2)}`, { nodeId, clusterId: clusterIdStr, reliabilityScore, ip, port });
@@ -376,13 +381,20 @@ function handleJoin(nodeId, payload) {
     clusterIdStr = payloadClusterId;
   }
 
-  // freeBytes : même logique — préserver l'existant, sinon lire du payload
+  // freeBytes : préserver l'existant si défini (re-JOIN heartbeat). Sinon prendre la valeur
+  // du payload (premiere JOIN). Bug fix : `!freeBytesNum` etait vrai pour `freeBytes === 0`
+  // (disque plein legitime) → la valeur 0 etait ecrasee par le payload. Maintenant on teste
+  // explicitement `existing === undefined` pour distinguer "pas d'entree" de "entree à 0".
   let freeBytesNum = existing?.freeBytes ?? 0;
-  if (!freeBytesNum && typeof payloadFreeBytes === 'number'
+  if (existing === undefined && typeof payloadFreeBytes === 'number'
       && Number.isFinite(payloadFreeBytes) && payloadFreeBytes >= 0
       && payloadFreeBytes <= Number.MAX_SAFE_INTEGER) {
     freeBytesNum = Math.floor(payloadFreeBytes);
   }
+
+  // Story stabilite — preserve pubKeyB64 (cache lors de l'AUTH) pour que GET_PEERS
+  // reste fonctionnel meme apres fermeture WS pendant la fenetre TTL.
+  const pubKeyB64 = existing?.pubKeyB64 ?? sessions.get(nodeId)?.pubKeyB64 ?? '';
 
   signalingRegistry.set(nodeId, {
     ip: ip ?? '0.0.0.0',
@@ -394,7 +406,8 @@ function handleJoin(nodeId, payload) {
     currentMemberCount: existing?.currentMemberCount ?? 0,
     lastSeen: Date.now(),
     ttlTimer,
-    isSuperPair: wasSuperPair
+    isSuperPair: wasSuperPair,
+    pubKeyB64
   });
 
   eventCounters.joinEvents++;
@@ -405,20 +418,23 @@ function handleJoin(nodeId, payload) {
 function handleGetPeers(ws) {
   const peers = [];
   for (const [nodeId, entry] of signalingRegistry.entries()) {
-    // Story 10.1 — exporter la clé publique EC P-256 (SPKI-DER Base64) lue depuis la session
-    // active. La clé est déjà vérifiée à l'AUTH (signature EC P-256 validée) — le serveur joue
-    // le rôle de PKI TOFU. Si la session est fermée ou si l'export échoue (clé non-exportable),
-    // pubKeySpkiDerB64 vaut "" pour cette entrée (le client retombera sur ByteArray(0)).
-    let pubKeySpkiDerB64 = '';
-    try {
-      const session = sessions.get(nodeId);
-      if (session?.publicKey) {
-        pubKeySpkiDerB64 = session.publicKey
-          .export({ format: 'der', type: 'spki' })
-          .toString('base64');
+    // Story stabilite — pubKey lue directement depuis signalingRegistry (cachee a l'AUTH).
+    // Reste disponible meme apres fermeture WS pendant la fenetre TTL (60s).
+    // Fallback session pour les entries legacy qui n'auraient pas encore pubKeyB64.
+    let pubKeySpkiDerB64 = entry.pubKeyB64 ?? '';
+    if (!pubKeySpkiDerB64) {
+      try {
+        const session = sessions.get(nodeId);
+        if (session?.pubKeyB64) {
+          pubKeySpkiDerB64 = session.pubKeyB64;
+        } else if (session?.publicKey) {
+          pubKeySpkiDerB64 = session.publicKey
+            .export({ format: 'der', type: 'spki' })
+            .toString('base64');
+        }
+      } catch (e) {
+        console.warn(`[GET_PEERS] export clé publique échoué pour nodeId=${nodeId.slice(0, 8)} : ${e.message}`);
       }
-    } catch (e) {
-      console.warn(`[GET_PEERS] export clé publique échoué pour nodeId=${nodeId.slice(0, 8)} : ${e.message}`);
     }
 
     peers.push({
@@ -637,10 +653,12 @@ function handleElectionBroadcast(fromNodeId, payload) {
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
   'Content-Type': 'application/json'
 };
+
+const ADMIN_SECRET = process.env.ADMIN_SECRET ?? '';
 
 function sendJson(res, data) {
   const body = JSON.stringify(data);
@@ -656,13 +674,38 @@ const httpServer = http.createServer((req, res) => {
     return;
   }
 
+  const url = req.url.split('?')[0];
+
+  // ── POST /admin/reset — déconnecte tous les nœuds et purge l'état du relay ──
+  if (req.method === 'POST' && url === '/admin/reset') {
+    const auth = req.headers['authorization'] ?? '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!ADMIN_SECRET || token !== ADMIN_SECRET) {
+      res.writeHead(401, CORS_HEADERS);
+      res.end('{"error":"Unauthorized"}');
+      return;
+    }
+    const disconnected = sessions.size;
+    for (const [, session] of sessions.entries()) {
+      try { session.ws.close(1001, 'Admin reset'); } catch { /* déjà fermée */ }
+    }
+    sessions.clear();
+    for (const entry of signalingRegistry.values()) clearTimeout(entry.ttlTimer);
+    signalingRegistry.clear();
+    for (const entries of relayBuffer.values()) {
+      for (const e of entries) clearTimeout(e.ttlTimer);
+    }
+    relayBuffer.clear();
+    logEvent('WARN', 'ADMIN', `Reset administrateur : ${disconnected} nœud(s) déconnecté(s)`, { disconnected });
+    sendJson(res, { ok: true, disconnected });
+    return;
+  }
+
   if (req.method !== 'GET') {
     res.writeHead(405, CORS_HEADERS);
     res.end('{"error":"Method Not Allowed"}');
     return;
   }
-
-  const url = req.url.split('?')[0];
 
   if (url === '/health') {
     let superPeerCount = 0;
@@ -802,8 +845,17 @@ wss.on('connection', (ws) => {
       }
 
       clearTimeout(authTimeout);
-      authState = { nodeId: result.nodeId, publicKey: result.publicKey };
-      sessions.set(result.nodeId, { ws, publicKey: result.publicKey });
+      // Cache la cle publique en Base64 SPKI-DER une seule fois a l'AUTH (au lieu de
+      // re-exporter a chaque GET_PEERS). Stockee aussi dans signalingRegistry pour
+      // rester disponible meme apres fermeture WS (pendant la fenetre TTL 60s).
+      let cachedPubKeyB64 = '';
+      try {
+        cachedPubKeyB64 = result.publicKey.export({ format: 'der', type: 'spki' }).toString('base64');
+      } catch (e) {
+        console.warn(`[AUTH] export pubKey echoue pour ${result.nodeId.slice(0,8)} : ${e.message}`);
+      }
+      authState = { nodeId: result.nodeId, publicKey: result.publicKey, pubKeyB64: cachedPubKeyB64 };
+      sessions.set(result.nodeId, { ws, publicKey: result.publicKey, pubKeyB64: cachedPubKeyB64 });
       safeSend(ws, buildFrame(MSG.AUTH_OK));
       console.log(`[AUTH] nodeId=${result.nodeId.slice(0, 8)} authentifié (${sessions.size} sessions)`);
 
@@ -869,16 +921,13 @@ wss.on('connection', (ws) => {
       const currentSession = sessions.get(authState.nodeId);
       if (currentSession && currentSession.ws === ws) {
         sessions.delete(authState.nodeId);
-        const entry = signalingRegistry.get(authState.nodeId);
-        if (entry) {
-          clearTimeout(entry.ttlTimer);
-          signalingRegistry.delete(authState.nodeId);
-          recordChurn(authState.nodeId);
-          eventCounters.departures++;
-          logEvent('WARN', 'DEPART', `Nœud déconnecté : ${authState.nodeId.slice(0, 8)} (${sessions.size} sessions restantes)`, { nodeId: authState.nodeId, remaining: sessions.size });
-        } else {
-          logEvent('INFO', 'WS', `Session fermée : ${authState.nodeId.slice(0, 8)} (${sessions.size} sessions restantes)`, { nodeId: authState.nodeId });
-        }
+        // Story stabilite — NE PAS supprimer signalingRegistry ici. Une micro-coupure
+        // reseau (NAT timeout, 4G handoff, Render cold start) ferme la WS pendant 1-30s ;
+        // si on purge l'entree, les autres nœuds qui font GET_PEERS pendant la fenetre
+        // de reconnexion ne voient plus ce pair → "serveur voit 4, telephone voit 3".
+        // Le TTL de 60s gere deja le cleanup pour les vrais departs. Si le pair revient
+        // avant TTL, le prochain JOIN/REGISTER_PEER reset le timer.
+        logEvent('INFO', 'WS', `Session fermée : ${authState.nodeId.slice(0, 8)} — entry conservee en signalingRegistry (TTL ${TTL_MS / 1000}s) (${sessions.size} sessions restantes)`, { nodeId: authState.nodeId, remaining: sessions.size });
       } else {
         console.log(`[WS] nodeId=${authState.nodeId.slice(0, 8)} ancienne ws fermée — session active conservée`);
       }

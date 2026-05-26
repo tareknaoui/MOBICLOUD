@@ -158,9 +158,7 @@ private fun JetpackApp(
 
     val context = LocalContext.current
 
-    // TODO: [Story Settings] SettingsDialog remplacée par un placeholder non-crashant (code review 1-2).
-    // La dialog sera implémentée dans la story dédiée aux Paramètres.
-    // if (showSettingsDialog) { /* SettingsDialog placeholder */ }
+    // SettingsDialog non implementee en V5 — perspective UX dans rapport.
 
     // If there is no top-level destination, show the main scaffold
     if (appState.currentTopLevelDestination == null) {
@@ -282,7 +280,7 @@ private fun JetpackScaffold(
                                 duration = SnackbarDuration.Short,
                             ) == SnackbarResult.ActionPerformed
                             if (actionPerformed && action == SnackbarAction.REPORT) {
-                                // TODO: Implémenter le système de reporting (ex. Firebase Crashlytics ou rapport utilisateur)
+                                // Perspective rapport : systeme de reporting non implemente en V5 (Zero-Firebase).
                                 Timber.w(throwable, "[REPORT] Action demandée par l'utilisateur — reporting non implémenté")
                             }
                             actionPerformed

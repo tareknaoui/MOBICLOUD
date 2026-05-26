@@ -364,6 +364,11 @@ class RelayWebSocketClient @Inject constructor(
                         .coerceIn(0, com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE)
                 )
             }
-        }.getOrDefault(emptyList())
+        }.getOrElse { e ->
+            // Sans ce log, un PEERS payload malforme retourne emptyList() silencieusement
+            // → tous les pairs sont "perdus" pour ce cycle GET_PEERS sans trace dans logcat.
+            Log.e(TAG, "[DIAG] parsePeersPayload echec — payload (${payload.size}o) : ${e.message}")
+            emptyList()
+        }
     }
 }

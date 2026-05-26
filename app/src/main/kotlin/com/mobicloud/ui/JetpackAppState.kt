@@ -150,8 +150,8 @@ class JetpackAppState(
     /**
      * State flow of top-level destinations with unread resources.
      */
+    // Badges "unread" non utilises en V5 — perspective UX si on ajoute notifications applicatives.
     val topLevelDestinationsWithUnreadResources: StateFlow<Set<TopLevelDestination>> =
-        // TODO: Requires Implementation
         MutableStateFlow(setOf<TopLevelDestination>()).asStateFlow()
 
     /**

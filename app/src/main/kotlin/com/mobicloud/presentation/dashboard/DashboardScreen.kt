@@ -45,9 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mobicloud.domain.models.NetworkType
 import com.mobicloud.domain.models.NodeRole
-import com.mobicloud.domain.models.TransferChannelState
 import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
-import com.mobicloud.presentation.dashboard.components.CloudRelayBadge
 import com.mobicloud.presentation.dashboard.components.HealthBanner
 import com.mobicloud.presentation.dashboard.components.HealthState
 import com.mobicloud.presentation.dashboard.components.KpiDiagnosticCard
@@ -69,7 +67,6 @@ fun DashboardScreen(
     val hasActivePeers  by viewModel.hasActivePeers.collectAsStateWithLifecycle()
     val nodeRole        by viewModel.nodeRole.collectAsStateWithLifecycle()
     val isNetworkUnstable by viewModel.isNetworkUnstable.collectAsStateWithLifecycle()
-    val relayState      by viewModel.relayState.collectAsStateWithLifecycle()
 
     val isExpertMode    by viewModel.isExpertMode.collectAsStateWithLifecycle()
     val communitySize   by viewModel.communitySize.collectAsStateWithLifecycle()
@@ -88,11 +85,14 @@ fun DashboardScreen(
         derivedStateOf {
             val reliability = (diagnostics.reliabilityScore * 100).toInt()
             val peerCount   = diagnostics.activePeerCount
+            // Architecture V5 100% relai HA — pas de canal TCP direct possible. Critere "sain"
+            // base uniquement sur la fiabilite + stabilite reseau (ancien check DIRECT toujours
+            // faux en V5 → noeud bloque a "Slow" en permanence meme avec un cluster sain).
             when {
-                !hasActivePeers                                                  -> HealthState.Searching
-                reliability < 40 || isNetworkUnstable                           -> HealthState.Degraded(peerCount)
-                reliability >= 70 && relayState == TransferChannelState.DIRECT  -> HealthState.Healthy(peerCount, networkLabel)
-                else                                                             -> HealthState.Slow(peerCount, networkLabel)
+                !hasActivePeers                       -> HealthState.Searching
+                reliability < 40 || isNetworkUnstable -> HealthState.Degraded(peerCount)
+                reliability >= 70                     -> HealthState.Healthy(peerCount, networkLabel)
+                else                                  -> HealthState.Slow(peerCount, networkLabel, reliability)
             }
         }
     }
@@ -115,7 +115,6 @@ fun DashboardScreen(
         DashboardHero(
             score        = diagnostics.reliabilityScore,
             nodeRole     = nodeRole,
-            relayState   = relayState,
             isExpertMode = isExpertMode,
             isUnstable   = isNetworkUnstable
         )
@@ -199,7 +198,6 @@ fun DashboardScreen(
 private fun DashboardHero(
     score: Float,
     nodeRole: NodeRole,
-    relayState: TransferChannelState,
     isExpertMode: Boolean,
     isUnstable: Boolean
 ) {
@@ -242,9 +240,6 @@ private fun DashboardHero(
                     modifier   = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                 )
             }
-
-            Spacer(Modifier.height(10.dp))
-            CloudRelayBadge(state = relayState)
 
             if (isExpertMode && isUnstable) {
                 Spacer(Modifier.height(10.dp))

@@ -51,3 +51,13 @@ async function get<T>(path: string): Promise<T> {
 export const fetchTopology = () => get<TopologyData>('/metrics/topology');
 export const fetchHealth = () => get<HealthData>('/health');
 export const fetchEvents = () => get<EventsData>('/metrics/events');
+
+export async function resetAllNodes(secret: string): Promise<{ ok: boolean; disconnected: number }> {
+  const res = await fetch(`${BASE}/admin/reset`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${secret}`, 'Content-Type': 'application/json' },
+  });
+  if (res.status === 401) throw new Error('Secret incorrect');
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}

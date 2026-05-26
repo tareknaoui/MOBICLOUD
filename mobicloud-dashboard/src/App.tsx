@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import GraphView2D from './components/GraphView2D';
 import NetworkPanel from './components/NetworkPanel';
 import RealtimeLog from './components/RealtimeLog';
@@ -8,6 +9,7 @@ import { useLogs } from './hooks/useLogs';
 import { useClusters } from './hooks/useClusters';
 import { useTheme } from './hooks/useTheme';
 import type { HealthData, EventsData } from './services/api';
+import { resetAllNodes } from './services/api';
 
 function fmtUptime(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -67,8 +69,28 @@ export default function App() {
   const logs = useLogs();
   const clusters = useClusters();
   const { theme, toggle } = useTheme();
+  const [resetState, setResetState] = useState<'idle' | 'loading' | 'ok' | 'err'>('idle');
+  const [resetMsg, setResetMsg] = useState('');
 
   const relayOffline = !!(topoError || healthError);
+
+  async function handleReset() {
+    const secret = window.prompt('Secret admin (ADMIN_SECRET) :');
+    if (!secret) return;
+    if (!window.confirm(`Déconnecter tous les nœuds (${health?.sessions ?? '?'} sessions) ?`)) return;
+    setResetState('loading');
+    try {
+      const r = await resetAllNodes(secret);
+      setResetState('ok');
+      setResetMsg(`${r.disconnected} nœud(s) déconnecté(s)`);
+    } catch (e: unknown) {
+      setResetState('err');
+      setResetMsg(e instanceof Error ? e.message : 'Erreur inconnue');
+    } finally {
+      setTimeout(() => setResetState('idle'), 4000);
+    }
+  }
+
   const nodeCount = topology?.nodes.length ?? 0;
   const superPeerCount = topology?.nodes.filter(n => n.isSuperPair).length ?? 0;
   const totalAuth = buildKpis(health, events);
@@ -99,6 +121,23 @@ export default function App() {
               churn {churn}%{churn >= 30 ? ' ⚠' : ''}
             </span>
           </>}
+          <button
+            onClick={handleReset}
+            disabled={resetState === 'loading'}
+            title="Déconnecter tous les nœuds et purger l'état du relay"
+            style={{
+              background: resetState === 'ok' ? 'var(--accent-green)' : resetState === 'err' ? 'var(--accent-red)' : 'var(--accent-red)',
+              color: '#fff', border: 'none', borderRadius: 6,
+              padding: '3px 10px', cursor: resetState === 'loading' ? 'wait' : 'pointer',
+              fontSize: 11, fontWeight: 600, opacity: resetState === 'loading' ? 0.6 : 1,
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}
+          >
+            {resetState === 'loading' ? '⏳ Reset…'
+              : resetState === 'ok' ? `✓ ${resetMsg}`
+              : resetState === 'err' ? `✗ ${resetMsg}`
+              : '⟳ Reset nœuds'}
+          </button>
           <ThemeToggle theme={theme} onToggle={toggle} />
         </div>
       </header>

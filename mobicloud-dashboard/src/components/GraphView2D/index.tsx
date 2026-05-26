@@ -20,13 +20,13 @@ interface Props { topology: TopologyData | null; error: string | null; theme: Th
 interface KnownNode {
   id: string; isSuperPair: boolean; isConnected: boolean;
   clusterId: string; reliabilityScore: number; freeBytes: number;
-  ip: string; port: number; departedAt: number | null;
+  ip: string; port: number; lastSeen: number; departedAt: number | null;
 }
 
 interface SelectedNode {
   id: string; isSuperPair: boolean; isConnected: boolean;
   clusterId: string; reliabilityScore: number; freeBytes: number;
-  ip: string; port: number; color: string;
+  ip: string; port: number; lastSeen: number; color: string;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -35,6 +35,21 @@ function fmtBytes(b: number) {
   if (b >= 1e6) return `${(b / 1e6).toFixed(1)} MB`;
   if (b >= 1e3) return `${(b / 1e3).toFixed(1)} KB`;
   return `${b} B`;
+}
+
+function fmtAgo(ms: number): string {
+  const s = Math.floor((Date.now() - ms) / 1000);
+  if (s < 5) return 'à l\'instant';
+  if (s < 60) return `il y a ${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `il y a ${m}m`;
+  return `il y a ${Math.floor(m / 60)}h`;
+}
+
+function reliabilityColor(score: number): string {
+  if (score >= 0.7) return '#34c759';
+  if (score >= 0.4) return '#ff9f0a';
+  return '#ff3b30';
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -266,7 +281,7 @@ export default function GraphView2D({ topology, error, theme }: Props) {
           id: n.id, label: n.id.slice(0, 6),
           isSuperPair: n.isSuperPair, isConnected: n.isConnected,
           clusterId: effectiveClusterId ?? '', reliabilityScore: n.reliabilityScore,
-          freeBytes: n.freeBytes, ip: n.ip, port: n.port, color,
+          freeBytes: n.freeBytes, ip: n.ip, port: n.port, lastSeen: n.lastSeen, color,
           parent: parentId,
         };
 
@@ -293,6 +308,7 @@ export default function GraphView2D({ topology, error, theme }: Props) {
           existingNode.data('freeBytes', n.freeBytes);
           existingNode.data('ip', n.ip);
           existingNode.data('port', n.port);
+          existingNode.data('lastSeen', n.lastSeen);
           existingNode.data('color', color);
           existingNode.removeClass('superpeer member offline').addClass(cls);
         }
@@ -300,7 +316,7 @@ export default function GraphView2D({ topology, error, theme }: Props) {
         known.set(n.id, {
           id: n.id, isSuperPair: n.isSuperPair, isConnected: n.isConnected,
           clusterId: effectiveClusterId ?? '', reliabilityScore: n.reliabilityScore,
-          freeBytes: n.freeBytes, ip: n.ip, port: n.port, departedAt: null,
+          freeBytes: n.freeBytes, ip: n.ip, port: n.port, lastSeen: n.lastSeen, departedAt: null,
         });
       }
 
@@ -393,37 +409,73 @@ export default function GraphView2D({ topology, error, theme }: Props) {
       {selected && (
         <div style={{
           position: 'absolute',
-          left: Math.min(tooltipPos.x + 14, cw - 220),
-          top: Math.min(Math.max(tooltipPos.y - 10, 10), ch - 200),
+          left: Math.min(tooltipPos.x + 16, cw - 248),
+          top: Math.min(Math.max(tooltipPos.y - 12, 8), ch - 260),
           zIndex: 30,
           background: isDark ? '#111827' : '#ffffff',
-          border: `1px solid ${isDark ? '#374151' : '#e2e8f0'}`,
-          borderRadius: 8, padding: '8px 12px', fontSize: 12,
+          border: `1px solid ${isDark ? '#1e3a5f' : '#bfdbfe'}`,
+          borderRadius: 10, padding: '10px 14px', fontSize: 12,
           color: isDark ? '#e2e8f0' : '#0f172a',
-          pointerEvents: 'none',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.3)', minWidth: 200,
+          boxShadow: isDark
+            ? '0 4px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(96,165,250,0.1)'
+            : '0 4px 24px rgba(0,0,0,0.14)',
+          minWidth: 230, pointerEvents: 'auto',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+          {/* Header */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
             <span style={{
-              width: 10, height: 10, borderRadius: '50%', display: 'inline-block',
+              width: 11, height: 11, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
               background: selected.isSuperPair ? '#facc15' : selected.isConnected ? selected.color : '#6b7280',
+              boxShadow: selected.isSuperPair ? '0 0 6px rgba(250,204,21,0.7)' : 'none',
             }} />
-            <span style={{ fontWeight: 600 }}>
-              {selected.isSuperPair ? '⭐ Super-Peer' : selected.isConnected ? 'Member' : '○ Offline'}
+            <span style={{ fontWeight: 700, fontSize: 13 }}>
+              {selected.isSuperPair ? 'Super-Peer' : selected.isConnected ? 'Member' : 'Offline'}
             </span>
+            <button
+              onClick={() => setSelected(null)}
+              style={{
+                marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer',
+                color: isDark ? '#64748b' : '#94a3b8', fontSize: 14, lineHeight: 1, padding: '0 2px',
+              }}
+              title="Fermer"
+            >✕</button>
           </div>
-          <div style={{ fontFamily: 'monospace', fontSize: 10, color: isDark ? '#64748b' : '#94a3b8', marginBottom: 6 }}>
+
+          {/* Node ID */}
+          <div style={{
+            fontFamily: 'monospace', fontSize: 10,
+            color: isDark ? '#94a3b8' : '#64748b',
+            background: isDark ? '#1f2937' : '#f1f5f9',
+            borderRadius: 4, padding: '3px 6px', marginBottom: 10,
+            wordBreak: 'break-all', lineHeight: 1.5,
+          }}>
             {selected.id}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 10px' }}>
-            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Cluster</span>
-            <span style={{ fontFamily: 'monospace', fontSize: 10 }}>{selected.clusterId || '—'}</span>
+
+          {/* Detail rows */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 12px', alignItems: 'baseline' }}>
+            <span style={{ color: isDark ? '#64748b' : '#94a3b8', whiteSpace: 'nowrap' }}>Cluster</span>
+            <span style={{ fontFamily: 'monospace', fontSize: 10, color: isDark ? '#93c5fd' : '#2563eb' }}>
+              {selected.clusterId ? selected.clusterId.slice(0, 12) + '…' : '—'}
+            </span>
+
             <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Fiabilité</span>
-            <span>{(selected.reliabilityScore * 100).toFixed(1)}%</span>
+            <span style={{ fontWeight: 600, color: reliabilityColor(selected.reliabilityScore) }}>
+              {(selected.reliabilityScore * 100).toFixed(1)}%
+            </span>
+
             <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Stockage libre</span>
             <span>{fmtBytes(selected.freeBytes)}</span>
-            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>IP</span>
-            <span style={{ fontFamily: 'monospace', fontSize: 10 }}>{selected.ip || '—'}:{selected.port || '—'}</span>
+
+            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Adresse</span>
+            <span style={{ fontFamily: 'monospace', fontSize: 10 }}>
+              {selected.ip || '—'}:{selected.port || '—'}
+            </span>
+
+            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Vu</span>
+            <span style={{ color: isDark ? '#94a3b8' : '#64748b', fontSize: 11 }}>
+              {selected.lastSeen ? fmtAgo(selected.lastSeen) : '—'}
+            </span>
           </div>
         </div>
       )}

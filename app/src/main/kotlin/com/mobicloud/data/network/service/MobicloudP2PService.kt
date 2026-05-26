@@ -145,7 +145,12 @@ class MobicloudP2PService : Service() {
         const val CHANNEL_ID = "mobicloud_p2p_channel"
         const val NOTIFICATION_ID = 404
         private const val PEER_TIMEOUT_MS = 60_000L
-        private const val EVICTION_CHECK_INTERVAL_MS = 1000L
+        // Aligne sur LIVENESS_CHECK_INTERVAL_MS du domain (15s = 1/4 de PEER_TIMEOUT_MS).
+        // L'ancien 1000L declenchait 86 400 UPDATE SQL/jour pour rien (PEER_TIMEOUT etant
+        // de 60s, evincer 1s plus tot ou 15s plus tard ne change rien fonctionnellement),
+        // gardait le CPU reveille en permanence et creait de la contention Room avec les
+        // peerRepository.registerOrUpdatePeer enchaines dans processPeerList.
+        private const val EVICTION_CHECK_INTERVAL_MS = 15_000L
         private const val RELIABILITY_SCORE_INTERVAL_MS = 30_000L
         private const val LOGTAG = "MobicloudP2PService"
         /** Durée du mandat Super-Pair avant abdication automatique (testable via overrideAbdicationDelayMs). */
@@ -418,7 +423,6 @@ class MobicloudP2PService : Service() {
             // Le statut Super-Pair sera revendiqué via REGISTER_PEER UNIQUEMENT après victoire Bully.
             // Keepalive toutes les 30s pour rester avant l'expiration du TTL serveur (60s).
             launch {
-                delay(3_000L) // attendre AUTH_OK WebSocket
                 // FIX GOSSIP TCP : annoncer l'IP LAN reelle (WiFi/hotspot) au lieu
                 // de "0.0.0.0". Sinon les pairs sur le meme LAN ne peuvent pas se
                 // joindre directement (resolution localhost -> ECONNREFUSED en boucle).

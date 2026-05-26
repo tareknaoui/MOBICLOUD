@@ -103,7 +103,7 @@ class ReceiveAndHostBlockUseCase internal constructor(
             }
             val signature = signResult.getOrThrow()
 
-            // TODO Epic 8: UpdateWeightScoreUseCase.increment()
+            // Karma/WeightScore retire du scope V4 (2026-04-28) — perspective rapport uniquement.
 
             ReceiveBlockResult.Success(
                 ack = BlockAckMessage(

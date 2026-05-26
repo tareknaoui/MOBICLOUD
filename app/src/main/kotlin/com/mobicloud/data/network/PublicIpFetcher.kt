@@ -8,7 +8,7 @@ import javax.inject.Inject
 
 /**
  * Utilitaire pour récupérer l'IP publique du périphérique.
- * Essentiel pour que l'Ancre Firebase diffuse une IP de contact joignable.
+ * Utilisé par RegisterSuperPeerUseCase pour annoncer une IP joignable au relai HA.
  */
 class PublicIpFetcher @Inject constructor() {
     private val client = OkHttpClient()
