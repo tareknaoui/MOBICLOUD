@@ -42,6 +42,24 @@ export interface EventsData {
   uptimeMs: number;
 }
 
+export interface TransferEvent {
+  from: string;
+  to: string;
+  blockId: string;
+  bytes: number;
+}
+
+export function subscribeToTransfers(onEvent: (e: TransferEvent) => void): () => void {
+  const es = new EventSource(`${BASE}/dashboard/events`);
+  es.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data) as TransferEvent & { type: string };
+      if (data.type === 'block_transfer') onEvent(data);
+    } catch { /* ignore malformed */ }
+  };
+  return () => es.close();
+}
+
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);

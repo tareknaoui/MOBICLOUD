@@ -147,6 +147,17 @@ const signalingRegistry = new Map();
 // Map<blockId, [{ fromNodeId, destNodeId, data: Buffer, ttlTimer }]>
 const relayBuffer = new Map();
 
+// SSE clients dashboard (Set de Response objects)
+const sseClients = new Set();
+
+function emitSseEvent(type, data) {
+  if (sseClients.size === 0) return;
+  const msg = `data: ${JSON.stringify({ type, ...data })}\n\n`;
+  for (const res of sseClients) {
+    try { res.write(msg); } catch { sseClients.delete(res); }
+  }
+}
+
 // Compteurs d'événements pour le dashboard admin (réinitialisés au redémarrage du process)
 const eventCounters = {
   authFailures: 0,
@@ -525,6 +536,7 @@ function handleUpload(fromNodeId, payload, senderWs) {
     safeSend(destSession.ws, buildFrame(MSG.FORWARD, forwardPayload));
     eventCounters.forwardedBlocks++;
     logEvent('INFO', 'RELAY', `Bloc forwardé : ${blockId.slice(0, 16)}… → ${destNodeId.slice(0, 8)} (direct)`, { blockId: blockId.slice(0, 16), from: fromNodeId.slice(0, 8), to: destNodeId.slice(0, 8) });
+    emitSseEvent('block_transfer', { from: fromNodeId, to: destNodeId, blockId: blockId.slice(0, 16), bytes: data.length });
   } else {
     // Cap buffer RAM
     if (relayBuffer.size >= MAX_RELAY_BUFFER_ENTRIES) {
@@ -834,6 +846,19 @@ const httpServer = http.createServer((req, res) => {
     const since = Number.isFinite(sinceRaw) && sinceRaw > 0 ? sinceRaw : 0;
     const filtered = since > 0 ? realtimeLogs.filter(e => e.ts > since) : realtimeLogs.slice(-50);
     sendJson(res, { logs: filtered, serverTime: Date.now() });
+
+  } else if (url === '/dashboard/events') {
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(': keep-alive\n\n');
+    sseClients.add(res);
+    req.on('close', () => sseClients.delete(res));
+    return;
 
   } else {
     res.writeHead(404, CORS_HEADERS);

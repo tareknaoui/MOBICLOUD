@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Cytoscape from 'cytoscape';
 import coseBilkent from 'cytoscape-cose-bilkent';
-import type { TopologyData, RelayNode } from '../../services/api';
+import type { TopologyData, RelayNode, TransferEvent } from '../../services/api';
 import type { Theme } from '../../hooks/useTheme';
 
 // Register layout plugin once (try/catch survives HMR re-imports)
@@ -15,7 +15,14 @@ const CLUSTER_COLORS = [
 const DEPART_TTL_MS = 30_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface Props { topology: TopologyData | null; error: string | null; theme: Theme; }
+interface Props { topology: TopologyData | null; error: string | null; theme: Theme; latestTransfer?: TransferEvent | null; }
+
+interface Particle {
+  fromX: number; fromY: number;
+  toX: number; toY: number;
+  startTime: number; duration: number;
+  color: string;
+}
 
 interface KnownNode {
   id: string; isSuperPair: boolean; isConnected: boolean;
@@ -27,6 +34,12 @@ interface SelectedNode {
   id: string; isSuperPair: boolean; isConnected: boolean;
   clusterId: string; reliabilityScore: number; freeBytes: number;
   ip: string; port: number; lastSeen: number; color: string;
+}
+
+interface SelectedCluster {
+  clusterId: string; color: string;
+  memberCount: number; connectedCount: number;
+  totalFreeBytes: number; avgReliability: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -160,8 +173,10 @@ function animateIn(ids: string[], cy: Cytoscape.Core) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function GraphView2D({ topology, error, theme }: Props) {
+export default function GraphView2D({ topology, error, theme, latestTransfer }: Props) {
   const containerRef   = useRef<HTMLDivElement>(null);
+  const canvasRef      = useRef<HTMLCanvasElement>(null);
+  const particlesRef   = useRef<Particle[]>([]);
   const cyRef          = useRef<Cytoscape.Core | null>(null);
   const knownNodesRef  = useRef(new Map<string, KnownNode>());
   const clusterColorRef = useRef(new Map<string, string>());
@@ -172,8 +187,9 @@ export default function GraphView2D({ topology, error, theme }: Props) {
   const isDark   = theme === 'dark';
   const bgColor  = isDark ? '#030712' : '#e8edf5';
 
-  const [selected, setSelected]       = useState<SelectedNode | null>(null);
-  const [tooltipPos, setTooltipPos]   = useState({ x: 0, y: 0 });
+  const [selected, setSelected]             = useState<SelectedNode | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<SelectedCluster | null>(null);
+  const [tooltipPos, setTooltipPos]         = useState({ x: 0, y: 0 });
   const [connectedCount, setConnectedCount] = useState(0);
 
   // Code review P10 : clear le panel selectionne si le nœud disparait de la topologie
@@ -201,25 +217,111 @@ export default function GraphView2D({ topology, error, theme }: Props) {
     });
     cyRef.current = cy;
 
-    cy.on('tap', 'node:not(.cluster)', evt => {
-      const d = evt.target.data() as SelectedNode;
-      const rp = evt.target.renderedPosition();
-      setSelected(d);
-      setTooltipPos({ x: rp.x, y: rp.y });
+    cy.on('tap', evt => {
+      if (evt.target === cy) {
+        setSelected(null);
+        setSelectedCluster(null);
+      } else if (evt.target.isNode && evt.target.isNode()) {
+        const rp = evt.target.renderedPosition();
+        setTooltipPos({ x: rp.x, y: rp.y });
+        if (evt.target.hasClass('cluster')) {
+          const children = evt.target.children().not('.cluster');
+          const members = children.toArray() as Cytoscape.NodeSingular[];
+          const connected = members.filter(m => m.data('isConnected'));
+          const totalFree = members.reduce((s, m) => s + (m.data('freeBytes') as number), 0);
+          const avgRel = members.length > 0
+            ? members.reduce((s, m) => s + (m.data('reliabilityScore') as number), 0) / members.length
+            : 0;
+          setSelectedCluster({
+            clusterId: evt.target.data('id').replace('cluster-', ''),
+            color: evt.target.data('color'),
+            memberCount: members.length,
+            connectedCount: connected.length,
+            totalFreeBytes: totalFree,
+            avgReliability: avgRel,
+          });
+          setSelected(null);
+        } else {
+          const d = evt.target.data() as SelectedNode;
+          setSelected(d);
+          setSelectedCluster(null);
+        }
+      }
     });
-    cy.on('tap', 'core', () => setSelected(null));
 
     return () => { cy.destroy(); cyRef.current = null; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Resize ─────────────────────────────────────────────────────────────────
+  // ── Resize (sync canvas size too) ──────────────────────────────────────────
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(() => cyRef.current?.resize());
+    const ro = new ResizeObserver(() => {
+      cyRef.current?.resize();
+      if (canvasRef.current) {
+        canvasRef.current.width  = el.clientWidth;
+        canvasRef.current.height = el.clientHeight;
+      }
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // ── Particle RAF loop ───────────────────────────────────────────────────────
+  useEffect(() => {
+    let rafId: number;
+    function easeInOut(t: number) { return t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; }
+    function loop() {
+      const canvas = canvasRef.current;
+      if (!canvas) { rafId = requestAnimationFrame(loop); return; }
+      const ctx = canvas.getContext('2d');
+      if (!ctx) { rafId = requestAnimationFrame(loop); return; }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const now = performance.now();
+      particlesRef.current = particlesRef.current.filter(p => {
+        const t = Math.min(1, (now - p.startTime) / p.duration);
+        const et = easeInOut(t);
+        const x = p.fromX + (p.toX - p.fromX) * et;
+        const y = p.fromY + (p.toY - p.fromY) * et;
+        // Glow halo
+        const grad = ctx.createRadialGradient(x, y, 0, x, y, 10);
+        grad.addColorStop(0, p.color + 'cc');
+        grad.addColorStop(1, p.color + '00');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(x, y, 10, 0, Math.PI * 2);
+        ctx.fill();
+        // Core dot
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fill();
+        return t < 1;
+      });
+      rafId = requestAnimationFrame(loop);
+    }
+    rafId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(rafId);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Spawn particle on transfer event ───────────────────────────────────────
+  useEffect(() => {
+    if (!latestTransfer || !cyRef.current) return;
+    const cy = cyRef.current;
+    const fromNode = cy.$(`#${latestTransfer.from}`);
+    const toNode   = cy.$(`#${latestTransfer.to}`);
+    if (!fromNode.length || !toNode.length) return;
+    const fromPos = fromNode.renderedPosition();
+    const toPos   = toNode.renderedPosition();
+    const color   = (fromNode.data('color') as string) || '#60a5fa';
+    particlesRef.current.push({
+      fromX: fromPos.x, fromY: fromPos.y,
+      toX: toPos.x, toY: toPos.y,
+      startTime: performance.now(),
+      duration: 1200,
+      color,
+    });
+  }, [latestTransfer]);
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -300,7 +402,7 @@ export default function GraphView2D({ topology, error, theme }: Props) {
           // Position: near cluster centroid if layout is done, random otherwise
           let pos = { x: (Math.random() - 0.5) * 300, y: (Math.random() - 0.5) * 300 };
           if (effectiveClusterId && layoutDoneRef.current) {
-            const siblings = cy.nodes(`[clusterId = "${effectiveClusterId}"]`).filter(':not(.cluster)');
+            const siblings = cy.nodes(`[clusterId = "${effectiveClusterId}"]`).not('.cluster');
             if (siblings.length > 0) {
               const positions = siblings.map(m => (m as Cytoscape.NodeSingular).position());
               pos = {
@@ -359,7 +461,7 @@ export default function GraphView2D({ topology, error, theme }: Props) {
     });
 
     // Initial layout: cose-bilkent runs once, then nodes remain draggable
-    if (!layoutDoneRef.current && cy.nodes(':not(.cluster)').length > 0) {
+    if (!layoutDoneRef.current && cy.nodes().not('.cluster').length > 0) {
       layoutDoneRef.current = true;
       const layout = cy.layout({
         name: 'cose-bilkent',
@@ -380,7 +482,7 @@ export default function GraphView2D({ topology, error, theme }: Props) {
         tilingPaddingHorizontal: 350,
       } as never);
       layout.on('layoutstop', () => {
-        cy.fit(cy.nodes(':not(.cluster)'), 60);
+        cy.fit(cy.nodes().not('.cluster'), 60);
         animateIn(newNodeIds, cy);
       });
       layout.run();
@@ -416,6 +518,12 @@ export default function GraphView2D({ topology, error, theme }: Props) {
 
       {/* Cytoscape mounts here */}
       <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Particle canvas overlay — pointer-events: none pour ne pas bloquer les clics Cytoscape */}
+      <canvas
+        ref={canvasRef}
+        style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5 }}
+      />
 
       {selected && (
         <div style={{
@@ -486,6 +594,42 @@ export default function GraphView2D({ topology, error, theme }: Props) {
             <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Vu</span>
             <span style={{ color: isDark ? '#94a3b8' : '#64748b', fontSize: 11 }}>
               {selected.lastSeen ? fmtAgo(selected.lastSeen) : '—'}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {selectedCluster && (
+        <div style={{
+          position: 'absolute',
+          left: Math.min(tooltipPos.x + 16, cw - 248),
+          top: Math.min(Math.max(tooltipPos.y - 12, 8), ch - 200),
+          zIndex: 30,
+          background: isDark ? '#111827' : '#ffffff',
+          border: `1px solid ${selectedCluster.color}55`,
+          borderRadius: 10, padding: '10px 14px', fontSize: 12,
+          color: isDark ? '#e2e8f0' : '#0f172a',
+          boxShadow: isDark ? '0 4px 24px rgba(0,0,0,0.6)' : '0 4px 24px rgba(0,0,0,0.14)',
+          minWidth: 200, pointerEvents: 'auto',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+            <span style={{ width: 11, height: 11, borderRadius: 3, display: 'inline-block', flexShrink: 0, background: selectedCluster.color }} />
+            <span style={{ fontWeight: 700, fontSize: 13 }}>Cluster</span>
+            <button onClick={() => setSelectedCluster(null)} style={{ marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer', color: isDark ? '#64748b' : '#94a3b8', fontSize: 14, lineHeight: 1, padding: '0 2px' }} title="Fermer">✕</button>
+          </div>
+          <div style={{ fontFamily: 'monospace', fontSize: 10, color: isDark ? '#94a3b8' : '#64748b', background: isDark ? '#1f2937' : '#f1f5f9', borderRadius: 4, padding: '3px 6px', marginBottom: 10, wordBreak: 'break-all' }}>
+            {selectedCluster.clusterId}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 12px', alignItems: 'baseline' }}>
+            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Membres</span>
+            <span><strong style={{ color: selectedCluster.connectedCount === selectedCluster.memberCount ? '#34c759' : '#ff9f0a' }}>{selectedCluster.connectedCount}</strong>/{selectedCluster.memberCount} connectés</span>
+
+            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Stockage libre</span>
+            <span>{fmtBytes(selectedCluster.totalFreeBytes)}</span>
+
+            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Fiab. moy.</span>
+            <span style={{ fontWeight: 600, color: reliabilityColor(selectedCluster.avgReliability) }}>
+              {(selectedCluster.avgReliability * 100).toFixed(1)}%
             </span>
           </div>
         </div>

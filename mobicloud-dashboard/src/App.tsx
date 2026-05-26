@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import GraphView2D from './components/GraphView2D';
 import NetworkPanel from './components/NetworkPanel';
 import RealtimeLog from './components/RealtimeLog';
@@ -8,8 +8,8 @@ import { useHealth } from './hooks/useHealth';
 import { useLogs } from './hooks/useLogs';
 import { useClusters } from './hooks/useClusters';
 import { useTheme } from './hooks/useTheme';
-import type { HealthData, EventsData } from './services/api';
-import { resetAllNodes } from './services/api';
+import type { HealthData, EventsData, TransferEvent } from './services/api';
+import { resetAllNodes, subscribeToTransfers } from './services/api';
 
 function fmtUptime(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -71,6 +71,9 @@ export default function App() {
   const { theme, toggle } = useTheme();
   const [resetState, setResetState] = useState<'idle' | 'loading' | 'ok' | 'err'>('idle');
   const [resetMsg, setResetMsg] = useState('');
+  const [latestTransfer, setLatestTransfer] = useState<TransferEvent | null>(null);
+
+  useEffect(() => subscribeToTransfers(setLatestTransfer), []);
 
   const relayOffline = !!(topoError || healthError);
 
@@ -163,7 +166,7 @@ export default function App() {
               </span>
             ))}
           </div>
-          <GraphView2D topology={topology} error={topoError} theme={theme} />
+          <GraphView2D topology={topology} error={topoError} theme={theme} latestTransfer={latestTransfer} />
         </div>
 
         {/* ── Panneau droit — 32% ── */}
