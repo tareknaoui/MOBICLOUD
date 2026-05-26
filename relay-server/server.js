@@ -313,6 +313,31 @@ function handleRegisterPeer(nodeId, payload) {
   // Cap : refuser si annuaire plein et ce nœud n'est pas déjà enregistré
   if (!signalingRegistry.has(nodeId) && signalingRegistry.size >= MAX_SIGNALING_PEERS) return false;
 
+  // Unicité SP par cluster : si un SP connecté existe déjà pour ce clusterId, rejeter.
+  // Cela évite le double-SP après reconnexion simultanée (race Bully post-Doze).
+  // Si le SP existant est déconnecté (TTL non encore expiré), on le dégrade pour laisser
+  // le nouveau prendre le rôle (failover normal).
+  if (clusterIdStr) {
+    for (const [existingId, existingEntry] of signalingRegistry.entries()) {
+      if (existingEntry.isSuperPair
+          && existingEntry.clusterId === clusterIdStr
+          && existingId !== nodeId) {
+        if (sessions.has(existingId)) {
+          logEvent('WARN', 'ELECTION',
+            `REGISTER_PEER rejeté : SP déjà actif cluster=${clusterIdStr.slice(0, 8)} sp=${existingId.slice(0, 8)} challenger=${nodeId.slice(0, 8)}`,
+            { nodeId: nodeId.slice(0, 8), existingSP: existingId.slice(0, 8) });
+          return false;
+        } else {
+          // SP existant déconnecté → le révoquer pour que le nouveau le remplace
+          existingEntry.isSuperPair = false;
+          logEvent('INFO', 'ELECTION',
+            `SP révoqué (déconnecté) → ${nodeId.slice(0, 8)} prend le rôle cluster=${clusterIdStr.slice(0, 8)}`,
+            { revokedSP: existingId.slice(0, 8), newSP: nodeId.slice(0, 8) });
+        }
+      }
+    }
+  }
+
   // Annuler l'ancien timer TTL si re-registration
   const existing = signalingRegistry.get(nodeId);
   if (existing?.ttlTimer) clearTimeout(existing.ttlTimer);
