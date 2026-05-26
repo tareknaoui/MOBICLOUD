@@ -313,9 +313,10 @@ function handleRegisterPeer(nodeId, payload) {
     logEvent('WARN', 'DEPART', `Nœud TTL expiré (60s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
   }, TTL_MS);
 
-  // Story stabilite — preserve pubKeyB64 (existing ou depuis sessions) pour que
-  // GET_PEERS reste fonctionnel meme apres fermeture WS pendant la fenetre TTL.
-  const pubKeyB64 = existing?.pubKeyB64 ?? sessions.get(nodeId)?.pubKeyB64 ?? '';
+  // Story stabilite — preserve pubKeyB64 pour que GET_PEERS reste fonctionnel meme
+  // apres fermeture WS pendant la fenetre TTL. Code review P1 : priorite a la session
+  // fraiche (rotation de cle) sur le cache du registre.
+  const pubKeyB64 = sessions.get(nodeId)?.pubKeyB64 ?? existing?.pubKeyB64 ?? '';
 
   signalingRegistry.set(nodeId, {
     ip, port,
@@ -381,20 +382,21 @@ function handleJoin(nodeId, payload) {
     clusterIdStr = payloadClusterId;
   }
 
-  // freeBytes : préserver l'existant si défini (re-JOIN heartbeat). Sinon prendre la valeur
-  // du payload (premiere JOIN). Bug fix : `!freeBytesNum` etait vrai pour `freeBytes === 0`
-  // (disque plein legitime) → la valeur 0 etait ecrasee par le payload. Maintenant on teste
-  // explicitement `existing === undefined` pour distinguer "pas d'entree" de "entree à 0".
+  // freeBytes : code review P2 — accepter la valeur du payload a chaque re-JOIN si
+  // valide (heartbeat reflete le disque a jour). Fallback sur l'existant si absent/invalide.
+  // L'ancienne logique `existing === undefined` bloquait toute mise a jour apres la 1re JOIN
+  // → drift entre disque reel (ex. 500MB) et registre (5GB) pendant la duree de vie du noeud.
   let freeBytesNum = existing?.freeBytes ?? 0;
-  if (existing === undefined && typeof payloadFreeBytes === 'number'
+  if (typeof payloadFreeBytes === 'number'
       && Number.isFinite(payloadFreeBytes) && payloadFreeBytes >= 0
       && payloadFreeBytes <= Number.MAX_SAFE_INTEGER) {
     freeBytesNum = Math.floor(payloadFreeBytes);
   }
 
-  // Story stabilite — preserve pubKeyB64 (cache lors de l'AUTH) pour que GET_PEERS
-  // reste fonctionnel meme apres fermeture WS pendant la fenetre TTL.
-  const pubKeyB64 = existing?.pubKeyB64 ?? sessions.get(nodeId)?.pubKeyB64 ?? '';
+  // Story stabilite — preserve pubKeyB64 pour que GET_PEERS reste fonctionnel meme
+  // apres fermeture WS pendant la fenetre TTL. Code review P1 : priorite a la session
+  // fraiche (rotation de cle) sur le cache du registre.
+  const pubKeyB64 = sessions.get(nodeId)?.pubKeyB64 ?? existing?.pubKeyB64 ?? '';
 
   signalingRegistry.set(nodeId, {
     ip: ip ?? '0.0.0.0',
@@ -651,6 +653,11 @@ function handleElectionBroadcast(fromNodeId, payload) {
 
 // ─── Serveur HTTP + WebSocketServer ─────────────────────────────────────────
 
+// Code review P4 : Origines autorisees pour les endpoints sensibles (admin/*).
+// Read-only endpoints (/health, /metrics/*) gardent une CORS plus permissive plus bas.
+const ALLOWED_ADMIN_ORIGINS = (process.env.ADMIN_ALLOWED_ORIGINS ?? '')
+  .split(',').map(s => s.trim()).filter(Boolean);
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -658,7 +665,22 @@ const CORS_HEADERS = {
   'Content-Type': 'application/json'
 };
 
+function buildAdminCorsHeaders(reqOrigin) {
+  const allowed = reqOrigin && ALLOWED_ADMIN_ORIGINS.includes(reqOrigin) ? reqOrigin : 'null';
+  return {
+    ...CORS_HEADERS,
+    'Access-Control-Allow-Origin': allowed,
+    'Vary': 'Origin'
+  };
+}
+
 const ADMIN_SECRET = process.env.ADMIN_SECRET ?? '';
+if (!ADMIN_SECRET) {
+  console.warn('[ADMIN] ADMIN_SECRET non configure — /admin/* desactive (401 systematique).');
+}
+if (ALLOWED_ADMIN_ORIGINS.length === 0) {
+  console.warn('[ADMIN] ADMIN_ALLOWED_ORIGINS vide — aucune origine autorisee pour /admin/*.');
+}
 
 function sendJson(res, data) {
   const body = JSON.stringify(data);
@@ -677,11 +699,28 @@ const httpServer = http.createServer((req, res) => {
   const url = req.url.split('?')[0];
 
   // ── POST /admin/reset — déconnecte tous les nœuds et purge l'état du relay ──
+  // Code review P4 : Origine restreinte, comparaison timing-safe, log des echecs avec IP.
   if (req.method === 'POST' && url === '/admin/reset') {
+    const reqOrigin = req.headers['origin'] ?? '';
+    const adminHeaders = buildAdminCorsHeaders(reqOrigin);
+    const remoteIp = req.socket?.remoteAddress ?? '?';
+    if (ALLOWED_ADMIN_ORIGINS.length > 0 && !ALLOWED_ADMIN_ORIGINS.includes(reqOrigin)) {
+      logEvent('WARN', 'ADMIN', `Reset refuse : origine non autorisee (${reqOrigin || 'null'}) ip=${remoteIp}`, { origin: reqOrigin, ip: remoteIp });
+      res.writeHead(403, adminHeaders);
+      res.end('{"error":"Forbidden origin"}');
+      return;
+    }
     const auth = req.headers['authorization'] ?? '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    if (!ADMIN_SECRET || token !== ADMIN_SECRET) {
-      res.writeHead(401, CORS_HEADERS);
+    let tokenOk = false;
+    if (ADMIN_SECRET && token.length === ADMIN_SECRET.length) {
+      try {
+        tokenOk = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(ADMIN_SECRET));
+      } catch { tokenOk = false; }
+    }
+    if (!ADMIN_SECRET || !tokenOk) {
+      logEvent('WARN', 'ADMIN', `Reset refuse : auth invalide ip=${remoteIp} origin=${reqOrigin || 'null'}`, { ip: remoteIp, origin: reqOrigin });
+      res.writeHead(401, adminHeaders);
       res.end('{"error":"Unauthorized"}');
       return;
     }
@@ -690,14 +729,26 @@ const httpServer = http.createServer((req, res) => {
       try { session.ws.close(1001, 'Admin reset'); } catch { /* déjà fermée */ }
     }
     sessions.clear();
-    for (const entry of signalingRegistry.values()) clearTimeout(entry.ttlTimer);
+    // Code review P5 : defensive — un entry corrompu ne doit pas avorter le reset.
+    for (const entry of signalingRegistry.values()) {
+      try { if (entry?.ttlTimer) clearTimeout(entry.ttlTimer); } catch { /* ignore */ }
+    }
     signalingRegistry.clear();
     for (const entries of relayBuffer.values()) {
-      for (const e of entries) clearTimeout(e.ttlTimer);
+      if (!entries) continue;
+      for (const e of entries) {
+        try { if (e?.ttlTimer) clearTimeout(e.ttlTimer); } catch { /* ignore */ }
+      }
     }
     relayBuffer.clear();
-    logEvent('WARN', 'ADMIN', `Reset administrateur : ${disconnected} nœud(s) déconnecté(s)`, { disconnected });
-    sendJson(res, { ok: true, disconnected });
+    // Code review P11 : purger aussi les KPI pour eviter les compteurs fantomes post-reset.
+    for (const k of Object.keys(eventCounters)) {
+      if (k !== 'startedAt') eventCounters[k] = 0;
+    }
+    churnEvents.length = 0;
+    logEvent('WARN', 'ADMIN', `Reset administrateur : ${disconnected} nœud(s) déconnecté(s) ip=${remoteIp}`, { disconnected, ip: remoteIp });
+    res.writeHead(200, adminHeaders);
+    res.end(JSON.stringify({ ok: true, disconnected }));
     return;
   }
 

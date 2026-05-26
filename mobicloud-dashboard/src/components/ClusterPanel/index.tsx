@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ClusterInfo, ClustersData } from '../../hooks/useClusters';
 
 interface Props {
@@ -31,9 +31,10 @@ function storageBarColor(pct: number): string {
   return '#ff3b30';
 }
 
-function fmtAgo(ms: number): string {
+function fmtAgo(ms: number | undefined): string {
   if (!ms) return '—';
-  const s = Math.floor((Date.now() - ms) / 1000);
+  // Code review P9 : clamp negatif (horloge browser en avance sur le relay).
+  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
   if (s < 5) return 'now';
   if (s < 60) return `${s}s ago`;
   return `${Math.floor(s / 60)}m ago`;
@@ -41,11 +42,13 @@ function fmtAgo(ms: number): string {
 
 // ── Storage drill-down for one cluster ───────────────────────────────────────
 function ClusterDrillDown({ cluster }: { cluster: ClusterInfo }) {
-  const maxFreeBytes = Math.max(...cluster.members.map(m => m.freeBytes), 1);
+  // Code review P7 : guard contre members undefined (drift API).
+  const members = cluster.members ?? [];
+  const maxFreeBytes = Math.max(...members.map(m => m.freeBytes), 1);
   const totalFree = cluster.totalFreeBytes;
 
   // Sort: SP first, then by freeBytes desc
-  const sorted = [...cluster.members].sort((a, b) => {
+  const sorted = [...members].sort((a, b) => {
     if (a.isSuperPair !== b.isSuperPair) return a.isSuperPair ? -1 : 1;
     return b.freeBytes - a.freeBytes;
   });
@@ -210,6 +213,14 @@ function ClusterCard({ cluster, expanded, onToggle }: {
 // ── Main panel ────────────────────────────────────────────────────────────────
 export default function ClusterPanel({ data }: Props) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Code review P8 : si le cluster expanded disparait entre deux polls, clear l'expandedId
+  // pour eviter qu'un nouveau cluster reutilisant le meme id (ex. __no_cluster__) s'ouvre
+  // automatiquement sans clic utilisateur.
+  useEffect(() => {
+    if (expandedId && !data?.clusters.some(c => c.clusterId === expandedId)) {
+      setExpandedId(null);
+    }
+  }, [data, expandedId]);
   const churn = data?.churnRate ?? 0;
   const churnColor = churn >= 30 ? 'var(--accent-red)' : churn >= 15 ? 'var(--accent-orange)' : 'var(--accent-green)';
 

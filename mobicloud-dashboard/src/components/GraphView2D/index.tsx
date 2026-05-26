@@ -37,8 +37,10 @@ function fmtBytes(b: number) {
   return `${b} B`;
 }
 
-function fmtAgo(ms: number): string {
-  const s = Math.floor((Date.now() - ms) / 1000);
+function fmtAgo(ms: number | undefined): string {
+  // Code review P9/P12 : guard undefined (drift API backend) + clamp negatif (horloge browser).
+  if (!ms || !Number.isFinite(ms)) return '—';
+  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
   if (s < 5) return 'à l\'instant';
   if (s < 60) return `il y a ${s}s`;
   const m = Math.floor(s / 60);
@@ -173,6 +175,15 @@ export default function GraphView2D({ topology, error, theme }: Props) {
   const [selected, setSelected]       = useState<SelectedNode | null>(null);
   const [tooltipPos, setTooltipPos]   = useState({ x: 0, y: 0 });
   const [connectedCount, setConnectedCount] = useState(0);
+
+  // Code review P10 : clear le panel selectionne si le nœud disparait de la topologie
+  // (typique apres /admin/reset ou departure naturelle d'un peer).
+  useEffect(() => {
+    if (!selected || !topology) return;
+    if (!topology.nodes.some(n => n.id === selected.id)) {
+      setSelected(null);
+    }
+  }, [topology, selected]);
 
   // ── Mount: create Cytoscape instance ───────────────────────────────────────
   useEffect(() => {
