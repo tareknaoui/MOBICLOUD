@@ -536,7 +536,7 @@ function handleUpload(fromNodeId, payload, senderWs) {
     safeSend(destSession.ws, buildFrame(MSG.FORWARD, forwardPayload));
     eventCounters.forwardedBlocks++;
     logEvent('INFO', 'RELAY', `Bloc forwardé : ${blockId.slice(0, 16)}… → ${destNodeId.slice(0, 8)} (direct)`, { blockId: blockId.slice(0, 16), from: fromNodeId.slice(0, 8), to: destNodeId.slice(0, 8) });
-    emitSseEvent('block_transfer', { from: fromNodeId, to: destNodeId, blockId: blockId.slice(0, 16), bytes: data.length });
+    emitSseEvent('block_transfer', { from: fromNodeId, to: destNodeId, kind: 'block', blockId: blockId.slice(0, 16), bytes: data.length });
   } else {
     // Cap buffer RAM
     if (relayBuffer.size >= MAX_RELAY_BUFFER_ENTRIES) {
@@ -637,6 +637,7 @@ function handleSignal(fromNodeId, payload) {
     data.copy(out, 16);
     safeSend(destSession.ws, buildFrame(MSG.SIGNAL_RECEIVED, out));
     eventCounters.signalsSent++;
+    emitSseEvent('block_transfer', { from: fromNodeId, to: destNodeId, kind: 'signal', bytes: data.length });
   } else {
     eventCounters.droppedSignals++;
     logEvent('WARN', 'GOSSIP', `Signal Gossip droppé (dest absent) : ${fromNodeId.slice(0,8)} → ${destNodeId.slice(0,8)}`, { from: fromNodeId.slice(0,8), to: destNodeId.slice(0,8) });
@@ -661,6 +662,9 @@ function handleElectionBroadcast(fromNodeId, payload) {
   let clusterId = '';
   try { const p = JSON.parse(payload.toString('utf8')); msgType = p.type ?? '?'; clusterId = p.clusterId ?? ''; } catch { /* ignore */ }
   logEvent('INFO', 'ELECTION', `Bully broadcast type=${msgType} depuis ${fromNodeId.slice(0,8)} → ${forwarded} nœud(s)`, { from: fromNodeId.slice(0, 8), type: msgType, clusterId: clusterId.slice(0, 8), forwarded });
+  for (const [nodeId] of sessions.entries()) {
+    if (nodeId !== fromNodeId) emitSseEvent('block_transfer', { from: fromNodeId, to: nodeId, kind: 'election', bytes: payload.length });
+  }
 }
 
 // ─── Serveur HTTP + WebSocketServer ─────────────────────────────────────────

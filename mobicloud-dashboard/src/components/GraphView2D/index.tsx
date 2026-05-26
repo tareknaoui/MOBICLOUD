@@ -313,12 +313,15 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
     if (!fromNode.length || !toNode.length) return;
     const fromPos = fromNode.renderedPosition();
     const toPos   = toNode.renderedPosition();
-    const color   = (fromNode.data('color') as string) || '#60a5fa';
+    const color =
+      latestTransfer.kind === 'election' ? '#facc15' :   // jaune — Bully
+      latestTransfer.kind === 'signal'   ? '#22d3ee' :   // cyan  — Gossip
+      (fromNode.data('color') as string) || '#60a5fa';   // couleur cluster — bloc
     particlesRef.current.push({
       fromX: fromPos.x, fromY: fromPos.y,
       toX: toPos.x, toY: toPos.y,
       startTime: performance.now(),
-      duration: 1200,
+      duration: latestTransfer.kind === 'block' ? 1200 : 800,
       color,
     });
   }, [latestTransfer]);

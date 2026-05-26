@@ -45,7 +45,8 @@ export interface EventsData {
 export interface TransferEvent {
   from: string;
   to: string;
-  blockId: string;
+  kind: 'block' | 'signal' | 'election';
+  blockId?: string;
   bytes: number;
 }
 
