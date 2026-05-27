@@ -674,9 +674,20 @@ function handleSignal(fromNodeId, payload) {
 // signatureBytes base64, clusterId, timestampMs).
 // Forward à toutes les sessions connectées SAUF l'émetteur. Fire-and-forget.
 function handleElectionBroadcast(fromNodeId, payload) {
+  // Filtrer par clusterId : un broadcast Bully ne concerne que les nœuds du même cluster.
+  // Sans ce filtre, une élection dans le cluster A perturberait les nœuds du cluster B.
+  let senderClusterId = '';
+  try { senderClusterId = JSON.parse(payload.toString('utf8')).clusterId ?? ''; } catch { /* ignore */ }
+
   let forwarded = 0;
   for (const [nodeId, session] of sessions.entries()) {
     if (nodeId === fromNodeId) continue;
+    // Si le sender a un clusterId valide, ne forwarder qu'aux nœuds du même cluster.
+    // Legacy nodes (clusterId vide) reçoivent tous les broadcasts pour rétrocompatibilité.
+    if (senderClusterId) {
+      const peerEntry = signalingRegistry.get(nodeId);
+      if (peerEntry?.clusterId && peerEntry.clusterId !== senderClusterId) continue;
+    }
     if (session.ws.readyState === WebSocket.OPEN) {
       safeSend(session.ws, buildFrame(MSG.ELECTION_RECEIVED, payload));
       forwarded++;
@@ -979,7 +990,12 @@ wss.on('connection', (ws) => {
       }
       case MSG.REGISTER_PEER: {
         const ok = handleRegisterPeer(nodeId, frame.payload);
-        if (!ok) sendError(ws, 'REGISTER_PEER payload invalide');
+        if (!ok) {
+          sendError(ws, 'REGISTER_PEER rejeté');
+          // Envoyer la liste des pairs actifs immédiatement : le nœud rejeté
+          // découvre le vrai SP via processPeerList et sa FSM peut céder le rôle.
+          handleGetPeers(ws);
+        }
         break;
       }
       case MSG.JOIN: {
