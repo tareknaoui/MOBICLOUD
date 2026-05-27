@@ -1,6 +1,13 @@
 package com.mobicloud.presentation.explorer.components
 
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,10 +33,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -79,12 +88,34 @@ fun CatalogEntryCard(
         AvailabilityState.DEGRADE -> Triple("Degraded", Color(0xFFFF3B30), Color(0xFFFFEBEE))
     }
 
+    val animatedBadgeColor by animateColorAsState(
+        targetValue = badgeColor,
+        animationSpec = tween(400),
+        label = "badgeColor"
+    )
+    val animatedBadgeBg by animateColorAsState(
+        targetValue = badgeBg,
+        animationSpec = tween(400),
+        label = "badgeBg"
+    )
+
     val dateFormatter = remember { SimpleDateFormat("dd/MM • HH:mm", Locale.getDefault()) }
     val dateFormatted = dateFormatter.format(Date(entry.versionClock))
 
     val displayName = entry.originalFileName.ifBlank { "${entry.fileHash.take(10)}…" }
     val fileIcon = fileIconFor(entry.originalFileName)
     val sizeText = entry.originalFileSize.toReadableSize()
+
+    val downloadInteraction = remember { MutableInteractionSource() }
+    val isDownloadPressed by downloadInteraction.collectIsPressedAsState()
+    val downloadScale by animateFloatAsState(
+        targetValue = if (isDownloadPressed) 0.80f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
+        label = "downloadScale"
+    )
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -150,11 +181,11 @@ fun CatalogEntryCard(
 
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = badgeBg
+                color = animatedBadgeBg
             ) {
                 Text(
                     text = badgeText,
-                    color = badgeColor,
+                    color = animatedBadgeColor,
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Medium,
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
@@ -165,13 +196,19 @@ fun CatalogEntryCard(
                 Spacer(modifier = Modifier.width(0.dp))
                 IconButton(
                     onClick = { onDownload(entry.fileHash) },
+                    interactionSource = downloadInteraction,
                     modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Download,
                         contentDescription = "Download",
                         tint = Color(0xFF0A84FF),
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier
+                            .size(20.dp)
+                            .graphicsLayer {
+                                scaleX = downloadScale
+                                scaleY = downloadScale
+                            }
                     )
                 }
             }

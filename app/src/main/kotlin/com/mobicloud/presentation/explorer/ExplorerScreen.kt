@@ -5,6 +5,13 @@ import android.content.Intent
 import android.webkit.MimeTypeMap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,8 +49,10 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -168,6 +177,15 @@ fun ExplorerScreen(
         uri?.let { viewModel.storeFile(it) }
     }
 
+    // Capture last non-null progress states so exit animations can still display them
+    val inProgressState = storeState as? StoreState.InProgress
+    var capturedUpload by remember { mutableStateOf(inProgressState) }
+    if (inProgressState != null) capturedUpload = inProgressState
+
+    val inProgressDownload = downloadState.takeIf { it is DownloadState.Downloading || it is DownloadState.Decrypting }
+    var capturedDownload by remember { mutableStateOf(inProgressDownload) }
+    if (inProgressDownload != null) capturedDownload = inProgressDownload
+
     Scaffold(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -211,17 +229,27 @@ fun ExplorerScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            val inProgressState = storeState as? StoreState.InProgress
-            if (inProgressState != null) {
-                ErasureProgressIndicator(
-                    state = inProgressState,
-                    onCancel = { viewModel.cancelUpload() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
+            AnimatedVisibility(
+                visible = inProgressState != null,
+                enter = fadeIn(tween(300)) + expandVertically(tween(300)),
+                exit = fadeOut(tween(200)) + shrinkVertically(tween(200))
+            ) {
+                capturedUpload?.let { state ->
+                    ErasureProgressIndicator(
+                        state = state,
+                        onCancel = { viewModel.cancelUpload() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
             }
-            if (storeState is StoreState.Cancelled) {
+
+            AnimatedVisibility(
+                visible = storeState is StoreState.Cancelled,
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(200))
+            ) {
                 Text(
                     text = "Upload cancelled",
                     style = MaterialTheme.typography.labelMedium,
@@ -230,17 +258,20 @@ fun ExplorerScreen(
                 )
             }
 
-            val inProgressDownloadState = downloadState.takeIf {
-                it is DownloadState.Downloading || it is DownloadState.Decrypting
-            }
-            if (inProgressDownloadState != null) {
-                DownloadProgressIndicator(
-                    state = inProgressDownloadState,
-                    onCancel = { viewModel.resetDownloadState() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                )
+            AnimatedVisibility(
+                visible = inProgressDownload != null,
+                enter = fadeIn(tween(300)) + expandVertically(tween(300)),
+                exit = fadeOut(tween(200)) + shrinkVertically(tween(200))
+            ) {
+                capturedDownload?.let { state ->
+                    DownloadProgressIndicator(
+                        state = state,
+                        onCancel = { viewModel.resetDownloadState() },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                }
             }
 
             PullToRefreshBox(
@@ -248,74 +279,80 @@ fun ExplorerScreen(
                 onRefresh = { viewModel.refreshCatalog() },
                 modifier = Modifier.fillMaxSize()
             ) {
-                if (entries.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.FolderOpen,
-                                contentDescription = null,
-                                tint = Color(0xFFC7C7CC),
-                                modifier = Modifier.size(72.dp)
-                            )
-                            Text(
-                                text = "No shared files",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = Color(0xFF8E8E93)
-                            )
-                            Text(
-                                text = "Tap the + button to get started",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF8E8E93),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(horizontal = 32.dp)
-                            )
-                        }
-                    }
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        items(entries, key = { it.fileHash }) { entry ->
-                            val dismissState = rememberSwipeToDismissBoxState(
-                                confirmValueChange = { value ->
-                                    if (value == SwipeToDismissBoxValue.EndToStart) {
-                                        viewModel.moveToTrash(entry.fileHash)
-                                        true
-                                    } else false
-                                }
-                            )
-                            SwipeToDismissBox(
-                                state = dismissState,
-                                enableDismissFromStartToEnd = false,
-                                backgroundContent = {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxSize()
-                                            .background(Color(0xFFFF3B30))
-                                            .padding(end = 20.dp),
-                                        contentAlignment = Alignment.CenterEnd
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Delete",
-                                            tint = Color.White
-                                        )
-                                    }
-                                }
+                AnimatedContent(
+                    targetState = entries.isEmpty(),
+                    label = "emptyVsList"
+                ) { isEmpty ->
+                    if (isEmpty) {
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                CatalogEntryCard(
-                                    entry = entry,
-                                    onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
+                                Icon(
+                                    imageVector = Icons.Default.FolderOpen,
+                                    contentDescription = null,
+                                    tint = Color(0xFFC7C7CC),
+                                    modifier = Modifier.size(72.dp)
+                                )
+                                Text(
+                                    text = "No shared files",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color(0xFF8E8E93)
+                                )
+                                Text(
+                                    text = "Tap the + button to get started",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = Color(0xFF8E8E93),
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(horizontal = 32.dp)
                                 )
                             }
                         }
-                        item { Spacer(modifier = Modifier.height(80.dp)) }
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            items(entries, key = { it.fileHash }) { entry ->
+                                val dismissState = rememberSwipeToDismissBoxState(
+                                    confirmValueChange = { value ->
+                                        if (value == SwipeToDismissBoxValue.EndToStart) {
+                                            viewModel.moveToTrash(entry.fileHash)
+                                            true
+                                        } else false
+                                    }
+                                )
+                                SwipeToDismissBox(
+                                    state = dismissState,
+                                    enableDismissFromStartToEnd = false,
+                                    modifier = Modifier.animateItem(fadeInSpec = tween(300), fadeOutSpec = tween(200)),
+                                    backgroundContent = {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .background(Color(0xFFFF3B30))
+                                                .padding(end = 20.dp),
+                                            contentAlignment = Alignment.CenterEnd
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Delete",
+                                                tint = Color.White
+                                            )
+                                        }
+                                    }
+                                ) {
+                                    CatalogEntryCard(
+                                        entry = entry,
+                                        onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
+                                    )
+                                }
+                            }
+                            item { Spacer(modifier = Modifier.height(80.dp)) }
+                        }
                     }
                 }
             }
