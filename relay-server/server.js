@@ -34,13 +34,13 @@ const MSG = {
 // Story 12.1 — MIRROR: app/.../ClusterConstants.kt#MAX_CLUSTER_SIZE
 const MAX_CLUSTER_SIZE_SERVER = 2;
 
-const TTL_MS = 60_000;               // TTL registre signaling + buffer relay
+const TTL_MS = 180_000;              // TTL registre signaling — 3 min pour survivre aux pauses Doze Android (~90s)
 const AUTH_WINDOW_MS = 30_000;       // fenêtre anti-replay auth
 const AUTH_TIMEOUT_MS = 10_000;      // délai max pour envoyer AUTH après connexion
 const MAX_BLOCK_SIZE = 1_100_000;    // 1.1 MB — marge sur fragments MobiCloud ~1 MB
 const MAX_RELAY_BUFFER_ENTRIES = 500; // cap total des blocs en attente en RAM
 const MAX_SIGNALING_PEERS = 100;      // cap total des Super-Pairs enregistrés
-const HEARTBEAT_INTERVAL_MS = 30_000; // ping ws protocol-level — détecte les sockets zombies (réseau coupé sans close)
+const HEARTBEAT_INTERVAL_MS = 60_000; // ping ws protocol-level — 60s pour tolérer les pauses réseau Doze (kill après 2 cycles = 120s sans pong)
 
 // Regex IP : IPv4 ou IPv6 compacte — pas de hostname
 const IP_RE = /^[\d.:a-fA-F]{2,45}$/;
@@ -346,7 +346,7 @@ function handleRegisterPeer(nodeId, payload) {
     signalingRegistry.delete(nodeId);
     recordChurn(nodeId);
     eventCounters.departures++;
-    logEvent('WARN', 'DEPART', `Nœud TTL expiré (60s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
+    logEvent('WARN', 'DEPART', `Nœud TTL expiré (${TTL_MS / 1000}s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
   }, TTL_MS);
 
   // Story stabilite — preserve pubKeyB64 pour que GET_PEERS reste fonctionnel meme
@@ -406,7 +406,7 @@ function handleJoin(nodeId, payload) {
     signalingRegistry.delete(nodeId);
     recordChurn(nodeId);
     eventCounters.departures++;
-    logEvent('WARN', 'DEPART', `Nœud TTL expiré (60s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
+    logEvent('WARN', 'DEPART', `Nœud TTL expiré (${TTL_MS / 1000}s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
   }, TTL_MS);
 
   const wasSuperPair = existing?.isSuperPair ?? false;
@@ -911,9 +911,10 @@ const wss = new WebSocketServer({ server: httpServer, maxPayload: MAX_BLOCK_SIZE
 
 wss.on('connection', (ws) => {
   // Heartbeat protocol-level : détecte les sockets zombies (réseau coupé sans close TCP).
-  // Si pas de pong dans la fenêtre du heartbeat suivant, ws.terminate() force la fermeture.
-  ws.isAlive = true;
-  ws.on('pong', () => { ws.isAlive = true; });
+  // missedPings : kill après 2 cycles consécutifs sans pong (tolérance Doze Android ~90s).
+  // Un seul cycle manqué peut être un pic réseau 4G ou un réveil tardif de Doze.
+  ws.missedPings = 0;
+  ws.on('pong', () => { ws.missedPings = 0; });
 
   // État de la connexion — non authentifié jusqu'au premier message AUTH
   let authState = null; // null = non auth ; après AUTH_OK = { nodeId, publicKey }
@@ -1073,11 +1074,12 @@ function startServer() {
   // répondu au précédent ping (zombies). Le 'close' handler nettoiera sessions/registry.
   const heartbeat = setInterval(() => {
     for (const ws of wss.clients) {
-      if (ws.isAlive === false) {
+      ws.missedPings = (ws.missedPings ?? 0) + 1;
+      if (ws.missedPings > 2) {
+        // 2 cycles consécutifs sans pong (2 × 60s = 120s) → socket zombie
         ws.terminate();
         continue;
       }
-      ws.isAlive = false;
       try { ws.ping(); } catch { /* ws en cours de fermeture */ }
     }
   }, HEARTBEAT_INTERVAL_MS);
