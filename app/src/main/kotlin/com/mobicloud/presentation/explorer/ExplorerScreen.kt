@@ -12,7 +12,9 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -189,14 +193,14 @@ fun ExplorerScreen(
     Scaffold(
         modifier = modifier,
         snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = Color(0xFFF0F2F5),
+        containerColor = Color(0xFFF4F6F8), // Clean cool slate gray/off-white background
         topBar = {
             TopAppBar(
                 title = {
                     Text(
                         text = "My files",
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.SemiBold,
+                        fontWeight = FontWeight.Bold,
                         color = Color(0xFF1C1C1E)
                     )
                 },
@@ -210,7 +214,7 @@ fun ExplorerScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFFFBF6F1)
+                    containerColor = Color.White // Sleek white top bar
                 )
             )
         },
@@ -218,7 +222,8 @@ fun ExplorerScreen(
             FloatingActionButton(
                 onClick = { storeLauncher.launch("*/*") },
                 containerColor = Color(0xFF0A84FF),
-                contentColor = Color.White
+                contentColor = Color.White,
+                shape = RoundedCornerShape(16.dp) // Premium rounded corner FAB instead of generic pill
             ) {
                 Icon(Icons.Default.CloudUpload, contentDescription = "Store a file")
             }
@@ -287,27 +292,39 @@ fun ExplorerScreen(
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                                verticalArrangement = Arrangement.spacedBy(16.dp),
+                                modifier = Modifier.padding(horizontal = 32.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.FolderOpen,
-                                    contentDescription = null,
-                                    tint = Color(0xFFC7C7CC),
-                                    modifier = Modifier.size(72.dp)
-                                )
-                                Text(
-                                    text = "No shared files",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Medium,
-                                    color = Color(0xFF8E8E93)
-                                )
-                                Text(
-                                    text = "Tap the + button to get started",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Color(0xFF8E8E93),
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 32.dp)
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(80.dp)
+                                        .background(Color(0xFFE8ECEF), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.FolderOpen,
+                                        contentDescription = null,
+                                        tint = Color(0xFF90A4AE),
+                                        modifier = Modifier.size(36.dp)
+                                    )
+                                }
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "No shared files",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1C1C1E)
+                                    )
+                                    Text(
+                                        text = "Tap the cloud icon in the bottom right to upload and secure your first file.",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFF757575),
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
                         }
                     } else {
@@ -333,14 +350,19 @@ fun ExplorerScreen(
                                         Box(
                                             modifier = Modifier
                                                 .fillMaxSize()
-                                                .background(Color(0xFFFF3B30))
+                                                .background(
+                                                    color = Color(0xFFFFEBEE), // Soft premium rose background
+                                                    shape = RoundedCornerShape(16.dp)
+                                                )
+                                                .border(1.dp, Color(0xFFFFCDD2), RoundedCornerShape(16.dp))
                                                 .padding(end = 20.dp),
                                             contentAlignment = Alignment.CenterEnd
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
                                                 contentDescription = "Delete",
-                                                tint = Color.White
+                                                tint = Color(0xFFFF3B30),
+                                                modifier = Modifier.size(24.dp)
                                             )
                                         }
                                     }
