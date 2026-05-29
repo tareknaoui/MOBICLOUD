@@ -51,6 +51,7 @@ export interface TransferEvent {
 }
 
 export function subscribeToTransfers(onEvent: (e: TransferEvent) => void): () => void {
+  // Use the proxied BASE URL so that the request is same-origin to avoid CORS and browser tracking protection blocks.
   const es = new EventSource(`${BASE}/dashboard/events`);
   es.onmessage = (e) => {
     try {

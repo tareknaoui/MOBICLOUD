@@ -10,6 +10,9 @@ export default defineConfig({
         target: 'https://mobicloud-relay-3.onrender.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/relay/, ''),
+        headers: {
+          Connection: 'keep-alive',
+        },
       },
     },
   },
