@@ -12,6 +12,7 @@ import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
+import com.mobicloud.domain.repository.SignalingRepository
 import com.mobicloud.domain.repository.WifiNetworkRepository
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.LocalRepairBuffer
 import io.mockk.coEvery
@@ -47,6 +48,7 @@ class WifiClusterGuardTest {
     private lateinit var networkEventRepository: NetworkEventRepository
     private lateinit var nodeSettingsRepository: NodeSettingsRepository
     private lateinit var wifiNetworkRepository: WifiNetworkRepository
+    private lateinit var signalingRepository: SignalingRepository
 
     private val localNodeId = "local-node-AAA"
     private val localIdentity = NodeIdentity(localNodeId, ByteArray(65))
@@ -67,6 +69,7 @@ class WifiClusterGuardTest {
         networkEventRepository = mockk()
         nodeSettingsRepository = mockk()
         wifiNetworkRepository = mockk()
+        signalingRepository = mockk()
 
         coEvery { securityRepository.getIdentity() } returns Result.success(localIdentity)
         coEvery { trustScoreProvider.getTrustScore(any()) } returns 0
@@ -78,6 +81,7 @@ class WifiClusterGuardTest {
         coEvery {
             peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any())
         } returns Result.success(Unit)
+        coEvery { signalingRepository.fetchActiveSuperPeers() } returns Result.success(Unit)
     }
 
     private fun buildUseCase() = ProcessIncomingElectionEventUseCase(
@@ -89,7 +93,8 @@ class WifiClusterGuardTest {
         localRepairBuffer = localRepairBuffer,
         networkEventRepository = networkEventRepository,
         nodeSettingsRepository = nodeSettingsRepository,
-        wifiNetworkRepository = wifiNetworkRepository
+        wifiNetworkRepository = wifiNetworkRepository,
+        signalingRepository = signalingRepository
     )
 
     private fun superPeer() = Peer(

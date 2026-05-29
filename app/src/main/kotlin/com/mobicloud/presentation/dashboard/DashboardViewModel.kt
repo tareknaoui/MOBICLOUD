@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import com.mobicloud.domain.models.m11_join.toHexString
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Named
@@ -78,9 +79,15 @@ class DashboardViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
 
     // KPI "Communauté" — total membres du cluster (self inclus, cohérent avec l'onglet Communauté)
-    val communitySize: StateFlow<Int> = memberSnapshotCacheUseCase.inMemory
-        .map { members -> members.size }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
+    // S11/H11 : aligné sur la logique de NetworkViewModel.kt. Si l'appareil local n'est pas encore
+    // inscrit dans inMemory (par exemple en cours d'admission ou de reconnexion), on l'ajoute au décompte.
+    val communitySize: StateFlow<Int> = combine(
+        memberSnapshotCacheUseCase.inMemory,
+        localNodeIdFlow
+    ) { members, localNodeId ->
+        val hasSelf = localNodeId != null && members.any { it.nodeId.toHexString().lowercase() == localNodeId.lowercase() }
+        if (hasSelf || localNodeId == null) members.size else members.size + 1
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), 0)
 
     // KPI sémantique "Ma contribution" — quota partagé persisté en NodeSettings
     val allocatedStorageBytes: StateFlow<Long> = nodeSettingsRepository.observeSettings()

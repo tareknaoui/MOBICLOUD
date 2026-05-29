@@ -473,12 +473,20 @@ class MobicloudP2PService : Service() {
                             val now = System.currentTimeMillis()
                             // 1) Membre : reset le timer SP_TIMEOUT
                             runCatching { memberHeartbeatUseCase.markSpSeen() }
-                            // 2) SP : touch lastSeen de tous les membres actifs du cluster
+                            // 2) SP : touch lastSeen de tous les membres actifs du cluster (uniquement si nous sommes Super-Pair)
+                            // H11/S11 : au lieu d'utiliser 'now' (ce qui maintiendrait des nœuds morts comme C actifs pendant 90s),
+                            // on utilise une fenêtre de grâce réduite à 45s (now - SP_TIMEOUT_MS/2). Ainsi, s'ils sont réellement
+                            // éteints, ils seront évincés sous 45s, tout en laissant 45s aux nœuds actifs (intervalle HB = 30s) pour
+                            // envoyer leur preuve de vie.
                             runCatching {
-                                val clusterId = nodeSettingsRepository.getClusterIdOnce()
-                                if (clusterId.isNotBlank()) {
-                                    memberDao.listActiveSnapshot(clusterId).forEach { m ->
-                                        memberDao.touchHeartbeat(m.nodeId, now, m.freeBytes, m.ipAddress, m.port)
+                                val isSP = joinStateMachine.currentState.value is NodeJoinState.SuperPair
+                                if (isSP) {
+                                    val clusterId = nodeSettingsRepository.getClusterIdOnce()
+                                    if (clusterId.isNotBlank()) {
+                                        val graceLastSeen = now - (com.mobicloud.domain.models.m11_join.SP_TIMEOUT_MS / 2L)
+                                        memberDao.listActiveSnapshot(clusterId).forEach { m ->
+                                            memberDao.touchHeartbeat(m.nodeId, graceLastSeen, m.freeBytes, m.ipAddress, m.port)
+                                        }
                                     }
                                 }
                             }

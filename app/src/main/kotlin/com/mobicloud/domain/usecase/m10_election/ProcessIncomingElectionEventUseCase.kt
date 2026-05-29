@@ -21,6 +21,8 @@ import com.mobicloud.domain.usecase.m06_m07_repair_migration.LocalRepairBuffer
 import com.mobicloud.domain.usecase.m11_join.JoinStateMachine
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.first
+import com.mobicloud.domain.repository.SignalingRepository
 import javax.inject.Inject
 
 /**
@@ -42,6 +44,7 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
     private val networkEventRepository: NetworkEventRepository,
     private val nodeSettingsRepository: NodeSettingsRepository,
     private val wifiNetworkRepository: WifiNetworkRepository,
+    private val signalingRepository: SignalingRepository,
     private val joinStateMachine: JoinStateMachine? = null
 ) {
     operator fun invoke(): Flow<Result<ElectionEvent>> {
@@ -199,11 +202,33 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
     }
 
     private suspend fun verifyPayloadSignature(payload: ElectionPayload): Result<Unit> {
-        val senderPeer = peerRepository.peers.value
+        var senderPeer = peerRepository.peers.value
             .find { it.identity.nodeId == payload.senderNodeId }
-            ?: return Result.failure(
-                Exception("Bully ${payload.type.name} from unknown peer '${payload.senderNodeId}' -- ignored.")
-            )
+
+        if (senderPeer == null) {
+            // S11 (stabilité critique) : si le message provient d'un pair inconnu, on déclenche un
+            // fetch réactif via le relais HA pour tenter de charger sa clé publique en base de données locale.
+            runCatching { signalingRepository.fetchActiveSuperPeers() }
+            try {
+                kotlinx.coroutines.withTimeout(3000L) {
+                    peerRepository.peers.first { list ->
+                        val found = list.find { it.identity.nodeId == payload.senderNodeId }
+                        if (found != null) {
+                            senderPeer = found
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // Le timeout a expiré ou une erreur est survenue, on ignore et poursuit avec le statut null
+            }
+        }
+
+        val actualPeer = senderPeer ?: return Result.failure(
+            Exception("Bully ${payload.type.name} from unknown peer '${payload.senderNodeId}' -- ignored.")
+        )
 
         val dataToVerify = electionSignedBytes(
             type = payload.type,
@@ -216,7 +241,7 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
         val isValid = securityRepository.verifySignature(
             data = dataToVerify,
             signature = payload.signatureBytes,
-            publicKey = senderPeer.identity.publicKeyBytes
+            publicKey = actualPeer.identity.publicKeyBytes
         ).getOrElse { error ->
             return Result.failure(
                 Exception("Signature verification failed for ${payload.type.name} from '${payload.senderNodeId}'", error)
