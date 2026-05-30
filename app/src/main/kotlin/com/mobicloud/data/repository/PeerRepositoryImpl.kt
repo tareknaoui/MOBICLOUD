@@ -33,7 +33,8 @@ class PeerRepositoryImpl @Inject constructor(
         ipAddress: String?,
         port: Int?,
         isSuperPair: Boolean,
-        freeStorageBytes: Long
+        freeStorageBytes: Long,
+        displayName: String?
     ): Result<Unit> = runCatching {
         peerDao.insertOrUpdatePreservingRole(
             nodeId = identity.nodeId,
@@ -44,7 +45,8 @@ class PeerRepositoryImpl @Inject constructor(
             timestampMs = timestampMs,
             source = source.name,
             isSuperPair = if (isSuperPair) 1 else 0,
-            freeStorageBytes = freeStorageBytes
+            freeStorageBytes = freeStorageBytes,
+            displayName = displayName
         )
     }
 

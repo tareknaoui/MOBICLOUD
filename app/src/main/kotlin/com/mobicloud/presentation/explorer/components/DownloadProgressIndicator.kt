@@ -59,8 +59,9 @@ fun DownloadProgressIndicator(
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     when (animatedState) {
                         is DownloadState.Locating -> {
+                            val label = if (animatedState.isPreview) "Preview: Searching for file…" else "Searching for file…"
                             Text(
-                                text = "Searching for file…",
+                                text = label,
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                                 color = Color(0xFF1C1C1E)
@@ -78,8 +79,9 @@ fun DownloadProgressIndicator(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val label = if (animatedState.isPreview) "Previewing" else "Downloading"
                                 Text(
-                                    text = "Downloading",
+                                    text = label,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = Color(0xFF1C1C1E)
@@ -163,8 +165,9 @@ fun DownloadProgressIndicator(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
+                                val label = if (animatedState.isPreview) "Preview: Decrypting" else "Decrypting"
                                 Text(
-                                    text = "Decrypting",
+                                    text = label,
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontWeight = FontWeight.Medium,
                                     color = Color(0xFF1C1C1E)

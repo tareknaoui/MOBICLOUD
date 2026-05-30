@@ -10,7 +10,8 @@ data class ClusterNodeInfo(
     val reliabilityScore: Float,
     val nodeStatus: ClusterNodeStatus,
     val channel: String,
-    val lastSeenMs: Long
+    val lastSeenMs: Long,
+    val displayName: String? = null
 )
 
 data class ClusterTopologyState(

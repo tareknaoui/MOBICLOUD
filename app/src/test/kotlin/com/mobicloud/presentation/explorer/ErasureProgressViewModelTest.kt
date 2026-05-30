@@ -32,6 +32,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -105,6 +106,7 @@ class ErasureProgressViewModelTest {
         every { defaultCursor.close() } returns Unit
 
         every { catalogRepository.getActiveEntriesFlow() } returns catalogFlow
+        every { catalogRepository.getActiveFolderNamesFlow() } returns flowOf(emptyList())
         every { context.contentResolver } returns contentResolver
         every { context.cacheDir } returns File(System.getProperty("java.io.tmpdir") ?: "/tmp")
         every { contentResolver.query(any(), any(), any(), any(), any()) } returns defaultCursor

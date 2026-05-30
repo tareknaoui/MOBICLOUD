@@ -78,4 +78,18 @@ interface CatalogRepository {
 
     /** Supprime les entrées dont deletedAt < (now - 30 jours). */
     suspend fun purgeExpired(): Result<Unit>
+
+    // Story 13.5 — organisation en dossiers (local uniquement)
+
+    /** Déplace un fichier vers un dossier (null = racine). */
+    suspend fun moveFileToFolder(fileHash: String, folderPath: String?): Result<Unit>
+
+    /** Observe la liste des noms de dossiers actifs (non vides, non corbeille). */
+    fun getActiveFolderNamesFlow(): Flow<List<String>>
+
+    /** Renomme un dossier (tous ses fichiers reçoivent le nouveau nom). */
+    suspend fun renameFolder(oldPath: String, newPath: String): Result<Unit>
+
+    /** Supprime un dossier : déplace tous ses fichiers vers la racine. */
+    suspend fun deleteFolder(folderPath: String): Result<Unit>
 }

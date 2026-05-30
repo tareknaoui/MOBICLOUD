@@ -39,5 +39,9 @@ data class CatalogEntryEntity(
     val isInTrash: Boolean = false,
 
     @ColumnInfo(name = "deleted_at", defaultValue = "NULL")
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+
+    // Story 13.5 — dossier local (non distribué dans le DHT/Gossip)
+    @ColumnInfo(name = "folder_path", defaultValue = "NULL")
+    val folderPath: String? = null
 )

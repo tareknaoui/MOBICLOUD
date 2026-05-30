@@ -184,7 +184,8 @@ class NetworkViewModel @Inject constructor(
             reliabilityScore = identity.reliabilityScore,
             nodeStatus = status,
             channel = channel,
-            lastSeenMs = lastSeenTimestampMs
+            lastSeenMs = lastSeenTimestampMs,
+            displayName = displayName
         )
     }
 }

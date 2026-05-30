@@ -8,6 +8,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -28,6 +29,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -124,7 +126,9 @@ private fun Long.toReadableSize(): String = when {
 fun CatalogEntryCard(
     entry: CatalogEntry,
     modifier: Modifier = Modifier,
-    onDownload: ((String) -> Unit)? = null
+    onDownload: ((String) -> Unit)? = null,
+    onPreview: ((String) -> Unit)? = null,
+    onLongClick: (() -> Unit)? = null
 ) {
     val availability = entry.availabilityState()
     val badgeStyle = badgeStyleFor(availability)
@@ -164,7 +168,9 @@ fun CatalogEntryCard(
     )
 
     Card(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .then(if (onLongClick != null) Modifier.combinedClickable(onClick = {}, onLongClick = onLongClick) else Modifier),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, Color(0xFFF1F1F5)), // Sleek subtle border
         colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -248,6 +254,23 @@ fun CatalogEntryCard(
                         color = animatedBadgeColor,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            if (onPreview != null && availability != AvailabilityState.DEGRADE) {
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(
+                    onClick = { onPreview(entry.fileHash) },
+                    modifier = Modifier
+                        .size(36.dp)
+                        .background(Color(0xFFE8F1FF), CircleShape) // Sleek blue circular container for preview
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Visibility,
+                        contentDescription = "Preview",
+                        tint = Color(0xFF0A84FF),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }

@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>MobiCloud - Chapitre 5 : Réalisation et Implémentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
+  <style>
+    :root {
+      --primary: #0f172a;
+      --primary-light: #1e293b;
+      --accent: #4f46e5;
+      --accent-light: #e0e7ff;
+      --text: #334155;
+      --text-light: #64748b;
+      --bg: #ffffff;
+      --border: #e2e8f0;
+      
+      --note-color: #2563eb;
+      --note-bg: #eff6ff;
+      --tip-color: #16a34a;
+      --tip-bg: #f0fdf4;
+      --warning-color: #d97706;
+      --warning-bg: #fef3c7;
+      --danger-color: #dc2626;
+      --danger-bg: #fef2f2;
+    }
+
+    @media print {
+      body {
+        background-color: #ffffff;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      .page-break {
+        page-break-before: always;
+        break-before: page;
+      }
+    }
+
+    body {
+      font-family: 'Lora', Georgia, serif;
+      color: var(--text);
+      line-height: 1.7;
+      font-size: 11pt;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg);
+    }
+
+    /* Print page setup */
+    @page {
+      size: A4;
+      margin: 25mm 20mm 25mm 20mm;
+    }
+
+    /* Content styling */
+    .content {
+      padding: 0 10px;
+    }
+
+    /* Headings */
+    h1, h2, h3, h4, h5, h6 {
+      font-family: 'Outfit', 'Inter', sans-serif;
+      color: var(--primary);
+      font-weight: 700;
+      line-height: 1.25;
+      margin-top: 1.8em;
+      margin-bottom: 0.6em;
+      page-break-after: avoid;
+      break-after: avoid;
+    }
+
+    h1 {
+      font-size: 24pt;
+      border-bottom: 2.5px solid var(--accent);
+      padding-bottom: 0.3em;
+      margin-top: 0;
+    }
+
+    h2 {
+      font-size: 16pt;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.2em;
+      margin-top: 2em;
+      page-break-before: always;
+      break-before: page;
+    }
+
+    h3 {
+      font-size: 13pt;
+      color: var(--primary-light);
+      margin-top: 1.5em;
+    }
+
+    h4 {
+      font-size: 11.5pt;
+      color: var(--text);
+      font-weight: 600;
+    }
+
+    p {
+      margin-top: 0;
+      margin-bottom: 1.2em;
+      text-align: justify;
+    }
+
+    strong {
+      color: var(--primary);
+      font-weight: 600;
+      font-family: 'Inter', sans-serif;
+    }
+
+    /* Title Page */
+    .title-page {
+      page-break-after: always;
+      break-after: page;
+      height: 90vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-sizing: border-box;
+      padding: 40mm 15mm 20mm 15mm;
+    }
+
+    .title-header {
+      border-left: 6px solid var(--accent);
+      padding-left: 30px;
+      margin-top: 10vh;
+    }
+
+    .title-project {
+      font-family: 'Outfit', sans-serif;
+      font-size: 16pt;
+      font-weight: 800;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      margin-bottom: 15px;
+    }
+
+    .title-main {
+      font-family: 'Outfit', sans-serif;
+      font-size: 34pt;
+      font-weight: 800;
+      color: var(--primary);
+      line-height: 1.2;
+      margin: 0 0 20px 0;
+      border: none;
+      padding: 0;
+    }
+
+    .title-subtitle {
+      font-family: 'Inter', sans-serif;
+      font-size: 16pt;
+      color: var(--text-light);
+      font-weight: 300;
+      margin: 0;
+    }
+
+    .title-footer {
+      font-family: 'Inter', sans-serif;
+      border-top: 1px solid var(--border);
+      padding-top: 25px;
+      margin-top: auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+    }
+
+    .title-meta-item {
+      font-size: 8.5pt;
+      font-weight: 600;
+      color: var(--text-light);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .title-meta-value {
+      font-size: 12pt;
+      font-weight: 600;
+      color: var(--primary);
+      margin-top: 5px;
+    }
+
+    /* Code Blocks */
+    pre {
+      background-color: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 14px 18px;
+      overflow-x: auto;
+      margin: 1.5em 0;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    code {
+      font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+      font-size: 9pt;
+      background-color: #f1f5f9;
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: #0f172a;
+    }
+
+    pre code {
+      background-color: transparent;
+      padding: 0;
+      border-radius: 0;
+      color: inherit;
+      display: block;
+      line-height: 1.6;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 2em 0;
+      font-family: 'Inter', sans-serif;
+      font-size: 9.5pt;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    th {
+      background-color: #f8fafc;
+      color: var(--primary);
+      font-weight: 600;
+      border-bottom: 2px solid var(--border);
+      text-transform: uppercase;
+      font-size: 8pt;
+      letter-spacing: 0.06em;
+    }
+
+    tr:nth-child(even) td {
+      background-color: #f8fafc;
+    }
+
+    /* Callouts (GitHub alerts) */
+    blockquote {
+      margin: 1.8em 0;
+      padding: 16px 22px;
+      border-radius: 0 8px 8px 0;
+      font-family: 'Inter', sans-serif;
+      font-size: 10pt;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    blockquote p {
+      margin: 0;
+      text-align: left;
+      line-height: 1.6;
+    }
+
+    .callout-note {
+      border-left: 4px solid var(--note-color);
+      background-color: var(--note-bg);
+      color: #1e3a8a;
+    }
+    
+    .callout-tip {
+      border-left: 4px solid var(--tip-color);
+      background-color: var(--tip-bg);
+      color: #064e3b;
+    }
+
+    .callout-warning {
+      border-left: 4px solid var(--warning-color);
+      background-color: var(--warning-bg);
+      color: #78350f;
+    }
+
+    .callout-important {
+      border-left: 4px solid var(--danger-color);
+      background-color: var(--danger-bg);
+      color: #7f1d1d;
+    }
+
+    .callout-caution {
+      border-left: 4px solid var(--danger-color);
+      background-color: var(--danger-bg);
+      color: #7f1d1d;
+    }
+
+    .callout-title {
+      font-weight: 700;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      font-size: 8.5pt;
+      letter-spacing: 0.06em;
+    }
+
+    /* Lists */
+    ul, ol {
+      margin-top: 0;
+      margin-bottom: 1.2em;
+      padding-left: 24px;
+    }
+
+    li {
+      margin-bottom: 0.5em;
+    }
+
+    li p {
+      margin-bottom: 0;
+    }
+
+    /* Horizontal lines */
+    hr {
+      border: 0;
+      height: 1px;
+      background: var(--border);
+      margin: 2.5em 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PAGE DE GARDE -->
+  <div class="title-page">
+    <div class="title-header">
+      <div class="title-project">Projet de Fin d'Études — MOBICLOUD</div>
+      <h1 class="title-main">Chapitre 5 — Réalisation et Implémentation</h1>
+      <p class="title-subtitle">Rapport d'implémentation et de validation technique</p>
+    </div>
+    
+    <div class="title-footer">
+      <div>
+        <div class="title-meta-item">PRÉPARÉ PAR</div>
+        <div class="title-meta-value">Tarek Naoui</div>
+      </div>
+      <div style="text-align: right;">
+        <div class="title-meta-item">DATE</div>
+        <div class="title-meta-value">Mai 2026</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENU PRINCIPAL -->
+  <div class="content">
+    <h1>Chapter 5 — Implementation &amp; Realization</h1>
+<hr>
+<h2>5.1 Introduction</h2>
+<p>[To be written]</p>
+<hr>
+<h2>5.2 Development Environment</h2>
+<h3>5.2.1 Hardware Configuration</h3>
+<p><strong>Test Cluster — Android Devices</strong></p>
+<p>The validation of the system required a physical cluster of mobile devices to simulate real distributed storage conditions. Tests were conducted on clusters of three to five physical Android devices, depending on the scenario, in order to validate the minimum reconstruction quorum of $K = 3$ data fragments under various failure conditions. Additional nodes were simulated using Android emulators running API level 33 to extend the cluster size without requiring additional physical hardware.</p>
+<p>The physical devices used included models from the Google Pixel 6/7 and Samsung Galaxy S21 families, representing a range of hardware capabilities typical of mid-to-high-end Android smartphones. The minimum hardware profile across all test devices was 6 GB of RAM, Android 12 (API level 31), and at least 100 MB of available internal storage allocated to the system for fragment hosting.</p>
+<p><strong>Development Machine</strong></p>
+<p>The development and build environment ran on a workstation equipped with Windows 11 Pro, an Intel Core i7 or AMD Ryzen 7 processor, and a minimum of 16 GB of RAM. The elevated memory requirement was necessary to run Android Studio alongside multiple Android emulator instances simultaneously without performance degradation.</p>
+<h3>5.2.2 Software &amp; Tools</h3>
+<p><strong>Integrated Development Environment</strong></p>
+<p>The application was developed using Android Studio Iguana (version 2023.2.1), the official IDE for Android development, with Kotlin 1.9.x as the primary programming language. Kotlin was chosen for its null safety, coroutine support, and full interoperability with the Android SDK and the Java Native Interface required for NDK integration.</p>
+<p><strong>Android SDK Configuration</strong></p>
+<table>
+<thead>
+<tr>
+<th>Parameter</th>
+<th>Value</th>
+<th>Justification</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Compile SDK</td>
+<td>34 (Android 14)</td>
+<td>Access to the latest platform APIs and security improvements</td>
+</tr>
+<tr>
+<td>Target SDK</td>
+<td>34 (Android 14)</td>
+<td>Compliance with current Google Play requirements</td>
+</tr>
+<tr>
+<td>Minimum SDK</td>
+<td>26 (Android 8.0 Oreo)</td>
+<td>Required for robust Android Keystore hardware-backed key generation and modern network security APIs</td>
+</tr>
+</tbody></table>
+<p>The minimum SDK level of 26 was selected deliberately. Android 8.0 introduced stable support for hardware-backed key attestation via the Android Keystore, which is a foundational requirement for the system&#39;s identity and cryptographic security model. Setting the minimum below this level would require fallback implementations that cannot guarantee hardware-level key isolation.</p>
+<p><strong>Android NDK</strong></p>
+<p>The Native Development Kit (NDK), version 26.1.10909125, was used to integrate a native C++ implementation of the Reed-Solomon encoding and decoding algorithm. The decision to delegate this computation to native code rather than implementing it in Kotlin was driven by performance constraints: Erasure Coding involves intensive Galois Field arithmetic over large data blocks, and executing this workload on the Android Runtime (ART) would introduce unacceptable latency and battery drain during file upload and retrieval operations. The NDK bridge allows the computation to run at native speed while remaining callable from the Kotlin application layer via the Java Native Interface (JNI).</p>
+<p><strong>Relay Server</strong></p>
+<p>The relay server was implemented using <strong>Ktor 2.3.x</strong>, a Kotlin-native asynchronous server framework, providing the signaling and NAT traversal fallback functionality described in the system design. During the development phase, the server was deployed locally in a Docker container to enable rapid iteration without external network dependencies. For inter-network and cross-cluster testing, the server was deployed on a Virtual Private Server (VPS) with a public IP address, allowing physical devices on different networks to discover and communicate with each other through the relay.</p>
+<p><strong>Development &amp; Analysis Tools</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tool</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Git</td>
+<td>Source code versioning and branch management</td>
+</tr>
+<tr>
+<td>Wireshark / Fiddler</td>
+<td>Packet-level analysis of WebSocket frame inspection and relay traffic</td>
+</tr>
+<tr>
+<td>Postman</td>
+<td>Testing and validation of the relay server&#39;s REST signaling API</td>
+</tr>
+<tr>
+<td>Android Profiler</td>
+<td>Real-time measurement of CPU, memory, and battery consumption during Erasure Coding operations</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>5.3 Technology Stack</h2>
+<h3>5.3.1 Mobile Application</h3>
+<p>The Android application is built on a carefully selected set of libraries that reflect the architectural constraints of a distributed mobile system: asynchronous by nature, battery-conscious, and requiring clean separation between the P2P logic and the Android framework.</p>
+<p><strong>User Interface</strong></p>
+<p>The user interface is built with Jetpack Compose 1.5.x [1], Android&#39;s modern declarative UI toolkit, styled with Material Design 3 (M3) [2]. The declarative paradigm was chosen for its natural alignment with reactive state management: the UI reacts directly to changes in the distributed system state — such as a new peer joining or a fragment repair completing — without requiring manual view updates.</p>
+<p><strong>Dependency Injection</strong></p>
+<p>Dagger Hilt 2.48+ [3] is used for dependency injection throughout the application. In the context of a distributed system, where components such as the peer discovery service, the Gossip scheduler, and the liveness monitor have distinct and carefully managed lifecycles, Hilt provides a structured mechanism for scoping dependencies correctly and decoupling components for independent testability.</p>
+<p><strong>Local Persistence</strong></p>
+<p>Room 2.6.x [4] serves as the local database layer, mapping the entities of the data model described in Chapter 4 to an SQLite database. The schema has undergone 18 versioned migrations during development, managed through Room&#39;s automatic migration support, which ensures that existing data is preserved across application updates without manual migration scripts.</p>
+<p><strong>Asynchrony and Reactive Programming</strong></p>
+<p>Kotlin Coroutines 1.7.x and Flow [5] form the concurrency backbone of the application. The Gossip synchronization loop, the heartbeat broadcaster, the liveness monitoring cycle, and all network I/O operations run as structured coroutines, allowing the system to handle dozens of concurrent distributed tasks without blocking the main thread or creating unmanaged thread pools. Flow is used extensively to propagate real-time state changes — such as peer availability updates and catalog modifications — from the data layer to the UI layer reactively.</p>
+<p><strong>Networking</strong></p>
+<p>Two complementary libraries handle network communication. OkHttp 4.12.x [6] manages the persistent WebSocket connections to the relay server, providing built-in support for reconnection, ping/pong keepalive frames, and TLS. Retrofit 2.9.x [7] is used for the REST API calls to the relay server&#39;s signaling endpoints, offering a type-safe interface over HTTP with automatic serialization and error handling.</p>
+<p><strong>Serialization</strong></p>
+<p>Kotlinx Serialization 1.6.x [8] is used for all message encoding and decoding between peers, in Protocol Buffers binary format via a thin <code>MobiCloudProtoBuf</code> wrapper. The binary format was preferred over JSON to reduce packet size on the hot discovery loop and to improve decode performance on battery-constrained devices. JSON parsing is reserved for relay server REST responses, where human-readable payloads are an operational convenience.</p>
+<table>
+<thead>
+<tr>
+<th>Library</th>
+<th>Version</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Jetpack Compose</td>
+<td>1.5.x</td>
+<td>Declarative UI framework</td>
+</tr>
+<tr>
+<td>Material Design 3</td>
+<td>—</td>
+<td>UI component styling</td>
+</tr>
+<tr>
+<td>Dagger Hilt</td>
+<td>2.48+</td>
+<td>Dependency injection</td>
+</tr>
+<tr>
+<td>Room</td>
+<td>2.6.x</td>
+<td>Local SQLite persistence</td>
+</tr>
+<tr>
+<td>Kotlin Coroutines</td>
+<td>1.7.x</td>
+<td>Structured concurrency</td>
+</tr>
+<tr>
+<td>Kotlin Flow</td>
+<td>1.7.x</td>
+<td>Reactive state propagation</td>
+</tr>
+<tr>
+<td>OkHttp</td>
+<td>4.12.x</td>
+<td>WebSocket client</td>
+</tr>
+<tr>
+<td>Retrofit</td>
+<td>2.9.x</td>
+<td>REST API client</td>
+</tr>
+<tr>
+<td>Kotlinx Serialization</td>
+<td>1.6.x</td>
+<td>Message serialization</td>
+</tr>
+</tbody></table>
+<h3>5.3.2 Native Layer</h3>
+<p>The Reed-Solomon encoding and decoding engine is implemented in C++ and compiled into a single shared library (<code>librs-native.so</code>) using CMake via the Android NDK [10]. The implementation is based on a port of the <strong>Backblaze Reed-Solomon library</strong> [9], a production-grade open-source implementation that uses precomputed logarithm and anti-logarithm tables to perform Galois Field GF(256) arithmetic efficiently, avoiding the cost of runtime field element computation.</p>
+<p>The JNI bridge is exposed through a Kotlin class (<code>ErasureCodec</code>) that declares native methods for encoding and decoding operations. Both methods accept and return <code>DirectByteBuffer</code> instances — a critical design decision that allows the JVM and the native C++ layer to share the same memory region without copying data across the language boundary. For large files divided into multiple fragments, this zero-copy approach can eliminate several hundred milliseconds of memory transfer overhead per operation, which is significant on battery-constrained mobile hardware.</p>
+<pre><code>Kotlin (ErasureCodec)
+    ↓
+    ↓  encode(data: DirectByteBuffer, k: Int, n: Int): DirectByteBuffer
+    ↓  decode(fragments: DirectByteBuffer, k: Int): DirectByteBuffer
+    ↓
+JNI Bridge (librs-native.so)
+    ↓
+    ↓
+C++ Reed-Solomon Engine (Backblaze port, GF(256) log tables)
+</code></pre>
+<h3>5.3.3 Relay Server</h3>
+<p>The relay server is implemented using <strong>Ktor 2.3.x</strong> [11], a Kotlin-native asynchronous server framework. The decision to use Ktor rather than a Java-based alternative reflects a deliberate architectural choice: maintaining a single language ecosystem across both the mobile client and the server reduces friction in shared data model definitions, serialization logic, and development tooling.</p>
+<p>The server exposes a WebSocket endpoint for persistent peer connections, managed through the Ktor WebSockets plugin. Connected Super-Peers maintain permanent WebSocket sessions with the relay, which serves as the <strong>single transport channel</strong> for all inter-node communication: signaling, block upload, block download, and Gossip propagation all transit through this WebSocket connection. There is no direct peer-to-peer channel — every message between nodes is routed through the relay, which eliminates NAT traversal issues entirely and simplifies the security boundary to a single point. The server also exposes a REST API for stateless operations:</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Method</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/v1/auth/join</code></td>
+<td>POST</td>
+<td>Initial device authentication and cluster identifier assignment</td>
+</tr>
+<tr>
+<td><code>/v1/cluster/{id}/members</code></td>
+<td>GET</td>
+<td>Retrieval of the current active peer list for a given cluster</td>
+</tr>
+<tr>
+<td><code>/v1/signaling/offer</code></td>
+<td>POST</td>
+<td>Peer-to-peer connection initiation for devices beyond the local network</td>
+</tr>
+<tr>
+<td><code>/v1/inter-cluster/hosts</code></td>
+<td>GET</td>
+<td>Discovery of available storage nodes in remote clusters for inter-cluster upload fallback</td>
+</tr>
+</tbody></table>
+<p>During development, the server ran in a Docker container on the local development machine. For inter-network validation tests, it was deployed on a Virtual Private Server with a static public IP address, enabling devices connected to different physical networks to discover and communicate with each other through the relay.</p>
+<hr>
+<p><strong>References</strong></p>
+<blockquote>
+<p>[1] Google. <em>Jetpack Compose</em>. Android Developers Documentation. <a href="https://developer.android.com/jetpack/compose">https://developer.android.com/jetpack/compose</a>
+[2] Google. <em>Material Design 3</em>. <a href="https://m3.material.io">https://m3.material.io</a>
+[3] Google. <em>Dagger Hilt</em>. Android Developers Documentation. <a href="https://developer.android.com/training/dependency-injection/hilt-android">https://developer.android.com/training/dependency-injection/hilt-android</a>
+[4] Google. <em>Room Persistence Library</em>. Android Developers Documentation. <a href="https://developer.android.com/training/data-storage/room">https://developer.android.com/training/data-storage/room</a>
+[5] JetBrains. <em>Kotlin Coroutines</em>. <a href="https://kotlinlang.org/docs/coroutines-overview.html">https://kotlinlang.org/docs/coroutines-overview.html</a>
+[6] Square. <em>OkHttp</em>. <a href="https://square.github.io/okhttp">https://square.github.io/okhttp</a>
+[7] Square. <em>Retrofit</em>. <a href="https://square.github.io/retrofit">https://square.github.io/retrofit</a>
+[8] JetBrains. <em>Kotlinx Serialization</em>. <a href="https://github.com/Kotlin/kotlinx.serialization">https://github.com/Kotlin/kotlinx.serialization</a>
+[9] Backblaze. <em>Reed-Solomon Erasure Coding Library</em>. <a href="https://github.com/Backblaze/JavaReedSolomon">https://github.com/Backblaze/JavaReedSolomon</a>
+[10] Google. <em>Android NDK Guide</em>. Android Developers Documentation. <a href="https://developer.android.com/ndk/guides">https://developer.android.com/ndk/guides</a>
+[11] JetBrains. <em>Ktor Framework</em>. <a href="https://ktor.io/docs">https://ktor.io/docs</a></p>
+</blockquote>
+<hr>
+<h2>5.4 Implementation of Core Modules</h2>
+<h3>5.4.1 Peer Discovery &amp; Cluster Formation</h3>
+<p><strong>Architecture Overview</strong></p>
+<p>Cluster members in MobiCloud are not assumed to share a physical network: a cluster may span devices connected over 4G, home WiFi, or corporate networks simultaneously. Peer discovery therefore relies exclusively on the relay server as the authoritative registry, rather than a link-local mechanism such as UDP Multicast, which is confined to a single L2 segment and cannot reach nodes on different networks.</p>
+<p>The discovery module is organized around two components. <code>StartDiscoveryUseCase</code> is the high-level entry point, invoked at application startup. It delegates entirely to <code>RelayRepositoryImpl</code>, which maintains the persistent WebSocket connection to the relay and exposes cluster membership through <code>PeerRepository</code>, the single source of truth for all known peers.</p>
+<pre><code>StartDiscoveryUseCase
+    └── RelayRepositoryImpl  (WebSocket → relay server)
+              └─&gt; PeerRepository  (UPSERT → peer_nodes table)
+</code></pre>
+<p><strong>Join Payload — Identity Advertisement</strong></p>
+<p>When a node connects to the relay, it registers its identity by sending a signed <code>HelloPayload</code> as part of the JOIN handshake. The relay stores this record and makes it available to other cluster members through the <code>GET_PEERS</code> response. The payload is defined as follows:</p>
+<pre><code class="language-kotlin">@Serializable
+data class HelloPayload(
+    val nodeId: String,             // SHA-256(publicKeyBytes).take(8) — hex, 16 chars
+    val publicKeyBytes: ByteArray,  // DER-encoded EC public key (secp256r1)
+    val reliabilityScore: Float,    // Current reliability score R ∈ [0.0, 1.0]
+    val freeStorageBytes: Long,     // Available storage advertised to cluster peers
+    val superPair: Boolean,         // Whether this node currently holds the Super-Peer role
+    val currentMemberCount: Int,    // Active member count (non-zero only when superPair = true)
+    val displayName: String?        // User-chosen display name
+)
+</code></pre>
+<p>The <code>nodeId</code> is not a random UUID — it is deterministically derived as the first 8 bytes (16 hex characters) of the SHA-256 hash of the node&#39;s public key. Any receiving peer can verify this binding independently without a central registry. The payload is wrapped in a <code>HelloMessage</code> envelope that carries an ECDSA-SHA256 signature over the serialized payload bytes, preventing identity spoofing at the relay level:</p>
+<pre><code class="language-kotlin">@Serializable
+data class HelloMessage(
+    val payload: HelloPayload,
+    val signature: ByteArray   // ECDSA-SHA256 over the serialized HelloPayload bytes
+)
+</code></pre>
+<p><strong>Relay-Based Discovery — fetchSuperPeers</strong></p>
+<p>After connecting, the node sends a <code>GET_PEERS</code> frame to the relay. The relay responds with a <code>PeerList</code> event containing the active members of the cluster. <code>RelayRepositoryImpl</code> receives this list asynchronously through its internal event bus and registers each entry in <code>PeerRepository</code> via an <code>UPSERT</code> operation, updating the peer&#39;s <code>reliabilityScore</code>, <code>freeStorageBytes</code>, and <code>lastSeen</code> timestamp if it already exists, or creating a new record on first contact:</p>
+<pre><code class="language-kotlin">// RelayRepositoryImpl.kt
+override suspend fun fetchSuperPeers(): Result&lt;List&lt;RelayPeer&gt;&gt; = runCatching {
+    val deferred = CompletableDeferred&lt;List&lt;RelayPeer&gt;&gt;()
+    val listenJob = repoScope.launch {
+        _relayEvents
+            .filterIsInstance&lt;RelayEvent.PeerList&gt;()
+            .first()
+            .let { deferred.complete(it.peers) }
+    }
+    if (!client.sendGetPeers()) {
+        listenJob.cancel()
+        throw IllegalStateException(&quot;No active relay connection — GET_PEERS failed&quot;)
+    }
+    withTimeoutOrNull(5_000L) { deferred.await() } ?: emptyList()
+}
+</code></pre>
+<p>The subscription to <code>_relayEvents</code> is established <strong>before</strong> sending the <code>GET_PEERS</code> frame to eliminate the race condition in which the server response arrives before the collector is ready. If no response is received within 5 seconds, the call returns an empty list and the node retries at the next scheduled discovery cycle.</p>
+<h3>5.4.2 Leader Election — Bully Algorithm</h3>
+<p><strong>Architecture Overview</strong></p>
+<p>The leader election module is composed of three classes. <code>MonitorMemberLivenessUseCase</code> acts as the watchdog: it observes the peer stream from <code>PeerRepository</code> and triggers an election when the current Super-Peer&#39;s <code>lastSeen</code> timestamp has not been updated for 20 consecutive seconds. <code>RunBullyElectionUseCase</code> contains the election state machine. <code>MarkSelfAsSuperPairUseCase</code> handles the role transition when a node wins the election.</p>
+<p><strong>Reliability Score Implementation</strong></p>
+<p>Each node computes a dynamic reliability score $R$ used as its &quot;electoral weight&quot; during the election. The score is calculated in <code>ReliabilityScoreProviderImpl.kt</code> as a weighted average of three environmental factors:</p>
+<p>$$R = (E \times 0.4) + (U \times 0.3) + (S \times 0.3)$$</p>
+<p>Where:</p>
+<ul>
+<li>$E$ (Energy Factor): <code>1.0</code> if the device is connected to a power source, or the normalized battery percentage otherwise. Battery is weighted most heavily because the Super-Peer role involves sustained CPU and network activity.</li>
+<li>$U$ (Uptime Factor): The duration of continuous application execution, capped at 24 hours. Long-running nodes are considered more stable and less prone to sudden disconnection.</li>
+<li>$S$ (Signal Factor): The normalized WiFi signal strength (RSSI). A node with a weak connection is penalized to avoid becoming a coordination bottleneck.</li>
+</ul>
+<p>The corresponding implementation is as follows:</p>
+<pre><code class="language-kotlin">// ReliabilityScoreProviderImpl.kt
+val energyScore  = if (isPlugged) 1.0f else (batteryLevel / 100f)
+val uptimeScore  = minOf(1.0f, hoursOnline / 24f)
+val networkScore = wifiSignalStrength / -30f  // RSSI normalization
+val totalScore   = (energyScore * 0.4f) + (uptimeScore * 0.3f) + (networkScore * 0.3f)
+</code></pre>
+<p>A critical edge case is handled through a &quot;Guillotine&quot; mechanism: if the battery level falls below 5%, the score is immediately forced to <code>0.0</code>, regardless of uptime or network quality. This ensures that a critically low-battery device can never win or retain the Super-Peer role, preventing an imminent disconnection from destabilizing the cluster.</p>
+<p><strong>Election State Machine</strong></p>
+<p>The election is event-driven rather than timer-driven, avoiding the battery cost of continuous polling. When <code>MonitorMemberLivenessUseCase</code> detects a 20-second silence from the current Super-Peer, it invokes <code>RunBullyElectionUseCase</code>. A cooldown mechanism prevents election storms: if an election was initiated less than 5 seconds ago, subsequent triggers are ignored and the node only responds to incoming election messages.</p>
+<p>The core election logic is implemented as follows:</p>
+<pre><code class="language-kotlin">// RunBullyElectionUseCase.kt
+suspend fun startElection() {
+    val strongerPeers = peerRepository.getActivePeers()
+        .filter { it.reliabilityScore &gt; localScore }
+
+    if (strongerPeers.isEmpty()) {
+        // No stronger peer found — declare victory
+        announceVictory()
+    } else {
+        // Challenge stronger peers and wait for a response
+        strongerPeers.forEach { sendElectionMessage(it) }
+        val responseReceived = waitForAliveMessage(timeout = 3000)
+        if (!responseReceived) {
+            // No ALIVE response within 3 seconds — win by default
+            announceVictory()
+        }
+    }
+}
+</code></pre>
+<p>The election messages exchanged between nodes share a common <code>ElectionMessage</code> structure serialized to Protocol Buffers binary format. Three message types are used: <code>ELECTION</code>, sent to challenge peers with a higher reliability score; <code>ALIVE</code>, sent in response to indicate that a stronger candidate is taking over the election; and <code>COORDINATOR</code>, broadcast by the winner to notify the entire cluster of the new Super-Peer identity.</p>
+<p>In the case of identical reliability scores, the system applies a deterministic tie-breaking rule: the node with the lexicographically larger <code>nodeId</code> (derived from SHA-256 of its public key) wins the election, ensuring that all nodes reach the same conclusion independently without additional coordination.</p>
+<p><strong>Role Transition — MarkSelfAsSuperPairUseCase</strong></p>
+<p>When a node wins the election, <code>MarkSelfAsSuperPairUseCase</code> executes the following transition steps:</p>
+<ol>
+<li><strong>Local state update</strong>: Sets <code>isSuperPair = true</code> in the <code>node_settings</code> table, making the new role persistent across application restarts.</li>
+<li><strong>Relay server notification</strong>: Registers the node as the new Super-Peer for its cluster with the relay server, ensuring that global peer discovery reflects the updated coordinator.</li>
+<li><strong>Service activation</strong>: Starts the Use Cases reserved for the Super-Peer role, including <code>MonitorClusterHealthUseCase</code> and <code>TriggerAutoRepairUseCase</code>, which are inactive on standard peer nodes to conserve battery.</li>
+</ol>
+<h3>5.4.3 Erasure Coding — Reed-Solomon JNI Bridge</h3>
+<p><strong>Architecture Overview</strong></p>
+<p>The Erasure Coding module bridges two execution environments: the Kotlin application layer and a native C++ computation engine. It is composed of four files: <code>ErasureCodec.kt</code>, which declares the JNI interface; <code>EncodeErasureFragmentsUseCase.kt</code>, which orchestrates the encoding pipeline; <code>mobicloud-native.cpp</code>, which implements the JNI bridge; and <code>backblaze_rs.cpp</code>, which contains the ported Backblaze Reed-Solomon engine operating over GF(256). The native code is compiled by CMake into a single shared library loaded at runtime.</p>
+<pre><code>EncodeErasureFragmentsUseCase.kt
+    └── ErasureCodec.kt  (JNI declarations)
+            └── mobicloud-native.cpp  (JNI bridge)
+                    └── backblaze_rs.cpp  (Reed-Solomon GF(256))
+                            └── galois.cpp  (Galois Field arithmetic tables)
+</code></pre>
+<p><strong>Build Configuration</strong></p>
+<p>The native library is defined in <code>CMakeLists.txt</code> as follows:</p>
+<pre><code class="language-cmake">add_library(mobicloud-native SHARED
+    mobicloud-native.cpp
+    backblaze_rs.cpp
+    galois.cpp
+)
+find_library(log-lib log)
+target_link_libraries(mobicloud-native ${log-lib})
+</code></pre>
+<p>The <code>galois.cpp</code> file provides precomputed logarithm and anti-logarithm tables for GF(256) arithmetic, avoiding runtime field element computation and significantly reducing encoding latency. The <code>log</code> library is linked to enable native log output to Android&#39;s Logcat during debugging.</p>
+<p><strong>JNI Bridge — Zero-Copy Memory Sharing</strong></p>
+<p>The key design decision in the JNI bridge is the use of <code>DirectByteBuffer</code> instances for all data exchange between Kotlin and C++. Unlike regular Java byte arrays, which require copying across the JNI boundary, <code>DirectByteBuffer</code> allocates memory outside the JVM heap. Both the Kotlin layer and the C++ layer can access this memory region directly through a raw pointer, eliminating redundant copies for large file buffers.</p>
+<p>The Kotlin interface is declared as follows:</p>
+<pre><code class="language-kotlin">// ErasureCodec.kt
+class ErasureCodec {
+    init { System.loadLibrary(&quot;mobicloud-native&quot;) }
+
+    external fun encode(
+        input: ByteBuffer,
+        dataCount: Int,
+        parityCount: Int
+    ): Array&lt;ByteBuffer&gt;
+
+    external fun decode(
+        shards: Array&lt;ByteBuffer&gt;,
+        dataCount: Int,
+        parityCount: Int
+    ): ByteBuffer
+}
+</code></pre>
+<p>The corresponding C++ implementation retrieves the direct memory address exposed by the JVM and passes it to the Reed-Solomon engine without any intermediate copy:</p>
+<pre><code class="language-cpp">// mobicloud-native.cpp
+JNIEXPORT jobjectArray JNICALL
+Java_com_mobicloud_native_ErasureCodec_encode(
+        JNIEnv *env, jobject thiz,
+        jobject input, jint k, jint n) {
+
+    // Step 1 — Retrieve direct memory address from Kotlin buffer
+    void* inputBuffer = env-&gt;GetDirectBufferAddress(input);
+
+    // Step 2 — Invoke the Backblaze Reed-Solomon engine
+    std::vector&lt;void*&gt; outputShards = rs_encode(inputBuffer, k, n);
+
+    // Step 3 — Wrap output shards as DirectByteBuffers for Kotlin
+    jobjectArray result = env-&gt;NewObjectArray(k + n, byteBufferClass, nullptr);
+    for (int i = 0; i &lt; k + n; i++) {
+        jobject shard = env-&gt;NewDirectByteBuffer(outputShards[i], shardSize);
+        env-&gt;SetObjectArrayElement(result, i, shard);
+    }
+    return result;
+}
+</code></pre>
+<p><strong>Complete Encoding Pipeline</strong></p>
+<p>The full encoding flow, from file selection to fragment output, proceeds through the following steps:</p>
+<ol>
+<li><strong>Orchestration</strong>: <code>EncodeErasureFragmentsUseCase</code> receives the input file, computes the fragment size as $\lceil \text{fileSize} / K \rceil$, applies zero-padding to align the file size to a multiple of $K$, and wraps the padded content in a <code>DirectByteBuffer</code>.</li>
+<li><strong>JNI invocation</strong>: <code>ErasureCodec.encode(buffer, K, N)</code> is called, transferring control to the native layer via the JNI bridge.</li>
+<li><strong>Native computation</strong>: The Reed-Solomon engine computes $N$ parity shards from the $K$ data shards using GF(256) arithmetic. All computation operates on the shared memory region without copying.</li>
+<li><strong>Fragment assembly</strong>: The returned array of $K + N$ <code>ByteBuffer</code> instances is mapped to <code>ErasureFragment</code> objects in Kotlin, each assigned a sequential index. Data fragments receive indices $0$ to $K-1$; parity fragments receive indices $K$ to $K+N-1$.</li>
+<li><strong>Handoff</strong>: The fragment array is passed to the encryption module, which encrypts each fragment individually before distribution.</li>
+</ol>
+<p><strong>Error Handling</strong></p>
+<p>Two layers of error handling protect the application from native-layer failures. At the C++ level, null pointer checks and buffer size validations are performed before every memory access. If an invalid state is detected, the native code calls <code>env-&gt;ThrowNew()</code> to raise a <code>RuntimeException</code> in the Kotlin layer, which is caught by a <code>try/catch</code> block in <code>EncodeErasureFragmentsUseCase</code> and translated into a user-facing error. This approach prevents native segmentation faults from propagating to the Android runtime and crashing the application.</p>
+<h3>5.4.4 Fragment Placement &amp; Self-Healing</h3>
+<p>[To be written]</p>
+<h3>5.4.5 Distributed Catalog — DHT &amp; Gossip</h3>
+<p>[To be written]</p>
+<h3>5.4.6 Security Pipeline</h3>
+<p><strong>Architecture Overview</strong></p>
+<p>The security module is composed of three classes with clearly separated responsibilities. <code>SecurityRepositoryImpl</code> manages node identity and all interactions with the Android Keystore. <code>FragmentCipherUseCase</code> handles the symmetric encryption and decryption of individual file fragments. <code>FileKeyDerivationUseCase</code> manages the derivation of per-file encryption keys and their cryptographic wrapping for authorized recipients.</p>
+<p><strong>Hardware-Backed Identity — Android Keystore</strong></p>
+<p>Node identity keys are generated and stored exclusively within the device&#39;s hardware security module, backed by the Trusted Execution Environment (TEE). The Android Keystore system ensures that the private key material never enters the application process memory — all signing operations are executed inside the secure hardware boundary. This protection holds even on rooted devices, where the operating system itself may be compromised, because the TEE operates independently of the Android OS.</p>
+<p>Key generation is performed as follows:</p>
+<pre><code class="language-kotlin">// SecurityRepositoryImpl.kt
+val keyPairGenerator = KeyPairGenerator.getInstance(
+    KeyProperties.KEY_ALGORITHM_EC, &quot;AndroidKeyStore&quot;
+)
+val parameterSpec = KeyGenParameterSpec.Builder(
+    &quot;node_identity_key&quot;,
+    KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
+)
+    .setAlgorithmParameterSpec(ECGenParameterSpec(&quot;secp256r1&quot;))
+    .setDigests(KeyProperties.DIGEST_SHA256)
+    .build()
+
+keyPairGenerator.initialize(parameterSpec)
+val keyPair = keyPairGenerator.generateKeyPair()
+</code></pre>
+<p>The generated key pair uses the elliptic curve <code>secp256r1</code> (P-256), which provides 128-bit security with compact key sizes suitable for mobile network messages. The public key is freely distributed to other peers and stored in the <code>peer_nodes</code> table; the private key never leaves the hardware boundary.</p>
+<p><strong>Fragment-Level Encryption — AES-256-GCM</strong></p>
+<p>Each of the $K + N$ erasure-coded fragments is encrypted individually before transmission, using AES-256 in Galois/Counter Mode (GCM). GCM is an authenticated encryption scheme: it simultaneously provides confidentiality through stream cipher encryption and integrity through a 16-byte authentication tag appended to the ciphertext. Any attempt to modify a fragment in transit — even a single bit — will cause the authentication tag verification to fail at decryption time, making the fragment detectable as corrupted and discardable before it reaches the Reed-Solomon decoder.</p>
+<p>The output structure of each encrypted fragment is:</p>
+<pre><code>[ IV (12 bytes) | Ciphertext (variable) | GCM Auth Tag (16 bytes) ]
+</code></pre>
+<p>The 12-byte Initialization Vector (IV) is randomly generated for each fragment and stored in the <code>hosted_blocks</code> table alongside the encrypted content. It is required at decryption time and is transmitted as part of the fragment metadata. The GCM authentication tag is automatically appended by the Java <code>Cipher</code> API at the end of the ciphertext during encryption.</p>
+<p><strong>End-to-End Key Distribution — ECDH + HKDF</strong></p>
+<p>To share a file with another user without exposing its encryption key to any intermediate node, the system employs a hybrid key transport scheme combining Elliptic Curve Diffie-Hellman (ECDH) key agreement and HMAC-based Key Derivation Function (HKDF) [RFC 5869].</p>
+<p>The process operates in three steps:</p>
+<ol>
+<li><p><strong>Shared secret establishment</strong>: The sender uses its own hardware-backed private key and the recipient&#39;s public key to compute an ECDH shared secret. The same shared secret can be independently computed by the recipient using its private key and the sender&#39;s public key, without any network exchange.</p>
+</li>
+<li><p><strong>Key derivation</strong>: The shared secret is passed through HKDF-SHA256 to derive a symmetric wrapping key. HKDF adds entropy conditioning and domain separation, ensuring that the derived key is cryptographically independent of the raw shared secret.</p>
+</li>
+<li><p><strong>Key wrapping</strong>: The File Master Key — the symmetric key used to encrypt the file&#39;s fragments — is encrypted with the derived wrapping key and stored as the <code>wrapped_master_key</code> field in the <code>CatalogEntry</code>. Storage nodes hold this wrapped key as an opaque blob with no ability to derive its content.</p>
+</li>
+</ol>
+<p><strong>Message Authentication — Signature Verification</strong></p>
+<p>Trust in the distributed network is established through cryptographic signatures rather than IP addresses or network position. Every protocol message — including <code>HelloMessage</code> peer announcements, <code>ElectionMessage</code> election challenges, and <code>CatalogEntry</code> Gossip updates — carries an ECDSA signature computed with the sender&#39;s hardware-backed private key.</p>
+<p>Signature verification is performed at two critical points in the system. In <code>GossipSyncUseCase</code>, incoming catalog updates are verified before being written to the local database, preventing catalog poisoning by malicious peers. In <code>RunBullyElectionUseCase</code>, election messages are verified to prevent identity spoofing attacks in which a compromised node claims a fraudulently high reliability score to win the election.</p>
+<p>The verification procedure retrieves the sender&#39;s public key from the local <code>peer_nodes</code> table and calls <code>Signature.verify()</code> against the message payload. Messages that fail verification are silently discarded without any response, avoiding information leakage about the local node&#39;s verification capabilities.</p>
+<hr>
+<h2>5.5 User Interface</h2>
+<h3>5.5.1 Application Screens</h3>
+<p>[To be written]</p>
+<h3>5.5.2 UX Design Decisions</h3>
+<p>[To be written]</p>
+<hr>
+<h2>5.6 Testing &amp; Validation</h2>
+<h3>5.6.1 Test Environment &amp; Methodology</h3>
+<p>[To be written]</p>
+<h3>5.6.2 Performance Tests</h3>
+<p>[To be written]</p>
+<h3>5.6.3 Resilience Tests</h3>
+<p>[To be written]</p>
+<h3>5.6.4 Security Tests</h3>
+<p>[To be written]</p>
+<hr>
+<h2>5.7 Challenges &amp; Solutions</h2>
+<p>[To be written]</p>
+<hr>
+<h2>5.8 Conclusion</h2>
+<p>[To be written]</p>
+
+  </div>
+
+</body>
+</html>

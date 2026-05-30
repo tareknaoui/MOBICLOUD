@@ -18,7 +18,8 @@ data class PeerNodeEntity(
     @ColumnInfo(name = "is_active") val isActive: Boolean = true,
     val source: String = "REMOTE_FIREBASE",
     @ColumnInfo(name = "is_super_pair") val isSuperPair: Boolean = false,
-    @ColumnInfo(name = "free_storage_bytes") val freeStorageBytes: Long = 0L
+    @ColumnInfo(name = "free_storage_bytes") val freeStorageBytes: Long = 0L,
+    @ColumnInfo(name = "display_name") val displayName: String? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -45,7 +46,8 @@ fun PeerNodeEntity.toDomain() = Peer(
     port = port,
     isActive = isActive,
     isSuperPair = isSuperPair,
-    freeStorageBytes = freeStorageBytes
+    freeStorageBytes = freeStorageBytes,
+    displayName = displayName
 )
 
 fun Peer.toEntity() = PeerNodeEntity(
@@ -58,5 +60,6 @@ fun Peer.toEntity() = PeerNodeEntity(
     isActive = isActive,
     source = source.name,
     isSuperPair = isSuperPair,
-    freeStorageBytes = freeStorageBytes
+    freeStorageBytes = freeStorageBytes,
+    displayName = displayName
 )

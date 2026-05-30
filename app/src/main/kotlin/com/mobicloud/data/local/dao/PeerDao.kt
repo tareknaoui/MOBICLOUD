@@ -21,8 +21,9 @@ interface PeerDao {
     // lors d'un COORDINATOR Bully ne connaît pas l'IP/port du sender, il ne fait que mettre à jour isSuperPair).
     // Sans cette protection, le DAO écrasait l'IP/port à NULL → le super-pair devenait injoignable pour
     // BlockSender → fragments perdus en upload.
+    // display_name : COALESCE — si le nouveau nom est non-null, on l'applique ; sinon on conserve l'existant.
     @Query("""INSERT OR REPLACE INTO peer_nodes
-        (node_id, public_key_bytes, reliability_score, ip_address, port, last_seen_timestamp_ms, is_active, source, is_super_pair, free_storage_bytes)
+        (node_id, public_key_bytes, reliability_score, ip_address, port, last_seen_timestamp_ms, is_active, source, is_super_pair, free_storage_bytes, display_name)
         VALUES (:nodeId, :publicKeyBytes, :reliabilityScore,
         CASE
             WHEN :ipAddress IS NULL THEN (SELECT ip_address FROM peer_nodes WHERE node_id = :nodeId)
@@ -40,7 +41,8 @@ interface PeerDao {
         CASE WHEN COALESCE((SELECT source FROM peer_nodes WHERE node_id = :nodeId), '') = 'LAN_MULTICAST'
              AND :source != 'LAN_MULTICAST' THEN 'LAN_MULTICAST' ELSE :source END,
         MAX(:isSuperPair, COALESCE((SELECT is_super_pair FROM peer_nodes WHERE node_id = :nodeId), 0)),
-        :freeStorageBytes)""")
+        :freeStorageBytes,
+        COALESCE(:displayName, (SELECT display_name FROM peer_nodes WHERE node_id = :nodeId)))""")
     suspend fun insertOrUpdatePreservingRole(
         nodeId: String,
         publicKeyBytes: ByteArray,
@@ -50,7 +52,8 @@ interface PeerDao {
         timestampMs: Long,
         source: String,
         isSuperPair: Int,
-        freeStorageBytes: Long
+        freeStorageBytes: Long,
+        displayName: String?
     )
 
     @Query("UPDATE peer_nodes SET is_active = 0 WHERE last_seen_timestamp_ms < :cutoffMs")

@@ -35,6 +35,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -59,8 +60,43 @@ class ExplorerViewModel @Inject constructor(
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
 
-    val catalogEntries: StateFlow<List<CatalogEntry>> = catalogRepository.getActiveEntriesFlow()
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _selectedCategory = MutableStateFlow("All") // "All", "Images", "Videos", "Audio", "Documents"
+    val selectedCategory: StateFlow<String> = _selectedCategory.asStateFlow()
+
+    // Story 13.5 — navigation dossiers
+    private val _currentFolder = MutableStateFlow<String?>(null)
+    val currentFolder: StateFlow<String?> = _currentFolder.asStateFlow()
+
+    val folders: StateFlow<List<String>> = catalogRepository.getActiveFolderNamesFlow()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
+
+    val catalogEntries: StateFlow<List<CatalogEntry>> = combine(
+        catalogRepository.getActiveEntriesFlow(),
+        _searchQuery,
+        _selectedCategory,
+        _currentFolder
+    ) { entries, query, category, folder ->
+        var filtered = entries.filter { it.folderPath == folder }
+        if (query.isNotBlank()) {
+            filtered = filtered.filter { it.originalFileName.contains(query, ignoreCase = true) }
+        }
+        if (category != "All") {
+            filtered = filtered.filter { entry ->
+                val name = entry.originalFileName
+                when (category) {
+                    "Images" -> name.matches(Regex(".*\\.(jpg|jpeg|png|gif|webp|bmp)$", RegexOption.IGNORE_CASE))
+                    "Videos" -> name.matches(Regex(".*\\.(mp4|mkv|avi|mov)$", RegexOption.IGNORE_CASE))
+                    "Audio" -> name.matches(Regex(".*\\.(mp3|aac|flac|wav)$", RegexOption.IGNORE_CASE))
+                    "Documents" -> !name.matches(Regex(".*\\.(jpg|jpeg|png|gif|webp|bmp|mp4|mkv|avi|mov|mp3|aac|flac|wav)$", RegexOption.IGNORE_CASE))
+                    else -> true
+                }
+            }
+        }
+        filtered
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
 
     // Story 13.2 — corbeille : fileHash émis pour déclencher la snackbar "Annuler"
     private val _undoEvent = MutableSharedFlow<String>(extraBufferCapacity = 1)
@@ -97,6 +133,14 @@ class ExplorerViewModel @Inject constructor(
     @Volatile private var downloadStartMs: Long = 0L
     private var lastNodeCount: Int = 0
 
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun setSelectedCategory(category: String) {
+        _selectedCategory.value = category
+    }
+
     fun refreshCatalog() {
         if (_isRefreshing.value) return
         viewModelScope.launch {
@@ -124,26 +168,26 @@ class ExplorerViewModel @Inject constructor(
         }
     }
 
-    fun initiateDownload(fileHash: String) {
+    fun initiateDownload(fileHash: String, isPreview: Boolean = false) {
         // [Review][Patch] P6 — preemption : un utilisateur qui tape un fichier B pendant que
         // A est `Locating` doit pouvoir basculer. On annule les deux jobs (locate + download)
         // et on (re)pose l'état à `Locating(fileHash)`. Le même fichier tappé deux fois est
         // idempotent (pas de relance si déjà en cours sur le même hash).
         val current = _downloadState.value
-        if (current is DownloadState.Locating && current.fileHash == fileHash) return
-        if (current is DownloadState.Downloading && current.fileHash == fileHash) return
+        if (current is DownloadState.Locating && current.fileHash == fileHash && current.isPreview == isPreview) return
+        if (current is DownloadState.Downloading && current.fileHash == fileHash && current.isPreview == isPreview) return
         locateJob?.cancel()
         downloadJob?.cancel()
         downloadStartMs = System.currentTimeMillis()
-        _downloadState.value = DownloadState.Locating(fileHash)
+        _downloadState.value = DownloadState.Locating(fileHash, isPreview)
         locateJob = viewModelScope.launch {
             localizeFileBlocksUseCase.invoke(fileHash)
                 .onSuccess { map ->
-                    _downloadState.value = DownloadState.Located(fileHash, map)
-                    startDownload(fileHash, map)
+                    _downloadState.value = DownloadState.Located(fileHash, map, isPreview)
+                    startDownload(fileHash, map, isPreview)
                 }
                 .onFailure { e ->
-                    _downloadState.value = DownloadState.Error(fileHash, e.message ?: "Localisation échouée")
+                    _downloadState.value = DownloadState.Error(fileHash, e.message ?: "Localisation échouée", isPreview)
                 }
         }
     }
@@ -152,7 +196,7 @@ class ExplorerViewModel @Inject constructor(
      * Story 6.2 — chaîne automatique après `Located` : déclenche la course K+2 et met à jour
      * `_downloadState` à chaque progression. `k` est lu depuis le catalogue (persisté à l'upload).
      */
-    private fun startDownload(fileHash: String, blockMap: Map<String, ResolvedBlockLocation>) {
+    private fun startDownload(fileHash: String, blockMap: Map<String, ResolvedBlockLocation>, isPreview: Boolean = false) {
         downloadJob = viewModelScope.launch {
             val k = catalogRepository.getEntry(fileHash).getOrNull()?.k ?: ErasureParameters().k
             downloadFileBlocksUseCase.invoke(blockMap, k).collect { state ->
@@ -170,14 +214,15 @@ class ExplorerViewModel @Inject constructor(
                             failed = state.failed,
                             contributions = state.contributions,
                             slowNodeIds = state.slowNodeIds,
-                            failedFragmentIndices = state.failedFragmentIndices
+                            failedFragmentIndices = state.failedFragmentIndices,
+                            isPreview = isPreview
                         )
                     }
                     is DownloadProgressState.Completed -> {
                         // Story 6.3 — chaîne immédiate : déchiffrement + décodage EC + écriture
                         // atomique. Voir AssembleDownloadedFileUseCase pour les garanties
                         // (no partial visible, hash final, IV-transport gap, etc.).
-                        assembleDownloadedFileUseCase.invoke(fileHash, state.blocks)
+                        assembleDownloadedFileUseCase.invoke(fileHash, state.blocks, isPreview)
                             .collect { progress ->
                                 when (progress) {
                                     is AssembleDownloadedFileUseCase.AssembleProgress.Decrypting -> {
@@ -188,26 +233,28 @@ class ExplorerViewModel @Inject constructor(
                                         _downloadState.value = DownloadState.Decrypting(
                                             fileHash = fileHash,
                                             processed = progress.processed,
-                                            k = progress.k
+                                            k = progress.k,
+                                            isPreview = isPreview
                                         )
                                     }
                                     is AssembleDownloadedFileUseCase.AssembleProgress.Finalized ->
                                         _downloadState.value = when (val r = progress.result) {
                                             is AssembleDownloadedFileUseCase.AssembleResult.Success -> {
                                                 val durationMs = System.currentTimeMillis() - downloadStartMs
-                                                DownloadState.Assembled(fileHash, r.filePath, durationMs, lastNodeCount)
+                                                DownloadState.Assembled(fileHash, r.filePath, durationMs, lastNodeCount, isPreview)
                                             }
                                             is AssembleDownloadedFileUseCase.AssembleResult.Failure ->
                                                 DownloadState.Error(
                                                     fileHash,
-                                                    r.exception.message ?: "échec reconstruction"
+                                                    r.exception.message ?: "échec reconstruction",
+                                                    isPreview = isPreview
                                                 )
                                         }
                                 }
                             }
                     }
                     is DownloadProgressState.Failed ->
-                        _downloadState.value = DownloadState.Error(fileHash, state.reason)
+                        _downloadState.value = DownloadState.Error(fileHash, state.reason, isPreview = isPreview)
                 }
             }
         }
@@ -362,6 +409,26 @@ class ExplorerViewModel @Inject constructor(
             } finally {
                 tempFile.delete()
             }
+        }
+    }
+
+    // Story 13.5 — actions dossiers
+
+    fun navigateIntoFolder(name: String) { _currentFolder.value = name }
+    fun navigateToRoot() { _currentFolder.value = null }
+
+    fun moveFileToFolder(fileHash: String, folderPath: String?) {
+        viewModelScope.launch { catalogRepository.moveFileToFolder(fileHash, folderPath) }
+    }
+
+    fun renameFolder(oldPath: String, newPath: String) {
+        viewModelScope.launch { catalogRepository.renameFolder(oldPath, newPath) }
+    }
+
+    fun deleteFolder(folderPath: String) {
+        viewModelScope.launch {
+            if (_currentFolder.value == folderPath) _currentFolder.value = null
+            catalogRepository.deleteFolder(folderPath)
         }
     }
 

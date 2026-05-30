@@ -56,7 +56,7 @@ abstract class CatalogDatabase : RoomDatabase() {
     companion object {
         // Room `@Database` est en `RetentionPolicy.CLASS` → invisible à la réflexion runtime.
         // Cette constante sert de source unique consommée par l'annotation ET par les tests.
-        const val CURRENT_VERSION = 18
+        const val CURRENT_VERSION = 20
 
         // Story 1-3 — premier ajout de NodeIdentityEntity + PeerNodeEntity (sans is_super_pair).
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -284,6 +284,20 @@ abstract class CatalogDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE catalog_entry ADD COLUMN is_in_trash INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE catalog_entry ADD COLUMN deleted_at INTEGER DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_18_19 = object : Migration(18, 19) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE peer_nodes ADD COLUMN display_name TEXT DEFAULT NULL")
+            }
+        }
+
+        // Story 13.5 — dossier local pour l'organisation des fichiers (non distribué dans le DHT).
+        // NULL = racine ; non-null = nom du dossier. Entries existantes restent à la racine.
+        val MIGRATION_19_20 = object : Migration(19, 20) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE catalog_entry ADD COLUMN folder_path TEXT DEFAULT NULL")
             }
         }
     }

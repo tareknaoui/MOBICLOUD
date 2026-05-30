@@ -8,4 +8,6 @@ interface LocalDiscoveryRepository {
     fun updateSuperPairStatus(isSuperPair: Boolean)
     /** Story 12.1 — mise à jour du nombre de membres actifs dans le cluster (pour HELLO multicast). */
     fun updateCurrentMemberCount(count: Int)
+    /** Mise à jour du nom affiché de l'utilisateur local, inclus dans les HELLO broadcasts. */
+    fun updateDisplayName(name: String?)
 }

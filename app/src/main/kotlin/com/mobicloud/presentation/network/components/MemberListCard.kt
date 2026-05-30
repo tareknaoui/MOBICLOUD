@@ -56,9 +56,9 @@ private fun MemberRow(node: ClusterNodeInfo) {
     val seenLabel = if (node.isLocal) "You" else "Connected ${ageSec}s ago"
 
     val displayName = when {
-        node.isLocal && node.isSuperPair -> "You (Organizer)"
-        node.isLocal -> "You"
-        else -> "Member " + node.nodeId.take(4)
+        node.isLocal && node.isSuperPair -> "${node.displayName ?: "You"} (Organizer)"
+        node.isLocal -> node.displayName ?: "You"
+        else -> node.displayName ?: ("Member " + node.nodeId.take(4))
     }
 
     Row(

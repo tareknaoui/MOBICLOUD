@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.SystemClock
 import android.util.Log
 import com.mobicloud.core.format.MobiCloudProtoBuf
+import com.mobicloud.core.preferences.data.UserPreferencesDataSource
 import com.mobicloud.domain.models.DiscoverySource
 import com.mobicloud.domain.models.HelloMessage
 import com.mobicloud.domain.models.HelloPayload
@@ -49,6 +50,7 @@ class LocalDiscoveryRepositoryImplTest {
     private lateinit var identityRepository: IdentityRepository
     private lateinit var peerRepository: PeerRepository
     private lateinit var networkEventRepository: NetworkEventRepository
+    private lateinit var userPreferencesDataSource: UserPreferencesDataSource
     private lateinit var context: Context
     private lateinit var scope: CoroutineScope
 
@@ -81,7 +83,7 @@ class LocalDiscoveryRepositoryImplTest {
     )
 
     private inner class TestableLocalDiscoveryRepositoryImpl : LocalDiscoveryRepositoryImpl(
-        identityRepository, peerRepository, networkEventRepository, context, scope
+        identityRepository, peerRepository, networkEventRepository, userPreferencesDataSource, context, scope
     ) {
         var lastPayloadSigned: ByteArray? = null
 
@@ -112,11 +114,12 @@ class LocalDiscoveryRepositoryImplTest {
         identityRepository = mockk()
         peerRepository = mockk(relaxed = true)
         networkEventRepository = mockk(relaxed = true)
+        userPreferencesDataSource = mockk(relaxed = true)
         context = mockk(relaxed = true)
         scope = CoroutineScope(SupervisorJob() + UnconfinedTestDispatcher())
 
         coEvery { identityRepository.getIdentity() } returns Result.success(localIdentity)
-        coEvery { peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any(), any()) } returns Result.success(Unit)
+        coEvery { peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any(), any(), any()) } returns Result.success(Unit)
 
         repository = TestableLocalDiscoveryRepositoryImpl()
     }
@@ -210,7 +213,7 @@ class LocalDiscoveryRepositoryImplTest {
 
         assertFalse("processIncomingBytes doit retourner false pour une signature invalide", updated)
         coVerify(exactly = 0) {
-            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any(), any())
+            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 
@@ -228,7 +231,7 @@ class LocalDiscoveryRepositoryImplTest {
 
         assertFalse("Les propres datagrams doivent être filtrés", updated)
         coVerify(exactly = 0) {
-            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any(), any())
+            peerRepository.registerOrUpdatePeer(any(), any(), any(), any(), any(), any(), any(), any())
         }
     }
 

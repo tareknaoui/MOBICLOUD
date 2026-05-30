@@ -15,7 +15,8 @@ interface PeerRepository {
         ipAddress: String? = null,
         port: Int? = null,
         isSuperPair: Boolean = false,
-        freeStorageBytes: Long = 0L
+        freeStorageBytes: Long = 0L,
+        displayName: String? = null
     ): Result<Unit>
 
     suspend fun evictStalePeers(

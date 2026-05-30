@@ -30,6 +30,8 @@ import com.mobicloud.presentation.onboarding.InitRoute
 import com.mobicloud.presentation.onboarding.InitScreen
 import com.mobicloud.presentation.onboarding.PermissionsRoute
 import com.mobicloud.presentation.onboarding.PermissionsScreen
+import com.mobicloud.presentation.onboarding.ProfileSetupRoute
+import com.mobicloud.presentation.onboarding.ProfileSetupScreen
 import com.mobicloud.presentation.onboarding.WelcomeRoute
 import com.mobicloud.presentation.onboarding.WelcomeScreen
 import com.mobicloud.presentation.settings.SettingsRoute
@@ -66,8 +68,15 @@ fun JetpackNavHost(
         composable<PermissionsRoute> {
             PermissionsScreen(
                 onNavigateToInit = {
-                    navController.navigate(InitRoute)
+                    navController.navigate(ProfileSetupRoute)
                 },
+            )
+        }
+        composable<ProfileSetupRoute> {
+            ProfileSetupScreen(
+                onContinue = {
+                    navController.navigate(InitRoute)
+                }
             )
         }
         composable<InitRoute> {

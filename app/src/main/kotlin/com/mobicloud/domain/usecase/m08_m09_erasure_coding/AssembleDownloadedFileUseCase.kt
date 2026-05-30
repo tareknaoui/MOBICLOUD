@@ -64,7 +64,8 @@ class AssembleDownloadedFileUseCase @Inject constructor(
 
     fun invoke(
         fileHash: String,
-        blocks: Map<Int, DownloadedBlock>
+        blocks: Map<Int, DownloadedBlock>,
+        isPreview: Boolean = false
     ): Flow<AssembleProgress> = flow {
         // 1. Récupération du catalogue + métadonnées de chiffrement
         val catalog = catalogRepository.getEntry(fileHash).getOrNull()
@@ -223,11 +224,13 @@ class AssembleDownloadedFileUseCase @Inject constructor(
                 throw DownloadException.CorruptFile(fileHash, computedHash)
             }
 
-            // 6. Move atomique vers l'emplacement final visible utilisateur.
-            //    Fallback `copyTo + delete()` si renameTo échoue (cross-filesystem :
-            //    cacheDir sur /data, externalFiles sur /storage).
-            val finalDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                ?: context.filesDir
+            // 6. Move atomique vers l'emplacement final visible utilisateur ou cache temporaire pour preview.
+            //    Fallback `copyTo + delete()` si renameTo échoue.
+            val finalDir = if (isPreview) {
+                File(context.cacheDir, "previews").apply { if (!exists()) mkdirs() }
+            } else {
+                context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+            }
             if (!finalDir.exists()) finalDir.mkdirs()
             val outputName = if (catalog.originalFileName.isNotEmpty()) catalog.originalFileName
                              else "mobicloud_${fileHash.take(16)}"

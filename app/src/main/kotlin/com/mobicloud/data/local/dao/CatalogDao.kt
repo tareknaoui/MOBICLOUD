@@ -101,4 +101,18 @@ interface CatalogDao {
             permanentlyDeleteEntry(h)
         }
     }
+
+    // Story 13.5 — organisation en dossiers (local uniquement, non distribué dans le DHT)
+
+    @Query("UPDATE catalog_entry SET folder_path = :folder WHERE file_hash = :hash")
+    suspend fun updateFolderPath(hash: String, folder: String?)
+
+    @Query("SELECT DISTINCT folder_path FROM catalog_entry WHERE is_in_trash = 0 AND folder_path IS NOT NULL ORDER BY folder_path ASC")
+    fun getActiveFolderNamesFlow(): Flow<List<String>>
+
+    @Query("UPDATE catalog_entry SET folder_path = :newPath WHERE folder_path = :oldPath")
+    suspend fun renameFolder(oldPath: String, newPath: String)
+
+    @Query("UPDATE catalog_entry SET folder_path = NULL WHERE folder_path = :folderPath")
+    suspend fun moveFilesToRoot(folderPath: String)
 }

@@ -16,6 +16,8 @@ import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineScope
 import javax.inject.Singleton
 
+import com.mobicloud.core.preferences.data.UserPreferencesDataSource
+
 @Module
 @InstallIn(SingletonComponent::class)
 object P2PModule {
@@ -33,9 +35,15 @@ object P2PModule {
         identityRepository: IdentityRepository,
         peerRepository: PeerRepository,
         networkEventRepository: NetworkEventRepository,
+        userPreferencesDataSource: UserPreferencesDataSource,
         @ApplicationContext context: Context,
         @ApplicationScope scope: CoroutineScope
     ): LocalDiscoveryRepository = LocalDiscoveryRepositoryImpl(
-        identityRepository, peerRepository, networkEventRepository, context, scope
+        identityRepository,
+        peerRepository,
+        networkEventRepository,
+        userPreferencesDataSource,
+        context,
+        scope
     )
 }

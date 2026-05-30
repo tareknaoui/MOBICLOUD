@@ -30,5 +30,7 @@ data class CatalogEntry(
     @ProtoNumber(9) val n: Int = 2,
     // Story 13.2 — métadonnées de corbeille (locales uniquement, non distribuées dans le DHT)
     val isInTrash: Boolean = false,
-    val deletedAt: Long? = null
+    val deletedAt: Long? = null,
+    // Story 13.5 — dossier local (non distribué dans le DHT/Gossip)
+    val folderPath: String? = null
 )

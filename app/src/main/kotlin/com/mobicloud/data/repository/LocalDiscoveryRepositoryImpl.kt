@@ -7,6 +7,7 @@ import android.os.StatFs
 import android.os.SystemClock
 import android.util.Log
 import com.mobicloud.core.format.MobiCloudProtoBuf
+import com.mobicloud.core.preferences.data.UserPreferencesDataSource
 import com.mobicloud.core.security.KeystoreManager
 import com.mobicloud.di.ApplicationScope
 import com.mobicloud.domain.models.DiscoverySource
@@ -22,6 +23,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -40,6 +42,7 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
     private val identityRepository: IdentityRepository,
     private val peerRepository: PeerRepository,
     private val networkEventRepository: NetworkEventRepository,
+    private val userPreferencesDataSource: UserPreferencesDataSource,
     @ApplicationContext private val context: Context,
     @ApplicationScope private val externalScope: CoroutineScope
 ) : LocalDiscoveryRepository {
@@ -63,6 +66,7 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
     @Volatile private var isLocalNodeSuperPair: Boolean = false
     // Story 12.1 — nombre de membres actifs dans le cluster (pour currentMemberCount dans HELLO).
     @Volatile private var currentMemberCount: Int = 0
+    @Volatile private var localDisplayName: String? = null
 
     // Déféré 2 — StatFs mis en cache pour éviter un appel système dans la hot-loop réseau (toutes les 5 s).
     // TTL = 30 s : le disque libre ne change pas à cette fréquence, une lecture par TTL est largement suffisante.
@@ -129,6 +133,10 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
         currentMemberCount = count
     }
 
+    override fun updateDisplayName(name: String?) {
+        localDisplayName = name
+    }
+
     private fun acquireMulticastLock() {
         val wm = context.getSystemService(Context.WIFI_SERVICE) as WifiManager
         multicastLock = wm.createMulticastLock("mobicloud_discovery").apply {
@@ -145,6 +153,9 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
             return
         }
         val identity = identityResult.getOrThrow()
+        localDisplayName = runCatching {
+            userPreferencesDataSource.getUserDataPreferences().first().userName?.takeIf { it.isNotBlank() }
+        }.getOrNull()
         val group = InetAddress.getByName(MULTICAST_GROUP)
 
         runCatching {
@@ -161,7 +172,8 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
                             reliabilityScore = identity.reliabilityScore,
                             freeStorageBytes = getLocalFreeStorageBytes(),
                             superPair = isLocalNodeSuperPair,
-                            currentMemberCount = if (isLocalNodeSuperPair) currentMemberCount else 0
+                            currentMemberCount = if (isLocalNodeSuperPair) currentMemberCount else 0,
+                            displayName = localDisplayName
                         )
                         val payloadBytes = MobiCloudProtoBuf.encodeToByteArray(HelloPayload.serializer(), payload)
                         val signature = signPayload(payloadBytes)
@@ -298,7 +310,8 @@ open class LocalDiscoveryRepositoryImpl @Inject constructor(
                 ipAddress = sourceAddress,
                 port = msg.payload.tcpPort,
                 isSuperPair = msg.payload.superPair,
-                freeStorageBytes = msg.payload.freeStorageBytes
+                freeStorageBytes = msg.payload.freeStorageBytes,
+                displayName = msg.payload.displayName
             )
             insertResult.onFailure { Log.e(TAG, "Échec insertion pair LAN", it) }
             if (insertResult.isSuccess) {

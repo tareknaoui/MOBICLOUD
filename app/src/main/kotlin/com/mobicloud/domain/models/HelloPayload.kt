@@ -10,7 +10,8 @@ data class HelloPayload(
     val reliabilityScore: Float,
     val freeStorageBytes: Long = 0L,
     val superPair: Boolean = false,
-    val currentMemberCount: Int = 0   // Story 12.1 — charge cluster (SP uniquement, 0 sinon)
+    val currentMemberCount: Int = 0,   // Story 12.1 — charge cluster (SP uniquement, 0 sinon)
+    val displayName: String? = null    // Nom choisi par l'utilisateur, partagé lors du handshake
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -23,6 +24,7 @@ data class HelloPayload(
         if (freeStorageBytes != other.freeStorageBytes) return false
         if (superPair != other.superPair) return false
         if (currentMemberCount != other.currentMemberCount) return false
+        if (displayName != other.displayName) return false
         return true
     }
 
@@ -34,6 +36,7 @@ data class HelloPayload(
         result = 31 * result + freeStorageBytes.hashCode()
         result = 31 * result + superPair.hashCode()
         result = 31 * result + currentMemberCount
+        result = 31 * result + displayName.hashCode()
         return result
     }
 }

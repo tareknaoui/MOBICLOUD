@@ -48,7 +48,8 @@ class CatalogRepositoryImpl(
             k = k,
             n = n,
             isInTrash = isInTrash,
-            deletedAt = deletedAt
+            deletedAt = deletedAt,
+            folderPath = folderPath
         )
 
     private fun FragmentLocation.toEntity(catalogFileHash: String): FragmentLocationEntity =
@@ -89,7 +90,8 @@ class CatalogRepositoryImpl(
             k = catalogEntry.k,
             n = catalogEntry.n,
             isInTrash = catalogEntry.isInTrash,
-            deletedAt = catalogEntry.deletedAt
+            deletedAt = catalogEntry.deletedAt,
+            folderPath = catalogEntry.folderPath
         )
 
     // --- CatalogRepository impl ---
@@ -111,7 +113,10 @@ class CatalogRepositoryImpl(
             )
             if (!isInRange) return@runCatching // Rejet silencieux (AC #6)
 
-            val entityEntry = entry.toEntity()
+            // Story 13.5 — préserver le folderPath local lors d'un upsert Gossip :
+            // l'entrée entrante n'a pas de folderPath (local uniquement), on lit l'existant en DB.
+            val existingFolderPath = catalogDao.getCatalogEntry(entry.fileHash)?.catalogEntry?.folderPath
+            val entityEntry = entry.copy(folderPath = existingFolderPath).toEntity()
             val entityFragments = entry.fragmentLocations.map { it.toEntity(entry.fileHash) }
             catalogDao.insertWithFragments(entityEntry, entityFragments)
         }
@@ -180,5 +185,25 @@ class CatalogRepositoryImpl(
                 val expiryTs = System.currentTimeMillis() - 30L * 24 * 60 * 60 * 1000
                 catalogDao.purgeExpiredEntries(expiryTs)
             }
+        }
+
+    // Story 13.5 — dossiers locaux
+
+    override suspend fun moveFileToFolder(fileHash: String, folderPath: String?): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching { catalogDao.updateFolderPath(fileHash, folderPath) }
+        }
+
+    override fun getActiveFolderNamesFlow(): Flow<List<String>> =
+        catalogDao.getActiveFolderNamesFlow()
+
+    override suspend fun renameFolder(oldPath: String, newPath: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching { catalogDao.renameFolder(oldPath, newPath) }
+        }
+
+    override suspend fun deleteFolder(folderPath: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching { catalogDao.moveFilesToRoot(folderPath) }
         }
 }

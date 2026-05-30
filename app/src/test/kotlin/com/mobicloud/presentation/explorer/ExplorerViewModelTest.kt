@@ -88,6 +88,7 @@ class ExplorerViewModelTest {
         coEvery { catalogRepository.purgeExpired() } returns Result.success(Unit)
         context = mockk(relaxed = true)
         every { catalogRepository.getActiveEntriesFlow() } returns catalogFlow
+        every { catalogRepository.getActiveFolderNamesFlow() } returns flowOf(emptyList())
     }
 
     @After
@@ -321,13 +322,112 @@ class ExplorerViewModelTest {
         assertTrue("durationMs should be >= 0, got ${state.durationMs}", state.durationMs >= 0L)
     }
 
+    // Test Story Preview #1 — initiateDownload avec isPreview = true
+    @Test
+    fun `initiateDownload avec isPreview true produit Locating et Located avec isPreview true`() = runTest {
+        val fileHash = "aabbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+        val blockMap = emptyMap<String, ResolvedBlockLocation>()
+
+        coEvery { localizeFileBlocksUseCase.invoke(fileHash) } returns Result.success(blockMap)
+        every { downloadFileBlocksUseCase.invoke(any(), any()) } returns flowOf(
+            DownloadProgressState.Progress(received = 1, k = 4, failed = 0)
+        )
+        every { assembleDownloadedFileUseCase.invoke(any(), any(), any()) } returns flow { }
+
+        val viewModel = createViewModel()
+        viewModel.initiateDownload(fileHash, isPreview = true)
+        advanceUntilIdle()
+
+        val state = viewModel.downloadState.value
+        assertTrue("expected Downloading, got $state", state is DownloadState.Downloading)
+        state as DownloadState.Downloading
+        assertTrue(state.isPreview)
+    }
+
+    // Test Story Preview #2 — startDownload avec isPreview = true appelle assembleDownloadedFileUseCase avec isPreview = true
+    @Test
+    fun `startDownload avec isPreview true appelle assembleDownloadedFileUseCase avec isPreview true et produit Assembled avec isPreview true`() = runTest {
+        val fileHash = "aabbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678"
+        val blockMap = emptyMap<String, ResolvedBlockLocation>()
+
+        coEvery { localizeFileBlocksUseCase.invoke(fileHash) } returns Result.success(blockMap)
+        every { downloadFileBlocksUseCase.invoke(any(), any()) } returns flowOf(
+            DownloadProgressState.Completed(emptyMap())
+        )
+        every { assembleDownloadedFileUseCase.invoke(any(), any(), isPreview = true) } returns flowOf(
+            AssembleDownloadedFileUseCase.AssembleProgress.Finalized(
+                AssembleDownloadedFileUseCase.AssembleResult.Success("/sdcard/test.txt")
+            )
+        )
+
+        val viewModel = createViewModel()
+        viewModel.initiateDownload(fileHash, isPreview = true)
+        advanceUntilIdle()
+
+        val state = viewModel.downloadState.value
+        assertTrue("expected Assembled, got $state", state is DownloadState.Assembled)
+        state as DownloadState.Assembled
+        assertTrue(state.isPreview)
+        coVerify(exactly = 1) { assembleDownloadedFileUseCase.invoke(fileHash, any(), isPreview = true) }
+    }
+
+    // Test Story Search & Filter #1 — setSearchQuery
+    @Test
+    fun `setSearchQuery filtre les catalogEntries par nom de fichier`() = runTest {
+        val entries = listOf(
+            makeCatalogEntry(fileHash = "hash1", originalFileName = "vacation_photo.jpg"),
+            makeCatalogEntry(fileHash = "hash2", originalFileName = "monthly_report.pdf"),
+            makeCatalogEntry(fileHash = "hash3", originalFileName = "sunset_video.mp4")
+        )
+        catalogFlow.value = entries
+
+        val viewModel = createViewModel()
+        val collected = mutableListOf<List<CatalogEntry>>()
+        val job = launch { viewModel.catalogEntries.collect { collected.add(it) } }
+        advanceUntilIdle()
+
+        viewModel.setSearchQuery("report")
+        advanceUntilIdle()
+        job.cancel()
+
+        assertEquals(1, collected.last().size)
+        assertEquals("monthly_report.pdf", collected.last().first().originalFileName)
+    }
+
+    // Test Story Search & Filter #2 — setSelectedCategory
+    @Test
+    fun `setSelectedCategory filtre les catalogEntries par categorie`() = runTest {
+        val entries = listOf(
+            makeCatalogEntry(fileHash = "hash1", originalFileName = "vacation_photo.jpg"),
+            makeCatalogEntry(fileHash = "hash2", originalFileName = "monthly_report.pdf"),
+            makeCatalogEntry(fileHash = "hash3", originalFileName = "sunset_video.mp4")
+        )
+        catalogFlow.value = entries
+
+        val viewModel = createViewModel()
+        val collected = mutableListOf<List<CatalogEntry>>()
+        val job = launch { viewModel.catalogEntries.collect { collected.add(it) } }
+        advanceUntilIdle()
+
+        viewModel.setSelectedCategory("Videos")
+        advanceUntilIdle()
+        job.cancel()
+
+        assertEquals(1, collected.last().size)
+        assertEquals("sunset_video.mp4", collected.last().first().originalFileName)
+    }
+
     private fun makeCatalogEntry(
         fileHash: String = "aabbccdd1234567890abcdef1234567890abcdef1234567890abcdef12345678",
-        fragmentLocations: List<FragmentLocation> = emptyList()
+        fragmentLocations: List<FragmentLocation> = emptyList(),
+        originalFileName: String = "",
+        originalFileSize: Long = 0L
     ) = CatalogEntry(
         fileHash = fileHash,
         ownerPubKeyHash = "ownerHash01234567",
         versionClock = System.currentTimeMillis(),
-        fragmentLocations = fragmentLocations
+        fragmentLocations = fragmentLocations,
+        originalFileName = originalFileName,
+        originalFileSize = originalFileSize
     )
 }

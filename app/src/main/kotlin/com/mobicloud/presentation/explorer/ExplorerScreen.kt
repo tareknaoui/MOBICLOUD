@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -28,12 +29,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -46,8 +56,10 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
@@ -71,6 +83,8 @@ import com.mobicloud.presentation.explorer.components.AssembledBottomSheet
 import com.mobicloud.presentation.explorer.components.CatalogEntryCard
 import com.mobicloud.presentation.explorer.components.DownloadProgressIndicator
 import com.mobicloud.presentation.explorer.components.ErasureProgressIndicator
+import com.mobicloud.presentation.explorer.components.FolderItem
+import com.mobicloud.presentation.explorer.components.MoveToFolderSheet
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import java.io.File
@@ -89,6 +103,16 @@ fun ExplorerScreen(
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val storeState by viewModel.storeState.collectAsStateWithLifecycle()
     val downloadState by viewModel.downloadState.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val selectedCategory by viewModel.selectedCategory.collectAsStateWithLifecycle()
+    val currentFolder by viewModel.currentFolder.collectAsStateWithLifecycle()
+    val folders by viewModel.folders.collectAsStateWithLifecycle()
+
+    // Story 13.5 — état local pour le bottom sheet et les dialogues
+    var moveSheetEntry by remember { mutableStateOf<String?>(null) }
+    var folderContextTarget by remember { mutableStateOf<String?>(null) }
+    var renameDialogTarget by remember { mutableStateOf<String?>(null) }
+    var renameInput by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -124,7 +148,39 @@ fun ExplorerScreen(
     }
 
     val assembledState = downloadState as? DownloadState.Assembled
-    if (assembledState != null) {
+    
+    // Preview: automatically open the file without showing the bottom sheet
+    LaunchedEffect(assembledState) {
+        if (assembledState != null && assembledState.isPreview) {
+            val filePath = assembledState.filePath
+            val file = File(filePath)
+            android.util.Log.i("MobiCloud:Open", "[PREVIEW] tentative ouverture path=$filePath exists=${file.exists()} size=${if (file.exists()) file.length() else -1} ext='${file.extension}'")
+            try {
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val mimeType = MimeTypeMap.getSingleton()
+                    .getMimeTypeFromExtension(file.extension) ?: "application/octet-stream"
+                val intent = Intent(Intent.ACTION_VIEW).apply {
+                    setDataAndType(uri, mimeType)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                try {
+                    context.startActivity(intent)
+                    viewModel.resetDownloadState()
+                } catch (e: ActivityNotFoundException) {
+                    android.util.Log.w("MobiCloud:Open", "[PREVIEW] ActivityNotFound mime=$mimeType", e)
+                    snackbarHostState.showSnackbar("No app installed to open this file type.")
+                    viewModel.resetDownloadState()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MobiCloud:Open", "[PREVIEW] FileProvider échoué path=$filePath", e)
+                snackbarHostState.showSnackbar("Could not open the file. Please try again.")
+                viewModel.resetDownloadState()
+            }
+        }
+    }
+
+    // Download: show the details bottom sheet for user confirmation
+    if (assembledState != null && !assembledState.isPreview) {
         AssembledBottomSheet(
             state = assembledState,
             onOpen = { filePath ->
@@ -173,6 +229,78 @@ fun ExplorerScreen(
                 viewModel.undoMoveToTrash(fileHash)
             }
         }
+    }
+
+    // Story 13.5 — MoveToFolderSheet
+    moveSheetEntry?.let { fileHash ->
+        MoveToFolderSheet(
+            folders = folders,
+            currentFolderPath = entries.find { it.fileHash == fileHash }?.folderPath,
+            onMoveToFolder = { folderName -> viewModel.moveFileToFolder(fileHash, folderName) },
+            onMoveToRoot = { viewModel.moveFileToFolder(fileHash, null) },
+            onDismiss = { moveSheetEntry = null }
+        )
+    }
+
+    // Story 13.5 — dialogue contextuel dossier (long-press sur FolderItem)
+    folderContextTarget?.let { folder ->
+        AlertDialog(
+            onDismissRequest = { folderContextTarget = null },
+            title = { Text(folder, fontWeight = FontWeight.Bold) },
+            text = { Text("Que voulez-vous faire avec ce dossier ?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    folderContextTarget = null
+                    renameInput = folder
+                    renameDialogTarget = folder
+                }) {
+                    Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Renommer")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    viewModel.deleteFolder(folder)
+                    folderContextTarget = null
+                }) {
+                    Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF3B30))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Supprimer", color = Color(0xFFFF3B30))
+                }
+            }
+        )
+    }
+
+    // Story 13.5 — dialogue renommage dossier
+    renameDialogTarget?.let { oldName ->
+        AlertDialog(
+            onDismissRequest = { renameDialogTarget = null; renameInput = "" },
+            title = { Text("Renommer le dossier", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = renameInput,
+                    onValueChange = { renameInput = it },
+                    label = { Text("Nouveau nom") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (renameInput.isNotBlank() && renameInput != oldName) {
+                            viewModel.renameFolder(oldName, renameInput.trim())
+                        }
+                        renameDialogTarget = null
+                        renameInput = ""
+                    },
+                    enabled = renameInput.isNotBlank()
+                ) { Text("Valider") }
+            },
+            dismissButton = {
+                TextButton(onClick = { renameDialogTarget = null; renameInput = "" }) { Text("Annuler") }
+            }
+        )
     }
 
     val storeLauncher = rememberLauncherForActivityResult(
@@ -234,6 +362,64 @@ fun ExplorerScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // Search Bar
+            ExplorerSearchBar(
+                query = searchQuery,
+                onQueryChange = { viewModel.setSearchQuery(it) },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Story 13.5 — breadcrumb quand on est dans un dossier
+            if (currentFolder != null) {
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { viewModel.navigateToRoot() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = Color(0xFF0A84FF))
+                    }
+                    Text(
+                        text = "/ $currentFolder",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1C1C1E)
+                    )
+                }
+            }
+
+            // Story 13.5 — row de dossiers à la racine
+            if (currentFolder == null && folders.isNotEmpty()) {
+                val allEntries = entries
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+                ) {
+                    items(folders) { folder ->
+                        val count = allEntries.count { it.folderPath == folder }
+                        FolderItem(
+                            name = folder,
+                            fileCount = count,
+                            onClick = { viewModel.navigateIntoFolder(folder) },
+                            onLongClick = { folderContextTarget = folder }
+                        )
+                    }
+                }
+            }
+
+            // Filter Chips
+            FilterChipRow(
+                selectedCategory = selectedCategory,
+                onCategorySelected = { viewModel.setSelectedCategory(it) }
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
             AnimatedVisibility(
                 visible = inProgressState != null,
                 enter = fadeIn(tween(300)) + expandVertically(tween(300)),
@@ -369,7 +555,9 @@ fun ExplorerScreen(
                                 ) {
                                     CatalogEntryCard(
                                         entry = entry,
-                                        onDownload = { fileHash -> viewModel.initiateDownload(fileHash) }
+                                        onDownload = { fileHash -> viewModel.initiateDownload(fileHash, isPreview = false) },
+                                        onPreview = { fileHash -> viewModel.initiateDownload(fileHash, isPreview = true) },
+                                        onLongClick = { moveSheetEntry = entry.fileHash }
                                     )
                                 }
                             }
@@ -379,5 +567,87 @@ fun ExplorerScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ExplorerSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    OutlinedTextField(
+        value = query,
+        onValueChange = onQueryChange,
+        placeholder = { Text("Search files...", color = Color(0xFF8E8E93)) },
+        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF8E8E93)) },
+        trailingIcon = {
+            if (query.isNotEmpty()) {
+                IconButton(onClick = { onQueryChange("") }) {
+                    Icon(Icons.Default.Clear, contentDescription = "Clear", tint = Color(0xFF8E8E93))
+                }
+            }
+        },
+        singleLine = true,
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Color(0xFF0A84FF),
+            unfocusedBorderColor = Color(0xFFE5E5EA),
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            focusedTextColor = Color(0xFF1C1C1E),
+            unfocusedTextColor = Color(0xFF1C1C1E)
+        ),
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.fillMaxWidth()
+    )
+}
+
+@Composable
+private fun FilterChipRow(
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val categories = listOf("All", "Images", "Videos", "Audio", "Documents")
+    LazyRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        items(categories) { category ->
+            CustomFilterChip(
+                text = category,
+                isSelected = category == selectedCategory,
+                onClick = { onCategorySelected(category) }
+            )
+        }
+    }
+}
+
+@Composable
+private fun CustomFilterChip(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bgColor = if (isSelected) Color(0xFF0A84FF) else Color.White
+    val textColor = if (isSelected) Color.White else Color(0xFF48484A)
+    val borderColor = if (isSelected) Color(0xFF0A84FF) else Color(0xFFE5E5EA)
+
+    Box(
+        modifier = modifier
+            .background(bgColor, RoundedCornerShape(20.dp))
+            .border(1.dp, borderColor, RoundedCornerShape(20.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            color = textColor,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold
+        )
     }
 }
