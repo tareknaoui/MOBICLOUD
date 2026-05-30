@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -107,9 +108,9 @@ fun ErasureProgressIndicator(
                                 color = Color(0xFF0A84FF),
                                 trackColor = Color(0xFFE5E5EA)
                             )
-                            Row(
+                            FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 for (index in 0 until animatedState.total) {
                                     val isData = index < animatedState.dataBlockCount

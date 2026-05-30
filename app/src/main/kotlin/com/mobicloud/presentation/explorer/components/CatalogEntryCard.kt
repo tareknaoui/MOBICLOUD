@@ -171,129 +171,158 @@ fun CatalogEntryCard(
         modifier = modifier
             .fillMaxWidth()
             .then(if (onLongClick != null) Modifier.combinedClickable(onClick = {}, onLongClick = onLongClick) else Modifier),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         border = BorderStroke(1.dp, Color(0xFFF1F1F5)), // Sleek subtle border
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp, pressedElevation = 3.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp, pressedElevation = 4.dp)
     ) {
-        Row(
+        Column(
             modifier = Modifier
                 .padding(horizontal = 16.dp, vertical = 14.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                .fillMaxWidth()
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(fileStyle.bgColor, CircleShape),
-                contentAlignment = Alignment.Center
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                Icon(
-                    imageVector = fileStyle.icon,
-                    contentDescription = null,
-                    tint = fileStyle.iconColor,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = displayName,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF1C1C1E),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "${entry.fragmentLocations.size} copies",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF757575)
-                    )
-                    if (sizeText.isNotEmpty()) {
-                        Text(text = "•", color = Color(0xFFB0BEC5), fontSize = 10.sp)
-                        Text(
-                            text = sizeText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color(0xFF757575)
-                        )
-                    }
-                    Text(text = "•", color = Color(0xFFB0BEC5), fontSize = 10.sp)
-                    Text(
-                        text = dateFormatted,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Color(0xFF757575)
-                    )
-                }
-            }
-
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = animatedBadgeBg,
-                border = BorderStroke(1.dp, animatedBadgeBorder),
-                modifier = Modifier.padding(horizontal = 2.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                // Left: File Type Icon with status dot overlapping bottom-right
+                Box(
+                    modifier = Modifier.size(44.dp)
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(6.dp)
+                            .size(44.dp)
+                            .background(fileStyle.bgColor, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = fileStyle.icon,
+                            contentDescription = null,
+                            tint = fileStyle.iconColor,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    // Small glowing status dot
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
                             .background(badgeStyle.dotColor, CircleShape)
+                            .border(2.dp, Color.White, CircleShape)
+                            .align(Alignment.BottomEnd)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                }
+
+                // Middle: Filename and metadata (size, date)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1C1C1E),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (sizeText.isNotEmpty()) {
+                            Text(
+                                text = sizeText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF8E8E93)
+                            )
+                            Text(text = "•", color = Color(0xFFE5E5EA), fontSize = 10.sp)
+                        }
+                        Text(
+                            text = dateFormatted,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = Color(0xFF8E8E93)
+                        )
+                    }
+                }
+
+                // Right: Action buttons (Preview, Download) grouped neatly
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    if (onPreview != null && availability != AvailabilityState.DEGRADE) {
+                        IconButton(
+                            onClick = { onPreview(entry.fileHash) },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0xFFE8F1FF), CircleShape) // Sleek blue circular container for preview
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Visibility,
+                                contentDescription = "Preview",
+                                tint = Color(0xFF0A84FF),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    if (onDownload != null && availability != AvailabilityState.DEGRADE) {
+                        IconButton(
+                            onClick = { onDownload(entry.fileHash) },
+                            interactionSource = downloadInteraction,
+                            modifier = Modifier
+                                .size(36.dp)
+                                .background(Color(0xFFF2F4F7), CircleShape) // Sleek circular container
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "Download",
+                                tint = Color(0xFF0A84FF),
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .graphicsLayer {
+                                        scaleX = downloadScale
+                                        scaleY = downloadScale
+                                    }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Bottom secondary row for status badges
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.padding(start = 56.dp), // Alignment with the start of the title
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Status label badge (Complete, Partial, Degraded)
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = animatedBadgeBg,
+                    border = BorderStroke(1.dp, animatedBadgeBorder)
+                ) {
                     Text(
                         text = badgeStyle.text,
                         color = animatedBadgeColor,
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
-            }
 
-            if (onPreview != null && availability != AvailabilityState.DEGRADE) {
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(
-                    onClick = { onPreview(entry.fileHash) },
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color(0xFFE8F1FF), CircleShape) // Sleek blue circular container for preview
+                // Copies count badge
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = Color(0xFFF2F4F7),
+                    border = BorderStroke(1.dp, Color(0xFFE5E5EA))
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Visibility,
-                        contentDescription = "Preview",
-                        tint = Color(0xFF0A84FF),
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
-            }
-
-            if (onDownload != null && availability != AvailabilityState.DEGRADE) {
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(
-                    onClick = { onDownload(entry.fileHash) },
-                    interactionSource = downloadInteraction,
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color(0xFFF2F4F7), CircleShape) // Sleek circular container
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Download,
-                        contentDescription = "Download",
-                        tint = Color(0xFF0A84FF),
-                        modifier = Modifier
-                            .size(20.dp)
-                            .graphicsLayer {
-                                scaleX = downloadScale
-                                scaleY = downloadScale
-                            }
+                    Text(
+                        text = "${entry.fragmentLocations.size} copies",
+                        color = Color(0xFF48484A),
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                     )
                 }
             }

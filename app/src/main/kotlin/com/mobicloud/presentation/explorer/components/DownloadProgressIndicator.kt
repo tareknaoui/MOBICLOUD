@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -104,9 +105,9 @@ fun DownloadProgressIndicator(
                             val receivedByFragment = animatedState.contributions.associateBy { it.fragmentIndex }
                             val failedFragments = animatedState.failedFragmentIndices
 
-                            Row(
+                            FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
                                 for (index in 0 until totalBlocks) {
                                     val isData = index < params.k
