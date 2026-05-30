@@ -1,0 +1,235 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 520" width="100%" height="100%">
+  <!-- Definitions for filters and markers -->
+  <defs>
+    <!-- Drop Shadow Filter for nodes -->
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.08"/>
+    </filter>
+    <filter id="glow-green" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="3" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+    
+    <!-- Arrow heads -->
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#3b82f6" />
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#10b981" />
+    </marker>
+    <marker id="arrow-slate" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748b" />
+    </marker>
+  </defs>
+
+  <!-- Background Layer -->
+  <rect width="100%" height="100%" fill="#ffffff" />
+  
+  <!-- Grid pattern for professional look (subtle) -->
+  <g opacity="0.05">
+    <path d="M 0,50 L 920,50 M 0,100 L 920,100 M 0,150 L 920,150 M 0,200 L 920,200 M 0,250 L 920,250 M 0,300 L 920,300 M 0,355 L 920,355 M 0,400 L 920,400 M 0,450 L 920,450" fill="none" stroke="#000" stroke-width="1"/>
+    <path d="M 50,0 L 50,520 M 100,0 L 100,520 M 150,0 L 150,520 M 200,0 L 200,520 M 250,0 L 250,520 M 300,0 L 300,520 M 350,0 L 350,520 M 400,0 L 400,520 M 450,0 L 450,520 M 500,0 L 500,520 M 550,0 L 550,520 M 600,0 L 600,520 M 650,0 L 650,520 M 700,0 L 700,520 M 750,0 L 750,520 M 800,0 L 800,520 M 850,0 L 850,520" fill="none" stroke="#000" stroke-width="1"/>
+  </g>
+
+  <!-- ==================== CLUSTER LOCAL (LEFT) ==================== -->
+  <g id="local-cluster" transform="translate(20, 30)">
+    <!-- Container Box -->
+    <rect width="320" height="460" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 4" />
+    <rect width="180" height="28" rx="14" x="70" y="-14" fill="#0f172a" />
+    <text x="160" y="5" fill="#ffffff" font-family="Segoe UI, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.5">CLUSTER LOCAL (LAN / WiFi)</text>
+    
+    <!-- mDNS LAN Area Indication -->
+    <rect x="15" y="25" width="290" height="415" rx="8" fill="#f1f5f9" opacity="0.5" />
+    <text x="160" y="44" fill="#475569" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="600" text-anchor="middle" letter-spacing="1">ZONE DE DÉCOUVERTE mDNS (LAN)</text>
+
+    <!-- Super-Peer A -->
+    <g id="sp-a" transform="translate(30, 200)" filter="url(#shadow)">
+      <rect width="260" height="85" rx="12" fill="#ecfdf5" stroke="#10b981" stroke-width="2" />
+      <!-- Star Icon representing Leader -->
+      <path d="M 28 24 L 30.5 30 L 37 30.5 L 32 35 L 33.5 41.5 L 28 38 L 22.5 41.5 L 24 35 L 19 30.5 L 25.5 30 Z" fill="#10b981" />
+      <!-- Phone Frame Icon -->
+      <rect x="238" y="15" width="12" height="22" rx="2" fill="none" stroke="#047857" stroke-width="1.5"/>
+      <line x1="242" y1="33" x2="246" y2="33" stroke="#047857" stroke-width="1.5" />
+      <!-- Text -->
+      <text x="50" y="32" fill="#047857" font-family="Segoe UI, -apple-system, sans-serif" font-size="14" font-weight="700">Super-Pair A (Mobi-Leader)</text>
+      <text x="50" y="48" fill="#065f46" font-family="Segoe UI, -apple-system, sans-serif" font-size="11" font-weight="600">ID: 0x4F3A...B2A (Local IP: 192.168.1.50)</text>
+      <text x="50" y="64" fill="#34d399" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="700">Rôle: Coordinateur &amp; Passerelle Relais</text>
+    </g>
+
+    <!-- Regular Peer A1 -->
+    <g id="peer-a1" transform="translate(30, 75)" filter="url(#shadow)">
+      <rect width="260" height="75" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+      <circle cx="30" cy="38" r="14" fill="#f1f5f9" />
+      <!-- Phone Frame Icon -->
+      <rect x="24" y="27" width="12" height="22" rx="2" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <line x1="28" y1="45" x2="32" y2="45" stroke="#475569" stroke-width="1.5" />
+      <!-- Text -->
+      <text x="54" y="30" fill="#0f172a" font-family="Segoe UI, -apple-system, sans-serif" font-size="12" font-weight="700">Pair Régulier A1</text>
+      <text x="54" y="44" fill="#64748b" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="600">ID: 0xA31F...F71 (192.168.1.88)</text>
+      <text x="54" y="58" fill="#64748b" font-family="Segoe UI, -apple-system, sans-serif" font-size="10">Héberge 2 fragments chiffrés (AES-GCM)</text>
+    </g>
+
+    <!-- Regular Peer A2 -->
+    <g id="peer-a2" transform="translate(30, 335)" filter="url(#shadow)">
+      <rect width="260" height="75" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+      <circle cx="30" cy="38" r="14" fill="#f1f5f9" />
+      <!-- Phone Frame Icon -->
+      <rect x="24" y="27" width="12" height="22" rx="2" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <line x1="28" y1="45" x2="32" y2="45" stroke="#475569" stroke-width="1.5" />
+      <!-- Text -->
+      <text x="54" y="30" fill="#0f172a" font-family="Segoe UI, -apple-system, sans-serif" font-size="12" font-weight="700">Pair Régulier A2</text>
+      <text x="54" y="44" fill="#64748b" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="600">ID: 0xC9B2...01E (192.168.1.102)</text>
+      <text x="54" y="58" fill="#64748b" font-family="Segoe UI, -apple-system, sans-serif" font-size="10">Héberge 2 fragments chiffrés (AES-GCM)</text>
+    </g>
+
+    <!-- Connections within Cluster LAN (Direct TCP) -->
+    <!-- SP to Peer A1 -->
+    <path d="M 160 200 L 160 150" fill="none" stroke="#10b981" stroke-dasharray="3 3" stroke-width="2" marker-start="url(#arrow-green)" marker-end="url(#arrow-green)" />
+    <text x="165" y="180" fill="#059669" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="600">mDNS &amp; Gossip LAN</text>
+    
+    <!-- SP to Peer A2 -->
+    <path d="M 160 285 L 160 335" fill="none" stroke="#10b981" stroke-dasharray="3 3" stroke-width="2" marker-start="url(#arrow-green)" marker-end="url(#arrow-green)" />
+    <text x="165" y="315" fill="#059669" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="600">mDNS &amp; Gossip LAN</text>
+
+    <!-- Direct Data path TCP (solid green) -->
+    <path d="M 230 150 L 230 200" fill="none" stroke="#059669" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+    <path d="M 90 335 L 90 285" fill="none" stroke="#059669" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+    <text x="235" y="175" fill="#059669" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="700">TCP Direct</text>
+    <text x="45" y="315" fill="#059669" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="700">TCP Direct</text>
+  </g>
+
+  <!-- ==================== WEBSOCKET RELAYS HA (MIDDLE) ==================== -->
+  <g id="relays" transform="translate(370, 70)">
+    <!-- Cloud base background -->
+    <path d="M 30,120 Q 10,70 50,50 Q 80,10 130,30 Q 180,10 200,60 Q 240,70 230,120 Q 240,170 200,200 Q 170,230 120,210 Q 70,230 40,190 Q 10,160 30,120 Z" fill="#eff6ff" stroke="#93c5fd" stroke-width="2" opacity="0.85"/>
+    <text x="130" y="45" fill="#1e3a8a" font-family="Segoe UI, -apple-system, sans-serif" font-size="12" font-weight="800" text-anchor="middle">RELAIS HAUTE DISPONIBILITÉ (HA)</text>
+    <text x="130" y="60" fill="#2563eb" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="700" text-anchor="middle">Render.com (2 Instances Actives)</text>
+
+    <!-- Relay Server instance 1 -->
+    <g id="relay-1" transform="translate(35, 75)" filter="url(#shadow)">
+      <rect width="180" height="50" rx="8" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5" />
+      <rect width="6" height="50" fill="#3b82f6" rx="2" />
+      <!-- Server Icon (subtle) -->
+      <rect x="15" y="16" width="16" height="18" rx="2" fill="none" stroke="#2563eb" stroke-width="1.5"/>
+      <line x1="18" y1="21" x2="28" y2="21" stroke="#2563eb" stroke-width="1" />
+      <line x1="18" y1="26" x2="28" y2="26" stroke="#2563eb" stroke-width="1" />
+      <circle cx="27" cy="30" r="1" fill="#10b981" />
+      <!-- Text -->
+      <text x="42" y="24" fill="#1e3a8a" font-family="Segoe UI, -apple-system, sans-serif" font-size="11" font-weight="700">Relay Node Server 1</text>
+      <text x="42" y="38" fill="#2563eb" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="600">Port 80/443 (Secure WSS)</text>
+    </g>
+
+    <!-- Relay Server instance 2 -->
+    <g id="relay-2" transform="translate(35, 140)" filter="url(#shadow)">
+      <rect width="180" height="50" rx="8" fill="#ffffff" stroke="#3b82f6" stroke-width="1.5" />
+      <rect width="6" height="50" fill="#3b82f6" rx="2" />
+      <!-- Server Icon -->
+      <rect x="15" y="16" width="16" height="18" rx="2" fill="none" stroke="#2563eb" stroke-width="1.5"/>
+      <line x1="18" y1="21" x2="28" y2="21" stroke="#2563eb" stroke-width="1" />
+      <line x1="18" y1="26" x2="28" y2="26" stroke="#2563eb" stroke-width="1" />
+      <circle cx="27" cy="30" r="1" fill="#10b981" />
+      <!-- Text -->
+      <text x="42" y="24" fill="#1e3a8a" font-family="Segoe UI, -apple-system, sans-serif" font-size="11" font-weight="700">Relay Node Server 2</text>
+      <text x="42" y="38" fill="#2563eb" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="600">Statut: Actif / Load-Balanced</text>
+    </g>
+
+    <text x="130" y="208" fill="#1e3a8a" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="700" text-anchor="middle">Signalisation / Annuaire / WAN Fallback</text>
+  </g>
+
+  <!-- ==================== CLUSTER DISTANT (RIGHT) ==================== -->
+  <g id="remote-cluster" transform="translate(580, 30)">
+    <!-- Container Box -->
+    <rect width="320" height="460" rx="16" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="6 4" />
+    <rect width="180" height="28" rx="14" x="70" y="-14" fill="#475569" />
+    <text x="160" y="5" fill="#ffffff" font-family="Segoe UI, -apple-system, sans-serif" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.5">CLUSTER DISTANT (NAT / 4G)</text>
+
+    <!-- mDNS LAN Area Indication -->
+    <rect x="15" y="25" width="290" height="415" rx="8" fill="#f1f5f9" opacity="0.5" />
+    <text x="160" y="44" fill="#475569" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="600" text-anchor="middle" letter-spacing="1">ZONE DE DÉCOUVERTE mDNS (LAN)</text>
+
+    <!-- Super-Peer X -->
+    <g id="sp-x" transform="translate(30, 200)" filter="url(#shadow)">
+      <rect width="260" height="85" rx="12" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2" />
+      <!-- Star Icon -->
+      <path d="M 28 24 L 30.5 30 L 37 30.5 L 32 35 L 33.5 41.5 L 28 38 L 22.5 41.5 L 24 35 L 19 30.5 L 25.5 30 Z" fill="#8b5cf6" />
+      <!-- Phone Frame Icon -->
+      <rect x="238" y="15" width="12" height="22" rx="2" fill="none" stroke="#6d28d9" stroke-width="1.5"/>
+      <line x1="242" y1="33" x2="246" y2="33" stroke="#6d28d9" stroke-width="1.5" />
+      <!-- Text -->
+      <text x="50" y="32" fill="#6d28d9" font-family="Segoe UI, -apple-system, sans-serif" font-size="14" font-weight="700">Super-Peer X (Mobi-Leader)</text>
+      <text x="50" y="48" fill="#5b21b6" font-family="Segoe UI, -apple-system, sans-serif" font-size="11" font-weight="600">ID: 0x8BA4...3D2 (WAN Relay Connection)</text>
+      <text x="50" y="64" fill="#a78bfa" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="700">Rôle: Coordinateur &amp; Tunneling Relais</text>
+    </g>
+
+    <!-- Regular Peer X1 -->
+    <g id="peer-x1" transform="translate(30, 75)" filter="url(#shadow)">
+      <rect width="260" height="75" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+      <circle cx="30" cy="38" r="14" fill="#f1f5f9" />
+      <!-- Phone Frame Icon -->
+      <rect x="24" y="27" width="12" height="22" rx="2" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <line x1="28" y1="45" x2="32" y2="45" stroke="#475569" stroke-width="1.5" />
+      <!-- Text -->
+      <text x="54" y="30" fill="#0f172a" font-family="Segoe UI, -apple-system, sans-serif" font-size="12" font-weight="700">Pair Régulier X1</text>
+      <text x="54" y="44" fill="#64748b" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="600">ID: 0xF5A2...192 (Remote Local Subnet)</text>
+      <text x="54" y="58" fill="#64748b" font-family="Segoe UI, -apple-system, sans-serif" font-size="10">Héberge 2 fragments chiffrés (AES-GCM)</text>
+    </g>
+
+    <!-- Regular Peer X2 -->
+    <g id="peer-x2" transform="translate(30, 335)" filter="url(#shadow)">
+      <rect width="260" height="75" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="1.5" />
+      <circle cx="30" cy="38" r="14" fill="#f1f5f9" />
+      <!-- Phone Frame Icon -->
+      <rect x="24" y="27" width="12" height="22" rx="2" fill="none" stroke="#475569" stroke-width="1.5"/>
+      <line x1="28" y1="45" x2="32" y2="45" stroke="#475569" stroke-width="1.5" />
+      <!-- Text -->
+      <text x="54" y="30" fill="#0f172a" font-family="Segoe UI, -apple-system, sans-serif" font-size="12" font-weight="700">Pair Régulier X2</text>
+      <text x="54" y="44" fill="#64748b" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="600">ID: 0xD761...66C (Remote Local Subnet)</text>
+      <text x="54" y="58" fill="#64748b" font-family="Segoe UI, -apple-system, sans-serif" font-size="10">Héberge 1 fragment chiffré (AES-GCM)</text>
+    </g>
+
+    <!-- Connections within Remote Cluster (Direct TCP) -->
+    <!-- SP to Peer X1 -->
+    <path d="M 160 200 L 160 150" fill="none" stroke="#8b5cf6" stroke-dasharray="3 3" stroke-width="2" marker-start="url(#arrow-slate)" marker-end="url(#arrow-slate)" />
+    <text x="165" y="180" fill="#6d28d9" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="600">mDNS &amp; Gossip LAN</text>
+    
+    <!-- SP to Peer X2 -->
+    <path d="M 160 285 L 160 335" fill="none" stroke="#8b5cf6" stroke-dasharray="3 3" stroke-width="2" marker-start="url(#arrow-slate)" marker-end="url(#arrow-slate)" />
+    <text x="165" y="315" fill="#6d28d9" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="600">mDNS &amp; Gossip LAN</text>
+
+    <!-- Direct Data path TCP (solid purple) -->
+    <path d="M 230 150 L 230 200" fill="none" stroke="#6d28d9" stroke-width="1.5" marker-end="url(#arrow-slate)"/>
+    <path d="M 90 335 L 90 285" fill="none" stroke="#6d28d9" stroke-width="1.5" marker-end="url(#arrow-slate)"/>
+    <text x="235" y="175" fill="#6d28d9" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="700">TCP Direct</text>
+    <text x="45" y="315" fill="#6d28d9" font-family="Segoe UI, -apple-system, sans-serif" font-size="9" font-weight="700">TCP Direct</text>
+  </g>
+
+  <!-- ==================== WAN WEBSOCKET INTER-CLUSTER TUNNELS ==================== -->
+  <!-- Local Super-Peer to HA Relays -->
+  <path d="M 310 270 C 370 270, 370 210, 420 200" fill="none" stroke="#3b82f6" stroke-width="2.5" marker-end="url(#arrow-blue)" />
+  <path d="M 420 190 C 370 180, 370 250, 310 250" fill="none" stroke="#3b82f6" stroke-width="2.5" marker-end="url(#arrow-blue)" />
+  <text x="365" y="240" fill="#1e3a8a" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="700" text-anchor="middle">WebSocket (WSS)</text>
+  <text x="365" y="252" fill="#2563eb" font-family="Segoe UI, -apple-system, sans-serif" font-size="8" font-weight="600" text-anchor="middle">Tunneling NAT Traversal</text>
+
+  <!-- Remote Super-Peer to HA Relays -->
+  <path d="M 610 270 C 550 270, 550 210, 500 200" fill="none" stroke="#3b82f6" stroke-width="2.5" marker-end="url(#arrow-blue)" />
+  <path d="M 500 190 C 550 180, 550 250, 610 250" fill="none" stroke="#3b82f6" stroke-width="2.5" marker-end="url(#arrow-blue)" />
+  <text x="555" y="240" fill="#1e3a8a" font-family="Segoe UI, -apple-system, sans-serif" font-size="10" font-weight="700" text-anchor="middle">WebSocket (WSS)</text>
+  <text x="555" y="252" fill="#2563eb" font-family="Segoe UI, -apple-system, sans-serif" font-size="8" font-weight="600" text-anchor="middle">Tunneling NAT Traversal</text>
+
+  <!-- Legend / Explanatory notes -->
+  <g transform="translate(140, 485)" font-family="Segoe UI, -apple-system, sans-serif" font-size="10">
+    <rect x="-10" y="-10" width="660" height="35" rx="6" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1"/>
+    
+    <circle cx="10" cy="8" r="4" fill="#10b981"/>
+    <text x="20" y="11" fill="#475569" font-weight="700">Découverte LAN (mDNS)</text>
+    
+    <line x1="165" y1="8" x2="195" y2="8" stroke="#059669" stroke-width="1.5"/>
+    <text x="205" y="11" fill="#475569" font-weight="700">Canal Direct TCP</text>
+    
+    <line x1="330" y1="8" x2="360" y2="8" stroke="#3b82f6" stroke-width="2.5"/>
+    <text x="370" y="11" fill="#475569" font-weight="700">Liaison Relais WebSocket (TLS/WSS)</text>
+    
+    <path d="M 560 3 L 565 8 L 575 8" fill="none" stroke="#cbd5e1" stroke-dasharray="4 2" stroke-width="1"/>
+    <text x="585" y="11" fill="#475569" font-weight="700">Limite de Réseau Inter-Membres</text>
+  </g>
+</svg>

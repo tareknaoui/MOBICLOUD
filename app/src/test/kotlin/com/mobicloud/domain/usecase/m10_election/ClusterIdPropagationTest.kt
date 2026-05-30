@@ -15,6 +15,8 @@ import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.repository.SignalingRepository
 import com.mobicloud.domain.repository.WifiNetworkRepository
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.LocalRepairBuffer
+import com.mobicloud.domain.models.m11_join.NodeJoinState
+import com.mobicloud.domain.usecase.m11_join.JoinStateMachine
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -54,9 +56,9 @@ class ClusterIdPropagationTest {
     private lateinit var wifiNetworkRepository: WifiNetworkRepository
     private lateinit var signalingRepository: SignalingRepository
 
-    private val localNodeId = "local-node-AAA"
+    private val localNodeId = "aabbccddeeff00112233"
     private val localIdentity = NodeIdentity(localNodeId, ByteArray(65))
-    private val superPairNodeId = "super-pair-BBB"
+    private val superPairNodeId = "aabbccddeeff00112244"
     private val superPairIdentity = NodeIdentity(superPairNodeId, ByteArray(65))
     private val superPairClusterId = "cluster-BBB-1234"
 
@@ -93,7 +95,7 @@ class ClusterIdPropagationTest {
         coEvery { signalingRepository.fetchActiveSuperPeers() } returns Result.success(Unit)
     }
 
-    private fun buildProcessUseCase() = ProcessIncomingElectionEventUseCase(
+    private fun buildProcessUseCase(joinStateMachine: JoinStateMachine? = null) = ProcessIncomingElectionEventUseCase(
         securityRepository = securityRepository,
         trustScoreProvider = trustScoreProvider,
         peerRepository = peerRepository,
@@ -103,7 +105,8 @@ class ClusterIdPropagationTest {
         networkEventRepository = networkEventRepository,
         nodeSettingsRepository = nodeSettingsRepository,
         wifiNetworkRepository = wifiNetworkRepository,
-        signalingRepository = signalingRepository
+        signalingRepository = signalingRepository,
+        joinStateMachine = joinStateMachine
     )
 
     private fun knownSuperPeer() = Peer(
@@ -239,5 +242,47 @@ class ClusterIdPropagationTest {
 
         assertTrue(event is ElectionEvent.CoordinatorRegistered)
         assertEquals(superPairNodeId, (event as ElectionEvent.CoordinatorRegistered).coordinatorNodeId)
+    }
+
+    // ── AC7 — SuperPair stable ne modifie pas son clusterId à cause d'un coordinateur rival ──
+
+    @Test
+    fun `COORDINATOR rival recu par un SuperPair stable ne modifie pas son clusterId`() = runTest {
+        every { peerRepository.peers } returns MutableStateFlow(listOf(knownSuperPeer()))
+
+        val mockJoinStateMachine = mockk<JoinStateMachine>(relaxed = true)
+        every { mockJoinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.SuperPair("cluster-local-AAA"))
+
+        val useCase = buildProcessUseCase(joinStateMachine = mockJoinStateMachine)
+        val resultFlow = useCase()
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            resultFlow.first { it.isSuccess && it.getOrNull() is ElectionEvent.CoordinatorRegistered }
+        }
+        incomingFlow.emit(coordinatorPayload("cluster-rival-BBB"))
+        job.join()
+
+        coVerify(exactly = 0) { nodeSettingsRepository.updateClusterId(any()) }
+    }
+
+    // ── AC8 — Member stable ne modifie pas son clusterId à cause d'un coordinateur rival ──
+
+    @Test
+    fun `COORDINATOR rival recu par un Member stable ne modifie pas son clusterId`() = runTest {
+        every { peerRepository.peers } returns MutableStateFlow(listOf(knownSuperPeer()))
+
+        val mockJoinStateMachine = mockk<JoinStateMachine>(relaxed = true)
+        every { mockJoinStateMachine.currentState } returns MutableStateFlow(NodeJoinState.Member("cluster-local-AAA", "sp-node-AAA".toByteArray()))
+
+        val useCase = buildProcessUseCase(joinStateMachine = mockJoinStateMachine)
+        val resultFlow = useCase()
+
+        val job = launch(UnconfinedTestDispatcher(testScheduler)) {
+            resultFlow.first { it.isSuccess && it.getOrNull() is ElectionEvent.CoordinatorRegistered }
+        }
+        incomingFlow.emit(coordinatorPayload("cluster-rival-BBB"))
+        job.join()
+
+        coVerify(exactly = 0) { nodeSettingsRepository.updateClusterId(any()) }
     }
 }

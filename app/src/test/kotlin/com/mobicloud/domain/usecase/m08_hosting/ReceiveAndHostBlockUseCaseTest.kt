@@ -47,6 +47,7 @@ class ReceiveAndHostBlockUseCaseTest {
         ReceiveAndHostBlockUseCase(
             hostedBlockRepository = hostedBlockRepository,
             securityRepository = securityRepository,
+            context = io.mockk.mockk(relaxed = true),
             diskSpaceProvider = { diskSpaceBytes }
         )
 

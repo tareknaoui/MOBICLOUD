@@ -217,6 +217,30 @@ override suspend fun fetchSuperPeers(): Result<List<RelayPeer>> = runCatching {
 
 The subscription to `_relayEvents` is established **before** sending the `GET_PEERS` frame to eliminate the race condition in which the server response arrives before the collector is ready. If no response is received within 5 seconds, the call returns an empty list and the node retries at the next scheduled discovery cycle.
 
+### 5.4.1.1 Network Topology & Cluster Architecture
+
+To fully understand how peer discovery and cluster formation operate in a production environment, it is essential to map the network topology of the MobiCloud system. Because mobile networks are characterized by strict firewalls, carrier-grade NATs (CGNAT), and dynamic IP addressing, MobiCloud utilizes a hybrid topology combining local decentralized clusters with a high-availability cloud-backed relay layer.
+
+The topology is divided into three primary components, as illustrated in the architecture diagram below:
+
+1. **Local LAN Cluster (Subnet Layer)**:
+   - **Regular Peers**: Standard Android devices that store encrypted data fragments, participate in the local Gossip protocol, and respond to retrieval requests.
+   - **Super-Peer**: A single dynamically elected coordinator (using the Bully Algorithm described in Section 5.4.2) that orchestrates local operations. The Super-Peer acts as the cluster representative, manages local catalog synchronizations, scans for under-replicated blocks, and bridges communications between local peers and the external relay server.
+   - **mDNS LAN Discovery**: Devices on the same physical Wi-Fi network discover each other autonomously without internet access by broadcasting mDNS (Multicast DNS) service advertisements on port 5353 over UDP.
+   - **Direct TCP Channels**: When two peers reside on the same LAN or have direct route accessibility, they establish direct peer-to-peer TCP sockets. This maximizes data transfer speed and avoids cloud resource consumption for local sharing.
+
+2. **High-Availability WebSocket Relay Layer (Cloud Bridge)**:
+   - To bypass NAT traversal restrictions (e.g., when a client on a 4G network wants to share data with a client on a home Wi-Fi network), MobiCloud deploys a multi-instance WebSocket Relay Server cluster on Render.com.
+   - These relays handle stateless authentication, keep track of active Super-Peers, and provide a secure, persistent store-and-forward channel.
+   - Every peer registers its presence and identity through a signed WebSocket connection. When direct TCP communication is blocked by firewalls or NAT boundaries, data blocks are safely routed via this WebSocket relay layer using a custom high-performance binary framing protocol.
+
+3. **Remote Cluster (WAN Layer)**:
+   - Remote clusters represent separate, independent local subnets of Android devices (e.g., a cluster at a different geographic site or on a different network provider).
+   - Each remote cluster maintains its own Super-Peer and utilizes the identical local discovery and election mechanisms.
+   - Inter-cluster communication is bridged entirely through the WebSocket relays: the local Super-Peer queries the relay cluster registry for remote host addresses, enabling transparent data distribution and retrieval across the WAN.
+
+![MobiCloud Network Topology](docs/network_topology.svg)
+
 ### 5.4.2 Leader Election — Bully Algorithm
 
 **Architecture Overview**

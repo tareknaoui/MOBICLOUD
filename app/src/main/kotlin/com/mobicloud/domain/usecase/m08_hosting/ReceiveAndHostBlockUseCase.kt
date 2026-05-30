@@ -16,15 +16,18 @@ import javax.inject.Singleton
 class ReceiveAndHostBlockUseCase internal constructor(
     private val hostedBlockRepository: HostedBlockRepository,
     private val securityRepository: SecurityRepository,
+    private val context: android.content.Context,
     private val diskSpaceProvider: () -> Long
 ) {
     @Inject
     constructor(
         hostedBlockRepository: HostedBlockRepository,
-        securityRepository: SecurityRepository
+        securityRepository: SecurityRepository,
+        @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context
     ) : this(
         hostedBlockRepository,
         securityRepository,
+        context,
         { StatFs(Environment.getDataDirectory().path).availableBytes }
     )
 
@@ -87,6 +90,38 @@ class ReceiveAndHostBlockUseCase internal constructor(
                     )
                 }
                 android.util.Log.i("MobiCloud:Host", "[RX] STORED ${message.blockId.take(8)} on disk")
+                try {
+                    val notificationManager = context.getSystemService(android.content.Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                    val channelId = "mobicloud_hosting_channel"
+                    
+                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                        var channel = notificationManager.getNotificationChannel(channelId)
+                        if (channel == null) {
+                            channel = android.app.NotificationChannel(
+                                channelId,
+                                "MobiCloud Hosting Activities",
+                                android.app.NotificationManager.IMPORTANCE_DEFAULT
+                            ).apply {
+                                description = "Notifications lorsqu'un autre membre stocke des données chez vous"
+                                enableLights(true)
+                                lightColor = android.graphics.Color.BLUE
+                                enableVibration(true)
+                            }
+                            notificationManager.createNotificationChannel(channel)
+                        }
+                    }
+
+                    val builder = androidx.core.app.NotificationCompat.Builder(context, channelId)
+                        .setSmallIcon(android.R.drawable.stat_notify_sync)
+                        .setContentTitle("MobiCloud - Hébergement de bloc")
+                        .setContentText("Un membre (${message.ownerId.take(8)}) stocke un fragment chez vous.")
+                        .setPriority(androidx.core.app.NotificationCompat.PRIORITY_DEFAULT)
+                        .setDefaults(androidx.core.app.NotificationCompat.DEFAULT_ALL)
+                        .setAutoCancel(true)
+                    notificationManager.notify(message.blockId.take(8).hashCode(), builder.build())
+                } catch (e: Exception) {
+                    android.util.Log.e("MobiCloud:Host", "Erreur lors de l'envoi de la notification: ${e.message}")
+                }
             } else {
                 android.util.Log.i("MobiCloud:Host", "[RX] already exists ${message.blockId.take(8)} — idempotent")
             }

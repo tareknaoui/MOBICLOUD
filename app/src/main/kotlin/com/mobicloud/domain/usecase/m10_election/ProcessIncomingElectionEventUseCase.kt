@@ -136,9 +136,11 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                     isSuperPair = true
                 )
 
-                // Story 12.1 : clusterId adopté depuis le COORDINATOR (non-self, non-blank).
+                // Story 12.1 : clusterId adopté depuis le COORDINATOR (non-self, non-blank) uniquement si on n'a pas déjà de cluster actif stable (Undiscovered/Isolated).
                 // Plus de dérivation SSID WiFi — seuls COORDINATOR, JOIN_ACCEPT et BullySolo écrivent le clusterId.
-                if (payload.clusterId.isNotBlank() && payload.senderNodeId != localIdentity.nodeId) {
+                val localState = joinStateMachine?.currentState?.value
+                val canAdoptClusterId = joinStateMachine == null || localState is NodeJoinState.Undiscovered || localState is NodeJoinState.Isolated
+                if (payload.clusterId.isNotBlank() && payload.senderNodeId != localIdentity.nodeId && canAdoptClusterId) {
                     nodeSettingsRepository.updateClusterId(payload.clusterId)
                 }
 

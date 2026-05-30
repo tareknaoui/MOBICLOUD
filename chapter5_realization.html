@@ -611,6 +611,40 @@ override suspend fun fetchSuperPeers(): Result&lt;List&lt;RelayPeer&gt;&gt; = ru
 }
 </code></pre>
 <p>The subscription to <code>_relayEvents</code> is established <strong>before</strong> sending the <code>GET_PEERS</code> frame to eliminate the race condition in which the server response arrives before the collector is ready. If no response is received within 5 seconds, the call returns an empty list and the node retries at the next scheduled discovery cycle.</p>
+
+<h3>5.4.1.1 Network Topology &amp; Cluster Architecture</h3>
+
+<p>To fully understand how peer discovery and cluster formation operate in a production environment, it is essential to map the network topology of the MobiCloud system. Because mobile networks are characterized by strict firewalls, carrier-grade NATs (CGNAT), and dynamic IP addressing, MobiCloud utilizes a hybrid topology combining local decentralized clusters with a high-availability cloud-backed relay layer.</p>
+
+<p>The topology is divided into three primary components, as illustrated in the architecture diagram below:</p>
+
+<ol>
+<li><strong>Local LAN Cluster (Subnet Layer)</strong>:
+   <ul>
+   <li><strong>Regular Peers</strong>: Standard Android devices that store encrypted data fragments, participate in the local Gossip protocol, and respond to retrieval requests.</li>
+   <li><strong>Super-Peer</strong>: A single dynamically elected coordinator (using the Bully Algorithm described in Section 5.4.2) that orchestrates local operations. The Super-Peer acts as the cluster representative, manages local catalog synchronizations, scans for under-replicated blocks, and bridges communications between local peers and the external relay server.</li>
+   <li><strong>mDNS LAN Discovery</strong>: Devices on the same physical Wi-Fi network discover each other autonomously without internet access by broadcasting mDNS (Multicast DNS) service advertisements on port 5353 over UDP.</li>
+   <li><strong>Direct TCP Channels</strong>: When two peers reside on the same LAN or have direct route accessibility, they establish direct peer-to-peer TCP sockets. This maximizes data transfer speed and avoids cloud resource consumption for local sharing.</li>
+   </ul>
+</li>
+<li><strong>High-Availability WebSocket Relay Layer (Cloud Bridge)</strong>:
+   <ul>
+   <li>To bypass NAT traversal restrictions (e.g., when a client on a 4G network wants to share data with a client on a home Wi-Fi network), MobiCloud deploys a multi-instance WebSocket Relay Server cluster on Render.com.</li>
+   <li>These relays handle stateless authentication, keep track of active Super-Peers, and provide a secure, persistent store-and-forward channel.</li>
+   <li>Every peer registers its presence and identity through a signed WebSocket connection. When direct TCP communication is blocked by firewalls or NAT boundaries, data blocks are safely routed via this WebSocket relay layer using a custom high-performance binary framing protocol.</li>
+   </ul>
+</li>
+<li><strong>Remote Cluster (WAN Layer)</strong>:
+   <ul>
+   <li>Remote clusters represent separate, independent local subnets of Android devices (e.g., a cluster at a different geographic site or on a different network provider).</li>
+   <li>Each remote cluster maintains its own Super-Peer and utilizes the identical local discovery and election mechanisms.</li>
+   <li>Inter-cluster communication is bridged entirely through the WebSocket relays: the local Super-Peer queries the relay cluster registry for remote host addresses, enabling transparent data distribution and retrieval across the WAN.</li>
+   </ul>
+</li>
+</ol>
+
+<p><img src="docs/network_topology.svg" alt="MobiCloud Network Topology" style="max-width: 100%; height: auto; display: block; margin: 2em auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-radius: 8px;"></p>
+
 <h3>5.4.2 Leader Election — Bully Algorithm</h3>
 <p><strong>Architecture Overview</strong></p>
 <p>The leader election module is composed of three classes. <code>MonitorMemberLivenessUseCase</code> acts as the watchdog: it observes the peer stream from <code>PeerRepository</code> and triggers an election when the current Super-Peer&#39;s <code>lastSeen</code> timestamp has not been updated for 20 consecutive seconds. <code>RunBullyElectionUseCase</code> contains the election state machine. <code>MarkSelfAsSuperPairUseCase</code> handles the role transition when a node wins the election.</p>
