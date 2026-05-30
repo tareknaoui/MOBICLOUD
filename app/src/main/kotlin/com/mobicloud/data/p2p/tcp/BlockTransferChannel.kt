@@ -10,8 +10,8 @@ object BlockTransferChannel {
     const val MAX_ACK_TIMEOUT_MS = 30_000L
     // Limite ACK message — le payload ACK est petit (<1 KB)
     const val MAX_ACK_PAYLOAD_BYTES = 4_096
-    // Limite payload BLOCK_TRANSFER — 1 MiB ciphertext + 16 tag GCM + overhead proto
-    const val MAX_BLOCK_PAYLOAD_BYTES = 2_000_000
+    // Limite payload BLOCK_TRANSFER — support de plus gros blocs
+    const val MAX_BLOCK_PAYLOAD_BYTES = 20_000_000
 
     const val DHT_LOOKUP_REQ: Byte = 0x30
     const val DHT_LOOKUP_RESP: Byte = 0x31

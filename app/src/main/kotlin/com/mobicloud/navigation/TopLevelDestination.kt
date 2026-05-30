@@ -64,18 +64,18 @@ enum class TopLevelDestination(
         titleTextId = R.string.explorer,
         route = ExplorerRoute::class,
     ),
-    SETTINGS(
-        selectedIcon = Icons.Filled.Settings,
-        unselectedIcon = Icons.Outlined.Settings,
-        iconTextId = R.string.settings,
-        titleTextId = R.string.settings,
-        route = SettingsRoute::class,
-    ),
     NETWORK(
         selectedIcon = Icons.Filled.Hub,
         unselectedIcon = Icons.Outlined.Hub,
         iconTextId = R.string.network,
         titleTextId = R.string.network,
         route = NetworkRoute::class,
+    ),
+    SETTINGS(
+        selectedIcon = Icons.Filled.Settings,
+        unselectedIcon = Icons.Outlined.Settings,
+        iconTextId = R.string.settings,
+        titleTextId = R.string.settings,
+        route = SettingsRoute::class,
     ),
 }

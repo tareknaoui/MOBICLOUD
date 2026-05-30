@@ -116,7 +116,7 @@ class ReceiveAndHostBlockUseCase internal constructor(
         }
 
     companion object {
-        const val MAX_BLOCK_PAYLOAD_BYTES = 2_000_000
+        const val MAX_BLOCK_PAYLOAD_BYTES = 20_000_000
         const val MIN_FREE_BYTES = 100L * 1024 * 1024 // 100 MB
 
         // [Review][Patch] Préfixe de domaine pour la signature ACK (domain separation).

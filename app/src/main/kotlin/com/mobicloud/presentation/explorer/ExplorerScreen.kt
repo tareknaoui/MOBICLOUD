@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedTextField
@@ -113,6 +114,8 @@ fun ExplorerScreen(
     var folderContextTarget by remember { mutableStateOf<String?>(null) }
     var renameDialogTarget by remember { mutableStateOf<String?>(null) }
     var renameInput by remember { mutableStateOf("") }
+    var showCreateFolderDialog by remember { mutableStateOf(false) }
+    var folderInput by remember { mutableStateOf("") }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -303,6 +306,37 @@ fun ExplorerScreen(
         )
     }
 
+    // Story 13.5 — dialogue création dossier
+    if (showCreateFolderDialog) {
+        AlertDialog(
+            onDismissRequest = { showCreateFolderDialog = false; folderInput = "" },
+            title = { Text("Nouveau dossier", fontWeight = FontWeight.Bold) },
+            text = {
+                OutlinedTextField(
+                    value = folderInput,
+                    onValueChange = { folderInput = it },
+                    label = { Text("Nom du dossier") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (folderInput.isNotBlank()) {
+                            viewModel.createFolder(folderInput.trim())
+                        }
+                        showCreateFolderDialog = false
+                        folderInput = ""
+                    },
+                    enabled = folderInput.isNotBlank()
+                ) { Text("Valider") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCreateFolderDialog = false; folderInput = "" }) { Text("Annuler") }
+            }
+        )
+    }
+
     val storeLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
@@ -393,23 +427,64 @@ fun ExplorerScreen(
                 }
             }
 
-            // Story 13.5 — row de dossiers à la racine
-            if (currentFolder == null && folders.isNotEmpty()) {
-                val allEntries = entries
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+            // Folders Header / Row
+            if (currentFolder == null) {
+                androidx.compose.foundation.layout.Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    items(folders) { folder ->
-                        val count = allEntries.count { it.folderPath == folder }
-                        FolderItem(
-                            name = folder,
-                            fileCount = count,
-                            onClick = { viewModel.navigateIntoFolder(folder) },
-                            onLongClick = { folderContextTarget = folder }
+                    Text(
+                        text = "Folders",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF1C1C1E)
+                    )
+                    TextButton(
+                        onClick = { showCreateFolderDialog = true }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CreateNewFolder,
+                            contentDescription = null,
+                            tint = Color(0xFF0A84FF),
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "New Folder",
+                            color = Color(0xFF0A84FF),
+                            fontWeight = FontWeight.SemiBold,
+                            style = MaterialTheme.typography.labelLarge
                         )
                     }
+                }
+
+                if (folders.isNotEmpty()) {
+                    val allEntries = entries
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                    ) {
+                        items(folders) { folder ->
+                            val count = allEntries.count { it.folderPath == folder }
+                            FolderItem(
+                                name = folder,
+                                fileCount = count,
+                                onClick = { viewModel.navigateIntoFolder(folder) },
+                                onLongClick = { folderContextTarget = folder }
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "No folders created yet",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF8E8E93),
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
                 }
             }
 

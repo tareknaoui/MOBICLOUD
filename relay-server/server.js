@@ -37,7 +37,7 @@ const MAX_CLUSTER_SIZE_SERVER = 2;
 const TTL_MS = 180_000;              // TTL registre signaling — 3 min pour survivre aux pauses Doze Android (~90s)
 const AUTH_WINDOW_MS = 30_000;       // fenêtre anti-replay auth
 const AUTH_TIMEOUT_MS = 10_000;      // délai max pour envoyer AUTH après connexion
-const MAX_BLOCK_SIZE = 1_100_000;    // 1.1 MB — marge sur fragments MobiCloud ~1 MB
+const MAX_BLOCK_SIZE = 20_000_000;   // 20 MB — support de plus gros blocs
 const MAX_RELAY_BUFFER_ENTRIES = 500; // cap total des blocs en attente en RAM
 const MAX_SIGNALING_PEERS = 100;      // cap total des Super-Pairs enregistrés
 const HEARTBEAT_INTERVAL_MS = 60_000; // ping ws protocol-level — 60s pour tolérer les pauses réseau Doze (kill après 2 cycles = 120s sans pong)

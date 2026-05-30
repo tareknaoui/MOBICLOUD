@@ -70,8 +70,14 @@ class ExplorerViewModel @Inject constructor(
     private val _currentFolder = MutableStateFlow<String?>(null)
     val currentFolder: StateFlow<String?> = _currentFolder.asStateFlow()
 
-    val folders: StateFlow<List<String>> = catalogRepository.getActiveFolderNamesFlow()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
+    private val _createdEmptyFolders = MutableStateFlow<Set<String>>(emptySet())
+
+    val folders: StateFlow<List<String>> = combine(
+        catalogRepository.getActiveFolderNamesFlow(),
+        _createdEmptyFolders
+    ) { dbFolders, emptyFolders ->
+        (dbFolders + emptyFolders).distinct().sorted()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
 
     val catalogEntries: StateFlow<List<CatalogEntry>> = combine(
         catalogRepository.getActiveEntriesFlow(),
@@ -391,7 +397,13 @@ class ExplorerViewModel @Inject constructor(
                     }
                 }
                     .onSuccess { entry ->
-                        _storeState.value = StoreState.Success(entry, entry.fragmentLocations.size)
+                        val folder = _currentFolder.value
+                        if (folder != null) {
+                            catalogRepository.moveFileToFolder(fileHash, folder)
+                            _createdEmptyFolders.update { it - folder }
+                        }
+                        val updatedEntry = if (folder != null) entry.copy(folderPath = folder) else entry
+                        _storeState.value = StoreState.Success(updatedEntry, entry.fragmentLocations.size)
                         scheduleReset()
                     }
                     .onFailure { e ->
@@ -414,6 +426,12 @@ class ExplorerViewModel @Inject constructor(
 
     // Story 13.5 — actions dossiers
 
+    fun createFolder(name: String) {
+        if (name.isNotBlank()) {
+            _createdEmptyFolders.update { it + name.trim() }
+        }
+    }
+
     fun navigateIntoFolder(name: String) { _currentFolder.value = name }
     fun navigateToRoot() { _currentFolder.value = null }
 
@@ -428,6 +446,7 @@ class ExplorerViewModel @Inject constructor(
     fun deleteFolder(folderPath: String) {
         viewModelScope.launch {
             if (_currentFolder.value == folderPath) _currentFolder.value = null
+            _createdEmptyFolders.update { it - folderPath }
             catalogRepository.deleteFolder(folderPath)
         }
     }
