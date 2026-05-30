@@ -79,6 +79,9 @@ class ExplorerViewModel @Inject constructor(
         (dbFolders + emptyFolders).distinct().sorted()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
 
+    val allCatalogEntries: StateFlow<List<CatalogEntry>> = catalogRepository.getActiveEntriesFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), emptyList())
+
     val catalogEntries: StateFlow<List<CatalogEntry>> = combine(
         catalogRepository.getActiveEntriesFlow(),
         _searchQuery,

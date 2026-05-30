@@ -101,6 +101,7 @@ fun ExplorerScreen(
     viewModel: ExplorerViewModel = hiltViewModel()
 ) {
     val entries by viewModel.catalogEntries.collectAsStateWithLifecycle()
+    val allCatalogEntries by viewModel.allCatalogEntries.collectAsStateWithLifecycle()
     val isRefreshing by viewModel.isRefreshing.collectAsStateWithLifecycle()
     val storeState by viewModel.storeState.collectAsStateWithLifecycle()
     val downloadState by viewModel.downloadState.collectAsStateWithLifecycle()
@@ -462,7 +463,7 @@ fun ExplorerScreen(
                 }
 
                 if (folders.isNotEmpty()) {
-                    val allEntries = entries
+                    val allEntries = allCatalogEntries
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                         contentPadding = PaddingValues(horizontal = 16.dp),
