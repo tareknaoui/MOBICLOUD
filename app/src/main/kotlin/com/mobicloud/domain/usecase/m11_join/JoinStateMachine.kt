@@ -50,7 +50,9 @@ class JoinStateMachine @Inject constructor(
     val currentState: StateFlow<NodeJoinState> = _currentState.asStateFlow()
 
     // SupervisorJob → un timer qui crash n'annule pas le scope entier.
-    private val scope = CoroutineScope(SupervisorJob() + defaultDispatcher)
+    // var (pas val) : close() crée un nouveau scope pour survivre aux redémarrages START_STICKY
+    // du service dans le même process Android (le singleton Hilt survit, le service non).
+    private var scope = CoroutineScope(SupervisorJob() + defaultDispatcher)
     private var isolationTimerJob: Job? = null
 
     // Sérialise les transitions : lecture state + branchement + write doivent être atomiques.
@@ -59,6 +61,11 @@ class JoinStateMachine @Inject constructor(
     /** Annule toutes les coroutines (timer isolation, etc.). À appeler depuis le service onDestroy. */
     fun close() {
         scope.cancel()
+        // Réinitialiser le scope pour le prochain démarrage du service (START_STICKY même process).
+        // Sans ça, scope.launch() échoue silencieusement → sendJoinRequest / BullySolo jamais exécutés.
+        scope = CoroutineScope(SupervisorJob() + defaultDispatcher)
+        _currentState.value = NodeJoinState.Undiscovered
+        isolationTimerJob = null
     }
 
     suspend fun transition(event: JoinEvent) = transitionMutex.withLock {

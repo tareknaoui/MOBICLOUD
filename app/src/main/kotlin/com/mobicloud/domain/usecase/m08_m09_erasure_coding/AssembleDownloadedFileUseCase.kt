@@ -1,7 +1,13 @@
 package com.mobicloud.domain.usecase.m08_m09_erasure_coding
 
+import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
+import android.os.Build
 import android.os.Environment
+import android.provider.MediaStore
+import android.util.Log
+import android.webkit.MimeTypeMap
 import com.mobicloud.core.security.unwrapFileMasterKey
 import com.mobicloud.core.security.hkdfSha256
 import com.mobicloud.domain.models.DownloadException
@@ -224,25 +230,52 @@ class AssembleDownloadedFileUseCase @Inject constructor(
                 throw DownloadException.CorruptFile(fileHash, computedHash)
             }
 
-            // 6. Move atomique vers l'emplacement final visible utilisateur ou cache temporaire pour preview.
-            //    Fallback `copyTo + delete()` si renameTo échoue.
-            val finalDir = if (isPreview) {
-                File(context.cacheDir, "previews").apply { if (!exists()) mkdirs() }
-            } else {
-                context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
-            }
-            if (!finalDir.exists()) finalDir.mkdirs()
+            // 6. Publication du fichier reconstitué.
             val outputName = if (catalog.originalFileName.isNotEmpty()) catalog.originalFileName
                              else "mobicloud_${fileHash.take(16)}"
-            val finalFile = File(finalDir, outputName)
-            withContext(Dispatchers.IO) {
-                if (!tempFile.renameTo(finalFile)) {
-                    tempFile.copyTo(finalFile, overwrite = true)
-                    tempFile.delete()
+
+            val finalLocation: String
+            if (isPreview) {
+                // Preview : reste dans le cache privé (ouverture immédiate via FileProvider,
+                // aucune visibilité galerie souhaitée). Move atomique + fallback copyTo.
+                val finalDir = File(context.cacheDir, "previews").apply { if (!exists()) mkdirs() }
+                val finalFile = File(finalDir, outputName)
+                withContext(Dispatchers.IO) {
+                    if (!tempFile.renameTo(finalFile)) {
+                        tempFile.copyTo(finalFile, overwrite = true)
+                        tempFile.delete()
+                    }
+                }
+                finalLocation = finalFile.absolutePath
+            } else {
+                // Téléchargement : publier dans MediaStore (Android 10+) pour que les images/vidéos
+                // apparaissent dans la Galerie (Pictures/Movies) et les autres fichiers dans
+                // Téléchargements. Sur Android < 10 (pas de scoped storage), fallback dossier privé.
+                val mimeType = inferMimeType(outputName)
+                val publishedUri: String? =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        withContext(Dispatchers.IO) { publishToMediaStore(tempFile, outputName, mimeType) }
+                    } else null
+
+                if (publishedUri != null) {
+                    runCatching { tempFile.delete() }
+                    finalLocation = publishedUri
+                } else {
+                    // Fallback : dossier privé de l'app (comportement legacy, non visible Galerie).
+                    val finalDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS) ?: context.filesDir
+                    if (!finalDir.exists()) finalDir.mkdirs()
+                    val finalFile = File(finalDir, outputName)
+                    withContext(Dispatchers.IO) {
+                        if (!tempFile.renameTo(finalFile)) {
+                            tempFile.copyTo(finalFile, overwrite = true)
+                            tempFile.delete()
+                        }
+                    }
+                    finalLocation = finalFile.absolutePath
                 }
             }
             emit(AssembleProgress.Decrypting(processedCounter.get(), k))
-            emit(AssembleProgress.Finalized(AssembleResult.Success(finalFile.absolutePath)))
+            emit(AssembleProgress.Finalized(AssembleResult.Success(finalLocation)))
         } catch (e: DownloadException) {
             runCatching { tempFile.delete() }
             emit(AssembleProgress.Finalized(AssembleResult.Failure(e)))
@@ -258,4 +291,64 @@ class AssembleDownloadedFileUseCase @Inject constructor(
             runCatching { tempFile.delete() }
         }
     }.flowOn(Dispatchers.Default)
+
+    /** Déduit le type MIME depuis l'extension du nom de fichier ; octet-stream si inconnu. */
+    private fun inferMimeType(fileName: String): String {
+        val ext = fileName.substringAfterLast('.', "").lowercase()
+        return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+            ?: "application/octet-stream"
+    }
+
+    /**
+     * Publie [sourceFile] dans MediaStore (Android 10+, scoped storage — aucune permission requise).
+     *  - image   → Pictures/MobiCloud  (visible dans la Galerie)
+     *  - video   → Movies/MobiCloud    (visible dans la Galerie)
+     *  - autre   → Download/MobiCloud  (visible dans l'app Fichiers / Téléchargements)
+     * Retourne l'URI content:// résultant (String) ou null en cas d'échec (le caller fait alors
+     * un fallback vers le dossier privé).
+     */
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.Q)
+    private fun publishToMediaStore(sourceFile: File, displayName: String, mimeType: String): String? =
+        runCatching {
+            val resolver = context.contentResolver
+            val collection: Uri
+            val relativePath: String
+            when {
+                mimeType.startsWith("image/") -> {
+                    collection = MediaStore.Images.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                    relativePath = Environment.DIRECTORY_PICTURES + "/MobiCloud"
+                }
+                mimeType.startsWith("video/") -> {
+                    collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                    relativePath = Environment.DIRECTORY_MOVIES + "/MobiCloud"
+                }
+                else -> {
+                    collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                    relativePath = Environment.DIRECTORY_DOWNLOADS + "/MobiCloud"
+                }
+            }
+
+            val values = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+                // IS_PENDING=1 cache l'entrée des autres apps tant que l'écriture n'est pas finie.
+                put(MediaStore.MediaColumns.IS_PENDING, 1)
+            }
+
+            val uri = resolver.insert(collection, values) ?: error("MediaStore insert a retourné null")
+            resolver.openOutputStream(uri)?.use { out ->
+                sourceFile.inputStream().use { it.copyTo(out) }
+            } ?: error("openOutputStream a retourné null")
+
+            values.clear()
+            values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+            resolver.update(uri, values, null, null)
+
+            Log.i("MobiCloud:Save", "Publié dans MediaStore : $relativePath/$displayName → $uri")
+            uri.toString()
+        }.getOrElse { e ->
+            Log.e("MobiCloud:Save", "publishToMediaStore échoué pour $displayName : ${e.message}", e)
+            null
+        }
 }

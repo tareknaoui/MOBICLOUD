@@ -140,6 +140,11 @@ function verifyAuth(payload) {
 // Map<nodeId, { ws, publicKey }>
 const sessions = new Map();
 
+// Map<nodeId, expiresAt> — ban temporaire post-chaos-kill (défaut 30s).
+// Empêche la reconnexion automatique Android pendant la fenêtre de démo.
+const CHAOS_BAN_MS = 30_000;
+const killedNodes = new Map();
+
 // Map<nodeId, { ip, port, reliabilityScore, electedAt, lastSeen, ttlTimer, isSuperPair }>
 // isSuperPair=false → simple présence (JOIN), isSuperPair=true → Super-Pair élu (REGISTER_PEER).
 const signalingRegistry = new Map();
@@ -254,7 +259,7 @@ function handleRegisterPeer(nodeId, payload) {
   let entry;
   try { entry = JSON.parse(payload.toString('utf8')); } catch { return false; }
 
-  const { ip, port, reliabilityScore, electedAt, clusterId, freeBytes, currentMemberCount } = entry;
+  const { ip, port, reliabilityScore, electedAt, clusterId, freeBytes, totalBytes, currentMemberCount } = entry;
   console.log(`[REGISTER-DBG] nodeId=${nodeId.slice(0,8)} ip=${ip} port=${port} typeof_port=${typeof port}`);
   if (!ip || typeof port !== 'number' || port < 0 || port > 65535) {
     console.warn(`[REGISTER_PEER] rejeté: ip=${ip} port=${port} typeof_port=${typeof port}`);
@@ -293,6 +298,20 @@ function handleRegisterPeer(nodeId, payload) {
       freeBytesNum = Math.floor(freeBytes);
     } else {
       console.warn(`[SIGNALING] freeBytes invalide rejeté (coerce en 0) — nodeId=${nodeId.slice(0, 8)} type=${typeof freeBytes}`);
+    }
+  }
+
+  // totalBytes : quota alloué par l'utilisateur (allocatedStorageBytes Android).
+  // Même validation que freeBytes. 0 = non communiqué (legacy ou JOIN).
+  let totalBytesNum = 0;
+  if (totalBytes !== undefined && totalBytes !== null) {
+    if (typeof totalBytes === 'number'
+      && Number.isFinite(totalBytes)
+      && totalBytes >= 0
+      && totalBytes <= Number.MAX_SAFE_INTEGER) {
+      totalBytesNum = Math.floor(totalBytes);
+    } else {
+      console.warn(`[SIGNALING] totalBytes invalide rejeté (coerce en 0) — nodeId=${nodeId.slice(0, 8)} type=${typeof totalBytes}`);
     }
   }
 
@@ -354,12 +373,18 @@ function handleRegisterPeer(nodeId, payload) {
   // fraiche (rotation de cle) sur le cache du registre.
   const pubKeyB64 = sessions.get(nodeId)?.pubKeyB64 ?? existing?.pubKeyB64 ?? '';
 
+  // Clamp reliabilityScore à [0, 1] — refuse les valeurs hors plage sans logger (ex: 100.0 envoyé en mode %)
+  const reliabilityScoreNum = (typeof reliabilityScore === 'number' && Number.isFinite(reliabilityScore))
+    ? Math.min(1, Math.max(0, reliabilityScore))
+    : 0.5;
+
   signalingRegistry.set(nodeId, {
     ip, port,
-    reliabilityScore: reliabilityScore ?? 0.5,
+    reliabilityScore: reliabilityScoreNum,
     electedAt: electedAt ?? Date.now(),
     clusterId: clusterIdStr,
     freeBytes: freeBytesNum,
+    totalBytes: totalBytesNum,
     currentMemberCount: currentMemberCountNum,
     lastSeen: Date.now(),
     ttlTimer,
@@ -372,7 +397,9 @@ function handleRegisterPeer(nodeId, payload) {
 }
 
 // JOIN : ajoute le nœud à l'annuaire en tant que simple participant (isSuperPair=false).
-// Si le nœud est DÉJÀ enregistré comme Super-Pair, le statut est préservé (re-JOIN ne dégrade pas).
+// isSuperPair est TOUJOURS réinitialisé à false : le statut SP doit être revendiqué via
+// REGISTER_PEER après victoire Bully. Un SP actif re-envoie REGISTER_PEER via onConnectedHook
+// dans les ms suivant le JOIN — aucune perte de statut en pratique.
 // ip/port sont optionnels — peuvent être omis pour les nœuds non joignables directement.
 function handleJoin(nodeId, payload) {
   let entry;
@@ -432,13 +459,18 @@ function handleJoin(nodeId, payload) {
   // fraiche (rotation de cle) sur le cache du registre.
   const pubKeyB64 = sessions.get(nodeId)?.pubKeyB64 ?? existing?.pubKeyB64 ?? '';
 
+  const reliabilityScoreJoin = (typeof reliabilityScore === 'number' && Number.isFinite(reliabilityScore))
+    ? Math.min(1, Math.max(0, reliabilityScore))
+    : (existing?.reliabilityScore ?? 0.5);
+
   signalingRegistry.set(nodeId, {
     ip: ip ?? '0.0.0.0',
     port: port ?? 0,
-    reliabilityScore: reliabilityScore ?? 0.5,
+    reliabilityScore: reliabilityScoreJoin,
     electedAt: existing?.electedAt ?? null,
     clusterId: clusterIdStr,
     freeBytes: freeBytesNum,
+    totalBytes: existing?.totalBytes ?? 0,
     currentMemberCount: existing?.currentMemberCount ?? 0,
     lastSeen: Date.now(),
     ttlTimer,
@@ -743,6 +775,36 @@ function sendJson(res, data) {
   res.end(body);
 }
 
+// Auth admin partagee (/admin/reset, /admin/kill) : origine restreinte + token Bearer
+// timing-safe. Retourne { adminHeaders, remoteIp } si autorise, sinon ecrit la reponse
+// d'erreur (403/401) et retourne null — le caller doit alors `return`.
+function authorizeAdmin(req, res, action) {
+  const reqOrigin = req.headers['origin'] ?? '';
+  const adminHeaders = buildAdminCorsHeaders(reqOrigin);
+  const remoteIp = req.socket?.remoteAddress ?? '?';
+  if (ALLOWED_ADMIN_ORIGINS.length > 0 && !ALLOWED_ADMIN_ORIGINS.includes(reqOrigin)) {
+    logEvent('WARN', 'ADMIN', `${action} refuse : origine non autorisee (${reqOrigin || 'null'}) ip=${remoteIp}`, { origin: reqOrigin, ip: remoteIp });
+    res.writeHead(403, adminHeaders);
+    res.end('{"error":"Forbidden origin"}');
+    return null;
+  }
+  const auth = req.headers['authorization'] ?? '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  let tokenOk = false;
+  if (ADMIN_SECRET && token.length === ADMIN_SECRET.length) {
+    try {
+      tokenOk = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(ADMIN_SECRET));
+    } catch { tokenOk = false; }
+  }
+  if (!ADMIN_SECRET || !tokenOk) {
+    logEvent('WARN', 'ADMIN', `${action} refuse : auth invalide ip=${remoteIp} origin=${reqOrigin || 'null'}`, { ip: remoteIp, origin: reqOrigin });
+    res.writeHead(401, adminHeaders);
+    res.end('{"error":"Unauthorized"}');
+    return null;
+  }
+  return { adminHeaders, remoteIp };
+}
+
 const httpServer = http.createServer((req, res) => {
   // Preflight CORS
   if (req.method === 'OPTIONS') {
@@ -756,29 +818,9 @@ const httpServer = http.createServer((req, res) => {
   // ── POST /admin/reset — déconnecte tous les nœuds et purge l'état du relay ──
   // Code review P4 : Origine restreinte, comparaison timing-safe, log des echecs avec IP.
   if (req.method === 'POST' && url === '/admin/reset') {
-    const reqOrigin = req.headers['origin'] ?? '';
-    const adminHeaders = buildAdminCorsHeaders(reqOrigin);
-    const remoteIp = req.socket?.remoteAddress ?? '?';
-    if (ALLOWED_ADMIN_ORIGINS.length > 0 && !ALLOWED_ADMIN_ORIGINS.includes(reqOrigin)) {
-      logEvent('WARN', 'ADMIN', `Reset refuse : origine non autorisee (${reqOrigin || 'null'}) ip=${remoteIp}`, { origin: reqOrigin, ip: remoteIp });
-      res.writeHead(403, adminHeaders);
-      res.end('{"error":"Forbidden origin"}');
-      return;
-    }
-    const auth = req.headers['authorization'] ?? '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-    let tokenOk = false;
-    if (ADMIN_SECRET && token.length === ADMIN_SECRET.length) {
-      try {
-        tokenOk = crypto.timingSafeEqual(Buffer.from(token), Buffer.from(ADMIN_SECRET));
-      } catch { tokenOk = false; }
-    }
-    if (!ADMIN_SECRET || !tokenOk) {
-      logEvent('WARN', 'ADMIN', `Reset refuse : auth invalide ip=${remoteIp} origin=${reqOrigin || 'null'}`, { ip: remoteIp, origin: reqOrigin });
-      res.writeHead(401, adminHeaders);
-      res.end('{"error":"Unauthorized"}');
-      return;
-    }
+    const ctx = authorizeAdmin(req, res, 'Reset');
+    if (!ctx) return;
+    const { adminHeaders, remoteIp } = ctx;
     const disconnected = sessions.size;
     for (const [, session] of sessions.entries()) {
       try { session.ws.close(1001, 'Admin reset'); } catch { /* déjà fermée */ }
@@ -804,6 +846,46 @@ const httpServer = http.createServer((req, res) => {
     logEvent('WARN', 'ADMIN', `Reset administrateur : ${disconnected} nœud(s) déconnecté(s) ip=${remoteIp}`, { disconnected, ip: remoteIp });
     res.writeHead(200, adminHeaders);
     res.end(JSON.stringify({ ok: true, disconnected }));
+    return;
+  }
+
+  // ── POST /admin/kill?nodeId=XXXX — "Chaos demo" : simule la panne d'UN seul nœud ──
+  // Ferme sa session WS + le retire de l'annuaire (= churn réel). Le reste du cluster
+  // continue ; un fichier reste récupérable tant qu'il reste k fragments (erasure coding).
+  if (req.method === 'POST' && url === '/admin/kill') {
+    const ctx = authorizeAdmin(req, res, 'Kill');
+    if (!ctx) return;
+    const { adminHeaders, remoteIp } = ctx;
+
+    const nodeId = new URLSearchParams(req.url.split('?')[1] ?? '').get('nodeId') ?? '';
+    if (!/^[0-9a-fA-F]{16}$/.test(nodeId)) {
+      res.writeHead(400, adminHeaders);
+      res.end('{"error":"nodeId invalide (16 chars hex attendus)"}');
+      return;
+    }
+
+    let killed = false;
+    const session = sessions.get(nodeId);
+    if (session) {
+      try { session.ws.close(1001, 'Chaos kill'); } catch { /* déjà fermée */ }
+      sessions.delete(nodeId);
+      killed = true;
+    }
+    const entry = signalingRegistry.get(nodeId);
+    if (entry) {
+      try { if (entry.ttlTimer) clearTimeout(entry.ttlTimer); } catch { /* ignore */ }
+      signalingRegistry.delete(nodeId);
+      killed = true;
+    }
+    if (killed) {
+      recordChurn(nodeId);
+      eventCounters.departures++;
+      // Ban temporaire : empêche la reconnexion Android automatique pendant CHAOS_BAN_MS.
+      killedNodes.set(nodeId, Date.now() + CHAOS_BAN_MS);
+      logEvent('WARN', 'ADMIN', `Chaos kill : nœud ${nodeId.slice(0, 8)} tué + ban ${CHAOS_BAN_MS / 1000}s ip=${remoteIp}`, { nodeId, ip: remoteIp, reason: 'CHAOS_KILL' });
+    }
+    res.writeHead(200, adminHeaders);
+    res.end(JSON.stringify({ ok: true, killed, nodeId, banSeconds: killed ? CHAOS_BAN_MS / 1000 : 0 }));
     return;
   }
 
@@ -835,6 +917,7 @@ const httpServer = http.createServer((req, res) => {
         clusterId: entry.clusterId ?? '',
         reliabilityScore: entry.reliabilityScore ?? 0,
         freeBytes: entry.freeBytes ?? 0,
+        totalBytes: entry.totalBytes ?? 0,
         ip: entry.ip ?? '',
         port: entry.port ?? 0,
         lastSeen: entry.lastSeen ?? 0,
@@ -955,6 +1038,21 @@ wss.on('connection', (ws) => {
         ws.close(1008, 'AUTH invalide');
         return;
       }
+      // Chaos-kill ban : rejeter le nœud pendant la fenêtre post-kill.
+      // Nettoie au passage les entrées expirées pour éviter une fuite mémoire.
+      const banExpiry = killedNodes.get(result.nodeId);
+      if (banExpiry) {
+        if (Date.now() < banExpiry) {
+          const remainMs = banExpiry - Date.now();
+          logEvent('WARN', 'AUTH', `Reconnexion refusée (chaos ban ${Math.ceil(remainMs / 1000)}s restantes) : ${result.nodeId.slice(0, 8)}`, { nodeId: result.nodeId });
+          sendError(ws, `Chaos ban actif — reconnexion dans ${Math.ceil(remainMs / 1000)}s`);
+          ws.close(1008, 'Chaos ban');
+          return;
+        } else {
+          killedNodes.delete(result.nodeId); // ban expiré — laisser passer
+        }
+      }
+
       eventCounters.authSuccesses++;
       logEvent('INFO', 'AUTH', `Authentification réussie : ${result.nodeId.slice(0, 8)}`, { nodeId: result.nodeId });
 

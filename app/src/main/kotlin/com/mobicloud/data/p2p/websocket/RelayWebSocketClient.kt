@@ -323,7 +323,8 @@ class RelayWebSocketClient @Inject constructor(
         electedAt: Long,
         clusterId: String,
         freeBytes: Long,
-        currentMemberCount: Int
+        currentMemberCount: Int,
+        totalBytes: Long = 0L
     ): Boolean {
         val ws = activeWebSocket ?: return false
         val json = org.json.JSONObject().apply {
@@ -334,6 +335,7 @@ class RelayWebSocketClient @Inject constructor(
             put("electedAt",          electedAt)
             put("clusterId",          clusterId)
             put("freeBytes",          freeBytes)
+            put("totalBytes",         totalBytes)
             put("currentMemberCount", currentMemberCount)
         }
         val payload = json.toString().toByteArray(Charsets.UTF_8)

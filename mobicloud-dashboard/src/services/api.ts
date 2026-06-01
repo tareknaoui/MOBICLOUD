@@ -8,6 +8,7 @@ export interface RelayNode {
   clusterId: string;
   reliabilityScore: number;
   freeBytes: number;
+  totalBytes: number;
   ip: string;
   port: number;
   lastSeen: number;
@@ -74,6 +75,17 @@ export const fetchEvents = () => get<EventsData>('/metrics/events');
 
 export async function resetAllNodes(secret: string): Promise<{ ok: boolean; disconnected: number }> {
   const res = await fetch(`${BASE}/admin/reset`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${secret}`, 'Content-Type': 'application/json' },
+  });
+  if (res.status === 401) throw new Error('Secret incorrect');
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// Chaos demo : simule la panne d'un seul nœud (déconnexion + retrait de l'annuaire).
+export async function killNode(nodeId: string, secret: string): Promise<{ ok: boolean; killed: boolean; nodeId: string }> {
+  const res = await fetch(`${BASE}/admin/kill?nodeId=${encodeURIComponent(nodeId)}`, {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${secret}`, 'Content-Type': 'application/json' },
   });

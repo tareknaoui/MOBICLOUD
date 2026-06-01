@@ -194,9 +194,9 @@ class SignalingRepositoryImpl @Inject constructor(
         }.onFailure { e ->
             Log.w(TAG, "countActiveByClusterId échoué — coerce à 0 pour REGISTER_PEER", e)
         }.getOrDefault(0)
-        val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt, clusterId, freeBytes, currentMemberCount)
+        val sent = relayClient.sendRegisterPeer(nodeId, ip, port, reliabilityScore, electedAt, clusterId, freeBytes, currentMemberCount, totalBytes = settings.allocatedStorageBytes)
         if (!sent) error("RelayWebSocketClient non connecté — REGISTER_PEER non envoyé")
-        Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore clusterId=${clusterId.take(8).ifEmpty { "(legacy)" }} freeBytes=$freeBytes memberCount=$currentMemberCount/$MAX_CLUSTER_SIZE")
+        Log.d(TAG, "REGISTER_PEER envoyé : ip=$ip port=$port score=$reliabilityScore clusterId=${clusterId.take(8).ifEmpty { "(legacy)" }} freeBytes=$freeBytes totalBytes=${settings.allocatedStorageBytes} memberCount=$currentMemberCount/$MAX_CLUSTER_SIZE")
         Unit
     }.onFailure { e ->
         Log.e(TAG, "registerAsSuperPeer échoué : ${e.message}")

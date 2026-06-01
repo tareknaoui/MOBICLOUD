@@ -2,6 +2,7 @@ package com.mobicloud.presentation.explorer
 
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.net.Uri
 import android.webkit.MimeTypeMap
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -188,14 +189,22 @@ fun ExplorerScreen(
         AssembledBottomSheet(
             state = assembledState,
             onOpen = { filePath ->
-                val file = File(filePath)
-                android.util.Log.i("MobiCloud:Open", "[DIAG] tentative ouverture path=$filePath exists=${file.exists()} size=${if (file.exists()) file.length() else -1} ext='${file.extension}'")
+                android.util.Log.i("MobiCloud:Open", "[DIAG] tentative ouverture path=$filePath")
                 try {
-                    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                    android.util.Log.i("MobiCloud:Open", "[DIAG] uri=$uri")
-                    val mimeType = MimeTypeMap.getSingleton()
-                        .getMimeTypeFromExtension(file.extension) ?: "application/octet-stream"
-                    android.util.Log.i("MobiCloud:Open", "[DIAG] mime=$mimeType")
+                    // Le téléchargement publie dans MediaStore (Android 10+) → filePath est un
+                    // content:// Uri ouvrable directement. Sinon (preview/fallback privé) → File + FileProvider.
+                    val uri: Uri
+                    val mimeType: String
+                    if (filePath.startsWith("content://")) {
+                        uri = Uri.parse(filePath)
+                        mimeType = context.contentResolver.getType(uri) ?: "application/octet-stream"
+                    } else {
+                        val file = File(filePath)
+                        uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                        mimeType = MimeTypeMap.getSingleton()
+                            .getMimeTypeFromExtension(file.extension) ?: "application/octet-stream"
+                    }
+                    android.util.Log.i("MobiCloud:Open", "[DIAG] uri=$uri mime=$mimeType")
                     val intent = Intent(Intent.ACTION_VIEW).apply {
                         setDataAndType(uri, mimeType)
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -208,7 +217,7 @@ fun ExplorerScreen(
                         scope.launch { snackbarHostState.showSnackbar("No app installed to open this file type.") }
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("MobiCloud:Open", "[DIAG] FileProvider échoué path=$filePath", e)
+                    android.util.Log.e("MobiCloud:Open", "[DIAG] ouverture échouée path=$filePath", e)
                     scope.launch { snackbarHostState.showSnackbar("Could not open the file. Please try again.") }
                 }
             },

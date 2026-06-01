@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Cytoscape from 'cytoscape';
 import coseBilkent from 'cytoscape-cose-bilkent';
 import type { TopologyData, RelayNode, TransferEvent } from '../../services/api';
+import { killNode } from '../../services/api';
 import type { Theme } from '../../hooks/useTheme';
 
 // Register layout plugin once (try/catch survives HMR re-imports)
@@ -26,20 +27,20 @@ interface Particle {
 
 interface KnownNode {
   id: string; isSuperPair: boolean; isConnected: boolean;
-  clusterId: string; reliabilityScore: number; freeBytes: number;
+  clusterId: string; reliabilityScore: number; freeBytes: number; totalBytes: number;
   ip: string; port: number; lastSeen: number; departedAt: number | null;
 }
 
 interface SelectedNode {
   id: string; isSuperPair: boolean; isConnected: boolean;
-  clusterId: string; reliabilityScore: number; freeBytes: number;
+  clusterId: string; reliabilityScore: number; freeBytes: number; totalBytes: number;
   ip: string; port: number; lastSeen: number; color: string;
 }
 
 interface SelectedCluster {
   clusterId: string; color: string;
   memberCount: number; connectedCount: number;
-  totalFreeBytes: number; avgReliability: number;
+  totalFreeBytes: number; totalAllocatedBytes: number; avgReliability: number;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -48,6 +49,11 @@ function fmtBytes(b: number) {
   if (b >= 1e6) return `${(b / 1e6).toFixed(1)} MB`;
   if (b >= 1e3) return `${(b / 1e3).toFixed(1)} KB`;
   return `${b} B`;
+}
+
+function clampPct(ratio: number): number {
+  if (!Number.isFinite(ratio)) return 0;
+  return Math.min(100, Math.max(0, ratio * 100));
 }
 
 function fmtAgo(ms: number | undefined): string {
@@ -62,8 +68,9 @@ function fmtAgo(ms: number | undefined): string {
 }
 
 function reliabilityColor(score: number): string {
-  if (score >= 0.7) return '#34c759';
-  if (score >= 0.4) return '#ff9f0a';
+  const s = Number.isFinite(score) ? Math.min(1, Math.max(0, score)) : 0;
+  if (s >= 0.7) return '#34c759';
+  if (s >= 0.4) return '#ff9f0a';
   return '#ff3b30';
 }
 
@@ -191,6 +198,31 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
   const [selectedCluster, setSelectedCluster] = useState<SelectedCluster | null>(null);
   const [tooltipPos, setTooltipPos]         = useState({ x: 0, y: 0 });
   const [connectedCount, setConnectedCount] = useState(0);
+  const [killing, setKilling]               = useState<string | null>(null);
+
+  // Chaos demo : simule la panne du nœud sélectionné. Le secret admin est saisi une seule
+  // fois par session (sessionStorage) puis réutilisé. Le nœud passera "offline" au prochain
+  // poll de topologie (3s) via la logique de départ existante.
+  async function handleKill(nodeId: string) {
+    let secret = sessionStorage.getItem('mc_admin_secret') ?? '';
+    if (!secret) {
+      secret = window.prompt('Admin secret (ADMIN_SECRET) :') ?? '';
+      if (!secret) return;
+      sessionStorage.setItem('mc_admin_secret', secret);
+    }
+    setKilling(nodeId);
+    try {
+      await killNode(nodeId, secret);
+      setSelected(null);
+    } catch (e: unknown) {
+      if (e instanceof Error && e.message === 'Secret incorrect') {
+        sessionStorage.removeItem('mc_admin_secret'); // permet de re-saisir au prochain essai
+      }
+      window.alert(`Kill échoué : ${e instanceof Error ? e.message : 'erreur inconnue'}`);
+    } finally {
+      setKilling(null);
+    }
+  }
 
   // Code review P10 : clear le panel selectionne si le nœud disparait de la topologie
   // (typique apres /admin/reset ou departure naturelle d'un peer).
@@ -228,16 +260,20 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
           const children = evt.target.children().not('.cluster');
           const members = children.toArray() as Cytoscape.NodeSingular[];
           const connected = members.filter(m => m.data('isConnected'));
-          const totalFree = members.reduce((s, m) => s + (m.data('freeBytes') as number), 0);
-          const avgRel = members.length > 0
-            ? members.reduce((s, m) => s + (m.data('reliabilityScore') as number), 0) / members.length
-            : 0;
+          const totalFree = connected.reduce((s, m) => s + (Number(m.data('freeBytes')) || 0), 0);
+          const totalAllocated = connected.reduce((s, m) => s + (Number(m.data('totalBytes')) || 0), 0);
+          const relSum = members.reduce((s, m) => {
+            const r = Number(m.data('reliabilityScore'));
+            return s + (Number.isFinite(r) ? Math.min(1, Math.max(0, r)) : 0);
+          }, 0);
+          const avgRel = members.length > 0 ? relSum / members.length : 0;
           setSelectedCluster({
             clusterId: evt.target.data('id').replace('cluster-', ''),
             color: evt.target.data('color'),
             memberCount: members.length,
             connectedCount: connected.length,
             totalFreeBytes: totalFree,
+            totalAllocatedBytes: totalAllocated,
             avgReliability: avgRel,
           });
           setSelected(null);
@@ -397,7 +433,8 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
           id: n.id, label: n.id.slice(0, 6),
           isSuperPair: n.isSuperPair, isConnected: n.isConnected,
           clusterId: effectiveClusterId ?? '', reliabilityScore: n.reliabilityScore,
-          freeBytes: n.freeBytes, ip: n.ip, port: n.port, lastSeen: n.lastSeen, color,
+          freeBytes: n.freeBytes, totalBytes: n.totalBytes ?? 0,
+          ip: n.ip, port: n.port, lastSeen: n.lastSeen, color,
           parent: parentId,
         };
 
@@ -422,6 +459,7 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
           existingNode.data('isConnected', n.isConnected);
           existingNode.data('reliabilityScore', n.reliabilityScore);
           existingNode.data('freeBytes', n.freeBytes);
+          existingNode.data('totalBytes', n.totalBytes ?? 0);
           existingNode.data('ip', n.ip);
           existingNode.data('port', n.port);
           existingNode.data('lastSeen', n.lastSeen);
@@ -432,7 +470,8 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
         known.set(n.id, {
           id: n.id, isSuperPair: n.isSuperPair, isConnected: n.isConnected,
           clusterId: effectiveClusterId ?? '', reliabilityScore: n.reliabilityScore,
-          freeBytes: n.freeBytes, ip: n.ip, port: n.port, lastSeen: n.lastSeen, departedAt: null,
+          freeBytes: n.freeBytes, totalBytes: n.totalBytes ?? 0,
+          ip: n.ip, port: n.port, lastSeen: n.lastSeen, departedAt: null,
         });
       }
 
@@ -532,7 +571,7 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
         <div style={{
           position: 'absolute',
           left: Math.min(tooltipPos.x + 16, cw - 248),
-          top: Math.min(Math.max(tooltipPos.y - 12, 8), ch - 260),
+          top: Math.min(Math.max(tooltipPos.y - 12, 8), ch - 320),
           zIndex: 30,
           background: isDark ? '#111827' : '#ffffff',
           border: `1px solid ${isDark ? '#1e3a5f' : '#bfdbfe'}`,
@@ -582,12 +621,40 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
             </span>
 
             <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Fiabilité</span>
-            <span style={{ fontWeight: 600, color: reliabilityColor(selected.reliabilityScore) }}>
-              {(selected.reliabilityScore * 100).toFixed(1)}%
+            <span>
+              <span style={{ fontWeight: 600, color: reliabilityColor(selected.reliabilityScore) }}>
+                {clampPct(selected.reliabilityScore).toFixed(1)}%
+              </span>
+              <div style={{ marginTop: 3, height: 5, borderRadius: 3, background: isDark ? '#1f2937' : '#e2e8f0', overflow: 'hidden' }}>
+                <div style={{ width: `${clampPct(selected.reliabilityScore)}%`, height: '100%', background: reliabilityColor(selected.reliabilityScore), borderRadius: 3, transition: 'width 0.4s ease' }} />
+              </div>
             </span>
 
-            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Stockage libre</span>
-            <span>{fmtBytes(selected.freeBytes)}</span>
+            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Stockage</span>
+            <span>
+              {selected.totalBytes > 0 ? (() => {
+                const used = Math.max(0, selected.totalBytes - selected.freeBytes);
+                const libre = selected.totalBytes - used;
+                const pct = Math.min(100, (used / selected.totalBytes) * 100);
+                const barColor = pct >= 90 ? '#ff3b30' : pct >= 70 ? '#ff9f0a' : '#34c759';
+                return (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3, color: isDark ? '#94a3b8' : '#64748b' }}>
+                      <span>Utilisé : <strong style={{ color: isDark ? '#e2e8f0' : '#0f172a' }}>{fmtBytes(used)}</strong></span>
+                      <span>Total : <strong style={{ color: isDark ? '#e2e8f0' : '#0f172a' }}>{fmtBytes(selected.totalBytes)}</strong></span>
+                    </div>
+                    <div style={{ height: 7, borderRadius: 4, background: isDark ? '#1f2937' : '#e2e8f0', overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 4, transition: 'width 0.4s ease' }} />
+                    </div>
+                    <div style={{ fontSize: 10, marginTop: 3, color: isDark ? '#64748b' : '#94a3b8' }}>
+                      Libre : {fmtBytes(libre)} ({(100 - pct).toFixed(1)}%)
+                    </div>
+                  </div>
+                );
+              })() : (
+                <span>{fmtBytes(selected.freeBytes)} libre</span>
+              )}
+            </span>
 
             <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Adresse</span>
             <span style={{ fontFamily: 'monospace', fontSize: 10 }}>
@@ -599,6 +666,25 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
               {selected.lastSeen ? fmtAgo(selected.lastSeen) : '—'}
             </span>
           </div>
+
+          {/* Chaos demo : tuer ce nœud pour démontrer la résilience erasure coding */}
+          {selected.isConnected && (
+            <button
+              onClick={() => handleKill(selected.id)}
+              disabled={killing === selected.id}
+              title="Simuler une panne de ce nœud (démo résilience). Le fichier reste récupérable tant qu'il reste k fragments."
+              style={{
+                marginTop: 12, width: '100%',
+                background: killing === selected.id ? '#7f1d1d' : '#dc2626',
+                color: '#fff', border: 'none', borderRadius: 6,
+                padding: '7px 0', fontSize: 11, fontWeight: 700,
+                cursor: killing === selected.id ? 'wait' : 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              }}
+            >
+              {killing === selected.id ? '⏳ Kill en cours…' : '💀 Kill (chaos demo)'}
+            </button>
+          )}
         </div>
       )}
 
@@ -606,7 +692,7 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
         <div style={{
           position: 'absolute',
           left: Math.min(tooltipPos.x + 16, cw - 248),
-          top: Math.min(Math.max(tooltipPos.y - 12, 8), ch - 200),
+          top: Math.min(Math.max(tooltipPos.y - 12, 8), ch - 280),
           zIndex: 30,
           background: isDark ? '#111827' : '#ffffff',
           border: `1px solid ${selectedCluster.color}55`,
@@ -627,12 +713,40 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
             <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Membres</span>
             <span><strong style={{ color: selectedCluster.connectedCount === selectedCluster.memberCount ? '#34c759' : '#ff9f0a' }}>{selectedCluster.connectedCount}</strong>/{selectedCluster.memberCount} connectés</span>
 
-            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Stockage libre</span>
-            <span>{fmtBytes(selectedCluster.totalFreeBytes)}</span>
+            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Stockage</span>
+            <span>
+              {selectedCluster.totalAllocatedBytes > 0 ? (() => {
+                const used = Math.max(0, selectedCluster.totalAllocatedBytes - selectedCluster.totalFreeBytes);
+                const libre = selectedCluster.totalAllocatedBytes - used;
+                const pct = Math.min(100, (used / selectedCluster.totalAllocatedBytes) * 100);
+                const barColor = pct >= 90 ? '#ff3b30' : pct >= 70 ? '#ff9f0a' : '#34c759';
+                return (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3, color: isDark ? '#94a3b8' : '#64748b' }}>
+                      <span>Utilisé : <strong style={{ color: isDark ? '#e2e8f0' : '#0f172a' }}>{fmtBytes(used)}</strong></span>
+                      <span>Total : <strong style={{ color: isDark ? '#e2e8f0' : '#0f172a' }}>{fmtBytes(selectedCluster.totalAllocatedBytes)}</strong></span>
+                    </div>
+                    <div style={{ height: 7, borderRadius: 4, background: isDark ? '#1f2937' : '#e2e8f0', overflow: 'hidden' }}>
+                      <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 4, transition: 'width 0.4s ease' }} />
+                    </div>
+                    <div style={{ fontSize: 10, marginTop: 3, color: isDark ? '#64748b' : '#94a3b8' }}>
+                      Libre : {fmtBytes(libre)} ({(100 - pct).toFixed(1)}%)
+                    </div>
+                  </div>
+                );
+              })() : (
+                <span>{fmtBytes(selectedCluster.totalFreeBytes)} libre</span>
+              )}
+            </span>
 
             <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Fiab. moy.</span>
-            <span style={{ fontWeight: 600, color: reliabilityColor(selectedCluster.avgReliability) }}>
-              {(selectedCluster.avgReliability * 100).toFixed(1)}%
+            <span>
+              <span style={{ fontWeight: 600, color: reliabilityColor(selectedCluster.avgReliability) }}>
+                {clampPct(selectedCluster.avgReliability).toFixed(1)}%
+              </span>
+              <div style={{ marginTop: 3, height: 5, borderRadius: 3, background: isDark ? '#1f2937' : '#e2e8f0', overflow: 'hidden' }}>
+                <div style={{ width: `${clampPct(selectedCluster.avgReliability)}%`, height: '100%', background: reliabilityColor(selectedCluster.avgReliability), borderRadius: 3, transition: 'width 0.4s ease' }} />
+              </div>
             </span>
           </div>
         </div>
