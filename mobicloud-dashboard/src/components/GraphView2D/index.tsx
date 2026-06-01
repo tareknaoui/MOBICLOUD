@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Cytoscape from 'cytoscape';
 import coseBilkent from 'cytoscape-cose-bilkent';
-import type { TopologyData, RelayNode, TransferEvent } from '../../services/api';
+import type { TopologyData, RelayNode, TransferEvent, FragmentFile } from '../../services/api';
 import { killNode } from '../../services/api';
 import type { Theme } from '../../hooks/useTheme';
 
@@ -16,7 +16,15 @@ const CLUSTER_COLORS = [
 const DEPART_TTL_MS = 30_000;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface Props { topology: TopologyData | null; error: string | null; theme: Theme; latestTransfer?: TransferEvent | null; }
+interface Props {
+  topology: TopologyData | null;
+  error: string | null;
+  theme: Theme;
+  latestTransfer?: TransferEvent | null;
+  fragmentFiles?: FragmentFile[];
+  onHighlightChange?: (fileId: string | null) => void;
+  onRegisterFocus?: (fn: (nodeId: string) => void) => void;
+}
 
 interface Particle {
   fromX: number; fromY: number;
@@ -72,6 +80,15 @@ function reliabilityColor(score: number): string {
   if (s >= 0.7) return '#34c759';
   if (s >= 0.4) return '#ff9f0a';
   return '#ff3b30';
+}
+
+function mimeIcon(mime: string) {
+  if (mime.startsWith('image/'))  return '🖼';
+  if (mime.startsWith('video/'))  return '🎬';
+  if (mime.startsWith('audio/'))  return '🎵';
+  if (mime === 'application/pdf') return '📄';
+  if (mime === 'application/zip') return '📦';
+  return '📁';
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -154,6 +171,17 @@ function buildStylesheet(isDark: boolean): any[] {
       style: { 'overlay-opacity': 0.1 },
     },
     {
+      selector: 'node.fragment-highlight',
+      style: {
+        'border-color': '#a855f7',
+        'border-width': 5,
+        'border-opacity': 1,
+        'overlay-color': '#a855f7',
+        'overlay-padding': 6,
+        'overlay-opacity': 0.22,
+      },
+    },
+    {
       selector: 'edge',
       style: {
         'line-color': 'data(color)',
@@ -180,7 +208,7 @@ function animateIn(ids: string[], cy: Cytoscape.Core) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function GraphView2D({ topology, error, theme, latestTransfer }: Props) {
+export default function GraphView2D({ topology, error, theme, latestTransfer, fragmentFiles, onHighlightChange, onRegisterFocus }: Props) {
   const containerRef   = useRef<HTMLDivElement>(null);
   const canvasRef      = useRef<HTMLCanvasElement>(null);
   const particlesRef   = useRef<Particle[]>([]);
@@ -197,8 +225,14 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
   const [selected, setSelected]             = useState<SelectedNode | null>(null);
   const [selectedCluster, setSelectedCluster] = useState<SelectedCluster | null>(null);
   const [tooltipPos, setTooltipPos]         = useState({ x: 0, y: 0 });
+  const [highlightedFileId, setHighlightedFileId] = useState<string | null>(null);
   const [connectedCount, setConnectedCount] = useState(0);
   const [killing, setKilling]               = useState<string | null>(null);
+
+  function setHighlight(fileId: string | null) {
+    setHighlightedFileId(fileId);
+    onHighlightChange?.(fileId);
+  }
 
   // Chaos demo : simule la panne du nœud sélectionné. Le secret admin est saisi une seule
   // fois par session (sessionStorage) puis réutilisé. Le nœud passera "offline" au prochain
@@ -232,6 +266,38 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
       setSelected(null);
     }
   }, [topology, selected]);
+
+  // Clear le highlight de fragments quand on change de nœud sélectionné
+  useEffect(() => { setHighlight(null); }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Appliquer / retirer la classe fragment-highlight sur Cytoscape
+  useEffect(() => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    cy.nodes('.fragment-highlight').removeClass('fragment-highlight');
+    if (highlightedFileId && fragmentFiles) {
+      const file = fragmentFiles.find(f => f.fileId === highlightedFileId);
+      if (file) {
+        for (const fr of file.fragments) {
+          cy.$(`#${fr.nodeId}`).addClass('fragment-highlight');
+        }
+      }
+    }
+  }, [highlightedFileId, fragmentFiles]);
+
+  // Enregistrer la fonction de focus auprès du parent (App.tsx gère la navigation)
+  useEffect(() => {
+    onRegisterFocus?.((nodeId: string) => {
+      const cy = cyRef.current;
+      if (!cy) return;
+      const node = cy.$(`#${nodeId}`);
+      if (!node.length) return;
+      cy.animate(
+        { center: { eles: node }, zoom: Math.max(cy.zoom(), 2.8) },
+        { duration: 480, easing: 'ease-out-cubic' as never },
+      );
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Mount: create Cytoscape instance ───────────────────────────────────────
   useEffect(() => {
@@ -570,8 +636,8 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
       {selected && (
         <div style={{
           position: 'absolute',
-          left: Math.min(tooltipPos.x + 16, cw - 248),
-          top: Math.min(Math.max(tooltipPos.y - 12, 8), ch - 320),
+          left: tooltipPos.x > cw * 0.6 ? Math.max(tooltipPos.x - 262, 8) : Math.min(tooltipPos.x + 16, cw - 310),
+          top: Math.min(Math.max(tooltipPos.y - 12, 8), ch - 340),
           zIndex: 30,
           background: isDark ? '#111827' : '#ffffff',
           border: `1px solid ${isDark ? '#1e3a5f' : '#bfdbfe'}`,
@@ -667,6 +733,56 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
             </span>
           </div>
 
+          {/* Fichiers hébergés sur ce nœud */}
+          {fragmentFiles && (() => {
+            const nodeFiles = fragmentFiles.filter(f => f.fragments.some(fr => fr.nodeId === selected.id));
+            if (nodeFiles.length === 0) return null;
+            return (
+              <div style={{ marginTop: 10, borderTop: `1px solid ${isDark ? '#1e3a5f' : '#e2e8f0'}`, paddingTop: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#a855f7', marginBottom: 6 }}>
+                  Fragments hébergés ({nodeFiles.length})
+                </div>
+                {nodeFiles.map(f => {
+                  const isHl = highlightedFileId === f.fileId;
+                  const myFrag = f.fragments.find(fr => fr.nodeId === selected.id);
+                  const aliveCount = f.fragments.filter(fr => fr.nodeConnected).length;
+                  const statusColor = aliveCount < f.k ? '#ef4444' : aliveCount < f.n ? '#f97316' : '#22c55e';
+                  return (
+                    <div
+                      key={f.fileId}
+                      onClick={() => setHighlight(isHl ? null : f.fileId)}
+                      title={isHl ? 'Cliquer pour retirer le surlignage' : `Surligner les ${f.n} nœuds portant ce fichier`}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '4px 6px', borderRadius: 5, cursor: 'pointer', marginBottom: 3,
+                        background: isHl ? (isDark ? '#3b0764' : '#ede9fe') : (isDark ? '#1f2937' : '#f8fafc'),
+                        border: `1px solid ${isHl ? '#a855f7' : (isDark ? '#374151' : '#e2e8f0')}`,
+                        transition: 'background 0.15s, border-color 0.15s',
+                      }}
+                    >
+                      <span style={{ fontSize: 13, flexShrink: 0 }}>{mimeIcon(f.mimeType)}</span>
+                      <span style={{ flex: 1, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isDark ? '#e2e8f0' : '#0f172a', fontWeight: 600 }}>
+                        {f.fileName}
+                      </span>
+                      {myFrag !== undefined && (
+                        <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#a855f7', fontWeight: 700 }}>#{myFrag.index}</span>
+                      )}
+                      <span style={{ fontSize: 9, fontWeight: 700, color: statusColor }}>{aliveCount}/{f.n}</span>
+                      <span style={{ fontSize: 9, color: isHl ? '#a855f7' : (isDark ? '#64748b' : '#94a3b8') }}>
+                        {isHl ? '●' : '○'}
+                      </span>
+                    </div>
+                  );
+                })}
+                {highlightedFileId && nodeFiles.some(f => f.fileId === highlightedFileId) && (
+                  <div style={{ fontSize: 9, color: '#a855f7', marginTop: 4, textAlign: 'center', opacity: 0.8 }}>
+                    {fragmentFiles.find(f => f.fileId === highlightedFileId)?.n} nœuds mis en évidence sur le graphe
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+
           {/* Chaos demo : tuer ce nœud pour démontrer la résilience erasure coding */}
           {selected.isConnected && (
             <button
@@ -682,7 +798,7 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
               }}
             >
-              {killing === selected.id ? '⏳ Kill en cours…' : '💀 Kill (chaos demo)'}
+              {killing === selected.id ? 'Kill en cours…' : 'Kill (chaos demo)'}
             </button>
           )}
         </div>
@@ -751,6 +867,7 @@ export default function GraphView2D({ topology, error, theme, latestTransfer }: 
           </div>
         </div>
       )}
+
     </div>
   );
 }

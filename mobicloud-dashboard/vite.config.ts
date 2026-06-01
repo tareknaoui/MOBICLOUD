@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/relay': {
-        target: 'https://mobicloud-relay-3.onrender.com',
+        target: 'http://localhost:10000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/relay/, ''),
         headers: {

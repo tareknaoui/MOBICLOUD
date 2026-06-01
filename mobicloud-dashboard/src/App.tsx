@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import GraphView2D from './components/GraphView2D';
 import NetworkPanel from './components/NetworkPanel';
 import RealtimeLog from './components/RealtimeLog';
 import ClusterPanel from './components/ClusterPanel';
+import FragmentMap from './components/FragmentMap';
 import { useTopology } from './hooks/useTopology';
 import { useHealth } from './hooks/useHealth';
 import { useLogs } from './hooks/useLogs';
 import { useClusters } from './hooks/useClusters';
 import { useTheme } from './hooks/useTheme';
-import type { HealthData, EventsData, TransferEvent } from './services/api';
-import { resetAllNodes, subscribeToTransfers } from './services/api';
+import type { HealthData, EventsData, TransferEvent, FragmentFile } from './services/api';
+import { resetAllNodes, subscribeToTransfers, fetchFragments } from './services/api';
 
 function fmtUptime(ms: number) {
   const s = Math.floor(ms / 1000);
@@ -72,8 +73,25 @@ export default function App() {
   const [resetState, setResetState] = useState<'idle' | 'loading' | 'ok' | 'err'>('idle');
   const [resetMsg, setResetMsg] = useState('');
   const [latestTransfer, setLatestTransfer] = useState<TransferEvent | null>(null);
+  const [fragmentFiles, setFragmentFiles] = useState<FragmentFile[]>([]);
+  const [hlFileId, setHlFileId]   = useState<string | null>(null);
+  const [navIdx, setNavIdx]       = useState(0);
+  const graphFocusRef             = useRef<(nodeId: string) => void>(() => {});
 
   useEffect(() => subscribeToTransfers(setLatestTransfer), []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const d = await fetchFragments();
+        if (!cancelled) setFragmentFiles(d.files ?? []);
+      } catch { /* relay offline */ }
+    }
+    load();
+    const id = setInterval(load, 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   const relayOffline = !!(topoError || healthError);
 
@@ -94,7 +112,21 @@ export default function App() {
     }
   }
 
+  // Reset navigation quand le fichier change
+  useEffect(() => { setNavIdx(0); }, [hlFileId]);
+
+  // Zoomer sur le nœud courant quand l'index change
+  useEffect(() => {
+    if (!hlFileId) return;
+    const file = fragmentFiles.find(f => f.fileId === hlFileId);
+    const fr = file?.fragments[navIdx];
+    if (fr) graphFocusRef.current(fr.nodeId);
+  }, [navIdx, hlFileId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const nodeCount = topology?.nodes.length ?? 0;
+  const nodeStatuses = new Map<string, boolean>(
+    (topology?.nodes ?? []).map(n => [n.id, n.isConnected])
+  );
   const superPeerCount = topology?.nodes.filter(n => n.isSuperPair).length ?? 0;
   const totalAuth = buildKpis(health, events);
   const churn = clusters?.churnRate ?? 0;
@@ -166,7 +198,12 @@ export default function App() {
               </span>
             ))}
           </div>
-          <GraphView2D topology={topology} error={topoError} theme={theme} latestTransfer={latestTransfer} />
+          <GraphView2D
+            topology={topology} error={topoError} theme={theme}
+            latestTransfer={latestTransfer} fragmentFiles={fragmentFiles}
+            onHighlightChange={(id) => { setHlFileId(id); }}
+            onRegisterFocus={(fn) => { graphFocusRef.current = fn; }}
+          />
         </div>
 
         {/* ── Panneau droit — 32% ── */}
@@ -202,6 +239,59 @@ export default function App() {
 
           {/* Clusters */}
           <ClusterPanel data={clusters} />
+
+          {/* Navigation fragments — s'affiche quand un fichier est sélectionné depuis le tooltip */}
+          {hlFileId && (() => {
+            const hlFile = fragmentFiles.find(f => f.fileId === hlFileId);
+            if (!hlFile) return null;
+            const frags = hlFile.fragments.map(fr => {
+              const n = topology?.nodes.find(nd => nd.id === fr.nodeId);
+              return { nodeId: fr.nodeId, index: fr.index, sizeBytes: fr.sizeBytes, isConnected: n?.isConnected ?? fr.nodeConnected, clusterId: n?.clusterId ?? '' };
+            });
+            const btnStyle = (disabled: boolean): React.CSSProperties => ({
+              background: 'none', border: '1px solid #7c3aed', borderRadius: 5,
+              cursor: disabled ? 'not-allowed' : 'pointer', color: disabled ? '#6b21a8' : '#a855f7',
+              padding: '2px 10px', fontSize: 13, fontWeight: 700, opacity: disabled ? 0.35 : 1,
+            });
+            return (
+              <div style={{ background: 'var(--bg-card2)', borderRadius: 8, border: '1px solid #7c3aed', overflow: 'hidden' }}>
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderBottom: '1px solid #4c1d95' }}>
+                  <span style={{ fontSize: 12 }}>{hlFile.mimeType.startsWith('image') ? '🖼' : hlFile.mimeType.startsWith('video') ? '🎬' : hlFile.mimeType.startsWith('audio') ? '🎵' : hlFile.mimeType.includes('pdf') ? '📄' : hlFile.mimeType.includes('zip') ? '📦' : '📁'}</span>
+                  <span style={{ flex: 1, fontSize: 10, fontWeight: 700, color: '#a855f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{hlFile.fileName}</span>
+                  <span style={{ fontSize: 9, color: 'var(--text-dim)' }}>k={hlFile.k}/{hlFile.n}</span>
+                  <button onClick={() => setHlFileId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 13, lineHeight: 1 }}>✕</button>
+                </div>
+                {/* Flèches navigation */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '6px 12px', borderBottom: '1px solid var(--border)' }}>
+                  <button style={btnStyle(navIdx === 0)} disabled={navIdx === 0} onClick={() => setNavIdx(i => i - 1)}>◀</button>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', minWidth: 80, textAlign: 'center' }}>
+                    Nœud {navIdx + 1} / {frags.length}
+                  </span>
+                  <button style={btnStyle(navIdx === frags.length - 1)} disabled={navIdx === frags.length - 1} onClick={() => setNavIdx(i => i + 1)}>▶</button>
+                </div>
+                {/* Tableau */}
+                <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+                  {frags.map((fr, i) => {
+                    const active = i === navIdx;
+                    return (
+                      <div key={fr.nodeId} onClick={() => { setNavIdx(i); graphFocusRef.current(fr.nodeId); }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 10px', cursor: 'pointer', borderBottom: '1px solid var(--border)',
+                          background: active ? '#3b0764' : 'transparent' }}>
+                        <span style={{ fontSize: 10, color: '#a855f7', fontWeight: 700, minWidth: 14 }}>{active ? '▶' : ''}</span>
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#a855f7', minWidth: 22 }}>#{fr.index}</span>
+                        <span style={{ fontFamily: 'monospace', fontSize: 9, color: 'var(--text-sec)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis' }}>{fr.nodeId.slice(0, 12)}…</span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: fr.isConnected ? '#22c55e' : '#ef4444' }}>{fr.isConnected ? '● En ligne' : '● Hors ligne'}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Fragment Map */}
+          <FragmentMap nodeStatuses={nodeStatuses} />
         </div>
       </div>
 

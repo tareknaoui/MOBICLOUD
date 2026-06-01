@@ -5,6 +5,7 @@
  */
 
 const crypto = require('crypto');
+const http   = require('http');
 const WebSocket = require('ws');
 
 const RELAY_URL = 'ws://localhost:10000';
@@ -91,6 +92,7 @@ class Peer {
     const payload = Buffer.from(JSON.stringify({
       ip: this.ip, port: this.port,
       freeBytes: this.freeBytes,
+      totalBytes: this.totalBytes,
       clusterId: this.clusterId,
       currentMemberCount: 1
     }), 'utf8');
@@ -113,6 +115,12 @@ class Peer {
     this.log(`REGISTER_PEER totalBytes=${(this.totalBytes/1e9).toFixed(1)}GB freeBytes=${(this.freeBytes/1e9).toFixed(1)}GB`);
   }
 
+  heartbeat() {
+    if (!this.alive || !this.ws || this.ws.readyState !== 1) return;
+    if (this.isSuperPeer) this.registerAsSuperPeer();
+    else this.sendJoin();
+  }
+
   sendElectionBroadcast() {
     const payload = Buffer.from(JSON.stringify({
       type: 'BULLY_VICTORY', newSuperPeer: this.nodeId,
@@ -133,6 +141,66 @@ class Peer {
       this.log(`échec: ${e.message}`);
       return false;
     }
+  }
+}
+
+// ─── Annonce fragments ────────────────────────────────────────────────────────
+function postJson(path, body) {
+  return new Promise((resolve, reject) => {
+    const data = JSON.stringify(body);
+    const opts = { hostname: 'localhost', port: 10000, path, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } };
+    const req = http.request(opts, r => { let s = ''; r.on('data', d => s += d); r.on('end', () => resolve(JSON.parse(s))); });
+    req.on('error', reject);
+    req.write(data); req.end();
+  });
+}
+
+function pickRandom(arr, n) {
+  const shuffled = [...arr].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n);
+}
+
+// Distribue n fragments : priorité aux nœuds du cluster home, débordement sur l'autre si besoin
+function pickClusterFirst(peersByCluster, homeClusterId, n) {
+  const home  = pickRandom(peersByCluster.get(homeClusterId) ?? [], n);
+  if (home.length >= n) return home;
+  // débordement : compléter avec l'autre cluster
+  const others = [...peersByCluster.entries()]
+    .filter(([cid]) => cid !== homeClusterId)
+    .flatMap(([, peers]) => peers);
+  const extra = pickRandom(others, n - home.length);
+  return [...home, ...extra];
+}
+
+async function announceFiles(connectedPeers) {
+  // Regrouper les nodeIds par cluster
+  const peersByCluster = new Map();
+  for (const p of connectedPeers) {
+    if (!peersByCluster.has(p.clusterId)) peersByCluster.set(p.clusterId, []);
+    peersByCluster.get(p.clusterId).push(p.nodeId);
+  }
+  const clusterIds = [...peersByCluster.keys()];
+
+  // chaque fichier est rattaché à un cluster (alternance A/B pour la démo)
+  const FILES = [
+    { fileName: 'photo_vacances.jpg',  mimeType: 'image/jpeg',       totalSize: 8_400_000,   k: 3, n: 5, home: clusterIds[0] },
+    { fileName: 'video_famille.mp4',   mimeType: 'video/mp4',        totalSize: 524_288_000, k: 4, n: 6, home: clusterIds[0] },
+    { fileName: 'rapport_stage.pdf',   mimeType: 'application/pdf',  totalSize: 2_150_000,   k: 2, n: 4, home: clusterIds[1] ?? clusterIds[0] },
+    { fileName: 'musique_playlist.mp3',mimeType: 'audio/mpeg',       totalSize: 15_700_000,  k: 3, n: 4, home: clusterIds[1] ?? clusterIds[0] },
+    { fileName: 'backup_contacts.zip', mimeType: 'application/zip',  totalSize: 1_200_000,   k: 5, n: 8, home: clusterIds[1] ?? clusterIds[0] },
+  ];
+
+  for (const file of FILES) {
+    const fileId   = crypto.randomBytes(8).toString('hex');
+    const chosen   = pickClusterFirst(peersByCluster, file.home, file.n);
+    const fragSize = Math.floor(file.totalSize / file.k);
+    const fragments = chosen.map((nodeId, i) => ({ nodeId, index: i, sizeBytes: fragSize }));
+    const homeLabel = file.home.slice(0, 8);
+    try {
+      await postJson('/fragments/announce', { fileId, ...file, fragments });
+      console.log(`[FRAG] ${file.fileName} → ${file.n} frags (k=${file.k}) cluster ${homeLabel}…`);
+    } catch (e) { console.error(`[FRAG] Erreur annonce ${file.fileName}: ${e.message}`); }
+    await sleep(100);
   }
 }
 
@@ -174,6 +242,15 @@ async function main() {
     console.log(`[SIM] Cluster ${leader.clusterLabel} → SP: ${leader.nodeId.slice(0,8)} (fiabilité ${leader.reliability})`);
     await sleep(200);
   }
+
+  // Heartbeat toutes les 90s pour reset le TTL (180s)
+  setInterval(() => {
+    connected.forEach(p => p.heartbeat());
+  }, 90_000);
+
+  // Annoncer les fichiers simulés
+  await sleep(300);
+  await announceFiles(connected);
 
   console.log('\n✅  Simulation prête — ouvre le dashboard React maintenant');
   console.log('     http://localhost:5173  (ou le port de ton Vite)\n');

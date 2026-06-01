@@ -69,9 +69,31 @@ async function get<T>(path: string): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+export interface FragmentEntry {
+  nodeId: string;
+  index: number;
+  sizeBytes: number;
+  nodeConnected: boolean;
+  nodeExists: boolean;
+}
+
+export interface FragmentFile {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  totalSize: number;
+  k: number;
+  n: number;
+  uploadedAt: number;
+  fragments: FragmentEntry[];
+  onlineFragments: number;
+  recoverable: boolean;
+}
+
 export const fetchTopology = () => get<TopologyData>('/metrics/topology');
 export const fetchHealth = () => get<HealthData>('/health');
 export const fetchEvents = () => get<EventsData>('/metrics/events');
+export const fetchFragments = () => get<{ files: FragmentFile[] }>('/metrics/fragments');
 
 export async function resetAllNodes(secret: string): Promise<{ ok: boolean; disconnected: number }> {
   const res = await fetch(`${BASE}/admin/reset`, {

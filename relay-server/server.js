@@ -152,6 +152,9 @@ const signalingRegistry = new Map();
 // Map<blockId, [{ fromNodeId, destNodeId, data: Buffer, ttlTimer }]>
 const relayBuffer = new Map();
 
+// Map<fileId, { fileName, mimeType, totalSize, k, n, uploadedAt, fragments:[{nodeId,index,sizeBytes}] }>
+const fragmentRegistry = new Map();
+
 // SSE clients dashboard (Set de Response objects)
 const sseClients = new Set();
 
@@ -408,7 +411,7 @@ function handleJoin(nodeId, payload) {
     return false;
   }
 
-  const { ip, port, reliabilityScore, clusterId: payloadClusterId, freeBytes: payloadFreeBytes } = entry;
+  const { ip, port, reliabilityScore, clusterId: payloadClusterId, freeBytes: payloadFreeBytes, totalBytes: payloadTotalBytes } = entry;
 
   // ip/port optionnels — si présents, doivent être valides
   if (ip !== undefined && ip !== null) {
@@ -470,7 +473,9 @@ function handleJoin(nodeId, payload) {
     electedAt: existing?.electedAt ?? null,
     clusterId: clusterIdStr,
     freeBytes: freeBytesNum,
-    totalBytes: existing?.totalBytes ?? 0,
+    totalBytes: (typeof payloadTotalBytes === 'number' && Number.isFinite(payloadTotalBytes) && payloadTotalBytes > 0)
+      ? Math.floor(payloadTotalBytes)
+      : (existing?.totalBytes ?? 0),
     currentMemberCount: existing?.currentMemberCount ?? 0,
     lastSeen: Date.now(),
     ttlTimer,
@@ -838,6 +843,7 @@ const httpServer = http.createServer((req, res) => {
       }
     }
     relayBuffer.clear();
+    fragmentRegistry.clear();
     // Code review P11 : purger aussi les KPI pour eviter les compteurs fantomes post-reset.
     for (const k of Object.keys(eventCounters)) {
       if (k !== 'startedAt') eventCounters[k] = 0;
@@ -886,6 +892,31 @@ const httpServer = http.createServer((req, res) => {
     }
     res.writeHead(200, adminHeaders);
     res.end(JSON.stringify({ ok: true, killed, nodeId, banSeconds: killed ? CHAOS_BAN_MS / 1000 : 0 }));
+    return;
+  }
+
+  // ── POST /fragments/announce — un nœud déclare quels fragments il héberge ──
+  if (req.method === 'POST' && url === '/fragments/announce') {
+    let body = '';
+    req.on('data', d => { body += d; if (body.length > 64_000) req.destroy(); });
+    req.on('end', () => {
+      try {
+        const { fileId, fileName, mimeType, totalSize, k, n, fragments } = JSON.parse(body);
+        if (typeof fileId !== 'string' || !fileId || typeof fileName !== 'string') {
+          res.writeHead(400, CORS_HEADERS); res.end('{"error":"fileId/fileName requis"}'); return;
+        }
+        if (!Array.isArray(fragments) || fragments.length === 0) {
+          res.writeHead(400, CORS_HEADERS); res.end('{"error":"fragments[] requis"}'); return;
+        }
+        fragmentRegistry.set(fileId, {
+          fileName, mimeType: mimeType ?? 'application/octet-stream',
+          totalSize: totalSize ?? 0, k: k ?? 1, n: n ?? fragments.length,
+          uploadedAt: Date.now(), fragments
+        });
+        res.writeHead(200, CORS_HEADERS);
+        res.end(JSON.stringify({ ok: true, fileId, fragments: fragments.length }));
+      } catch { res.writeHead(400, CORS_HEADERS); res.end('{"error":"JSON invalide"}'); }
+    });
     return;
   }
 
@@ -964,6 +995,21 @@ const httpServer = http.createServer((req, res) => {
       totalConnected: sessions.size,
       churnRate: getChurnRate()
     });
+
+  } else if (url === '/metrics/fragments') {
+    const files = [];
+    for (const [fileId, f] of fragmentRegistry.entries()) {
+      const fragments = f.fragments.map(fr => ({
+        nodeId: fr.nodeId,
+        index: fr.index,
+        sizeBytes: fr.sizeBytes ?? 0,
+        nodeConnected: sessions.has(fr.nodeId),
+        nodeExists: signalingRegistry.has(fr.nodeId),
+      }));
+      const onlineCount = fragments.filter(fr => fr.nodeConnected).length;
+      files.push({ fileId, fileName: f.fileName, mimeType: f.mimeType, totalSize: f.totalSize, k: f.k, n: f.n, uploadedAt: f.uploadedAt, fragments, onlineFragments: onlineCount, recoverable: onlineCount >= f.k });
+    }
+    sendJson(res, { files });
 
   } else if (url === '/metrics/logs') {
     // Paramètre ?since=timestamp pour ne récupérer que les nouveaux logs
