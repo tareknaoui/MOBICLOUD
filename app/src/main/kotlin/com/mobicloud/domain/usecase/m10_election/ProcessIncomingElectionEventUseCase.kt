@@ -155,7 +155,11 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                 val differentCluster = payload.clusterId != localClusterId
                 val differentSenderSameCluster =
                     payload.clusterId == localClusterId && payload.senderNodeId != localIdentity.nodeId
-                if (differentCluster || differentSenderSameCluster) {
+                // Guard : ignorer notre propre COORDINATOR renvoyé par le relay (echo).
+                // Sans ça : si le clusterId du payload diffère du clusterId persisté (ex. nouvelle
+                // élection avec UUID frais pas encore persisté), differentCluster=true déclenche
+                // CoordinatorReceived sur notre propre FSM → on tente de nous rejoindre.
+                if (payload.senderNodeId != localIdentity.nodeId && (differentCluster || differentSenderSameCluster)) {
                     joinStateMachine?.transition(
                         JoinEvent.CoordinatorReceived(
                             senderNodeId = payload.senderNodeId.hexToByteArray(),

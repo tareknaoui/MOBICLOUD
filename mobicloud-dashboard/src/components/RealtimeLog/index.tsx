@@ -48,8 +48,8 @@ export default function RealtimeLog({ logs }: Props) {
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--log-bg)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
       <div style={{ padding: '6px 12px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
         <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent-green)', display: 'inline-block' }} />
-        <span style={{ color: 'var(--text-sec)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Log temps réel</span>
-        <span style={{ color: 'var(--text-muted)', fontSize: 10, marginLeft: 'auto' }}>{logs.length} événements</span>
+        <span style={{ color: 'var(--text-sec)', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Real-time log</span>
+        <span style={{ color: 'var(--text-muted)', fontSize: 10, marginLeft: 'auto' }}>{logs.length} events</span>
       </div>
       <div
         ref={containerRef}
@@ -58,7 +58,7 @@ export default function RealtimeLog({ logs }: Props) {
       >
         {logs.length === 0 && (
           <div style={{ color: 'var(--text-muted)', padding: '12px 16px', fontStyle: 'italic' }}>
-            En attente d'événements...
+            Waiting for events...
           </div>
         )}
         {logs.map((log, i) => (

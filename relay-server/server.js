@@ -409,8 +409,6 @@ function handleJoin(nodeId, payload) {
     logEvent('WARN', 'DEPART', `Nœud TTL expiré (${TTL_MS / 1000}s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
   }, TTL_MS);
 
-  const wasSuperPair = existing?.isSuperPair ?? false;
-
   // clusterId : préserver l'existant (re-JOIN heartbeat) ; sinon accepter du payload si UUID v4 valide.
   const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   let clusterIdStr = existing?.clusterId ?? '';
@@ -444,12 +442,17 @@ function handleJoin(nodeId, payload) {
     currentMemberCount: existing?.currentMemberCount ?? 0,
     lastSeen: Date.now(),
     ttlTimer,
-    isSuperPair: wasSuperPair,
+    // isSuperPair intentionnellement réinitialisé à false : le statut SP doit être
+    // revendiqué via REGISTER_PEER après victoire Bully. Préserver l'ancien statut sur JOIN
+    // faisait apparaître un nœud redémarré comme SP fantôme dans GET_PEERS, ce qui poussait
+    // le vrai vainqueur Bully à abdiquer faussement (bug : vainqueur Bully finit en Member).
+    // Un SP actif re-envoie REGISTER_PEER via onConnectedHook dans les ms qui suivent le JOIN.
+    isSuperPair: false,
     pubKeyB64
   });
 
   eventCounters.joinEvents++;
-  logEvent('INFO', 'JOIN', `Nœud connecté : ${nodeId.slice(0, 8)} ip=${ip ?? '?'}:${port ?? '?'}${wasSuperPair ? ' [Super-Peer]' : ''} cluster=${clusterIdStr.slice(0,8) || 'none'}`, { nodeId, ip, port });
+  logEvent('INFO', 'JOIN', `Nœud connecté : ${nodeId.slice(0, 8)} ip=${ip ?? '?'}:${port ?? '?'} cluster=${clusterIdStr.slice(0,8) || 'none'}`, { nodeId, ip, port });
   return true;
 }
 

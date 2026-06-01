@@ -32,7 +32,7 @@ function ThemeToggle({ theme, onToggle }: { theme: string; onToggle: () => void 
       padding: '3px 10px', cursor: 'pointer', fontSize: 12, color: 'var(--text-sec)',
       display: 'flex', alignItems: 'center', gap: 5,
     }}>
-      {theme === 'dark' ? '☀ Clair' : '☾ Sombre'}
+      {theme === 'dark' ? '☀ Light' : '☾ Dark'}
     </button>
   );
 }
@@ -78,17 +78,17 @@ export default function App() {
   const relayOffline = !!(topoError || healthError);
 
   async function handleReset() {
-    const secret = window.prompt('Secret admin (ADMIN_SECRET) :');
+    const secret = window.prompt('Admin secret (ADMIN_SECRET):');
     if (!secret) return;
-    if (!window.confirm(`Déconnecter tous les nœuds (${health?.sessions ?? '?'} sessions) ?`)) return;
+    if (!window.confirm(`Disconnect all nodes (${health?.sessions ?? '?'} sessions)?`)) return;
     setResetState('loading');
     try {
       const r = await resetAllNodes(secret);
       setResetState('ok');
-      setResetMsg(`${r.disconnected} nœud(s) déconnecté(s)`);
+      setResetMsg(`${r.disconnected} node(s) disconnected`);
     } catch (e: unknown) {
       setResetState('err');
-      setResetMsg(e instanceof Error ? e.message : 'Erreur inconnue');
+      setResetMsg(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setTimeout(() => setResetState('idle'), 4000);
     }
@@ -113,12 +113,12 @@ export default function App() {
           <span style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ width: 7, height: 7, borderRadius: '50%', background: relayOffline ? 'var(--accent-red)' : 'var(--accent-green)', display: 'inline-block' }} />
             <span style={{ color: relayOffline ? 'var(--accent-red)' : 'var(--accent-green)', fontWeight: 600 }}>
-              {relayOffline ? 'Relay offline' : 'Relay connecté'}
+              {relayOffline ? 'Relay offline' : 'Relay connected'}
             </span>
           </span>
           {!relayOffline && health && <>
             <span style={{ color: 'var(--border)' }}>|</span>
-            <span style={{ color: 'var(--text-sec)' }}>{health.sessions} sessions · {health.participants} nœuds</span>
+            <span style={{ color: 'var(--text-sec)' }}>{health.sessions} sessions · {health.participants} nodes</span>
             <span style={{ color: 'var(--border)' }}>|</span>
             <span style={{ color: churn >= 30 ? 'var(--accent-red)' : churn >= 15 ? 'var(--accent-orange)' : 'var(--text-sec)', fontWeight: churn >= 30 ? 700 : 400 }}>
               churn {churn}%{churn >= 30 ? ' ⚠' : ''}
@@ -127,7 +127,7 @@ export default function App() {
           <button
             onClick={handleReset}
             disabled={resetState === 'loading'}
-            title="Déconnecter tous les nœuds et purger l'état du relay"
+            title="Disconnect all nodes and purge relay state"
             style={{
               background: resetState === 'ok' ? 'var(--accent-green)' : resetState === 'err' ? 'var(--accent-red)' : 'var(--accent-red)',
               color: '#fff', border: 'none', borderRadius: 6,
@@ -139,7 +139,7 @@ export default function App() {
             {resetState === 'loading' ? '⏳ Reset…'
               : resetState === 'ok' ? `✓ ${resetMsg}`
               : resetState === 'err' ? `✗ ${resetMsg}`
-              : '⟳ Reset nœuds'}
+              : '⟳ Reset nodes'}
           </button>
           <ThemeToggle theme={theme} onToggle={toggle} />
         </div>
@@ -157,7 +157,7 @@ export default function App() {
             background: 'var(--bg-surface)', borderRadius: 6, padding: '4px 10px',
             border: '1px solid var(--border)'
           }}>
-            <span style={{ fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-sec)', fontSize: 10 }}>Topologie</span>
+            <span style={{ fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--text-sec)', fontSize: 10 }}>Topology</span>
             <span style={{ color: 'var(--border)' }}>·</span>
             {([['#facc15','Super-Peer'],['#60a5fa','Member'],['#6b7280','Offline']] as [string,string][]).map(([c,l]) => (
               <span key={l} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -173,31 +173,31 @@ export default function App() {
         <div style={{ flex: '0 0 32%', display: 'flex', flexDirection: 'column', overflowY: 'auto', gap: 8, padding: '10px 10px', background: 'var(--bg-base)' }}>
 
           <KpiSection title="Cluster" accent="var(--accent-blue)">
-            <KpiCard label="Sessions WS actives" value={health?.sessions ?? '—'} accent="var(--accent-blue)" />
-            <KpiCard label="Nœuds enregistrés"   value={health?.participants ?? '—'} />
-            <KpiCard label="Super-Peers élus"     value={health?.registeredSuperPeers ?? '—'} accent="var(--accent-yellow)" />
-            <KpiCard label="Membres"              value={nodeCount > 0 ? nodeCount - superPeerCount : '—'} />
+            <KpiCard label="Active WS sessions"   value={health?.sessions ?? '—'} accent="var(--accent-blue)" />
+            <KpiCard label="Registered nodes"     value={health?.participants ?? '—'} />
+            <KpiCard label="Elected cluster heads" value={health?.registeredSuperPeers ?? '—'} accent="var(--accent-yellow)" />
+            <KpiCard label="Members"              value={nodeCount > 0 ? nodeCount - superPeerCount : '—'} />
           </KpiSection>
 
-          <KpiSection title="Réseau" accent="var(--accent-cyan)">
-            <KpiCard label="Blocs relay buffer"   value={health?.pendingBlocks ?? '—'} warn={(health?.pendingBlocks ?? 0) > 50} />
-            <KpiCard label="Blocs forwardés"      value={events?.forwardedBlocks ?? '—'} />
-            <KpiCard label="Élections Bully"      value={events?.electionBroadcasts ?? '—'} accent="var(--accent-yellow)" />
-            <KpiCard label="Signaux Gossip"        value={events?.signalsSent ?? '—'} accent="var(--accent-cyan)" />
+          <KpiSection title="Network" accent="var(--accent-cyan)">
+            <KpiCard label="Relay buffer blocks"  value={health?.pendingBlocks ?? '—'} warn={(health?.pendingBlocks ?? 0) > 50} />
+            <KpiCard label="Forwarded blocks"     value={events?.forwardedBlocks ?? '—'} />
+            <KpiCard label="Bully elections"      value={events?.electionBroadcasts ?? '—'} accent="var(--accent-yellow)" />
+            <KpiCard label="Gossip signals"       value={events?.signalsSent ?? '—'} accent="var(--accent-cyan)" />
           </KpiSection>
 
-          <KpiSection title="Sécurité" accent="var(--accent-red)">
-            <KpiCard label="Auth réussies"        value={events?.authSuccesses ?? '—'} accent="var(--accent-green)" />
-            <KpiCard label="Auth échouées"        value={events?.authFailures ?? '—'} warn={(events?.authFailures ?? 0) > 0} />
-            <KpiCard label="Taux succès auth"     value={fmtPct(events?.authSuccesses ?? 0, totalAuth)} />
-            <KpiCard label="Uptime relay"         value={events ? fmtUptime(events.uptimeMs) : '—'} accent="var(--accent-green)" />
+          <KpiSection title="Security" accent="var(--accent-red)">
+            <KpiCard label="Auth successes"       value={events?.authSuccesses ?? '—'} accent="var(--accent-green)" />
+            <KpiCard label="Auth failures"        value={events?.authFailures ?? '—'} warn={(events?.authFailures ?? 0) > 0} />
+            <KpiCard label="Auth success rate"    value={fmtPct(events?.authSuccesses ?? 0, totalAuth)} />
+            <KpiCard label="Relay uptime"         value={events ? fmtUptime(events.uptimeMs) : '—'} accent="var(--accent-green)" />
           </KpiSection>
 
-          <KpiSection title="Stabilité" accent="var(--accent-orange)">
+          <KpiSection title="Stability" accent="var(--accent-orange)">
             <KpiCard label="Churn 5min"           value={events ? `${events.churnRate}%` : '—'} warn={(events?.churnRate ?? 0) >= 30} />
-            <KpiCard label="Départs totaux"       value={events?.departures ?? '—'} />
-            <KpiCard label="Connexions totales"   value={events?.joinEvents ?? '—'} />
-            <KpiCard label="Signaux droppés"      value={events?.droppedSignals ?? '—'} warn={(events?.droppedSignals ?? 0) > 10} />
+            <KpiCard label="Total departures"     value={events?.departures ?? '—'} />
+            <KpiCard label="Total connections"    value={events?.joinEvents ?? '—'} />
+            <KpiCard label="Dropped signals"      value={events?.droppedSignals ?? '—'} warn={(events?.droppedSignals ?? 0) > 10} />
           </KpiSection>
 
           {/* Clusters */}

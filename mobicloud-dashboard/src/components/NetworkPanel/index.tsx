@@ -10,7 +10,7 @@ function fmtTime(ts: number) {
 }
 
 export default function NetworkPanel({ history, theme }: Props) {
-  const data = history.map(p => ({ time: fmtTime(p.t), Sessions: p.sessions, 'Blocs relay': p.pendingBlocks }));
+  const data = history.map(p => ({ time: fmtTime(p.t), Sessions: p.sessions, 'Relay blocks': p.pendingBlocks }));
   const isDark = theme === 'dark';
   const gridColor = isDark ? '#1f2937' : '#e2e8f0';
   const tickColor = isDark ? '#4b5563' : '#94a3b8';
@@ -20,7 +20,7 @@ export default function NetworkPanel({ history, theme }: Props) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100%', background: 'var(--bg-card)', borderRadius: 10, border: '1px solid var(--border)' }}>
-      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent-green)', padding: '8px 12px 4px' }}>Activité réseau</div>
+      <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--accent-green)', padding: '8px 12px 4px' }}>Network activity</div>
       <div style={{ flex: 1, minHeight: 0 }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
@@ -33,7 +33,7 @@ export default function NetworkPanel({ history, theme }: Props) {
             />
             <Legend wrapperStyle={{ color: legendColor, fontSize: 10, paddingTop: 2 }} />
             <Line type="monotone" dataKey="Sessions" stroke="var(--accent-blue)" dot={false} strokeWidth={1.5} />
-            <Line type="monotone" dataKey="Blocs relay" stroke="var(--accent-yellow)" dot={false} strokeWidth={1.5} />
+            <Line type="monotone" dataKey="Relay blocks" stroke="var(--accent-yellow)" dot={false} strokeWidth={1.5} />
           </LineChart>
         </ResponsiveContainer>
       </div>

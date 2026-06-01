@@ -1,0 +1,4621 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": [
+      {
+        "id": "app_orchestrates_panels",
+        "label": "App orchestrates all dashboard panels via hooks and renders them in layout",
+        "nodes": [
+          "app_tsx",
+          "clusterpanel_component",
+          "networkpanel_component",
+          "realtimelog_component",
+          "graphview2d_component"
+        ],
+        "relation": "participate_in",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1.0,
+        "source_file": "mobicloud-dashboard/src/App.tsx"
+      },
+      {
+        "id": "cluster_superpeer_election_triad",
+        "label": "Cluster Topology, Super-Peer Election, and Bully Algorithm form the core P2P management pattern",
+        "nodes": [
+          "concept_cluster_topology",
+          "concept_superpeer",
+          "concept_bully_election"
+        ],
+        "relation": "implement",
+        "confidence": "INFERRED",
+        "confidence_score": 0.95,
+        "source_file": "mobicloud-dashboard/src/App.tsx"
+      },
+      {
+        "id": "hooks_feed_api_data",
+        "label": "useTopology, useHealth, useClusters all poll the API service and feed data upward to App",
+        "nodes": [
+          "hook_usetopology",
+          "hook_usehealth",
+          "hook_useclusters"
+        ],
+        "relation": "participate_in",
+        "confidence": "INFERRED",
+        "confidence_score": 0.95,
+        "source_file": "mobicloud-dashboard/src/App.tsx"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "label": "eslint.config.js",
+      "file_type": "code",
+      "source_file": "eslint.config.js",
+      "source_location": "L1",
+      "id": "eslint_config_js",
+      "community": 13,
+      "norm_label": "eslint.config.js"
+    },
+    {
+      "label": "package.json",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L1",
+      "id": "package_json",
+      "community": 2,
+      "norm_label": "package.json"
+    },
+    {
+      "label": "name",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L2",
+      "id": "mobicloud_dashboard_package_name",
+      "community": 2,
+      "norm_label": "name"
+    },
+    {
+      "label": "private",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L3",
+      "id": "mobicloud_dashboard_package_private",
+      "community": 2,
+      "norm_label": "private"
+    },
+    {
+      "label": "version",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L4",
+      "id": "mobicloud_dashboard_package_version",
+      "community": 2,
+      "norm_label": "version"
+    },
+    {
+      "label": "type",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L5",
+      "id": "mobicloud_dashboard_package_type",
+      "community": 2,
+      "norm_label": "type"
+    },
+    {
+      "label": "scripts",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L6",
+      "id": "mobicloud_dashboard_package_scripts",
+      "community": 2,
+      "norm_label": "scripts"
+    },
+    {
+      "label": "dev",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L7",
+      "id": "mobicloud_dashboard_package_scripts_dev",
+      "community": 2,
+      "norm_label": "dev"
+    },
+    {
+      "label": "build",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L8",
+      "id": "mobicloud_dashboard_package_scripts_build",
+      "community": 2,
+      "norm_label": "build"
+    },
+    {
+      "label": "lint",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "id": "mobicloud_dashboard_package_scripts_lint",
+      "community": 2,
+      "norm_label": "lint"
+    },
+    {
+      "label": "preview",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L10",
+      "id": "mobicloud_dashboard_package_scripts_preview",
+      "community": 2,
+      "norm_label": "preview"
+    },
+    {
+      "label": "dependencies",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L12",
+      "id": "mobicloud_dashboard_package_dependencies",
+      "community": 2,
+      "norm_label": "dependencies"
+    },
+    {
+      "label": "@tailwindcss/vite",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L13",
+      "id": "mobicloud_dashboard_package_dependencies_tailwindcss_vite",
+      "community": 2,
+      "norm_label": "@tailwindcss/vite"
+    },
+    {
+      "label": "@types/three",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L14",
+      "id": "mobicloud_dashboard_package_dependencies_types_three",
+      "community": 2,
+      "norm_label": "@types/three"
+    },
+    {
+      "label": "cytoscape",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L15",
+      "id": "mobicloud_dashboard_package_dependencies_cytoscape",
+      "community": 2,
+      "norm_label": "cytoscape"
+    },
+    {
+      "label": "cytoscape-cose-bilkent",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L16",
+      "id": "mobicloud_dashboard_package_dependencies_cytoscape_cose_bilkent",
+      "community": 2,
+      "norm_label": "cytoscape-cose-bilkent"
+    },
+    {
+      "label": "react",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L17",
+      "id": "mobicloud_dashboard_package_dependencies_react",
+      "community": 2,
+      "norm_label": "react"
+    },
+    {
+      "label": "react-dom",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L18",
+      "id": "mobicloud_dashboard_package_dependencies_react_dom",
+      "community": 2,
+      "norm_label": "react-dom"
+    },
+    {
+      "label": "react-force-graph-2d",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L19",
+      "id": "mobicloud_dashboard_package_dependencies_react_force_graph_2d",
+      "community": 2,
+      "norm_label": "react-force-graph-2d"
+    },
+    {
+      "label": "react-force-graph-3d",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L20",
+      "id": "mobicloud_dashboard_package_dependencies_react_force_graph_3d",
+      "community": 2,
+      "norm_label": "react-force-graph-3d"
+    },
+    {
+      "label": "recharts",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L21",
+      "id": "mobicloud_dashboard_package_dependencies_recharts",
+      "community": 2,
+      "norm_label": "recharts"
+    },
+    {
+      "label": "tailwindcss",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L22",
+      "id": "mobicloud_dashboard_package_dependencies_tailwindcss",
+      "community": 2,
+      "norm_label": "tailwindcss"
+    },
+    {
+      "label": "three",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L23",
+      "id": "mobicloud_dashboard_package_dependencies_three",
+      "community": 2,
+      "norm_label": "three"
+    },
+    {
+      "label": "devDependencies",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L25",
+      "id": "mobicloud_dashboard_package_devdependencies",
+      "community": 7,
+      "norm_label": "devdependencies"
+    },
+    {
+      "label": "@eslint/js",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L26",
+      "id": "mobicloud_dashboard_package_devdependencies_eslint_js",
+      "community": 7,
+      "norm_label": "@eslint/js"
+    },
+    {
+      "label": "@types/cytoscape",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L27",
+      "id": "mobicloud_dashboard_package_devdependencies_types_cytoscape",
+      "community": 7,
+      "norm_label": "@types/cytoscape"
+    },
+    {
+      "label": "@types/node",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L28",
+      "id": "mobicloud_dashboard_package_devdependencies_types_node",
+      "community": 7,
+      "norm_label": "@types/node"
+    },
+    {
+      "label": "@types/react",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L29",
+      "id": "mobicloud_dashboard_package_devdependencies_types_react",
+      "community": 7,
+      "norm_label": "@types/react"
+    },
+    {
+      "label": "@types/react-dom",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L30",
+      "id": "mobicloud_dashboard_package_devdependencies_types_react_dom",
+      "community": 7,
+      "norm_label": "@types/react-dom"
+    },
+    {
+      "label": "@vitejs/plugin-react",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L31",
+      "id": "mobicloud_dashboard_package_devdependencies_vitejs_plugin_react",
+      "community": 7,
+      "norm_label": "@vitejs/plugin-react"
+    },
+    {
+      "label": "eslint",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L32",
+      "id": "mobicloud_dashboard_package_devdependencies_eslint",
+      "community": 7,
+      "norm_label": "eslint"
+    },
+    {
+      "label": "eslint-plugin-react-hooks",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L33",
+      "id": "mobicloud_dashboard_package_devdependencies_eslint_plugin_react_hooks",
+      "community": 7,
+      "norm_label": "eslint-plugin-react-hooks"
+    },
+    {
+      "label": "eslint-plugin-react-refresh",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L34",
+      "id": "mobicloud_dashboard_package_devdependencies_eslint_plugin_react_refresh",
+      "community": 7,
+      "norm_label": "eslint-plugin-react-refresh"
+    },
+    {
+      "label": "globals",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L35",
+      "id": "mobicloud_dashboard_package_devdependencies_globals",
+      "community": 7,
+      "norm_label": "globals"
+    },
+    {
+      "label": "typescript",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L36",
+      "id": "mobicloud_dashboard_package_devdependencies_typescript",
+      "community": 7,
+      "norm_label": "typescript"
+    },
+    {
+      "label": "typescript-eslint",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L37",
+      "id": "mobicloud_dashboard_package_devdependencies_typescript_eslint",
+      "community": 7,
+      "norm_label": "typescript-eslint"
+    },
+    {
+      "label": "vite",
+      "file_type": "code",
+      "source_file": "package.json",
+      "source_location": "L38",
+      "id": "mobicloud_dashboard_package_devdependencies_vite",
+      "community": 7,
+      "norm_label": "vite"
+    },
+    {
+      "label": "tsconfig.app.json",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L1",
+      "id": "tsconfig_app_json",
+      "community": 4,
+      "norm_label": "tsconfig.app.json"
+    },
+    {
+      "label": "compilerOptions",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L2",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "community": 4,
+      "norm_label": "compileroptions"
+    },
+    {
+      "label": "tsBuildInfoFile",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L3",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_tsbuildinfofile",
+      "community": 4,
+      "norm_label": "tsbuildinfofile"
+    },
+    {
+      "label": "target",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L4",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_target",
+      "community": 4,
+      "norm_label": "target"
+    },
+    {
+      "label": "lib",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L5",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_lib",
+      "community": 4,
+      "norm_label": "lib"
+    },
+    {
+      "label": "module",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L6",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_module",
+      "community": 4,
+      "norm_label": "module"
+    },
+    {
+      "label": "types",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L7",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_types",
+      "community": 4,
+      "norm_label": "types"
+    },
+    {
+      "label": "skipLibCheck",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L8",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_skiplibcheck",
+      "community": 4,
+      "norm_label": "skiplibcheck"
+    },
+    {
+      "label": "moduleResolution",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L11",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_moduleresolution",
+      "community": 4,
+      "norm_label": "moduleresolution"
+    },
+    {
+      "label": "allowImportingTsExtensions",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L12",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_allowimportingtsextensions",
+      "community": 4,
+      "norm_label": "allowimportingtsextensions"
+    },
+    {
+      "label": "verbatimModuleSyntax",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L13",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_verbatimmodulesyntax",
+      "community": 4,
+      "norm_label": "verbatimmodulesyntax"
+    },
+    {
+      "label": "moduleDetection",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L14",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_moduledetection",
+      "community": 4,
+      "norm_label": "moduledetection"
+    },
+    {
+      "label": "noEmit",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L15",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_noemit",
+      "community": 4,
+      "norm_label": "noemit"
+    },
+    {
+      "label": "jsx",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L16",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_jsx",
+      "community": 4,
+      "norm_label": "jsx"
+    },
+    {
+      "label": "noUnusedLocals",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L19",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_nounusedlocals",
+      "community": 4,
+      "norm_label": "nounusedlocals"
+    },
+    {
+      "label": "noUnusedParameters",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L20",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_nounusedparameters",
+      "community": 4,
+      "norm_label": "nounusedparameters"
+    },
+    {
+      "label": "erasableSyntaxOnly",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L21",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_erasablesyntaxonly",
+      "community": 4,
+      "norm_label": "erasablesyntaxonly"
+    },
+    {
+      "label": "noFallthroughCasesInSwitch",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L22",
+      "id": "mobicloud_dashboard_tsconfig_app_compileroptions_nofallthroughcasesinswitch",
+      "community": 4,
+      "norm_label": "nofallthroughcasesinswitch"
+    },
+    {
+      "label": "include",
+      "file_type": "code",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L24",
+      "id": "mobicloud_dashboard_tsconfig_app_include",
+      "community": 4,
+      "norm_label": "include"
+    },
+    {
+      "label": "tsconfig.json",
+      "file_type": "code",
+      "source_file": "tsconfig.json",
+      "source_location": "L1",
+      "id": "tsconfig_json",
+      "community": 10,
+      "norm_label": "tsconfig.json"
+    },
+    {
+      "label": "files",
+      "file_type": "code",
+      "source_file": "tsconfig.json",
+      "source_location": "L2",
+      "id": "mobicloud_dashboard_tsconfig_files",
+      "community": 10,
+      "norm_label": "files"
+    },
+    {
+      "label": "references",
+      "file_type": "code",
+      "source_file": "tsconfig.json",
+      "source_location": "L3",
+      "id": "mobicloud_dashboard_tsconfig_references",
+      "community": 10,
+      "norm_label": "references"
+    },
+    {
+      "label": "tsconfig.node.json",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L1",
+      "id": "tsconfig_node_json",
+      "community": 5,
+      "norm_label": "tsconfig.node.json"
+    },
+    {
+      "label": "compilerOptions",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L2",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "community": 5,
+      "norm_label": "compileroptions"
+    },
+    {
+      "label": "tsBuildInfoFile",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L3",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_tsbuildinfofile",
+      "community": 5,
+      "norm_label": "tsbuildinfofile"
+    },
+    {
+      "label": "target",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L4",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_target",
+      "community": 5,
+      "norm_label": "target"
+    },
+    {
+      "label": "lib",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L5",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_lib",
+      "community": 5,
+      "norm_label": "lib"
+    },
+    {
+      "label": "module",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L6",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_module",
+      "community": 5,
+      "norm_label": "module"
+    },
+    {
+      "label": "types",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L7",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_types",
+      "community": 5,
+      "norm_label": "types"
+    },
+    {
+      "label": "skipLibCheck",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L8",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_skiplibcheck",
+      "community": 5,
+      "norm_label": "skiplibcheck"
+    },
+    {
+      "label": "moduleResolution",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L11",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_moduleresolution",
+      "community": 5,
+      "norm_label": "moduleresolution"
+    },
+    {
+      "label": "allowImportingTsExtensions",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L12",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_allowimportingtsextensions",
+      "community": 5,
+      "norm_label": "allowimportingtsextensions"
+    },
+    {
+      "label": "verbatimModuleSyntax",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L13",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_verbatimmodulesyntax",
+      "community": 5,
+      "norm_label": "verbatimmodulesyntax"
+    },
+    {
+      "label": "moduleDetection",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L14",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_moduledetection",
+      "community": 5,
+      "norm_label": "moduledetection"
+    },
+    {
+      "label": "noEmit",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L15",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_noemit",
+      "community": 5,
+      "norm_label": "noemit"
+    },
+    {
+      "label": "noUnusedLocals",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L18",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_nounusedlocals",
+      "community": 5,
+      "norm_label": "nounusedlocals"
+    },
+    {
+      "label": "noUnusedParameters",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L19",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_nounusedparameters",
+      "community": 5,
+      "norm_label": "nounusedparameters"
+    },
+    {
+      "label": "erasableSyntaxOnly",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L20",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_erasablesyntaxonly",
+      "community": 5,
+      "norm_label": "erasablesyntaxonly"
+    },
+    {
+      "label": "noFallthroughCasesInSwitch",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L21",
+      "id": "mobicloud_dashboard_tsconfig_node_compileroptions_nofallthroughcasesinswitch",
+      "community": 5,
+      "norm_label": "nofallthroughcasesinswitch"
+    },
+    {
+      "label": "include",
+      "file_type": "code",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L23",
+      "id": "mobicloud_dashboard_tsconfig_node_include",
+      "community": 5,
+      "norm_label": "include"
+    },
+    {
+      "label": "vite.config.ts",
+      "file_type": "code",
+      "source_file": "vite.config.ts",
+      "source_location": "L1",
+      "id": "vite_config_ts",
+      "community": 14,
+      "norm_label": "vite.config.ts"
+    },
+    {
+      "label": "App.tsx",
+      "file_type": "code",
+      "source_file": "src/App.tsx",
+      "source_location": "L1",
+      "id": "src_app_tsx",
+      "community": 0,
+      "norm_label": "app.tsx"
+    },
+    {
+      "label": "fmtUptime()",
+      "file_type": "code",
+      "source_file": "src/App.tsx",
+      "source_location": "L14",
+      "id": "src_app_fmtuptime",
+      "community": 0,
+      "norm_label": "fmtuptime()"
+    },
+    {
+      "label": "fmtPct()",
+      "file_type": "code",
+      "source_file": "src/App.tsx",
+      "source_location": "L23",
+      "id": "src_app_fmtpct",
+      "community": 0,
+      "norm_label": "fmtpct()"
+    },
+    {
+      "label": "ThemeToggle()",
+      "file_type": "code",
+      "source_file": "src/App.tsx",
+      "source_location": "L28",
+      "id": "src_app_themetoggle",
+      "community": 0,
+      "norm_label": "themetoggle()"
+    },
+    {
+      "label": "KpiCard()",
+      "file_type": "code",
+      "source_file": "src/App.tsx",
+      "source_location": "L40",
+      "id": "src_app_kpicard",
+      "community": 0,
+      "norm_label": "kpicard()"
+    },
+    {
+      "label": "KpiSection()",
+      "file_type": "code",
+      "source_file": "src/App.tsx",
+      "source_location": "L51",
+      "id": "src_app_kpisection",
+      "community": 0,
+      "norm_label": "kpisection()"
+    },
+    {
+      "label": "buildKpis()",
+      "file_type": "code",
+      "source_file": "src/App.tsx",
+      "source_location": "L62",
+      "id": "src_app_buildkpis",
+      "community": 0,
+      "norm_label": "buildkpis()"
+    },
+    {
+      "label": "App()",
+      "file_type": "code",
+      "source_file": "src/App.tsx",
+      "source_location": "L66",
+      "id": "src_app_app",
+      "community": 0,
+      "norm_label": "app()"
+    },
+    {
+      "label": "main.tsx",
+      "file_type": "code",
+      "source_file": "src/main.tsx",
+      "source_location": "L1",
+      "id": "src_main_tsx",
+      "community": 0,
+      "norm_label": "main.tsx"
+    },
+    {
+      "label": "index.tsx",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L1",
+      "id": "src_components_clusterpanel_index_tsx",
+      "community": 8,
+      "norm_label": "index.tsx"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L4",
+      "id": "clusterpanel_index_props",
+      "community": 8,
+      "norm_label": "props"
+    },
+    {
+      "label": "fmtBytes()",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L9",
+      "id": "clusterpanel_index_fmtbytes",
+      "community": 8,
+      "norm_label": "fmtbytes()"
+    },
+    {
+      "label": "fmtBytesShort()",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L16",
+      "id": "clusterpanel_index_fmtbytesshort",
+      "community": 8,
+      "norm_label": "fmtbytesshort()"
+    },
+    {
+      "label": "reliabilityColor()",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L22",
+      "id": "clusterpanel_index_reliabilitycolor",
+      "community": 8,
+      "norm_label": "reliabilitycolor()"
+    },
+    {
+      "label": "storageBarColor()",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L28",
+      "id": "clusterpanel_index_storagebarcolor",
+      "community": 8,
+      "norm_label": "storagebarcolor()"
+    },
+    {
+      "label": "fmtAgo()",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L34",
+      "id": "clusterpanel_index_fmtago",
+      "community": 8,
+      "norm_label": "fmtago()"
+    },
+    {
+      "label": "ClusterDrillDown()",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L44",
+      "id": "clusterpanel_index_clusterdrilldown",
+      "community": 8,
+      "norm_label": "clusterdrilldown()"
+    },
+    {
+      "label": "ClusterCard()",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L145",
+      "id": "clusterpanel_index_clustercard",
+      "community": 8,
+      "norm_label": "clustercard()"
+    },
+    {
+      "label": "ClusterPanel()",
+      "file_type": "code",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L214",
+      "id": "clusterpanel_index_clusterpanel",
+      "community": 8,
+      "norm_label": "clusterpanel()"
+    },
+    {
+      "label": "index.tsx",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L1",
+      "id": "src_components_graphview2d_index_tsx",
+      "community": 3,
+      "norm_label": "index.tsx"
+    },
+    {
+      "label": "CLUSTER_COLORS",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L11",
+      "id": "graphview2d_index_cluster_colors",
+      "community": 3,
+      "norm_label": "cluster_colors"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L18",
+      "id": "graphview2d_index_props",
+      "community": 3,
+      "norm_label": "props"
+    },
+    {
+      "label": "Particle",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L20",
+      "id": "graphview2d_index_particle",
+      "community": 3,
+      "norm_label": "particle"
+    },
+    {
+      "label": "KnownNode",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L27",
+      "id": "graphview2d_index_knownnode",
+      "community": 3,
+      "norm_label": "knownnode"
+    },
+    {
+      "label": "SelectedNode",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L33",
+      "id": "graphview2d_index_selectednode",
+      "community": 3,
+      "norm_label": "selectednode"
+    },
+    {
+      "label": "SelectedCluster",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L39",
+      "id": "graphview2d_index_selectedcluster",
+      "community": 3,
+      "norm_label": "selectedcluster"
+    },
+    {
+      "label": "fmtBytes()",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L46",
+      "id": "graphview2d_index_fmtbytes",
+      "community": 3,
+      "norm_label": "fmtbytes()"
+    },
+    {
+      "label": "fmtAgo()",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L53",
+      "id": "graphview2d_index_fmtago",
+      "community": 3,
+      "norm_label": "fmtago()"
+    },
+    {
+      "label": "reliabilityColor()",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L64",
+      "id": "graphview2d_index_reliabilitycolor",
+      "community": 3,
+      "norm_label": "reliabilitycolor()"
+    },
+    {
+      "label": "buildStylesheet()",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L71",
+      "id": "graphview2d_index_buildstylesheet",
+      "community": 3,
+      "norm_label": "buildstylesheet()"
+    },
+    {
+      "label": "animateIn()",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L161",
+      "id": "graphview2d_index_animatein",
+      "community": 3,
+      "norm_label": "animatein()"
+    },
+    {
+      "label": "GraphView2D()",
+      "file_type": "code",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L176",
+      "id": "graphview2d_index_graphview2d",
+      "community": 3,
+      "norm_label": "graphview2d()"
+    },
+    {
+      "label": "index.tsx",
+      "file_type": "code",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L1",
+      "id": "src_components_networkpanel_index_tsx",
+      "community": 3,
+      "norm_label": "index.tsx"
+    },
+    {
+      "label": "HistoryPoint",
+      "file_type": "code",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L4",
+      "id": "networkpanel_index_historypoint",
+      "community": 3,
+      "norm_label": "historypoint"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L5",
+      "id": "networkpanel_index_props",
+      "community": 3,
+      "norm_label": "props"
+    },
+    {
+      "label": "fmtTime()",
+      "file_type": "code",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L7",
+      "id": "networkpanel_index_fmttime",
+      "community": 3,
+      "norm_label": "fmttime()"
+    },
+    {
+      "label": "NetworkPanel()",
+      "file_type": "code",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L12",
+      "id": "networkpanel_index_networkpanel",
+      "community": 3,
+      "norm_label": "networkpanel()"
+    },
+    {
+      "label": "index.tsx",
+      "file_type": "code",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L1",
+      "id": "src_components_realtimelog_index_tsx",
+      "community": 9,
+      "norm_label": "index.tsx"
+    },
+    {
+      "label": "Props",
+      "file_type": "code",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L4",
+      "id": "realtimelog_index_props",
+      "community": 9,
+      "norm_label": "props"
+    },
+    {
+      "label": "LEVEL_COLOR",
+      "file_type": "code",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L8",
+      "id": "realtimelog_index_level_color",
+      "community": 9,
+      "norm_label": "level_color"
+    },
+    {
+      "label": "CAT_COLOR",
+      "file_type": "code",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L14",
+      "id": "realtimelog_index_cat_color",
+      "community": 9,
+      "norm_label": "cat_color"
+    },
+    {
+      "label": "fmt()",
+      "file_type": "code",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L25",
+      "id": "realtimelog_index_fmt",
+      "community": 9,
+      "norm_label": "fmt()"
+    },
+    {
+      "label": "RealtimeLog()",
+      "file_type": "code",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L30",
+      "id": "realtimelog_index_realtimelog",
+      "community": 9,
+      "norm_label": "realtimelog()"
+    },
+    {
+      "label": "useClusters.ts",
+      "file_type": "code",
+      "source_file": "src/hooks/useClusters.ts",
+      "source_location": "L1",
+      "id": "src_hooks_useclusters_ts",
+      "community": 8,
+      "norm_label": "useclusters.ts"
+    },
+    {
+      "label": "ClusterMember",
+      "file_type": "code",
+      "source_file": "src/hooks/useClusters.ts",
+      "source_location": "L5",
+      "id": "hooks_useclusters_clustermember",
+      "community": 8,
+      "norm_label": "clustermember"
+    },
+    {
+      "label": "ClusterInfo",
+      "file_type": "code",
+      "source_file": "src/hooks/useClusters.ts",
+      "source_location": "L14",
+      "id": "hooks_useclusters_clusterinfo",
+      "community": 8,
+      "norm_label": "clusterinfo"
+    },
+    {
+      "label": "ClustersData",
+      "file_type": "code",
+      "source_file": "src/hooks/useClusters.ts",
+      "source_location": "L24",
+      "id": "hooks_useclusters_clustersdata",
+      "community": 8,
+      "norm_label": "clustersdata"
+    },
+    {
+      "label": "useClusters()",
+      "file_type": "code",
+      "source_file": "src/hooks/useClusters.ts",
+      "source_location": "L31",
+      "id": "hooks_useclusters_useclusters",
+      "community": 0,
+      "norm_label": "useclusters()"
+    },
+    {
+      "label": "useHealth.ts",
+      "file_type": "code",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L1",
+      "id": "src_hooks_usehealth_ts",
+      "community": 0,
+      "norm_label": "usehealth.ts"
+    },
+    {
+      "label": "HealthState",
+      "file_type": "code",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L5",
+      "id": "hooks_usehealth_healthstate",
+      "community": 0,
+      "norm_label": "healthstate"
+    },
+    {
+      "label": "useHealth()",
+      "file_type": "code",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L15",
+      "id": "hooks_usehealth_usehealth",
+      "community": 0,
+      "norm_label": "usehealth()"
+    },
+    {
+      "label": "useLogs.ts",
+      "file_type": "code",
+      "source_file": "src/hooks/useLogs.ts",
+      "source_location": "L1",
+      "id": "src_hooks_uselogs_ts",
+      "community": 0,
+      "norm_label": "uselogs.ts"
+    },
+    {
+      "label": "LogEntry",
+      "file_type": "code",
+      "source_file": "src/hooks/useLogs.ts",
+      "source_location": "L4",
+      "id": "hooks_uselogs_logentry",
+      "community": 9,
+      "norm_label": "logentry"
+    },
+    {
+      "label": "useLogs()",
+      "file_type": "code",
+      "source_file": "src/hooks/useLogs.ts",
+      "source_location": "L15",
+      "id": "hooks_uselogs_uselogs",
+      "community": 0,
+      "norm_label": "uselogs()"
+    },
+    {
+      "label": "useTheme.ts",
+      "file_type": "code",
+      "source_file": "src/hooks/useTheme.ts",
+      "source_location": "L1",
+      "id": "src_hooks_usetheme_ts",
+      "community": 0,
+      "norm_label": "usetheme.ts"
+    },
+    {
+      "label": "Theme",
+      "file_type": "code",
+      "source_file": "src/hooks/useTheme.ts",
+      "source_location": "L3",
+      "id": "hooks_usetheme_theme",
+      "community": 3,
+      "norm_label": "theme"
+    },
+    {
+      "label": "useTheme()",
+      "file_type": "code",
+      "source_file": "src/hooks/useTheme.ts",
+      "source_location": "L7",
+      "id": "hooks_usetheme_usetheme",
+      "community": 0,
+      "norm_label": "usetheme()"
+    },
+    {
+      "label": "useTopology.ts",
+      "file_type": "code",
+      "source_file": "src/hooks/useTopology.ts",
+      "source_location": "L1",
+      "id": "src_hooks_usetopology_ts",
+      "community": 0,
+      "norm_label": "usetopology.ts"
+    },
+    {
+      "label": "TopologyState",
+      "file_type": "code",
+      "source_file": "src/hooks/useTopology.ts",
+      "source_location": "L5",
+      "id": "hooks_usetopology_topologystate",
+      "community": 0,
+      "norm_label": "topologystate"
+    },
+    {
+      "label": "useTopology()",
+      "file_type": "code",
+      "source_file": "src/hooks/useTopology.ts",
+      "source_location": "L12",
+      "id": "hooks_usetopology_usetopology",
+      "community": 0,
+      "norm_label": "usetopology()"
+    },
+    {
+      "label": "api.ts",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L1",
+      "id": "src_services_api_ts",
+      "community": 0,
+      "norm_label": "api.ts"
+    },
+    {
+      "label": "RelayNode",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L5",
+      "id": "services_api_relaynode",
+      "community": 3,
+      "norm_label": "relaynode"
+    },
+    {
+      "label": "TopologyData",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L17",
+      "id": "services_api_topologydata",
+      "community": 0,
+      "norm_label": "topologydata"
+    },
+    {
+      "label": "HealthData",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L23",
+      "id": "services_api_healthdata",
+      "community": 0,
+      "norm_label": "healthdata"
+    },
+    {
+      "label": "EventsData",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L31",
+      "id": "services_api_eventsdata",
+      "community": 0,
+      "norm_label": "eventsdata"
+    },
+    {
+      "label": "TransferEvent",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L45",
+      "id": "services_api_transferevent",
+      "community": 3,
+      "norm_label": "transferevent"
+    },
+    {
+      "label": "subscribeToTransfers()",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L53",
+      "id": "services_api_subscribetotransfers",
+      "community": 0,
+      "norm_label": "subscribetotransfers()"
+    },
+    {
+      "label": "get()",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L65",
+      "id": "services_api_get",
+      "community": 0,
+      "norm_label": "get()"
+    },
+    {
+      "label": "fetchTopology()",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L71",
+      "id": "services_api_fetchtopology",
+      "community": 0,
+      "norm_label": "fetchtopology()"
+    },
+    {
+      "label": "fetchHealth()",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L72",
+      "id": "services_api_fetchhealth",
+      "community": 0,
+      "norm_label": "fetchhealth()"
+    },
+    {
+      "label": "fetchEvents()",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L73",
+      "id": "services_api_fetchevents",
+      "community": 0,
+      "norm_label": "fetchevents()"
+    },
+    {
+      "label": "resetAllNodes()",
+      "file_type": "code",
+      "source_file": "src/services/api.ts",
+      "source_location": "L75",
+      "id": "services_api_resetallnodes",
+      "community": 0,
+      "norm_label": "resetallnodes()"
+    },
+    {
+      "label": "cytoscape-cose-bilkent.d.ts",
+      "file_type": "code",
+      "source_file": "src/types/cytoscape-cose-bilkent.d.ts",
+      "source_location": "L1",
+      "id": "src_types_cytoscape_cose_bilkent_d_ts",
+      "community": 15,
+      "norm_label": "cytoscape-cose-bilkent.d.ts"
+    },
+    {
+      "label": "ESLint Config",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/eslint.config.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_eslintconfig",
+      "community": 16,
+      "norm_label": "eslint config"
+    },
+    {
+      "label": "package.json (Dashboard)",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/package.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_packagejson",
+      "community": 17,
+      "norm_label": "package.json (dashboard)"
+    },
+    {
+      "label": "Vite Config (vite.config.ts)",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/vite.config.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_viteconfig",
+      "community": 11,
+      "norm_label": "vite config (vite.config.ts)"
+    },
+    {
+      "label": "Vite Dev Proxy for Relay CORS Avoidance",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/vite.config.ts",
+      "source_location": "L7-18",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "In dev mode all /relay requests are proxied to https://mobicloud-relay-3.onrender.com to avoid CORS and browser tracking protection blocks; in prod VITE_RELAY_URL is used directly.",
+      "id": "concept_relay_proxy",
+      "community": 11,
+      "norm_label": "vite dev proxy for relay cors avoidance"
+    },
+    {
+      "label": "MobiCloud Relay Server (mobicloud-relay-3.onrender.com)",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/vite.config.ts",
+      "source_location": "L10",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Single HA relay instance on Render.com; dashboard queries its REST metrics endpoints and SSE stream.",
+      "id": "relay_server",
+      "community": 6,
+      "norm_label": "mobicloud relay server (mobicloud-relay-3.onrender.com)"
+    },
+    {
+      "label": "main.tsx (Entry Point)",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/main.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_main",
+      "community": 18,
+      "norm_label": "main.tsx (entry point)"
+    },
+    {
+      "label": "GraphView2D Component",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_graphview2d",
+      "community": 6,
+      "norm_label": "graphview2d component"
+    },
+    {
+      "label": "Canvas Particle Animation for Transfer Events",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": "L270-327",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "A requestAnimationFrame loop on an overlay canvas animates colored glowing dots along edges to visualise block, signal, and election transfers between nodes in real time.",
+      "id": "concept_particle_animation",
+      "community": 6,
+      "norm_label": "canvas particle animation for transfer events"
+    },
+    {
+      "label": "Incremental Cytoscape Topology Update (no re-layout)",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": "L334-497",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Topology diffs are applied incrementally: departed nodes are kept visible for 30 s with DEPART_TTL, edges are rebuilt only when active membership changes (mesh key), and cose-bilkent layout runs only once on first load to preserve user pan/zoom.",
+      "id": "concept_incremental_topology",
+      "community": 6,
+      "norm_label": "incremental cytoscape topology update (no re-layout)"
+    },
+    {
+      "label": "Super-Peer / Cluster Topology Visualisation",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": "L11-14",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Super-peers are rendered as gold (yellow) compound-parent cluster nodes; regular members as blue dots. Full-mesh edges are drawn within each cluster to reflect the MobiCloud super-peer topology.",
+      "id": "concept_superpeer_topology",
+      "community": 6,
+      "norm_label": "super-peer / cluster topology visualisation"
+    },
+    {
+      "label": "useClusters Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useClusters.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_useclusters",
+      "community": 6,
+      "norm_label": "useclusters hook"
+    },
+    {
+      "label": "useHealth Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useHealth.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_usehealth",
+      "community": 6,
+      "norm_label": "usehealth hook"
+    },
+    {
+      "label": "useLogs Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useLogs.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_uselogs",
+      "community": 6,
+      "norm_label": "uselogs hook"
+    },
+    {
+      "label": "useTheme Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useTheme.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_usetheme",
+      "community": 6,
+      "norm_label": "usetheme hook"
+    },
+    {
+      "label": "useTopology Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useTopology.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_usetopology",
+      "community": 6,
+      "norm_label": "usetopology hook"
+    },
+    {
+      "label": "Short-Polling Pattern (setTimeout loop)",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/hooks/useTopology.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "All data hooks (useTopology, useHealth, useLogs, useClusters) use a cancelled-flag + setTimeout loop instead of setInterval to avoid overlapping requests and ensure cleanup on unmount.",
+      "id": "concept_polling_pattern",
+      "community": 6,
+      "norm_label": "short-polling pattern (settimeout loop)"
+    },
+    {
+      "label": "API Service (api.ts)",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/services/api.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_api",
+      "community": 6,
+      "norm_label": "api service (api.ts)"
+    },
+    {
+      "label": "SSE Transfer Event Stream",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/services/api.ts",
+      "source_location": "L53-63",
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "rationale": "Block/signal/election transfer events are pushed via SSE (/dashboard/events) so the GraphView2D can animate particles in real time without polling overhead.",
+      "id": "concept_sse_transfer",
+      "community": 6,
+      "norm_label": "sse transfer event stream"
+    },
+    {
+      "label": "cytoscape-cose-bilkent Type Declaration",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/types/cytoscape-cose-bilkent.d.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "dashboard_cytoscape_type",
+      "community": 6,
+      "norm_label": "cytoscape-cose-bilkent type declaration"
+    },
+    {
+      "label": "App (Root Component)",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "app_tsx",
+      "community": 1,
+      "norm_label": "app (root component)"
+    },
+    {
+      "label": "ClusterPanel Component",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "clusterpanel_component",
+      "community": 1,
+      "norm_label": "clusterpanel component"
+    },
+    {
+      "label": "NetworkPanel Component",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/components/NetworkPanel/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "networkpanel_component",
+      "community": 1,
+      "norm_label": "networkpanel component"
+    },
+    {
+      "label": "RealtimeLog Component",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/components/RealtimeLog/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "realtimelog_component",
+      "community": 1,
+      "norm_label": "realtimelog component"
+    },
+    {
+      "label": "GraphView2D Component",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "graphview2d_component",
+      "community": 1,
+      "norm_label": "graphview2d component"
+    },
+    {
+      "label": "useTopology Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useTopology.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "hook_usetopology",
+      "community": 1,
+      "norm_label": "usetopology hook"
+    },
+    {
+      "label": "useHealth Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useHealth.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "hook_usehealth",
+      "community": 1,
+      "norm_label": "usehealth hook"
+    },
+    {
+      "label": "useLogs Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useLogs.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "hook_uselogs",
+      "community": 1,
+      "norm_label": "uselogs hook"
+    },
+    {
+      "label": "useClusters Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useClusters.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "hook_useclusters",
+      "community": 1,
+      "norm_label": "useclusters hook"
+    },
+    {
+      "label": "useTheme Hook",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/hooks/useTheme.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "hook_usetheme",
+      "community": 1,
+      "norm_label": "usetheme hook"
+    },
+    {
+      "label": "API Service",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/src/services/api.ts",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "service_api",
+      "community": 1,
+      "norm_label": "api service"
+    },
+    {
+      "label": "Super-Peer Node Role",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_superpeer",
+      "community": 1,
+      "norm_label": "super-peer node role"
+    },
+    {
+      "label": "Cluster Topology Visualization",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_cluster_topology",
+      "community": 1,
+      "norm_label": "cluster topology visualization"
+    },
+    {
+      "label": "Churn Rate Monitoring",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_churnrate",
+      "community": 1,
+      "norm_label": "churn rate monitoring"
+    },
+    {
+      "label": "Relay Server (HA WebSocket)",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_relay",
+      "community": 1,
+      "norm_label": "relay server (ha websocket)"
+    },
+    {
+      "label": "Node Reliability Score",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_reliability_score",
+      "community": 1,
+      "norm_label": "node reliability score"
+    },
+    {
+      "label": "KPI Dashboard Sections",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_kpi_dashboard",
+      "community": 1,
+      "norm_label": "kpi dashboard sections"
+    },
+    {
+      "label": "Bully Election Algorithm",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_bully_election",
+      "community": 1,
+      "norm_label": "bully election algorithm"
+    },
+    {
+      "label": "Transfer Event (Block Transfer)",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_transfer_event",
+      "community": 1,
+      "norm_label": "transfer event (block transfer)"
+    },
+    {
+      "label": "Realtime Log Event Categories",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/components/RealtimeLog/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_realtime_log_categories",
+      "community": 1,
+      "norm_label": "realtime log event categories"
+    },
+    {
+      "label": "index.html Entry Point",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/index.html",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "index_html",
+      "community": 1,
+      "norm_label": "index.html entry point"
+    },
+    {
+      "label": "tsconfig.app.json (App TypeScript Config)",
+      "file_type": "code",
+      "source_file": "mobicloud-dashboard/tsconfig.app.json",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "tsconfig_app",
+      "community": 12,
+      "norm_label": "tsconfig.app.json (app typescript config)"
+    },
+    {
+      "label": "Dashboard README",
+      "file_type": "document",
+      "source_file": "mobicloud-dashboard/README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "readme_dashboard",
+      "community": 12,
+      "norm_label": "dashboard readme"
+    },
+    {
+      "label": "Network Activity Time-Series Chart",
+      "file_type": "rationale",
+      "source_file": "mobicloud-dashboard/src/components/NetworkPanel/index.tsx",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "concept_network_activity_chart",
+      "community": 1,
+      "norm_label": "network activity time-series chart"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "package_json",
+      "target": "mobicloud_dashboard_package_dependencies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "package_json",
+      "target": "mobicloud_dashboard_package_devdependencies",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "package_json",
+      "target": "mobicloud_dashboard_package_name",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "package_json",
+      "target": "mobicloud_dashboard_package_private",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "package_json",
+      "target": "mobicloud_dashboard_package_scripts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "package_json",
+      "target": "mobicloud_dashboard_package_type",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "package_json",
+      "target": "mobicloud_dashboard_package_version",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_scripts",
+      "target": "mobicloud_dashboard_package_scripts_build",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_scripts",
+      "target": "mobicloud_dashboard_package_scripts_dev",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_scripts",
+      "target": "mobicloud_dashboard_package_scripts_lint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_scripts",
+      "target": "mobicloud_dashboard_package_scripts_preview",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_cytoscape",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_cytoscape_cose_bilkent",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_react",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_react_dom",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_react_force_graph_2d",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_react_force_graph_3d",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_recharts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_tailwindcss",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_tailwindcss_vite",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_three",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_dependencies",
+      "target": "mobicloud_dashboard_package_dependencies_types_three",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L32",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_eslint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L26",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_eslint_js",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_eslint_plugin_react_hooks",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_eslint_plugin_react_refresh",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L35",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_globals",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_types_cytoscape",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_types_node",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L29",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_types_react",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_types_react_dom",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L36",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_typescript",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L37",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_typescript_eslint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L38",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_vite",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "package.json",
+      "source_location": "L31",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_package_devdependencies",
+      "target": "mobicloud_dashboard_package_devdependencies_vitejs_plugin_react",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "tsconfig_app_json",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "tsconfig_app_json",
+      "target": "mobicloud_dashboard_tsconfig_app_include",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_allowimportingtsextensions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_erasablesyntaxonly",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_jsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_lib",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_module",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_moduledetection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_moduleresolution",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_noemit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_nofallthroughcasesinswitch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_nounusedlocals",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_nounusedparameters",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_skiplibcheck",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_target",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_tsbuildinfofile",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.app.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_app_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_app_compileroptions_verbatimmodulesyntax",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "tsconfig_json",
+      "target": "mobicloud_dashboard_tsconfig_files",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "tsconfig_json",
+      "target": "mobicloud_dashboard_tsconfig_references",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "tsconfig_node_json",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "tsconfig_node_json",
+      "target": "mobicloud_dashboard_tsconfig_node_include",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_allowimportingtsextensions",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_erasablesyntaxonly",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_lib",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_module",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_moduledetection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_moduleresolution",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_noemit",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_nofallthroughcasesinswitch",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_nounusedlocals",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L19",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_nounusedparameters",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_skiplibcheck",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_target",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_tsbuildinfofile",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_types",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "tsconfig.node.json",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "mobicloud_dashboard_tsconfig_node_compileroptions",
+      "target": "mobicloud_dashboard_tsconfig_node_compileroptions_verbatimmodulesyntax",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "hooks_useclusters_useclusters",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "hooks_usehealth_usehealth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "hooks_uselogs_uselogs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "hooks_usetheme_usetheme",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "hooks_usetopology_usetopology",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "services_api_eventsdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "services_api_healthdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "services_api_resetallnodes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "services_api_subscribetotransfers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "services_api_transferevent",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L66",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_app_app",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L62",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_app_buildkpis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_app_fmtpct",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_app_fmtuptime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L40",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_app_kpicard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L51",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_app_kpisection",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_app_themetoggle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_components_clusterpanel_index_tsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_components_graphview2d_index_tsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_components_networkpanel_index_tsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_components_realtimelog_index_tsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_hooks_useclusters_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_hooks_usehealth_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_hooks_uselogs_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_hooks_usetheme_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_hooks_usetopology_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_app_tsx",
+      "target": "src_services_api_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/main.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_main_tsx",
+      "target": "src_app_tsx",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L193",
+      "weight": 1.0,
+      "source": "src_app_app",
+      "target": "src_app_fmtuptime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L192",
+      "weight": 1.0,
+      "source": "src_app_app",
+      "target": "src_app_fmtpct",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/App.tsx",
+      "source_location": "L99",
+      "weight": 1.0,
+      "source": "src_app_app",
+      "target": "src_app_buildkpis",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/App.tsx",
+      "source_location": "L70",
+      "weight": 1.0,
+      "source": "src_app_app",
+      "target": "hooks_useclusters_useclusters"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/App.tsx",
+      "source_location": "L68",
+      "weight": 1.0,
+      "source": "src_app_app",
+      "target": "hooks_usehealth_usehealth"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/App.tsx",
+      "source_location": "L69",
+      "weight": 1.0,
+      "source": "src_app_app",
+      "target": "hooks_uselogs_uselogs"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/App.tsx",
+      "source_location": "L71",
+      "weight": 1.0,
+      "source": "src_app_app",
+      "target": "hooks_usetheme_usetheme"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/App.tsx",
+      "source_location": "L67",
+      "weight": 1.0,
+      "source": "src_app_app",
+      "target": "hooks_usetopology_usetopology"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L145",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "clusterpanel_index_clustercard",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L44",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "clusterpanel_index_clusterdrilldown",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L214",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "clusterpanel_index_clusterpanel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L34",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "clusterpanel_index_fmtago",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L9",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "clusterpanel_index_fmtbytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L16",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "clusterpanel_index_fmtbytesshort",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "clusterpanel_index_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L22",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "clusterpanel_index_reliabilitycolor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L28",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "clusterpanel_index_storagebarcolor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "hooks_useclusters_clusterinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "hooks_useclusters_clustersdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_clusterpanel_index_tsx",
+      "target": "src_hooks_useclusters_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "clusterpanel_index_props",
+      "target": "hooks_useclusters_clustersdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L197",
+      "weight": 1.0,
+      "source": "clusterpanel_index_clustercard",
+      "target": "clusterpanel_index_fmtbytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L63",
+      "weight": 1.0,
+      "source": "clusterpanel_index_clusterdrilldown",
+      "target": "clusterpanel_index_fmtbytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/ClusterPanel/index.tsx",
+      "source_location": "L198",
+      "weight": 1.0,
+      "source": "clusterpanel_index_clustercard",
+      "target": "clusterpanel_index_reliabilitycolor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L161",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_animatein",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L71",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_buildstylesheet",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_cluster_colors",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_fmtago",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L46",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_fmtbytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L176",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_graphview2d",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L27",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_knownnode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_particle",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L64",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_reliabilitycolor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L39",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_selectedcluster",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L33",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "graphview2d_index_selectednode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "hooks_usetheme_theme",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "services_api_relaynode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "services_api_topologydata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "services_api_transferevent",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "src_hooks_usetheme_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_graphview2d_index_tsx",
+      "target": "src_services_api_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "graphview2d_index_props",
+      "target": "hooks_usetheme_theme",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "graphview2d_index_props",
+      "target": "services_api_topologydata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "graphview2d_index_props",
+      "target": "services_api_transferevent",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L590",
+      "weight": 1.0,
+      "source": "graphview2d_index_graphview2d",
+      "target": "graphview2d_index_fmtbytes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L599",
+      "weight": 1.0,
+      "source": "graphview2d_index_graphview2d",
+      "target": "graphview2d_index_fmtago",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/GraphView2D/index.tsx",
+      "source_location": "L585",
+      "weight": 1.0,
+      "source": "graphview2d_index_graphview2d",
+      "target": "graphview2d_index_reliabilitycolor",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_networkpanel_index_tsx",
+      "target": "hooks_usetheme_theme",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_components_networkpanel_index_tsx",
+      "target": "networkpanel_index_fmttime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_networkpanel_index_tsx",
+      "target": "networkpanel_index_historypoint",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_components_networkpanel_index_tsx",
+      "target": "networkpanel_index_networkpanel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_components_networkpanel_index_tsx",
+      "target": "networkpanel_index_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_networkpanel_index_tsx",
+      "target": "src_hooks_usetheme_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/NetworkPanel/index.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "networkpanel_index_props",
+      "target": "hooks_usetheme_theme",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_realtimelog_index_tsx",
+      "target": "hooks_uselogs_logentry",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_components_realtimelog_index_tsx",
+      "target": "realtimelog_index_cat_color",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L25",
+      "weight": 1.0,
+      "source": "src_components_realtimelog_index_tsx",
+      "target": "realtimelog_index_fmt",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "src_components_realtimelog_index_tsx",
+      "target": "realtimelog_index_level_color",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_components_realtimelog_index_tsx",
+      "target": "realtimelog_index_props",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L30",
+      "weight": 1.0,
+      "source": "src_components_realtimelog_index_tsx",
+      "target": "realtimelog_index_realtimelog",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_components_realtimelog_index_tsx",
+      "target": "src_hooks_uselogs_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/components/RealtimeLog/index.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "realtimelog_index_props",
+      "target": "hooks_uselogs_logentry",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useClusters.ts",
+      "source_location": "L14",
+      "weight": 1.0,
+      "source": "src_hooks_useclusters_ts",
+      "target": "hooks_useclusters_clusterinfo",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useClusters.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_hooks_useclusters_ts",
+      "target": "hooks_useclusters_clustermember",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useClusters.ts",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "src_hooks_useclusters_ts",
+      "target": "hooks_useclusters_clustersdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useClusters.ts",
+      "source_location": "L31",
+      "weight": 1.0,
+      "source": "src_hooks_useclusters_ts",
+      "target": "hooks_useclusters_useclusters",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_hooks_usehealth_ts",
+      "target": "hooks_usehealth_healthstate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "src_hooks_usehealth_ts",
+      "target": "hooks_usehealth_usehealth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_hooks_usehealth_ts",
+      "target": "services_api_eventsdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_hooks_usehealth_ts",
+      "target": "services_api_fetchevents",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_hooks_usehealth_ts",
+      "target": "services_api_fetchhealth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_hooks_usehealth_ts",
+      "target": "services_api_healthdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_hooks_usehealth_ts",
+      "target": "src_services_api_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "hooks_usehealth_healthstate",
+      "target": "services_api_eventsdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useHealth.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "hooks_usehealth_healthstate",
+      "target": "services_api_healthdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useLogs.ts",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "src_hooks_uselogs_ts",
+      "target": "hooks_uselogs_logentry",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useLogs.ts",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "src_hooks_uselogs_ts",
+      "target": "hooks_uselogs_uselogs",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useLogs.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_hooks_uselogs_ts",
+      "target": "src_services_api_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useTheme.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_hooks_usetheme_ts",
+      "target": "hooks_usetheme_theme",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useTheme.ts",
+      "source_location": "L7",
+      "weight": 1.0,
+      "source": "src_hooks_usetheme_ts",
+      "target": "hooks_usetheme_usetheme",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useTopology.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_hooks_usetopology_ts",
+      "target": "hooks_usetopology_topologystate",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useTopology.ts",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "src_hooks_usetopology_ts",
+      "target": "hooks_usetopology_usetopology",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useTopology.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "src_hooks_usetopology_ts",
+      "target": "services_api_fetchtopology",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useTopology.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_hooks_usetopology_ts",
+      "target": "services_api_topologydata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useTopology.ts",
+      "source_location": "L3",
+      "weight": 1.0,
+      "source": "src_hooks_usetopology_ts",
+      "target": "src_services_api_ts",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "references",
+      "context": "field",
+      "confidence": "EXTRACTED",
+      "source_file": "src/hooks/useTopology.ts",
+      "source_location": "L6",
+      "weight": 1.0,
+      "source": "hooks_usetopology_topologystate",
+      "target": "services_api_topologydata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L31",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_eventsdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L73",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_fetchevents",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_fetchhealth",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L71",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_fetchtopology",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L65",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_get",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L23",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_healthdata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_relaynode",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L75",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_resetallnodes",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_subscribetotransfers",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_topologydata",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L45",
+      "weight": 1.0,
+      "source": "src_services_api_ts",
+      "target": "services_api_transferevent",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L73",
+      "weight": 1.0,
+      "source": "services_api_fetchevents",
+      "target": "services_api_get",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L72",
+      "weight": 1.0,
+      "source": "services_api_fetchhealth",
+      "target": "services_api_get",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/services/api.ts",
+      "source_location": "L71",
+      "weight": 1.0,
+      "source": "services_api_fetchtopology",
+      "target": "services_api_get",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/vite.config.ts",
+      "source_location": "L7-18",
+      "weight": 1.0,
+      "source": "concept_relay_proxy",
+      "target": "dashboard_viteconfig"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/services/api.ts",
+      "source_location": "L3,L55,L71-73",
+      "weight": 1.0,
+      "source": "dashboard_api",
+      "target": "relay_server"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/hooks/useClusters.ts",
+      "source_location": "L3,L40",
+      "weight": 1.0,
+      "source": "dashboard_useclusters",
+      "target": "relay_server"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "concept_incremental_topology",
+      "target": "dashboard_graphview2d"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "concept_particle_animation",
+      "target": "dashboard_graphview2d"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "concept_superpeer_topology",
+      "target": "dashboard_graphview2d"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": "L4",
+      "weight": 1.0,
+      "source": "dashboard_graphview2d",
+      "target": "dashboard_api"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": "L2-3",
+      "weight": 1.0,
+      "source": "dashboard_graphview2d",
+      "target": "dashboard_cytoscape_type"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": "L5",
+      "weight": 1.0,
+      "source": "dashboard_graphview2d",
+      "target": "dashboard_usetheme"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/components/GraphView2D/index.tsx",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "concept_sse_transfer",
+      "target": "concept_particle_animation"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/hooks/useClusters.ts",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "concept_polling_pattern",
+      "target": "dashboard_useclusters"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/hooks/useHealth.ts",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "concept_polling_pattern",
+      "target": "dashboard_usehealth"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/hooks/useHealth.ts",
+      "source_location": "L2-3",
+      "weight": 1.0,
+      "source": "dashboard_usehealth",
+      "target": "dashboard_api"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/hooks/useLogs.ts",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "concept_polling_pattern",
+      "target": "dashboard_uselogs"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/hooks/useLogs.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "dashboard_uselogs",
+      "target": "dashboard_api"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/hooks/useTopology.ts",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "concept_polling_pattern",
+      "target": "dashboard_usetopology"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/hooks/useTopology.ts",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "dashboard_usetopology",
+      "target": "dashboard_api"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/services/api.ts",
+      "source_location": "L53",
+      "weight": 1.0,
+      "source": "concept_sse_transfer",
+      "target": "dashboard_api"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 204",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "clusterpanel_component"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 185",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "concept_bully_election"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 97-99",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "concept_cluster_topology"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 175-201",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "concept_kpi_dashboard"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 78",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "concept_relay"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 74-76",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "concept_transfer_event"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 169",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "graphview2d_component"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 70",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "hook_useclusters"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 68",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "hook_usehealth"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 69",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "hook_uselogs"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 71",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "hook_usetheme"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 67",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "hook_usetopology"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 217",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "networkpanel_component"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 222",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "realtimelog_component"
+    },
+    {
+      "relation": "calls",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": "line 12",
+      "weight": 1.0,
+      "source": "app_tsx",
+      "target": "service_api"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/index.html",
+      "source_location": "line 11",
+      "weight": 1.0,
+      "source": "index_html",
+      "target": "app_tsx"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": "line 224-225",
+      "weight": 1.0,
+      "source": "clusterpanel_component",
+      "target": "concept_churnrate"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": "line 79-80",
+      "weight": 1.0,
+      "source": "clusterpanel_component",
+      "target": "concept_reliability_score"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": "line 98-99",
+      "weight": 1.0,
+      "source": "clusterpanel_component",
+      "target": "concept_superpeer"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": "line 2",
+      "weight": 1.0,
+      "source": "clusterpanel_component",
+      "target": "hook_useclusters"
+    },
+    {
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/NetworkPanel/index.tsx",
+      "source_location": "line 12-42",
+      "weight": 1.0,
+      "source": "networkpanel_component",
+      "target": "concept_network_activity_chart"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/NetworkPanel/index.tsx",
+      "source_location": "line 2",
+      "weight": 1.0,
+      "source": "networkpanel_component",
+      "target": "hook_usetheme"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/RealtimeLog/index.tsx",
+      "source_location": "line 14-23",
+      "weight": 1.0,
+      "source": "realtimelog_component",
+      "target": "concept_realtime_log_categories"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/components/RealtimeLog/index.tsx",
+      "source_location": "line 2",
+      "weight": 1.0,
+      "source": "realtimelog_component",
+      "target": "hook_uselogs"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/hooks/useTopology.ts",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "hook_usetopology",
+      "target": "service_api"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/hooks/useHealth.ts",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "hook_usehealth",
+      "target": "service_api"
+    },
+    {
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/hooks/useClusters.ts",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "hook_useclusters",
+      "target": "service_api"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "concept_bully_election",
+      "target": "concept_superpeer"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": null,
+      "weight": 0.85,
+      "source": "concept_reliability_score",
+      "target": "concept_superpeer"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": null,
+      "weight": 0.95,
+      "source": "concept_superpeer",
+      "target": "concept_cluster_topology"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "mobicloud-dashboard/src/components/ClusterPanel/index.tsx",
+      "source_location": null,
+      "weight": 0.85,
+      "source": "concept_churnrate",
+      "target": "concept_cluster_topology"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "mobicloud-dashboard/src/App.tsx",
+      "source_location": null,
+      "weight": 0.85,
+      "source": "concept_relay",
+      "target": "concept_transfer_event"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "mobicloud-dashboard/src/components/RealtimeLog/index.tsx",
+      "source_location": null,
+      "weight": 0.75,
+      "source": "concept_realtime_log_categories",
+      "target": "concept_bully_election"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/README.md",
+      "source_location": "line 37",
+      "weight": 1.0,
+      "source": "readme_dashboard",
+      "target": "tsconfig_app"
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "app_orchestrates_panels",
+      "label": "App orchestrates all dashboard panels via hooks and renders them in layout",
+      "nodes": [
+        "app_tsx",
+        "clusterpanel_component",
+        "networkpanel_component",
+        "realtimelog_component",
+        "graphview2d_component"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "mobicloud-dashboard/src/App.tsx"
+    },
+    {
+      "id": "cluster_superpeer_election_triad",
+      "label": "Cluster Topology, Super-Peer Election, and Bully Algorithm form the core P2P management pattern",
+      "nodes": [
+        "concept_cluster_topology",
+        "concept_superpeer",
+        "concept_bully_election"
+      ],
+      "relation": "implement",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/App.tsx"
+    },
+    {
+      "id": "hooks_feed_api_data",
+      "label": "useTopology, useHealth, useClusters all poll the API service and feed data upward to App",
+      "nodes": [
+        "hook_usetopology",
+        "hook_usehealth",
+        "hook_useclusters"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "mobicloud-dashboard/src/App.tsx"
+    }
+  ],
+  "built_at_commit": "52c0e2f24f9a5b36a8dab07040f3dd2f6a70d90a"
+}
