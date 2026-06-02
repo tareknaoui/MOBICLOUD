@@ -58,4 +58,17 @@ class IdentityRepositoryImpl @Inject constructor(
             identityDao.updateReliabilityScore(nodeId, score)
         }
     }
+
+    override suspend fun restoreIdentity(identity: NodeIdentity): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            identityDao.clearIdentity()
+            identityDao.insertIdentity(
+                NodeIdentityEntity(
+                    nodeId = identity.nodeId,
+                    publicKeyBytes = identity.publicKeyBytes,
+                    reliabilityScore = identity.reliabilityScore
+                )
+            )
+        }
+    }
 }

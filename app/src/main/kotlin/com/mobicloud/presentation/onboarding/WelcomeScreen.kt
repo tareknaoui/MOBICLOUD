@@ -89,6 +89,7 @@ private val pages = listOf(
 @Composable
 fun WelcomeScreen(
     onFinish: () -> Unit,
+    onRestoreAccount: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: PermissionsViewModel = hiltViewModel(),
 ) {
@@ -180,7 +181,13 @@ fun WelcomeScreen(
                         )
                     }
                 } else {
-                    Spacer(Modifier.height(36.dp))
+                    TextButton(onClick = { onRestoreAccount() }) {
+                        Text(
+                            text = "Restaurer un compte existant",
+                            color = IosText2,
+                            fontSize = 14.sp,
+                        )
+                    }
                 }
             }
         }

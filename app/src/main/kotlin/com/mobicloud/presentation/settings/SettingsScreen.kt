@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -57,6 +58,8 @@ fun SettingsScreen(
     val usedBytes by viewModel.usedStorageBytes.collectAsStateWithLifecycle()
     val freeBytes by viewModel.freeSpaceBytes.collectAsStateWithLifecycle()
     val showWarning by viewModel.showWarningDialog.collectAsStateWithLifecycle()
+    val recoveryCode by viewModel.recoveryCode.collectAsStateWithLifecycle()
+    val exportError by viewModel.exportError.collectAsStateWithLifecycle()
 
     val minBytes = HALF_GB
     val maxBytes = ((freeBytes * 0.80f).toLong()).coerceAtLeast(minBytes)
@@ -78,7 +81,8 @@ fun SettingsScreen(
         modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         AnimatedVisibility(visible = storageVisible, enter = sectionEnter) {
             Card(
@@ -142,6 +146,54 @@ fun SettingsScreen(
                 }
             }
         }
+
+        AnimatedVisibility(visible = storageVisible, enter = sectionEnter) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, Color(0xFFF1F1F5)),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(imageVector = Icons.Outlined.Key, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(24.dp))
+                        Text("Récupération", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF1C1C1E))
+                    }
+                    Text("Exportez votre code de récupération pour restaurer vos données sur un nouvel appareil.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8E8E93))
+                    TextButton(onClick = { viewModel.exportIdentity() }) {
+                        Text("Afficher le code de récupération", color = Color(0xFF0A84FF))
+                    }
+                }
+            }
+        }
+    }
+
+    recoveryCode?.let { code ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissRecoveryCode() },
+            title = { Text("Code de récupération") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Notez ce code ou prenez une capture d'écran. Il vous permettra de restaurer votre compte sur un nouvel appareil.", fontSize = 13.sp, color = Color(0xFF8E8E93))
+                    Text(code, fontSize = 11.sp, color = Color(0xFF1C1C1E), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissRecoveryCode() }) { Text("Fermer") }
+            }
+        )
+    }
+
+    exportError?.let { error ->
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissExportError() },
+            title = { Text("Export impossible") },
+            text = { Text(error) },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissExportError() }) { Text("OK") }
+            }
+        )
     }
 
     if (showWarning) {

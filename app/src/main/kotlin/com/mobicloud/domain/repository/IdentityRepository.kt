@@ -21,4 +21,11 @@ interface IdentityRepository {
      * @param score Valeur normalisée dans [0.0, 1.0].
      */
     suspend fun updateReliabilityScore(nodeId: String, score: Float): Result<Unit>
+
+    /**
+     * Écrase l'identité locale en base avec une identité restaurée depuis un code de récupération.
+     * Appelé après [SecurityRepository.importFromRecoveryCode] pour que [getIdentity] retourne
+     * la bonne identité sans générer un nouveau keypair.
+     */
+    suspend fun restoreIdentity(identity: com.mobicloud.domain.models.NodeIdentity): Result<Unit>
 }

@@ -57,4 +57,16 @@ interface SecurityRepository {
      * de posture (clé software vs hardware).
      */
     suspend fun getEncryptionIdentity(): Result<EncryptionIdentity>
+
+    /**
+     * Exporte un code de récupération contenant les clés logicielles (identité + chiffrement).
+     * Retourne une erreur si l'identité est uniquement hardware-backed (non exportable).
+     */
+    suspend fun exportRecoveryCode(): Result<String>
+
+    /**
+     * Importe les clés depuis un code de récupération et les persiste dans EncryptedSharedPreferences.
+     * @return L'identité restaurée (nodeId + publicKeyBytes).
+     */
+    suspend fun importFromRecoveryCode(code: String): Result<NodeIdentity>
 }

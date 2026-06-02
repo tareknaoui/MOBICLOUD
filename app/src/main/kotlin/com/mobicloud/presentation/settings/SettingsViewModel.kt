@@ -8,6 +8,7 @@ import com.mobicloud.data.network.service.MobicloudP2PService
 import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
+import com.mobicloud.domain.usecase.m00_identity.ExportIdentityUseCase
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.SendDepartureNoticeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,7 +24,8 @@ class SettingsViewModel @Inject constructor(
     application: Application,
     private val settingsRepository: NodeSettingsRepository,
     hostedBlockRepository: HostedBlockRepository,
-    private val sendDepartureNoticeUseCase: SendDepartureNoticeUseCase
+    private val sendDepartureNoticeUseCase: SendDepartureNoticeUseCase,
+    private val exportIdentityUseCase: ExportIdentityUseCase
 ) : AndroidViewModel(application) {
 
     val settings: StateFlow<NodeSettings> = settingsRepository.observeSettings()
@@ -79,6 +81,23 @@ class SettingsViewModel @Inject constructor(
 
     fun requestLeaveCluster() { _showLeaveDialog.value = true }
     fun dismissLeaveDialog() { _showLeaveDialog.value = false }
+
+    private val _recoveryCode = MutableStateFlow<String?>(null)
+    val recoveryCode: StateFlow<String?> = _recoveryCode.asStateFlow()
+
+    private val _exportError = MutableStateFlow<String?>(null)
+    val exportError: StateFlow<String?> = _exportError.asStateFlow()
+
+    fun exportIdentity() {
+        viewModelScope.launch {
+            exportIdentityUseCase()
+                .onSuccess { _recoveryCode.value = it }
+                .onFailure { _exportError.value = it.message }
+        }
+    }
+
+    fun dismissRecoveryCode() { _recoveryCode.value = null }
+    fun dismissExportError() { _exportError.value = null }
 
     fun confirmLeaveCluster() {
         _showLeaveDialog.value = false
