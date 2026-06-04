@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -31,6 +32,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -60,6 +65,11 @@ fun SettingsScreen(
     val showWarning by viewModel.showWarningDialog.collectAsStateWithLifecycle()
     val recoveryCode by viewModel.recoveryCode.collectAsStateWithLifecycle()
     val exportError by viewModel.exportError.collectAsStateWithLifecycle()
+    val showCloudDialog by viewModel.showCloudDialog.collectAsStateWithLifecycle()
+    val cloudError by viewModel.cloudError.collectAsStateWithLifecycle()
+    val cloudSuccess by viewModel.cloudSuccess.collectAsStateWithLifecycle()
+    var cloudEmail by remember { mutableStateOf("") }
+    var cloudPassword by remember { mutableStateOf("") }
 
     val minBytes = HALF_GB
     val maxBytes = ((freeBytes * 0.80f).toLong()).coerceAtLeast(minBytes)
@@ -164,6 +174,12 @@ fun SettingsScreen(
                     TextButton(onClick = { viewModel.exportIdentity() }) {
                         Text("Afficher le code de récupération", color = Color(0xFF0A84FF))
                     }
+                    TextButton(onClick = { viewModel.requestCloudBackup() }) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(imageVector = Icons.Outlined.CloudUpload, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(16.dp))
+                            Text("Sauvegarder dans le cloud", color = Color(0xFF0A84FF))
+                        }
+                    }
                 }
             }
         }
@@ -192,6 +208,56 @@ fun SettingsScreen(
             text = { Text(error) },
             confirmButton = {
                 TextButton(onClick = { viewModel.dismissExportError() }) { Text("OK") }
+            }
+        )
+    }
+
+    if (showCloudDialog) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissCloudDialog() },
+            title = { Text("Sauvegarde cloud") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Entrez vos identifiants pour sauvegarder votre identité de façon chiffrée.", fontSize = 13.sp, color = Color(0xFF8E8E93))
+                    OutlinedTextField(
+                        value = cloudEmail,
+                        onValueChange = { cloudEmail = it },
+                        label = { Text("Email") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = cloudPassword,
+                        onValueChange = { cloudPassword = it },
+                        label = { Text("Mot de passe") },
+                        singleLine = true,
+                        visualTransformation = PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    cloudError?.let { Text(it, color = Color(0xFFFF3B30), fontSize = 12.sp) }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = { viewModel.doCloudBackup(cloudEmail, cloudPassword) },
+                    enabled = cloudEmail.isNotBlank() && cloudPassword.isNotBlank()
+                ) { Text("Sauvegarder") }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissCloudDialog() }) { Text("Annuler") }
+            }
+        )
+    }
+
+    if (cloudSuccess) {
+        AlertDialog(
+            onDismissRequest = { viewModel.dismissCloudSuccess() },
+            title = { Text("Sauvegardé") },
+            text = { Text("Votre identité est sauvegardée dans le cloud. Vous pourrez la restaurer sur un nouveau téléphone avec vos identifiants.") },
+            confirmButton = {
+                TextButton(onClick = { viewModel.dismissCloudSuccess() }) { Text("OK") }
             }
         )
     }

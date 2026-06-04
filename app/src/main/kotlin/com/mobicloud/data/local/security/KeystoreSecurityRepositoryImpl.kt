@@ -77,31 +77,13 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
     }
 
     override suspend fun generateIdentity(): Result<NodeIdentity> = withContext(Dispatchers.IO) {
-        // Guard: return existing identity (hardware or software) rather than overwriting
+        // Guard: return existing identity rather than overwriting
         val existing = getIdentity()
         if (existing.isSuccess) return@withContext existing
 
-        try {
-            val keyPairGenerator = KeyPairGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEYSTORE
-            )
-            val parameterSpec = KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
-                KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-            ).setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
-             .build()
-
-            keyPairGenerator.initialize(parameterSpec)
-            val keyBytes = keyPairGenerator.generateKeyPair().public.encoded
-            Result.success(NodeIdentity(sha256Id(keyBytes), keyBytes))
-
-        } catch (e: Exception) {
-            when (e) {
-                is KeyStoreException, is ProviderException, is StrongBoxUnavailableException ->
-                    generateSoftwareFallback()
-                else -> Result.failure(e)
-            }
-        }
+        // Always generate in software so the private key is stored in EncryptedSharedPreferences
+        // and can be exported for account recovery (cloud backup or recovery code).
+        generateSoftwareFallback()
     }
 
     /**
@@ -256,17 +238,27 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
 
             val (identityPriv, identityPub, encPriv, encPub) = parts
 
+            // Bug 4: validate keys before writing — fail fast with clear message
+            runCatching {
+                decodePrivateKey(Base64.decode(identityPriv, Base64.NO_WRAP))
+                decodePrivateKey(Base64.decode(encPriv, Base64.NO_WRAP))
+            }.onFailure {
+                return@withContext Result.failure(IllegalArgumentException("Code invalide : clé privée corrompue."))
+            }
+
             val identityPubBytes = Base64.decode(identityPub, Base64.NO_WRAP)
             val nodeId = sha256Id(identityPubBytes)
 
-            getEncryptedPrefs().edit()
-                .putString(PREF_KEY_PRIVATE, identityPriv)
-                .putString(PREF_KEY_PUBLIC, identityPub)
-                .putString(PREF_ENC_KEY_PRIVATE, encPriv)
-                .putString(PREF_ENC_KEY_PUBLIC, encPub)
-                .commit()
-
-            cachedEncryptionIdentity = null
+            // Bug 2: clear cache inside mutex so no concurrent coroutine recaches stale keys
+            encryptionIdentityMutex.withLock {
+                getEncryptedPrefs().edit()
+                    .putString(PREF_KEY_PRIVATE, identityPriv)
+                    .putString(PREF_KEY_PUBLIC, identityPub)
+                    .putString(PREF_ENC_KEY_PRIVATE, encPriv)
+                    .putString(PREF_ENC_KEY_PUBLIC, encPub)
+                    .commit()
+                cachedEncryptionIdentity = null
+            }
 
             Result.success(NodeIdentity(nodeId = nodeId, publicKeyBytes = identityPubBytes))
         } catch (e: Exception) {

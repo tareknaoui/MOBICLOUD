@@ -80,6 +80,10 @@ interface CatalogDao {
     }
 
     @Transaction
+    @Query("SELECT * FROM catalog_entry")
+    suspend fun getAllWithFragmentsOnce(): List<CatalogEntryWithFragments>
+
+    @Transaction
     @Query("SELECT * FROM catalog_entry WHERE is_in_trash = 1 AND deleted_at < :expiryTs")
     suspend fun getExpiredEntries(expiryTs: Long): List<CatalogEntryWithFragments>
 

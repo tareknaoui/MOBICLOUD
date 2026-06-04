@@ -90,6 +90,7 @@ private val pages = listOf(
 fun WelcomeScreen(
     onFinish: () -> Unit,
     onRestoreAccount: () -> Unit = {},
+    onCloudAuth: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: PermissionsViewModel = hiltViewModel(),
 ) {
@@ -181,9 +182,16 @@ fun WelcomeScreen(
                         )
                     }
                 } else {
+                    TextButton(onClick = { onCloudAuth() }) {
+                        Text(
+                            text = "Se connecter avec un compte",
+                            color = IosBlue,
+                            fontSize = 14.sp,
+                        )
+                    }
                     TextButton(onClick = { onRestoreAccount() }) {
                         Text(
-                            text = "Restaurer un compte existant",
+                            text = "Restaurer avec un code",
                             color = IosText2,
                             fontSize = 14.sp,
                         )

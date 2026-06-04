@@ -8,6 +8,7 @@ import com.mobicloud.data.network.service.MobicloudP2PService
 import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
+import com.mobicloud.domain.usecase.m00_identity.CloudRegisterUseCase
 import com.mobicloud.domain.usecase.m00_identity.ExportIdentityUseCase
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.SendDepartureNoticeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -25,7 +26,8 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: NodeSettingsRepository,
     hostedBlockRepository: HostedBlockRepository,
     private val sendDepartureNoticeUseCase: SendDepartureNoticeUseCase,
-    private val exportIdentityUseCase: ExportIdentityUseCase
+    private val exportIdentityUseCase: ExportIdentityUseCase,
+    private val cloudRegisterUseCase: CloudRegisterUseCase
 ) : AndroidViewModel(application) {
 
     val settings: StateFlow<NodeSettings> = settingsRepository.observeSettings()
@@ -98,6 +100,30 @@ class SettingsViewModel @Inject constructor(
 
     fun dismissRecoveryCode() { _recoveryCode.value = null }
     fun dismissExportError() { _exportError.value = null }
+
+    private val _showCloudDialog = MutableStateFlow(false)
+    val showCloudDialog: StateFlow<Boolean> = _showCloudDialog.asStateFlow()
+
+    private val _cloudError = MutableStateFlow<String?>(null)
+    val cloudError: StateFlow<String?> = _cloudError.asStateFlow()
+
+    private val _cloudSuccess = MutableStateFlow(false)
+    val cloudSuccess: StateFlow<Boolean> = _cloudSuccess.asStateFlow()
+
+    fun requestCloudBackup() { _showCloudDialog.value = true; _cloudError.value = null }
+    fun dismissCloudDialog() { _showCloudDialog.value = false; _cloudError.value = null }
+    fun dismissCloudSuccess() { _cloudSuccess.value = false }
+
+    fun doCloudBackup(email: String, password: String) {
+        viewModelScope.launch {
+            cloudRegisterUseCase(email, password)
+                .onSuccess {
+                    _showCloudDialog.value = false
+                    _cloudSuccess.value = true
+                }
+                .onFailure { _cloudError.value = it.message }
+        }
+    }
 
     fun confirmLeaveCluster() {
         _showLeaveDialog.value = false

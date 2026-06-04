@@ -30,12 +30,12 @@ function fmtSize(b: number) {
 }
 
 function mimeIcon(mime: string) {
-  if (mime.startsWith('image/'))       return '🖼';
-  if (mime.startsWith('video/'))       return '🎬';
-  if (mime.startsWith('audio/'))       return '🎵';
-  if (mime === 'application/pdf')      return '📄';
-  if (mime === 'application/zip')      return '📦';
-  return '📁';
+  if (mime.startsWith('image/'))       return 'IMG';
+  if (mime.startsWith('video/'))       return 'VID';
+  if (mime.startsWith('audio/'))       return 'AUD';
+  if (mime === 'application/pdf')      return 'PDF';
+  if (mime === 'application/zip')      return 'ZIP';
+  return 'FILE';
 }
 
 function FragmentRow({ file, topology }: { file: FileEntry; topology: Map<string, boolean> }) {
@@ -56,7 +56,7 @@ function FragmentRow({ file, topology }: { file: FileEntry; topology: Map<string
         onClick={() => setOpen(o => !o)}
         style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', padding: '4px 2px', borderRadius: 4 }}
       >
-        <span style={{ fontSize: 14 }}>{mimeIcon(file.mimeType)}</span>
+        <span style={{ fontSize: 9, fontFamily: 'monospace', background: 'var(--bg-card2)', color: 'var(--text-sec)', padding: '1px 4px', borderRadius: 3, flexShrink: 0 }}>{mimeIcon(file.mimeType)}</span>
         <span style={{ flex: 1, fontSize: 11, fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {file.fileName}
         </span>

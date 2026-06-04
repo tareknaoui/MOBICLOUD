@@ -32,6 +32,8 @@ import com.mobicloud.presentation.onboarding.PermissionsRoute
 import com.mobicloud.presentation.onboarding.PermissionsScreen
 import com.mobicloud.presentation.onboarding.ProfileSetupRoute
 import com.mobicloud.presentation.onboarding.ProfileSetupScreen
+import com.mobicloud.presentation.onboarding.CloudAuthRoute
+import com.mobicloud.presentation.onboarding.CloudAuthScreen
 import com.mobicloud.presentation.onboarding.RestoreIdentityRoute
 import com.mobicloud.presentation.onboarding.RestoreIdentityScreen
 import com.mobicloud.presentation.onboarding.WelcomeRoute
@@ -68,6 +70,9 @@ fun JetpackNavHost(
                 onRestoreAccount = {
                     navController.navigate(RestoreIdentityRoute)
                 },
+                onCloudAuth = {
+                    navController.navigate(CloudAuthRoute)
+                },
             )
         }
         composable<RestoreIdentityRoute> {
@@ -78,6 +83,16 @@ fun JetpackNavHost(
                     }
                 },
                 onBack = { navController.popBackStack() },
+            )
+        }
+        composable<CloudAuthRoute> {
+            CloudAuthScreen(
+                onSuccess = {
+                    navController.navigate(DashboardRoute) {
+                        popUpTo(WelcomeRoute) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
             )
         }
         composable<PermissionsRoute> {

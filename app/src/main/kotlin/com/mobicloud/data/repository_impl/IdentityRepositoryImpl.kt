@@ -61,8 +61,7 @@ class IdentityRepositoryImpl @Inject constructor(
 
     override suspend fun restoreIdentity(identity: NodeIdentity): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            identityDao.clearIdentity()
-            identityDao.insertIdentity(
+            identityDao.replaceIdentity(
                 NodeIdentityEntity(
                     nodeId = identity.nodeId,
                     publicKeyBytes = identity.publicKeyBytes,
