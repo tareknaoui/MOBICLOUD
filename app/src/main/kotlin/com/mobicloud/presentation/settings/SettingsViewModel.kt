@@ -8,6 +8,7 @@ import com.mobicloud.data.network.service.MobicloudP2PService
 import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
+import com.mobicloud.domain.usecase.m00_identity.CloudLoginAndSaveUseCase
 import com.mobicloud.domain.usecase.m00_identity.CloudRegisterUseCase
 import com.mobicloud.domain.usecase.m00_identity.ExportIdentityUseCase
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.SendDepartureNoticeUseCase
@@ -27,7 +28,8 @@ class SettingsViewModel @Inject constructor(
     hostedBlockRepository: HostedBlockRepository,
     private val sendDepartureNoticeUseCase: SendDepartureNoticeUseCase,
     private val exportIdentityUseCase: ExportIdentityUseCase,
-    private val cloudRegisterUseCase: CloudRegisterUseCase
+    private val cloudRegisterUseCase: CloudRegisterUseCase,
+    private val cloudLoginAndSaveUseCase: CloudLoginAndSaveUseCase
 ) : AndroidViewModel(application) {
 
     val settings: StateFlow<NodeSettings> = settingsRepository.observeSettings()
@@ -113,10 +115,22 @@ class SettingsViewModel @Inject constructor(
     fun requestCloudBackup() { _showCloudDialog.value = true; _cloudError.value = null }
     fun dismissCloudDialog() { _showCloudDialog.value = false; _cloudError.value = null }
     fun dismissCloudSuccess() { _cloudSuccess.value = false }
+    fun clearCloudError() { _cloudError.value = null }
 
     fun doCloudBackup(email: String, password: String) {
         viewModelScope.launch {
             cloudRegisterUseCase(email, password)
+                .onSuccess {
+                    _showCloudDialog.value = false
+                    _cloudSuccess.value = true
+                }
+                .onFailure { _cloudError.value = it.message }
+        }
+    }
+
+    fun doCloudLogin(email: String, password: String) {
+        viewModelScope.launch {
+            cloudLoginAndSaveUseCase(email, password)
                 .onSuccess {
                     _showCloudDialog.value = false
                     _cloudSuccess.value = true

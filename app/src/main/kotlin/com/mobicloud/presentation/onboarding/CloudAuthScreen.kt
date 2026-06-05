@@ -58,6 +58,7 @@ fun CloudAuthScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var isLoginMode by remember { mutableStateOf(true) }
 
     LaunchedEffect(state) {
         if (state is CloudAuthState.Success) onSuccess()
@@ -82,7 +83,7 @@ fun CloudAuthScreen(
             Spacer(Modifier.height(20.dp))
 
             Text(
-                text = "Restaurer mon compte",
+                text = if (isLoginMode) "Restaurer mon compte" else "Créer un compte cloud",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = IosText1,
@@ -92,7 +93,10 @@ fun CloudAuthScreen(
             Spacer(Modifier.height(8.dp))
 
             Text(
-                text = "Entrez les identifiants que vous avez utilisés sur votre ancien appareil pour restaurer votre identité et vos fichiers.",
+                text = if (isLoginMode)
+                    "Entrez les identifiants que vous avez utilisés sur votre ancien appareil pour restaurer votre identité et vos fichiers."
+                else
+                    "Créez un compte pour sauvegarder votre identité dans le cloud. Vous pourrez la restaurer sur un nouvel appareil.",
                 fontSize = 13.sp,
                 color = IosText2,
                 textAlign = TextAlign.Center,
@@ -138,7 +142,10 @@ fun CloudAuthScreen(
             Spacer(Modifier.height(24.dp))
 
             Button(
-                onClick = { viewModel.login(email, password) },
+                onClick = {
+                    if (isLoginMode) viewModel.login(email, password)
+                    else viewModel.register(email, password)
+                },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
                 shape = RoundedCornerShape(14.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = IosBlue),
@@ -148,7 +155,7 @@ fun CloudAuthScreen(
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                 } else {
                     Text(
-                        text = "Restaurer",
+                        text = if (isLoginMode) "Restaurer" else "Créer le compte",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
                         color = Color.White
@@ -156,7 +163,26 @@ fun CloudAuthScreen(
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = if (isLoginMode) "Pas encore de compte ?" else "Déjà un compte ?",
+                    fontSize = 13.sp,
+                    color = IosText2
+                )
+                TextButton(onClick = {
+                    isLoginMode = !isLoginMode
+                    viewModel.reset()
+                }) {
+                    Text(
+                        text = if (isLoginMode) "S'inscrire" else "Se connecter",
+                        fontSize = 13.sp,
+                        color = IosBlue,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
 
             TextButton(onClick = onBack) {
                 Text("Retour", color = IosText2, fontSize = 14.sp)

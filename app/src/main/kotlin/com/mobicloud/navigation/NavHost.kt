@@ -78,8 +78,10 @@ fun JetpackNavHost(
         composable<RestoreIdentityRoute> {
             RestoreIdentityScreen(
                 onRestored = {
+                    // popUpTo(0) clears the whole back stack up to root, works whether we came
+                    // from WelcomeScreen (onboarding) or SettingsScreen (in-app restore).
                     navController.navigate(DashboardRoute) {
-                        popUpTo(WelcomeRoute) { inclusive = true }
+                        popUpTo(0) { inclusive = true }
                     }
                 },
                 onBack = { navController.popBackStack() },
@@ -132,7 +134,9 @@ fun JetpackNavHost(
             )
         }
         composable<SettingsRoute> {
-            SettingsScreen()
+            SettingsScreen(
+                onRestoreIdentity = { navController.navigate(RestoreIdentityRoute) }
+            )
         }
         composable<NetworkRoute> {
             NetworkScreen()

@@ -38,9 +38,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,6 +60,7 @@ private const val HALF_GB = 512L * 1024 * 1024
 
 @Composable
 fun SettingsScreen(
+    onRestoreIdentity: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
@@ -70,6 +75,7 @@ fun SettingsScreen(
     val cloudSuccess by viewModel.cloudSuccess.collectAsStateWithLifecycle()
     var cloudEmail by remember { mutableStateOf("") }
     var cloudPassword by remember { mutableStateOf("") }
+    var cloudIsRegister by remember { mutableStateOf(true) }
 
     val minBytes = HALF_GB
     val maxBytes = ((freeBytes * 0.80f).toLong()).coerceAtLeast(minBytes)
@@ -174,6 +180,9 @@ fun SettingsScreen(
                     TextButton(onClick = { viewModel.exportIdentity() }) {
                         Text("Afficher le code de récupération", color = Color(0xFF0A84FF))
                     }
+                    TextButton(onClick = { onRestoreIdentity() }) {
+                        Text("Restaurer avec un code", color = Color(0xFF8E8E93))
+                    }
                     TextButton(onClick = { viewModel.requestCloudBackup() }) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(imageVector = Icons.Outlined.CloudUpload, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(16.dp))
@@ -186,6 +195,8 @@ fun SettingsScreen(
     }
 
     recoveryCode?.let { code ->
+        val context = LocalContext.current
+        var copied by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { viewModel.dismissRecoveryCode() },
             title = { Text("Code de récupération") },
@@ -197,6 +208,15 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { viewModel.dismissRecoveryCode() }) { Text("Fermer") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText("recovery_code", code))
+                    copied = true
+                }) {
+                    Text(if (copied) "Copié ✓" else "Copier", color = Color(0xFF0A84FF))
+                }
             }
         )
     }
@@ -215,10 +235,16 @@ fun SettingsScreen(
     if (showCloudDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissCloudDialog() },
-            title = { Text("Sauvegarde cloud") },
+            title = { Text(if (cloudIsRegister) "Créer un compte cloud" else "Mettre à jour la sauvegarde") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Entrez vos identifiants pour sauvegarder votre identité de façon chiffrée.", fontSize = 13.sp, color = Color(0xFF8E8E93))
+                    Text(
+                        if (cloudIsRegister)
+                            "Créez un compte pour sauvegarder votre identité de façon chiffrée."
+                        else
+                            "Connectez-vous à votre compte existant pour mettre à jour la sauvegarde.",
+                        fontSize = 13.sp, color = Color(0xFF8E8E93)
+                    )
                     OutlinedTextField(
                         value = cloudEmail,
                         onValueChange = { cloudEmail = it },
@@ -237,13 +263,28 @@ fun SettingsScreen(
                         modifier = Modifier.fillMaxWidth()
                     )
                     cloudError?.let { Text(it, color = Color(0xFFFF3B30), fontSize = 12.sp) }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            if (cloudIsRegister) "Déjà un compte ?" else "Nouveau compte ?",
+                            fontSize = 12.sp, color = Color(0xFF8E8E93)
+                        )
+                        TextButton(onClick = { cloudIsRegister = !cloudIsRegister; viewModel.clearCloudError() }) {
+                            Text(
+                                if (cloudIsRegister) "Se connecter" else "S'inscrire",
+                                fontSize = 12.sp, color = Color(0xFF0A84FF)
+                            )
+                        }
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
-                    onClick = { viewModel.doCloudBackup(cloudEmail, cloudPassword) },
+                    onClick = {
+                        if (cloudIsRegister) viewModel.doCloudBackup(cloudEmail, cloudPassword)
+                        else viewModel.doCloudLogin(cloudEmail, cloudPassword)
+                    },
                     enabled = cloudEmail.isNotBlank() && cloudPassword.isNotBlank()
-                ) { Text("Sauvegarder") }
+                ) { Text(if (cloudIsRegister) "Créer & sauvegarder" else "Connecter & sauvegarder") }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.dismissCloudDialog() }) { Text("Annuler") }

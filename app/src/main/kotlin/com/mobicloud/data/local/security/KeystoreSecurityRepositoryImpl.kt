@@ -77,12 +77,13 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
     }
 
     override suspend fun generateIdentity(): Result<NodeIdentity> = withContext(Dispatchers.IO) {
-        // Guard: return existing identity rather than overwriting
-        val existing = getIdentity()
-        if (existing.isSuccess) return@withContext existing
-
-        // Always generate in software so the private key is stored in EncryptedSharedPreferences
-        // and can be exported for account recovery (cloud backup or recovery code).
+        // Guard: only skip if a software key already exists (exportable).
+        // If only a hardware key exists (non-exportable), generate a software key so
+        // exportRecoveryCode() can work. Hardware key identity is abandoned at this point.
+        val prefs = getEncryptedPrefs()
+        if (prefs.getString(PREF_KEY_PRIVATE, null) != null) {
+            return@withContext getIdentity()
+        }
         generateSoftwareFallback()
     }
 
@@ -211,9 +212,17 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
     override suspend fun exportRecoveryCode(): Result<String> = withContext(Dispatchers.IO) {
         try {
             val prefs = getEncryptedPrefs()
+            // If no software identity key yet (hardware key from older install), generate one now.
+            if (prefs.getString(PREF_KEY_PRIVATE, null) == null) {
+                generateSoftwareFallback().getOrElse { return@withContext Result.failure(it) }
+            }
+            // If no encryption key yet, generate it now (auto-generates and persists).
+            if (prefs.getString(PREF_ENC_KEY_PRIVATE, null) == null) {
+                getEncryptionIdentity().getOrElse { return@withContext Result.failure(it) }
+            }
             val identityPriv = prefs.getString(PREF_KEY_PRIVATE, null)
                 ?: return@withContext Result.failure(
-                    IllegalStateException("Identité hardware non exportable. La récupération nécessite une clé logicielle.")
+                    IllegalStateException("Échec de génération de la clé logicielle.")
                 )
             val identityPub = prefs.getString(PREF_KEY_PUBLIC, null)
                 ?: return@withContext Result.failure(IllegalStateException("Clé publique introuvable."))

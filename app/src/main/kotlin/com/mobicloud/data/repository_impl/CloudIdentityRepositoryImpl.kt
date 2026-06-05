@@ -46,6 +46,17 @@ class CloudIdentityRepositoryImpl @Inject constructor(
             storeEncrypted(auth.access_token, auth.user.id, recoveryCode, password)
         }
 
+    override suspend fun loginAndBackup(email: String, password: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            val recoveryCode = securityRepository.exportRecoveryCode()
+                .getOrElse { return@withContext Result.failure(it) }
+
+            val auth = supabaseClient.signIn(email, password)
+                .getOrElse { return@withContext Result.failure(it) }
+
+            storeEncrypted(auth.access_token, auth.user.id, recoveryCode, password)
+        }
+
     override suspend fun loginAndRestore(email: String, password: String): Result<Unit> =
         withContext(Dispatchers.IO) {
             val auth = supabaseClient.signIn(email, password)
