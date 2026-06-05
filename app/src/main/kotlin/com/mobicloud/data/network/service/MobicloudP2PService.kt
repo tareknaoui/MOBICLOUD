@@ -121,6 +121,8 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var localDiscoveryRepository: LocalDiscoveryRepository
     @Inject lateinit var nodeSettingsRepository: NodeSettingsRepository
     @Inject lateinit var wifiNetworkRepository: com.mobicloud.domain.repository.WifiNetworkRepository
+    @Inject lateinit var catalogRepository: com.mobicloud.domain.repository.CatalogRepository
+    @Inject lateinit var relayRepository: com.mobicloud.domain.repository.RelayRepository
     @Inject lateinit var joinStateMachine: JoinStateMachine
     @Inject lateinit var joinNetworkClientImpl: JoinNetworkClientImpl
     @Inject lateinit var processJoinRequestUseCase: ProcessJoinRequestUseCase
@@ -436,11 +438,15 @@ class MobicloudP2PService : Service() {
                         val used = hostedBlockRepository.getTotalHostedBytes()
                         (settings.allocatedStorageBytes - used).coerceAtLeast(0L)
                     }.getOrDefault(0L)
+                    // Lire le score courant depuis la DB (mis à jour par calculateReliabilityScoreUseCase
+                    // toutes les 30s) plutôt que le snapshot immuable capturé au démarrage.
+                    val currentScore = identityRepository.getIdentity()
+                        .getOrNull()?.reliabilityScore ?: identity.reliabilityScore
                     signalingRepository.joinAsParticipant(
                         nodeId = identity.nodeId,
                         ip = announcedIp,
                         port = tcpPort,
-                        reliabilityScore = identity.reliabilityScore,
+                        reliabilityScore = currentScore,
                         freeBytes = joinFreeBytes,
                         totalBytes = settings.allocatedStorageBytes
                     ).onFailure { Log.w(LOGTAG, "auto-join relais échoué", it) }
@@ -465,14 +471,32 @@ class MobicloudP2PService : Service() {
                         joinAndFetch()
                         val electedAt = lastElectedAt
                         if (superPeerJob?.isActive == true && electedAt > 0L) {
+                            val spScore = identityRepository.getIdentity()
+                                .getOrNull()?.reliabilityScore ?: identity.reliabilityScore
                             signalingRepository.registerAsSuperPeer(
                                 ip = wifiNetworkRepository.getLocalIpAddress() ?: "0.0.0.0",
                                 port = tcpPort,
-                                reliabilityScore = identity.reliabilityScore,
+                                reliabilityScore = spScore,
                                 electedAt = electedAt,
                                 nodeId = identity.nodeId
                             ).onFailure { Log.w(LOGTAG, "[RECONNECT] re-register SP échoué : ${it.message}") }
                         }
+                        // Re-annonce les fragments existants après chaque (re)connexion.
+                        // Le relay Render est in-memory : chaque redémarrage Render vide fragmentRegistry.
+                        // Sans ça, les fichiers uploadés avant la reconnexion n'apparaissent plus dans le dashboard.
+                        serviceScope.launch {
+                            runCatching {
+                                val entries = catalogRepository.getActiveEntriesFlow().first()
+                                entries.filter { it.fragmentLocations.isNotEmpty() }.forEach { entry ->
+                                    relayRepository.announceFragments(entry)
+                                        .onFailure { Log.w(LOGTAG, "[FRAG] re-announce échoué: ${it.message}") }
+                                }
+                                if (entries.isNotEmpty()) {
+                                    Log.i(LOGTAG, "[FRAG] ${entries.size} entrées re-annoncées au relay")
+                                }
+                            }.onFailure { Log.w(LOGTAG, "[FRAG] re-announce catalog échoué: ${it.message}") }
+                        }
+
                         onConnectedCount++
                         if (onConnectedCount > 1) {
                             // Reconnexion détectée — rafraîchit les timestamps pour grace period
@@ -859,6 +883,8 @@ class MobicloudP2PService : Service() {
     /** Arrête le keepalive Super-Pair (utilisé par Story 3.3 — abdication). */
     fun abdicate() {
         localDiscoveryRepository.updateSuperPairStatus(false)
+        localDiscoveryRepository.updateCurrentMemberCount(0)
+        memberSnapshotCacheUseCase.clearMembers()
         superPeerJob?.cancel()
         superPeerJob = null
         // Notifier la FSM JOIN : sans ça, JoinStateMachine reste en SuperPair alors

@@ -95,4 +95,10 @@ class MemberSnapshotCacheUseCase @Inject constructor(
     }
 
     fun snapshot(): List<MemberInfo> = _inMemory.value
+
+    /** Vide le registre en mémoire (abdication SP, transition vers Undiscovered). */
+    fun clearMembers() {
+        _inMemory.value = emptyList()
+        _inMemoryClusterId = ""
+    }
 }
