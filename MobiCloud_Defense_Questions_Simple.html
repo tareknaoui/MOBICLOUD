@@ -24,24 +24,26 @@
 <!-- ===== SECTION 1 ===== -->
 <h2>1 — Project &amp; Motivation</h2>
 
+
+
 <div class="card">
   <div class="q">Q1. In one sentence, what problem does MobiCloud solve? <span class="tag gen">General</span></div>
-  <div class="a">MobiCloud lets Android phones store and share files with each other directly — without uploading anything to Google Drive, Dropbox, or any cloud service. Your data stays on devices you trust.</div>
+  <div class="a">MobiCloud helps users store files securely on a peer-to-peer network of mobile phones instead of using a central cloud server.</div>
 </div>
 
 <div class="card">
   <div class="q">Q2. Why did you choose a P2P approach rather than a simple client-server model? <span class="tag why">Why</span></div>
-  <div class="a">A central server is a single point of failure and a privacy risk — if it goes down, nothing works; if it is compromised, all files are exposed. P2P removes that single point: storage is spread across participants, and no central party ever sees the plaintext content.</div>
+  <div class="a">A client-server model is expensive to host and has a single point of failure. P2P uses the storage and network of the phones themselves, which protects privacy and removes server costs.</div>
 </div>
 
 <div class="card">
   <div class="q">Q3. Why target Android specifically, and not a desktop or web application? <span class="tag why">Why</span></div>
-  <div class="a">Mobile phones are the most personal and always-connected devices people own. They accumulate photos, documents, and sensitive data. Building on Android also lets us use the hardware-backed Android Keystore (TEE) to keep cryptographic keys secure — something a web app cannot guarantee.</div>
+  <div class="a">Almost everyone has a smartphone with them all the time. Also, Android has a secure hardware enclave (TEE) to protect cryptographic keys. Web apps cannot offer this level of security.</div>
 </div>
 
 <div class="card">
   <div class="q">Q4. What are the main limitations of your current prototype? <span class="tag gen">General</span></div>
-  <div class="a">The relay server is still a centralised component (though only for signalling, not data). The cluster size in the demo is set to 2 nodes on the relay side for simplicity. Battery impact under heavy usage has not been measured on real devices, only simulated. NAT hole-punching is not implemented — peers behind strict NAT must always use the relay.</div>
+  <div class="a">Currently, we use a central relay server to help phones connect. Also, the app only supports a small number of devices for testing, and we need a more user-friendly interface.</div>
 </div>
 
 <!-- ===== SECTION 2 ===== -->
@@ -49,27 +51,27 @@
 
 <div class="card">
   <div class="q">Q5. Why did you introduce a Super-Peer role instead of a fully flat P2P network? <span class="tag why">Why</span></div>
-  <div class="a">A fully flat network requires every node to know every other node, which scales poorly. The Super-Peer acts as a lightweight coordinator for its cluster: it manages the member list, triggers repairs, and relays election messages. Ordinary peers only need to know their Super-Peer, which reduces overhead significantly.</div>
+  <div class="a">Smart phones have limited battery and CPU. If every phone had to coordinate everything, they would lose battery quickly. The Super-Peer does the heavy work of coordinating the network, while regular nodes can save power.</div>
 </div>
 
 <div class="card">
   <div class="q">Q6. Why did you choose the Bully algorithm for Super-Peer election? <span class="tag why">Why</span></div>
-  <div class="a">Bully is simple to implement and converges quickly in small networks (3–10 nodes). It elects the node with the highest reliability score, which naturally promotes stable, well-connected devices. For our cluster sizes, its O(n²) message complexity is perfectly acceptable. More complex algorithms (Raft, Paxos) would be overkill for a mobile P2P demo.</div>
+  <div class="a">The Bully algorithm is simple and reliable. It selects the best Super-Peer based on a stability score. This ensures that the most stable phone is always in charge.</div>
 </div>
 
 <div class="card">
   <div class="q">Q7. Why did you add a relay server if the goal is decentralisation? <span class="tag why">Why</span></div>
-  <div class="a">Mobile phones sit behind NAT (carrier-grade NAT for 4G, home router NAT for WiFi). Two phones cannot reach each other directly without a rendezvous point. Our relay is a <em>zero-knowledge</em> relay: it only forwards encrypted bytes and never sees the content. It is a pragmatic trade-off — full decentralisation is theoretically possible with DHT-based signalling, but far more complex to build reliably on mobile.</div>
+  <div class="a">Phones on 4G or home Wi-Fi are behind firewalls (NAT) and cannot connect directly to each other. The relay helps them connect. It is only a bridge; it never reads or stores the files.</div>
 </div>
 
 <div class="card">
   <div class="q">Q8. Why use Clean Architecture (domain / data / presentation layers) for an Android app? <span class="tag why">Why</span></div>
-  <div class="a">Clean Architecture keeps the core business logic (erasure coding, gossip, election) completely independent of Android. This means the domain layer can be unit-tested without an emulator. It also makes it easy to swap implementations — for example, replacing the WebSocket transport with a direct TCP transport — without touching the use cases.</div>
+  <div class="a">Clean Architecture separates the core logic from Android-specific code. This makes the app easy to test and update. It also let us run P2P simulations on a computer without using a slow Android emulator.</div>
 </div>
 
 <div class="card">
   <div class="q">Q9. You used Kotlin Coroutines and Flow throughout the app. Why not threads or callbacks? <span class="tag why">Why</span></div>
-  <div class="a">Coroutines give structured concurrency: if a parent job is cancelled, all child coroutines are automatically cancelled. This prevents the common Android bug of background threads leaking after the screen is closed. Flow gives reactive, backpressure-aware streams for peer list updates and network events — much cleaner than callbacks in deeply nested P2P code.</div>
+  <div class="a">P2P apps need to manage many network connections and database tasks at the same time. Normal threads use too much memory. Coroutines are very light, and Flow helps us handle live network data easily without messy code.</div>
 </div>
 
 <!-- ===== SECTION 3 ===== -->
@@ -77,17 +79,17 @@
 
 <div class="card">
   <div class="q">Q10. Why did you choose Erasure Coding (Reed-Solomon) instead of simple replication? <span class="tag why">Why</span></div>
-  <div class="a">Simple replication stores 3 full copies → 3× storage overhead. Reed-Solomon with k=3 data + n=2 parity stores 5 fragments but each is only 1/3 of the file size → 5/3 ≈ 1.67× overhead. You get the same fault tolerance (can lose any 2 fragments and still recover) at roughly half the storage cost. On mobile, storage is precious.</div>
+  <div class="a">If we copy the whole file 3 times, it uses 3 times more storage. With Reed-Solomon (k=3, n=2), we divide the file into 3 parts and add 2 backup parts. The total storage is only 1.67 times the file size. We get the same safety but use half the storage.</div>
 </div>
 
 <div class="card">
   <div class="q">Q11. What happens if a peer that holds a fragment goes offline permanently? <span class="tag gen">General</span></div>
-  <div class="a">The Super-Peer runs a repair scan every 10 seconds. When it detects a peer is inactive, it checks the DHT to find which blocks that peer was hosting. If a block no longer has enough live copies, the Super-Peer sends a signed "replicate" directive to another live peer that holds a copy, instructing it to send the block to a new destination peer.</div>
+  <div class="a">The Super-Peer checks the network every 10 seconds. If a node goes offline, the Super-Peer finds which fragments are missing. It then tells another node holding a copy of that fragment to send it to a new node, keeping the file safe.</div>
 </div>
 
 <div class="card">
   <div class="q">Q12. Why did you use a local Room (SQLite) database instead of keeping everything in memory? <span class="tag why">Why</span></div>
-  <div class="a">Mobile apps are killed by the OS at any time. If the DHT and catalog were only in RAM, every restart would mean rediscovering the entire network state from scratch. SQLite persists the peer list, block locations, and catalog entries across app restarts, so the node can resume quickly without a full gossip re-sync.</div>
+  <div class="a">Android can close apps at any time to save memory. If we kept the network data in RAM, we would lose everything on restart. Storing it in Room (SQLite) database keeps the data safe so the app can restart and connect quickly.</div>
 </div>
 
 <!-- ===== SECTION 4 ===== -->
@@ -95,76 +97,82 @@
 
 <div class="card">
   <div class="q">Q13. Why did you choose AES-256-GCM for fragment encryption? <span class="tag why">Why</span></div>
-  <div class="a">AES-256-GCM is an authenticated encryption scheme: it both encrypts the data and produces a 128-bit authentication tag. This means if a stored fragment is tampered with or corrupted, decryption fails immediately — we detect integrity violations without a separate hash step. It is also hardware-accelerated on modern Android devices (AES-NI equivalent on ARM), so the performance cost is minimal.</div>
+  <div class="a">AES-256-GCM is a secure encryption algorithm. It encrypts the files and checks if they were modified or corrupted. If someone changes the encrypted file, decryption fails immediately. It is also very fast because modern phone processors support it in hardware.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q14. Why store keys in the Android Keystore (TEE) instead of in a regular file or database? <span class="tag why">Why</span></div>
-  <div class="a">If the private key is in a file, any app with root access or a backup extraction can steal it. The Android Keystore stores keys inside the Trusted Execution Environment (TEE) — a secure enclave that the rest of the OS cannot read. The private key never leaves the TEE; only the operation (sign/verify) is performed there. Even if the phone is stolen and the storage cloned, the private key cannot be extracted.</div>
+  <div class="q">Q14. What is the Hashcash mechanism and why did you add it? <span class="tag gen">General</span></div>
+  <div class="a">Hashcash is a simple proof-of-work. To join the network, a phone must solve a small math puzzle (finding a SHA-256 hash with 18 zero bits). This takes about 1 second. It prevents attackers from spamming the network with thousands of fake accounts because it would require too much computer power.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q15. What is the Hashcash mechanism and why did you add it? <span class="tag gen">General</span></div>
-  <div class="a">Hashcash is a proof-of-work: before a node is allowed to broadcast itself to the network, it must compute a SHA-256 hash that starts with 18 zero bits. This takes about one second of CPU time. It makes it expensive to create thousands of fake identities (a Sybil attack) — an attacker would need one second of compute per fake node. Legitimate nodes pay the cost once and cache the result.</div>
+  <div class="q">Q15. How does MobiCloud ensure that the relay server cannot read the stored files? <span class="tag gen">General</span></div>
+  <div class="a">We encrypt the file fragments on the phone before sending them over the network. The relay server only sees encrypted data and does not have the keys to decrypt it. Even if the relay server is hacked, the attacker cannot read anything.</div>
+</div>
+
+
+<div class="card">
+  <div class="q">Q16. If your system is Peer-to-Peer, why do you need Supabase and a WebSocket Relay? Isn't this centralized? <span class="tag why">Why</span></div>
+  <div class="a">No. They only handle connections and backup metadata, not your files. The WebSocket Relay helps phones behind firewalls connect to each other. Supabase only stores encrypted identity files. If both servers go down, phones on the same Wi-Fi can still find each other and share files directly.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q16. How does MobiCloud ensure that the relay server cannot read the stored files? <span class="tag gen">General</span></div>
-  <div class="a">Every fragment is encrypted on the sender's device before it is sent anywhere. The relay only ever sees opaque encrypted bytes; it does not have the keys. The encryption keys are derived per-fragment from a master key, and the master key itself is wrapped with the owner's EC public key (ECIES). Even if the relay server is hacked, the attacker gets useless ciphertext.</div>
+  <div class="q">Q17. How do you guarantee that Supabase employees or database hackers cannot read the backed-up private keys? <span class="tag gen">General</span></div>
+  <div class="a">The private keys are encrypted on the phone before they are uploaded to Supabase (Zero-Knowledge). The app encrypts them using AES-256-GCM with a key derived from the user's recovery password. Supabase never sees the password, so no one can decrypt the backup in the cloud.</div>
 </div>
 
 <!-- ===== SECTION 5 ===== -->
 <h2>5 — Gossip &amp; Synchronisation</h2>
 
 <div class="card">
-  <div class="q">Q17. What is the Gossip protocol and why did you use it to synchronise the DHT? <span class="tag gen">General</span></div>
-  <div class="a">Gossip (epidemic protocol) works like rumour spreading: each node periodically tells a few random neighbours what it knows, and they share back what the first node is missing. There is no master node that maintains the truth. It is decentralised, self-healing, and scales logarithmically — in a 100-node network, a new piece of information reaches everyone in about 7 gossip rounds. It tolerates node failures naturally.</div>
+  <div class="q">Q18. What is the Gossip protocol and why did you use it to synchronise the DHT? <span class="tag gen">General</span></div>
+  <div class="a">The Gossip protocol works like sharing a rumor. Every few seconds, a phone shares its database with two random neighbors. They do the same, and soon the whole network is updated. There is no master server. It is decentralized, self-healing, and works very well as the network grows.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q18. Why did you use a Bloom Filter inside the Gossip protocol instead of sending the full DHT? <span class="tag why">Why</span></div>
-  <div class="a">A Bloom filter is a compact probabilistic data structure. Instead of listing all 1000 block IDs (possibly several kilobytes), a node sends a 1024-bit (128-byte) filter that summarises which blocks it knows about. The receiver uses it to identify which entries are probably missing on the sender, then requests only those — a delta sync. This drastically reduces bandwidth per gossip cycle.</div>
+  <div class="q">Q19. Why did you use a Bloom Filter inside the Gossip protocol instead of sending the full DHT? <span class="tag why">Why</span></div>
+  <div class="a">Sending the entire list of files over the network uses too much bandwidth. Instead, we use a Bloom filter, which is a tiny summary of the data (only 128 bytes). The receiver checks the summary to find what is missing and only requests the missing files.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q19. Can a Bloom Filter give wrong answers? How does your system handle that? <span class="tag gen">General</span></div>
-  <div class="a">Yes — a Bloom filter can produce false positives (saying "I have it" when it does not). It never produces false negatives. In our system, a false positive means a delta request might not ask for a block that is actually missing. The consequence is a slightly delayed sync, not data loss. The next gossip cycle will correct it. We set 3 hash functions on a 1024-bit array, giving a false-positive rate well below 1% for our typical DHT sizes.</div>
+  <div class="q">Q20. Can a Bloom Filter give wrong answers? How does your system handle that? <span class="tag gen">General</span></div>
+  <div class="a">Yes, a Bloom filter can have false positives (saying it has a file when it actually does not). However, it never has false negatives. This means we might delay syncing a file for a few seconds, but we will never lose data. The next update cycle will fix it.</div>
 </div>
 
 <!-- ===== SECTION 6 ===== -->
 <h2>6 — Simulation &amp; Validation</h2>
 
 <div class="card">
-  <div class="q">Q20. Why did you use PeerSim for simulation instead of testing on real devices? <span class="tag why">Why</span></div>
-  <div class="a">Testing a 100-node distributed system on real phones would require 100 physical devices running simultaneously — impractical for a student project. PeerSim lets us simulate thousands of nodes in a single JVM process, inject churn (nodes joining and leaving), measure convergence time, and validate the election algorithm — all reproducibly and in seconds. Real device tests were done for connectivity validation (3–4 devices).</div>
+  <div class="q">Q21. Why did you use PeerSim for simulation instead of testing on real devices? <span class="tag why">Why</span></div>
+  <div class="a">Testing a P2P network with 100 phones is not possible for a student project. PeerSim is a simulator that runs on a computer. It lets us test how thousands of nodes behave, how they handle disconnects, and if the system works correctly. We also tested the app on 3-4 real devices.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q21. What did your simulation tell you about the system's behaviour under churn? <span class="tag gen">General</span></div>
-  <div class="a">At 30% churn (30% of nodes leaving every round), gossip convergence slows but does not break — all nodes eventually agree on the DHT state. The Bully election also remained stable: after a Super-Peer crashed, a new one was elected within 2–3 gossip cycles (about 4–6 seconds with our parameters). Above 50% churn, the network becomes too fragmented for reliable convergence.</div>
+  <div class="q">Q22. What did your simulation tell you about the system's behaviour under churn? <span class="tag gen">General</span></div>
+  <div class="a">Our tests showed that even if 30% of nodes leave the network suddenly, the system still works. If the Super-Peer crashes, a new one is elected in less than 6 seconds. The system only becomes unstable if more than 50% of devices disconnect at the same time.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q22. How did you test the security of the system? <span class="tag gen">General</span></div>
-  <div class="a">We reviewed each message type for: (1) authentication — every critical message is signed with EC P-256 and verified on reception; (2) replay attacks — timestamps with a ±30-second window; (3) unknown senders — Gossip and election messages from unrecognised peers are silently dropped; (4) DHT poisoning — only known active peers can inject DHT entries via gossip. We did not run a formal penetration test, but these controls address the main attack vectors for a P2P system.</div>
+  <div class="q">Q23. How did you test the security of the system? <span class="tag gen">General</span></div>
+  <div class="a">We secured the network in four ways: (1) every important message is signed cryptographically; (2) messages have a 30-second timestamp to prevent reuse (replay attacks); (3) we ignore messages from unknown devices; and (4) only active group members can update the file list.</div>
 </div>
 
 <!-- ===== SECTION 7 ===== -->
 <h2>7 — Open Questions &amp; Future Work</h2>
 
 <div class="card">
-  <div class="q">Q23. If you had 6 more months, what would you improve first? <span class="tag gen">General</span></div>
-  <div class="a">Three things: (1) Replace the centralised relay with a fully distributed DHT-based signalling layer so there is truly no central server. (2) Add file versioning and conflict resolution for concurrent writes. (3) Measure real battery consumption on physical devices and optimise the gossip interval accordingly.</div>
+  <div class="q">Q24. If you had 6 more months, what would you improve first? <span class="tag gen">General</span></div>
+  <div class="a">I would improve three things: (1) remove the central relay server and replace it with a fully decentralized connection layer; (2) add support for file versions to prevent users from overwriting each other's changes; and (3) measure the exact battery usage on real phones to optimize performance.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q24. How does MobiCloud compare to existing systems like IPFS or Bittorrent? <span class="tag gen">General</span></div>
-  <div class="a">IPFS is a full content-addressed filesystem — powerful but very heavy for a mobile app (hundreds of megabytes of dependencies, constant background activity). Bittorrent requires a tracker or DHT bootstrap and is designed for public file sharing, not private encrypted storage. MobiCloud is lighter, mobile-first, fully encrypted end-to-end, and designed for private groups (your own devices or trusted friends), not anonymous public swarms.</div>
+  <div class="q">Q25. How does MobiCloud compare to existing systems like IPFS or Bittorrent? <span class="tag gen">General</span></div>
+  <div class="a">IPFS and BitTorrent are built for computers and use too much battery and memory for a phone. MobiCloud is designed from scratch for mobile devices. It is lightweight, fully encrypted, and built for private sharing between friends rather than public downloads.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q25. Is MobiCloud ready for production use? <span class="tag gen">General</span></div>
-  <div class="a">No — this is a research prototype. The relay server runs on a free Render instance (which sleeps after inactivity). The cluster size is limited to 2 on the relay demo. There is no user account system, no file browser UI, and no protection against a malicious Super-Peer within a cluster. These are engineering challenges for a production version, not fundamental research obstacles.</div>
+  <div class="q">Q26. Is MobiCloud ready for production use? <span class="tag gen">General</span></div>
+  <div class="a">No, it is a research prototype. The relay server runs on a free cloud service and the cluster size is limited for testing. It does not have a full user interface or account management. These are engineering features we would add for a real product.</div>
 </div>
 
 <hr style="margin-top:40px; border:none; border-top:1px solid #ddd"/>
@@ -173,82 +181,93 @@
 <h2>8 — What If…</h2>
 
 <div class="card">
-  <div class="q">Q26. What if the relay server goes down completely? <span class="tag what">What If</span></div>
-  <div class="a">Peers that are already on the same local Wi-Fi network can still communicate directly via mDNS discovery and TCP. Peers on 4G or different networks lose the ability to find each other until the relay comes back — they cannot establish new connections. Files already distributed stay safe on the devices that hold fragments; nothing is lost, just temporarily unreachable across NAT boundaries.</div>
+  <div class="q">Q27. What if the relay server goes down completely? <span class="tag what">What If</span></div>
+  <div class="a">Nodes on the same Wi-Fi network can still find each other using local multicast (mDNS) and transfer files directly. Devices on 4G will lose connection until the relay is back online. No files are lost because the fragments are stored on the phones.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q27. What if the Super-Peer of a cluster crashes suddenly? <span class="tag what">What If</span></div>
-  <div class="a">The remaining peers detect the absence of a Super-Peer after about 120 seconds (4 missed heartbeats). If no other Super-Peer is found within 20 more seconds, the Bully election protocol starts automatically. The node with the highest reliability score broadcasts an ELECTION message, waits 3 seconds for any stronger competitor to respond, and if none does, declares itself the new Super-Peer by broadcasting a COORDINATOR message. Total recovery time: under 2 minutes in the worst case.</div>
+  <div class="q">Q28. What if the Super-Peer of a cluster crashes suddenly? <span class="tag what">What If</span></div>
+  <div class="a">If a phone stops receiving updates from the Super-Peer for 2 minutes, it starts a new election. The phone with the best stability score sends an election message. If no other phone has a higher score after 3 seconds, it becomes the new Super-Peer. The entire recovery takes less than 2 minutes.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q28. What if more than n=2 peers holding fragments go offline at the same time? <span class="tag what">What If</span></div>
-  <div class="a">With Reed-Solomon(k=3, n=2), you need at least k=3 fragments to reconstruct the file. If 3 or more peers go offline simultaneously and each held a different fragment, the file becomes unrecoverable from that cluster. This is why the repair mechanism is proactive — it runs every 10 seconds and re-replicates fragments the moment a peer goes inactive, before the situation gets worse. The circuit breaker also pauses repairs during network storms to avoid making things worse.</div>
+  <div class="q">Q29. What if more than n=2 peers holding fragments go offline at the same time? <span class="tag what">What If</span></div>
+  <div class="a">If 3 or more nodes holding fragments disconnect at the same time, we cannot rebuild the file. To prevent this, our repair system checks the network every 10 seconds. If a node goes offline, the system immediately copies its fragment to a new node before more devices can disconnect.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q29. What if two nodes both think they are the Super-Peer at the same time (split-brain)? <span class="tag what">What If</span></div>
-  <div class="a">This is called a split-brain scenario. We handle it in two ways: first, an existing Super-Peer that receives an ELECTION message immediately replies with a COORDINATOR message to tell the challenger to stand down. Second, the COORDINATOR message itself carries the cluster ID — if two nodes both become Super-Peers with different cluster IDs, new peers joining will pick only one and ignore the other. It is still an edge case we would want to harden further in a production system.</div>
+  <div class="q">Q30. What if two nodes both think they are the Super-Peer at the same time (split-brain)? <span class="tag what">What If</span></div>
+  <div class="a">If two phones think they are the Super-Peer, they will resolve it automatically. When a Super-Peer sees an election message, it sends a coordinator message to tell the other phone to stand down. Also, each cluster has a unique ID, so new phones will only connect to one Super-Peer.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q30. What if a malicious node joins the network and sends fake DHT entries? <span class="tag what">What If</span></div>
-  <div class="a">Every node that receives a DHT update via gossip first checks that the sender is a known active peer. Unknown senders are silently rejected. Additionally, every block transfer is acknowledged with a signed ACK that includes the SHA-256 hash of the received ciphertext — if a node injects a fake block ID pointing to garbage data, the download will fail hash verification. So a rogue node can disrupt availability but cannot silently corrupt data that gets decrypted.</div>
+  <div class="q">Q31. What if a malicious node joins the network and sends fake DHT entries? <span class="tag what">What If</span></div>
+  <div class="a">We only accept database updates from known active devices. Also, when downloading file fragments, the app verifies the SHA-256 hash of the file. If a rogue node sends fake or modified data, the hash check fails and the app rejects the file.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q31. What if a user's phone is stolen? Can the attacker read their files? <span class="tag what">What If</span></div>
-  <div class="a">No — for two reasons. First, the files are stored as fragments distributed across other devices, not whole on the stolen phone. Second, even the fragments stored on the stolen device are AES-256-GCM encrypted, and the master key is wrapped with the user's EC private key, which lives in the Android Keystore TEE hardware. An attacker cannot extract the private key from the TEE even with physical access. They would need to break AES-256, which is computationally infeasible.</div>
+  <div class="q">Q32. What if a user's phone is stolen? Can the attacker read their files? <span class="tag what">What If</span></div>
+  <div class="a">No. First, the phone only stores encrypted fragments, not whole files. Second, the private key is stored inside EncryptedSharedPreferences (encrypted using AES-256-GCM with a key from the Android Keystore TEE). The key is never written in plaintext on disk and is only decrypted in memory when needed, so it cannot be extracted by copying files.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q32. What if the network has very high churn — many devices joining and leaving constantly? <span class="tag what">What If</span></div>
-  <div class="a">The circuit breaker activates when more than 30% of cluster peers become inactive within a 2-minute window. When open, it queues repair directives in a local buffer instead of sending them immediately, preventing a storm of repair messages that would overload already struggling nodes. Once churn drops below 10%, the circuit breaker closes and queued repairs are flushed. This prevents a cascade failure where repair traffic makes the instability worse.</div>
+  <div class="q">Q33. What if the network has very high churn — many devices joining and leaving constantly? <span class="tag what">What If</span></div>
+  <div class="a">If too many devices connect and disconnect, the network gets overloaded. We use a Circuit Breaker: if more than 30% of devices disconnect in 2 minutes, we stop trying to repair files immediately. We queue the repairs and wait until the network is stable again. This prevents network congestion.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q33. What if two users upload the same file at the same time? <span class="tag what">What If</span></div>
-  <div class="a">Each upload produces a catalog entry keyed by the file's SHA-256 hash. If both uploads succeed with the same hash, there will be two catalog entries for the same content — a minor inefficiency (duplicated fragments) but not a correctness problem. A Last-Write-Wins CRDT timestamp resolves which entry is authoritative during gossip sync. In the current prototype we do not deduplicate storage, but it is a straightforward future optimisation.</div>
+  <div class="q">Q34. What if two users upload the same file at the same time? <span class="tag what">What If</span></div>
+  <div class="a">Both uploads will create entries based on the file's hash. The database uses timestamps (Last-Write-Wins) to decide which entry is the newest during sync. The system stores duplicate fragments in this prototype, but it does not cause any errors.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q34. What if the Bloom filter used in gossip keeps growing and becomes inaccurate? <span class="tag what">What If</span></div>
-  <div class="a">Our Bloom filter is not persistent — it is rebuilt from scratch every gossip cycle from the current local DHT entries. So it never accumulates stale bits. The false-positive rate stays stable because it only reflects what the node actually knows right now. A 1024-bit filter with 3 hash functions stays accurate up to about 100 entries; beyond that the false-positive rate climbs, which would mean a slight increase in unnecessary delta-sync requests — still not a correctness issue.</div>
+  <div class="q">Q35. What if the Bloom filter used in gossip keeps growing and becomes inaccurate? <span class="tag what">What If</span></div>
+  <div class="a">The Bloom filter is recreated from scratch during every gossip cycle, so it does not collect old data. If the number of files grows very large, the filter might become slightly less accurate. This only means we might send a few duplicate updates, but it does not cause any errors.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q35. What if a node has very little battery left — does it still participate fully? <span class="tag what">What If</span></div>
-  <div class="a">This is not yet implemented as a dynamic behaviour in the current prototype. In the simulation (PeerSim), we modelled battery drain from gossip sends (0.5 units) and receives (0.3 units) to validate that fan-out=2 is a reasonable trade-off. In a production version, a low-battery node should reduce its gossip fan-out, refuse to accept new hosted blocks, and notify the Super-Peer so repairs can redirect traffic away from it before it goes offline.</div>
+  <div class="q">Q36. What if a node has very little battery left — does it still participate fully? <span class="tag what">What If</span></div>
+  <div class="a">In our prototype, a low-battery node still behaves normally. However, in our simulations, we tested how battery drain works. In a production app, a phone with low battery would stop hosting new fragments and reduce its gossip activity to save power.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q36. What if someone replays an old election message to confuse the network? <span class="tag what">What If</span></div>
-  <div class="a">Every election message (ELECTION, ALIVE, COORDINATOR, ABDICATION) carries a timestamp and is signed with the sender's EC private key. On reception, the receiver checks that the timestamp is within ±30 seconds of its own clock. A replayed message from 5 minutes ago will be rejected immediately as "outside the anti-replay window", even if the signature is valid.</div>
+  <div class="q">Q37. What if someone replays an old election message to confuse the network? <span class="tag what">What If</span></div>
+  <div class="a">Every election message is signed and contains a timestamp. When a phone receives a message, it checks if it was sent in the last 30 seconds. If an attacker tries to resend an old message from 5 minutes ago, it is automatically rejected.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q37. What if a peer wants to leave the network gracefully? <span class="tag what">What If</span></div>
-  <div class="a">A Super-Peer broadcasts a signed ABDICATION message, then enters a 5-minute cooldown during which it cannot start or participate in a new election. This gives other nodes time to elect a replacement without the departing node interfering. A regular peer sends a LEAVE message signed with its identity key, which triggers the Super-Peer to remove it from the member list and proactively start repairing any blocks it was hosting.</div>
+  <div class="q">Q38. What if a peer wants to leave the network gracefully? <span class="tag what">What If</span></div>
+  <div class="a">If the Super-Peer wants to leave, it sends an abdication message and waits 5 minutes before disconnecting. This gives the network time to elect a new leader. A regular node sends a leave message, and the Super-Peer immediately re-copies its fragments to other active phones.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q38. What if the user's internet connection switches from Wi-Fi to 4G mid-transfer? <span class="tag what">What If</span></div>
-  <div class="a">The WebSocket connection to the relay will drop and reconnect. During reconnection (typically a few seconds), in-flight block transfers may fail. The upload use case handles each fragment independently — a failed fragment falls back to a second local peer or to an inter-cluster peer. The circuit breaker startup grace period (30 seconds) prevents a flood of false churn events when stale peer entries are evicted after reconnection.</div>
+  <div class="q">Q39. What if the user's internet connection switches from Wi-Fi to 4G mid-transfer? <span class="tag what">What If</span></div>
+  <div class="a">The app will reconnect to the relay. If a fragment transfer fails during the switch, the upload system retries it or sends it to a different node. We also have a 30-second delay before removing disconnected peers, which prevents false alarms.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q39. What if you needed to scale to thousands of devices — would the current design hold? <span class="tag what">What If</span></div>
-  <div class="a">Not without changes. The relay server is a bottleneck — a single Node.js process cannot handle thousands of persistent WebSocket connections without horizontal scaling and a shared session store (Redis, for example). The gossip protocol itself scales well (O(log N) convergence), but the single relay for signalling is the main weak point. The Super-Peer cluster model would need a second tier (Super-Peers of Super-Peers) to handle a global network, similar to Skype's historical architecture.</div>
+  <div class="q">Q40. What if you needed to scale to thousands of devices — would the current design hold? <span class="tag what">What If</span></div>
+  <div class="a">No, the current relay server would become overloaded. To scale to thousands of devices, we would need to run multiple relay servers behind a load balancer. We would also need to organize Super-Peers into multiple tiers (like a hierarchy) to handle a global network.</div>
 </div>
 
 <div class="card">
-  <div class="q">Q40. What if a user loses their phone — can they recover their files on a new device? <span class="tag what">What If</span></div>
-  <div class="a">In the current prototype, no — because the private key is locked inside the TEE of the lost device and cannot be exported. This is actually the correct security property (the key cannot be stolen), but it means recovery requires a backup strategy. A production solution would involve a secure key backup mechanism, such as encrypting a key export with a user password and storing it on a trusted second device or a password-protected backup service.</div>
+  <div class="q">Q41. What if a user loses their phone — can they recover their files on a new device? <span class="tag what">What If</span></div>
+  <div class="a">Yes. When the user sets up their identity, they get a recovery code. The app encrypts their private keys with a key derived from a recovery password (using PBKDF2 with 100,000 iterations) and uploads it to Supabase. On a new device, entering the code and password decrypts the keys and restores access to the files.</div>
+</div>
+
+
+<div class="card">
+  <div class="q">Q42. P2P protocols are notoriously power-hungry. How does MobiCloud prevent draining the user's mobile battery? <span class="tag what">What If</span></div>
+  <div class="a">We save battery in three ways: (1) we limit Gossip to talk to only 2 neighbors at a time; (2) the core math code is written in fast C++ (JNI) to save CPU power; and (3) we use a Circuit Breaker that stops network repair tasks if the network is too unstable, preventing useless battery drain.</div>
+</div>
+
+<div class="card">
+  <div class="q">Q43. Why did you choose k=3 data + n=2 parity for Reed-Solomon instead of other configurations like k=4 data + n=4 parity? <span class="tag why">Why</span></div>
+  <div class="a">It is the best balance for mobile phones. With k=3 and n=2, we only use 1.67 times the file size in storage, and we can lose 2 nodes without losing the file. Using larger configurations like k=4, n=4 would require the phone to upload 8 files at the same time, which is too slow and heavy for mobile networks.</div>
 </div>
 
 <hr style="margin-top:40px; border:none; border-top:1px solid #ddd"/>
-<p style="font-size:0.85em; color:#888;">MobiCloud — Defense Preparation · 40 Questions (25 General/Why + 15 What If) · Anis Naoui · 2026</p>
+<p style="font-size:0.85em; color:#888;">MobiCloud — Defense Preparation · 43 Questions (27 General/Why + 16 What If) · Anis Naoui · 2026</p>
 
 </body>
 </html>

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-
-const BASE = import.meta.env.VITE_RELAY_URL ?? 'http://localhost:10000';
+import { BASE } from '../services/api';
 
 export interface ClusterMember {
   nodeId: string;

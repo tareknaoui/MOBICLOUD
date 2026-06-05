@@ -108,6 +108,7 @@ class ExplorerViewModelTest {
         downloadFileBlocksUseCase = downloadFileBlocksUseCase,
         assembleDownloadedFileUseCase = assembleDownloadedFileUseCase,
         selectOptimalPeersUseCase = selectOptimalPeersUseCase,
+        relayRepository = mockk(relaxed = true),
         context = context
     )
 

@@ -344,18 +344,18 @@ class SignalingRepositoryImplTest {
 
     @Test
     fun `joinAsParticipant retourne success quand sendJoin retourne true`() = runTest {
-        every { relayClient.sendJoin(any(), any(), any(), any()) } returns true
+        every { relayClient.sendJoin(any(), any(), any(), any(), any(), any()) } returns true
 
         val repo = buildRepo()
         val result = repo.joinAsParticipant("test-node-id", "1.2.3.4", 5555, 0.7f)
 
         assertTrue(result.isSuccess)
-        verify { relayClient.sendJoin("test-node-id", "1.2.3.4", 5555, 0.7f) }
+        verify { relayClient.sendJoin("test-node-id", "1.2.3.4", 5555, 0.7f, 0L, 0L) }
     }
 
     @Test
     fun `joinAsParticipant retourne failure quand sendJoin retourne false`() = runTest {
-        every { relayClient.sendJoin(any(), any(), any(), any()) } returns false
+        every { relayClient.sendJoin(any(), any(), any(), any(), any(), any()) } returns false
 
         val repo = buildRepo()
         val result = repo.joinAsParticipant("test-node-id", null, null, 0.5f)

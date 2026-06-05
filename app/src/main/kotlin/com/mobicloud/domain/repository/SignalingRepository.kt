@@ -21,7 +21,9 @@ interface SignalingRepository {
         nodeId: String,
         ip: String? = null,
         port: Int? = null,
-        reliabilityScore: Float
+        reliabilityScore: Float,
+        freeBytes: Long = 0L,
+        totalBytes: Long = 0L
     ): Result<Unit>
 
     /** Enregistre ce nœud comme Super-Pair auprès des Serveurs Relais HA (post-Bully). */

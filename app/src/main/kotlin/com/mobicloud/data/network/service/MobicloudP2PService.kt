@@ -431,11 +431,18 @@ class MobicloudP2PService : Service() {
                 // skip cote GossipChannel.
                 suspend fun joinAndFetch() {
                     val announcedIp = wifiNetworkRepository.getLocalIpAddress() ?: "0.0.0.0"
+                    val settings = nodeSettingsRepository.getSettings()
+                    val joinFreeBytes = runCatching {
+                        val used = hostedBlockRepository.getTotalHostedBytes()
+                        (settings.allocatedStorageBytes - used).coerceAtLeast(0L)
+                    }.getOrDefault(0L)
                     signalingRepository.joinAsParticipant(
                         nodeId = identity.nodeId,
                         ip = announcedIp,
                         port = tcpPort,
-                        reliabilityScore = identity.reliabilityScore
+                        reliabilityScore = identity.reliabilityScore,
+                        freeBytes = joinFreeBytes,
+                        totalBytes = settings.allocatedStorageBytes
                     ).onFailure { Log.w(LOGTAG, "auto-join relais échoué", it) }
                     signalingRepository.fetchActiveSuperPeers()
                         .onFailure { Log.w(LOGTAG, "fetchActiveSuperPeers échoué", it) }

@@ -153,11 +153,13 @@ class SignalingRepositoryImpl @Inject constructor(
         nodeId: String,
         ip: String?,
         port: Int?,
-        reliabilityScore: Float
+        reliabilityScore: Float,
+        freeBytes: Long,
+        totalBytes: Long
     ): Result<Unit> = runCatching {
-        val sent = relayClient.sendJoin(nodeId, ip, port, reliabilityScore)
+        val sent = relayClient.sendJoin(nodeId, ip, port, reliabilityScore, freeBytes, totalBytes)
         if (!sent) error("RelayWebSocketClient non connecté — JOIN non envoyé")
-        Log.d(TAG, "JOIN envoyé : nodeId=${nodeId.take(8)} ip=$ip port=$port score=$reliabilityScore")
+        Log.d(TAG, "JOIN envoyé : nodeId=${nodeId.take(8)} ip=$ip port=$port score=$reliabilityScore freeBytes=$freeBytes totalBytes=$totalBytes")
         Unit
     }.onFailure { e ->
         Log.w(TAG, "joinAsParticipant échoué : ${e.message}")

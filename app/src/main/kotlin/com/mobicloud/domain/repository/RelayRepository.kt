@@ -1,6 +1,7 @@
 package com.mobicloud.domain.repository
 
 import com.mobicloud.domain.models.BlockTransferMessage
+import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.RelayPeer
 import kotlinx.coroutines.flow.StateFlow
 
@@ -28,6 +29,12 @@ interface RelayRepository {
         blockId: String,
         timeoutMs: Long
     ): Result<BlockTransferMessage>
+
+    /**
+     * Annonce au relay dashboard quels fragments de [entry] sont distribués sur quels nœuds.
+     * Best-effort : un échec ne doit pas bloquer l'upload.
+     */
+    suspend fun announceFragments(entry: CatalogEntry): Result<Unit>
 }
 
 enum class RelayConnectionState { CONNECTING, CONNECTED, RELAY_HA, OFFLINE }
