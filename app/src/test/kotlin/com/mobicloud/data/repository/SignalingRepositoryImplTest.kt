@@ -282,6 +282,41 @@ class SignalingRepositoryImplTest {
         }
     }
 
+    // FIX 2026-06-05 — reliabilityScore ET freeBytes du relay doivent être persistés.
+    // Avant : NodeIdentity(nodeId, pubKey) écrasait le score par le défaut 1.0f et
+    // freeStorageBytes restait à 0 → SelectOptimalPeersUseCase triait sur des valeurs
+    // toutes égales (Super-Pair parfois exclu du take(N), filtre capacité neutralisé).
+    @Test
+    fun `processPeerList persiste reliabilityScore et freeBytes du relay (FIX 2026-06-05)`() = runTest {
+        val repo = buildRepo()
+        val now = System.currentTimeMillis()
+
+        val peer = RelayPeer(
+            nodeId = "scored-node",
+            ip = "5.6.7.8",
+            port = 8888,
+            reliabilityScore = 0.42f,
+            lastSeen = now,
+            isSuperPair = true,
+            freeBytes = 123_456L,
+            pubKeySpkiDerB64 = FAKE_PUBKEY_B64
+        )
+
+        repo.processPeerList(listOf(peer))
+
+        coVerify {
+            peerRepository.registerOrUpdatePeer(
+                identity         = match { it.nodeId == "scored-node" && it.reliabilityScore == 0.42f },
+                timestampMs      = any(),
+                source           = DiscoverySource.RELAY_HA,
+                ipAddress        = "5.6.7.8",
+                port             = 8888,
+                isSuperPair      = true,
+                freeStorageBytes = 123_456L
+            )
+        }
+    }
+
     // Story 10.1 : un pair sans cle publique (relay legacy ou session WS fermee) est skip.
     // Sans ce filtre, les signatures Bully echouent silencieusement et personne ne reconnait
     // les COORDINATOR/ELECTION/ALIVE -- multi super-peers garanti.

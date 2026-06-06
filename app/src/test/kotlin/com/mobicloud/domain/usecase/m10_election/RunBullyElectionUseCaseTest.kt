@@ -101,6 +101,16 @@ class RunBullyElectionUseCaseTest {
 
     // ── Tests ─────────────────────────────────────────────────────────────────
 
+    // Tuning convergence (2026-06-05) : les tests de comportement ci-dessous référencent
+    // les constantes symboliquement → un revert accidentel des valeurs (ex. retour à
+    // 20s/45s) passerait inaperçu. Ce garde-fou épingle le choix délibéré :
+    // monitoring 6s (latence relay HA ≤ 5s) et solo-bootstrap 20s (cold-start Render ≤ 40s).
+    @Test
+    fun `tuning convergence — MONITORING_WINDOW vaut 6s et SOLO_BOOTSTRAP vaut 20s`() {
+        assertEquals(6_000L, RunBullyElectionUseCase.MONITORING_WINDOW_MS)
+        assertEquals(20_000L, RunBullyElectionUseCase.SOLO_BOOTSTRAP_TIMEOUT_MS)
+    }
+
     @Test
     fun `when no active superpair for 5s, and no ALIVE received, node wins election`() =
         runTest {
@@ -123,7 +133,7 @@ class RunBullyElectionUseCaseTest {
                 finalResult = flowResult.first()
             }
 
-            // Avancer de 20s (fenêtre de monitoring) puis 3s (timeout ALIVE) — aucun ALIVE émis
+            // Avancer de la fenêtre de monitoring (6s) puis 3s (timeout ALIVE) — aucun ALIVE émis
             advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS + 1L)
             advanceTimeBy(3_001L)
 
@@ -159,7 +169,7 @@ class RunBullyElectionUseCaseTest {
             finalResult = flowResult.first()
         }
 
-        // Avancer de 20s pour dépasser le monitoring
+        // Avancer au-delà de la fenêtre de monitoring (6s)
         advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS + 1L)
 
         // Émettre un ALIVE de score supérieur dans la fenêtre des 3s
@@ -293,7 +303,7 @@ class RunBullyElectionUseCaseTest {
             finalResult = flowResult.first()
         }
 
-        // Avancer en-dessous du délai solo-bootstrap (SOLO_BOOTSTRAP_TIMEOUT_MS=45s) pour
+        // Avancer en-dessous du délai solo-bootstrap (SOLO_BOOTSTRAP_TIMEOUT_MS=20s) pour
         // tester uniquement le garde-fou classique Bully (hasOtherKnownPeer) sans déclencher
         // le fallback isolation totale qui permettrait une élection solo.
         advanceTimeBy(RunBullyElectionUseCase.SOLO_BOOTSTRAP_TIMEOUT_MS - 5_000L)
@@ -344,7 +354,7 @@ class RunBullyElectionUseCaseTest {
             )
         )
 
-        // 20s + 3s pour victoire complète
+        // fenêtre de monitoring (6s) + 3s pour victoire complète
         advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS + 1L)
         advanceTimeBy(3_001L)
 
