@@ -532,6 +532,30 @@ class MobicloudP2PService : Service() {
                                     )
                                 }
                             }
+                            // 4) SP : détection split-brain post-reconnexion.
+                            // Le spScanJob ne tourne qu'à l'ENTRÉE de l'état SuperPair (FSM n'émet
+                            // pas si on était déjà SP avant la coupure). Un rival peut avoir été élu
+                            // pendant notre absence → on rescanne après 4s (temps que joinAndFetch +
+                            // re-register SP aient mis à jour la liste du relay).
+                            val isSPNow = joinStateMachine.currentState.value is NodeJoinState.SuperPair
+                            if (isSPNow) {
+                                serviceScope.launch {
+                                    delay(4_000L)
+                                    runCatching { signalingRepository.fetchActiveSuperPeers() }
+                                    val myClusterId = nodeSettingsRepository.getClusterIdOnce()
+                                    val peers = signalingRepository.latestPeers.value
+                                    val sameClusterRival = peers.firstOrNull { p ->
+                                        p.isSuperPair
+                                            && p.clusterId == myClusterId
+                                            && p.nodeId > identity.nodeId
+                                    }
+                                    if (sameClusterRival != null) {
+                                        Log.i(LOGTAG, "[RECONNECT] Split-brain post-reconnexion: yield to ${sameClusterRival.nodeId.take(8)}")
+                                        abdicate()
+                                        launch { abdicateSuperPeerUseCase() }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -774,6 +798,17 @@ class MobicloudP2PService : Service() {
                     Log.w(LOGTAG, "[SCORE-LOOP] identityRepository.getIdentity() a échoué — recalcul désactivé")
                     return@launch
                 }
+                // Calcul IMMÉDIAT au démarrage (avant le premier delay) : sinon le score persisté
+                // reste au défaut 1.0f jusqu'à T=30s. L'élection Bully démarre à T~6-16s → sans ce
+                // calcul initial, deux appareils lancés simultanément ont TOUS deux score=1.0 →
+                // égalité → départage sur nodeId, le vrai score (batterie/uptime/réseau) est ignoré.
+                calculateReliabilityScoreUseCase()
+                    .onSuccess { initialScore ->
+                        identityRepository.updateReliabilityScore(dbNodeId, initialScore)
+                            .onFailure { Log.w(LOGTAG, "Persistance du score initial échouée", it) }
+                        Log.i(LOGTAG, "[SCORE-LOOP] score initial = $initialScore pour ${dbNodeId.take(8)}")
+                    }
+                    .onFailure { Log.w(LOGTAG, "Calcul du score initial échoué", it) }
                 while (isActive) {
                     delay(RELIABILITY_SCORE_INTERVAL_MS)
                     calculateReliabilityScoreUseCase()

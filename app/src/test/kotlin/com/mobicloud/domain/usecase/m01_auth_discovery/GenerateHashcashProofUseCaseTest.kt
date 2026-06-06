@@ -155,6 +155,13 @@ class FakeSecurityRepository : SecurityRepository {
     // Story 6.3 — non utilisé par GenerateHashcashProofUseCase mais requis par le contrat.
     override suspend fun getEncryptionIdentity(): Result<com.mobicloud.domain.models.EncryptionIdentity> =
         Result.failure(UnsupportedOperationException("not needed in this fake"))
+
+    // M00 identity recovery — non utilisés ici mais requis par le contrat.
+    override suspend fun exportRecoveryCode(): Result<String> =
+        Result.failure(UnsupportedOperationException("not needed in this fake"))
+
+    override suspend fun importFromRecoveryCode(code: String): Result<NodeIdentity> =
+        Result.failure(UnsupportedOperationException("not needed in this fake"))
 }
 
 class FakeHashcashTokenRepository : HashcashTokenRepository {

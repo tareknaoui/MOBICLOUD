@@ -113,22 +113,24 @@ class SignalingRepositoryImpl @Inject constructor(
                 return@forEach
             }
 
-            Log.i(TAG, "[DIAG] insertion ${peer.nodeId.take(8)}@${peer.ip}:${peer.port} isSuperPair=${peer.isSuperPair} pubKey=${pubKeyBytes.size}o")
+            Log.i(TAG, "[DIAG] insertion ${peer.nodeId.take(8)}@${peer.ip}:${peer.port} isSuperPair=${peer.isSuperPair} score=${peer.reliabilityScore} freeBytes=${peer.freeBytes} pubKey=${pubKeyBytes.size}o")
             // isSuperPair vient maintenant du serveur (Story Bully) : true si REGISTER_PEER, false si JOIN.
             //
-            // Story 9.2 — `peer.clusterId` et `peer.freeBytes` ne sont volontairement PAS
-            // persistés ici. Ces deux champs sont des *snapshots volatiles* de l'annuaire HA
-            // (TTL serveur 60s). Les persister dans la table `peers` créerait un risque de
-            // servir des données obsolètes après expiration côté serveur. Ils seront consommés
-            // en mémoire par les use-cases inter-cluster (Stories 9.3 RequestHosting,
-            // 9.4 RequestBlock) directement à partir du Flow<RelayEvent.PeerList>.
+            // FIX 2026-06-05 — `reliabilityScore` et `freeBytes` du relay sont désormais persistés.
+            // Avant : NodeIdentity(peer.nodeId, pubKeyBytes) écrasait le score réel par le défaut 1.0f
+            // et freeStorageBytes restait à 0 → SelectOptimalPeersUseCase triait sur des valeurs
+            // toutes égales (ordre arbitraire, le Super-Pair pouvait être exclu de take(N)) et le
+            // filtre de capacité était neutralisé. Le risque de staleness (TTL serveur 60s) est borné :
+            // GET_PEERS rafraîchit ces champs toutes les ~10s. `clusterId` reste volatile (lu via
+            // latestPeers en mémoire pour l'inter-cluster).
             peerRepository.registerOrUpdatePeer(
-                identity    = NodeIdentity(peer.nodeId, pubKeyBytes),
-                timestampMs = SystemClock.elapsedRealtime(),
-                source      = DiscoverySource.RELAY_HA,
-                ipAddress   = peer.ip,
-                port        = peer.port,
-                isSuperPair = peer.isSuperPair
+                identity         = NodeIdentity(peer.nodeId, pubKeyBytes, peer.reliabilityScore),
+                timestampMs      = SystemClock.elapsedRealtime(),
+                source           = DiscoverySource.RELAY_HA,
+                ipAddress        = peer.ip,
+                port             = peer.port,
+                isSuperPair      = peer.isSuperPair,
+                freeStorageBytes = peer.freeBytes
             )
             insertedCount++
         }
