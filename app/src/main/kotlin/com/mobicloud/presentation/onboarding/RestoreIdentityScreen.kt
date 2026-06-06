@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -62,6 +63,36 @@ fun RestoreIdentityScreen(
         if (state is RestoreState.Success) {
             onRestored()
         }
+    }
+
+    if (state is RestoreState.SuccessWithPriorData) {
+        val oldHash = (state as RestoreState.SuccessWithPriorData).oldOwnerPubKeyHash
+        AlertDialog(
+            onDismissRequest = { viewModel.skipDeleteOldData() },
+            title = { Text("Données précédentes détectées", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Cet appareil contenait des données liées à une autre identité. " +
+                    "Voulez-vous les supprimer définitivement ?",
+                    fontSize = 14.sp,
+                    color = IosText2,
+                    lineHeight = 20.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.deleteOldData(oldHash) },
+                    colors = ButtonDefaults.buttonColors(containerColor = IosRed)
+                ) {
+                    Text("Supprimer", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.skipDeleteOldData() }) {
+                    Text("Conserver", color = IosText2)
+                }
+            }
+        )
     }
 
     Scaffold(

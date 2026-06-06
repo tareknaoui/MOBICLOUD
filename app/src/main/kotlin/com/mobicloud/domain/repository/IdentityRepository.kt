@@ -14,6 +14,13 @@ interface IdentityRepository {
     suspend fun getIdentity(): Result<NodeIdentity>
 
     /**
+     * Lit l'identité existante SANS jamais en générer une nouvelle.
+     * Retourne `null` si aucune identité n'est encore persistée (DB et Keystore vides).
+     * Contrairement à [getIdentity], n'a aucun effet de bord (pas de génération de keypair).
+     */
+    suspend fun peekIdentity(): Result<NodeIdentity?>
+
+    /**
      * Met à jour le score de fiabilité persisté en Room DB.
      * N'affecte pas les clés cryptographiques.
      *

@@ -137,4 +137,47 @@ class IdentityRepositoryImplTest {
         assertTrue(result.isFailure)
         assertTrue(result.exceptionOrNull() is RuntimeException)
     }
+
+    // --- peekIdentity : lecture sans effet de bord (fix faux positif "données précédentes") ---
+
+    @Test
+    fun `peekIdentity returns identity from DB without touching keystore`() = runTest {
+        coEvery { identityDao.getIdentity() } returns testEntity
+
+        val result = repository.peekIdentity()
+
+        assertTrue(result.isSuccess)
+        assertEquals(testNodeId, result.getOrNull()!!.nodeId)
+        coVerify(exactly = 0) { keystoreManager.getExistingIdentity() }
+        coVerify(exactly = 0) { keystoreManager.generateIdentity() }
+    }
+
+    @Test
+    fun `peekIdentity falls back to keystore when DB is empty`() = runTest {
+        coEvery { identityDao.getIdentity() } returns null
+        every { keystoreManager.getExistingIdentity() } returns testIdentity
+
+        val result = repository.peekIdentity()
+
+        assertTrue(result.isSuccess)
+        assertEquals(testNodeId, result.getOrNull()!!.nodeId)
+        // Ne doit JAMAIS générer ni persister
+        coVerify(exactly = 0) { keystoreManager.generateIdentity() }
+        coVerify(exactly = 0) { identityDao.insertIdentity(any()) }
+    }
+
+    @Test
+    fun `peekIdentity returns null on fresh device and never generates`() = runTest {
+        // Téléphone vierge : DB vide ET keystore vide
+        coEvery { identityDao.getIdentity() } returns null
+        every { keystoreManager.getExistingIdentity() } returns null
+
+        val result = repository.peekIdentity()
+
+        assertTrue(result.isSuccess)
+        assertEquals(null, result.getOrNull())
+        // Garantie anti-régression : aucun keypair jetable créé
+        coVerify(exactly = 0) { keystoreManager.generateIdentity() }
+        coVerify(exactly = 0) { identityDao.insertIdentity(any()) }
+    }
 }

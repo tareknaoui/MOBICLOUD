@@ -53,6 +53,21 @@ class IdentityRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun peekIdentity(): Result<NodeIdentity?> = withContext(Dispatchers.IO) {
+        runCatching {
+            // Lecture DB d'abord, puis Keystore — JAMAIS de génération (aucun effet de bord).
+            val savedEntity = identityDao.getIdentity()
+            if (savedEntity != null) {
+                return@runCatching NodeIdentity(
+                    nodeId = savedEntity.nodeId,
+                    publicKeyBytes = savedEntity.publicKeyBytes,
+                    reliabilityScore = savedEntity.reliabilityScore
+                )
+            }
+            keystoreManager.getExistingIdentity()
+        }
+    }
+
     override suspend fun updateReliabilityScore(nodeId: String, score: Float): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             identityDao.updateReliabilityScore(nodeId, score)

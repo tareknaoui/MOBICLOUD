@@ -6,10 +6,20 @@ import com.mobicloud.domain.repository.CatalogRepository
 import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import kotlinx.serialization.json.Json
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
 
 private val lenientJson = Json { ignoreUnknownKeys = true }
+
+/**
+ * Résultat d'un import d'identité.
+ *
+ * [previousOwnerPubKeyHash] est non-null uniquement si l'appareil avait déjà une identité
+ * distincte avant le restore — utile pour proposer à l'utilisateur de supprimer les anciennes
+ * données catalogue liées à cette identité.
+ */
+data class ImportIdentityResult(val previousOwnerPubKeyHash: String?)
 
 @Singleton
 class ImportIdentityUseCase @Inject constructor(
@@ -17,7 +27,14 @@ class ImportIdentityUseCase @Inject constructor(
     private val identityRepository: IdentityRepository,
     private val catalogRepository: CatalogRepository
 ) {
-    suspend operator fun invoke(code: String): Result<Unit> {
+    suspend operator fun invoke(code: String): Result<ImportIdentityResult> {
+        // Capturer l'ancienne identité avant de l'écraser — lecture SANS génération
+        // (sinon un téléphone vierge fabriquerait un keypair jetable et déclencherait
+        // un faux positif "données précédentes détectées").
+        val previousPubKeyHash = identityRepository.peekIdentity()
+            .getOrNull()
+            ?.let { sha256Hex(it.publicKeyBytes) }
+
         // Decode full payload — may have 4 parts (keys only) or 5 parts (keys + catalog).
         val decoded = runCatching {
             Base64.decode(code.trim(), Base64.URL_SAFE).toString(Charsets.UTF_8)
@@ -48,6 +65,14 @@ class ImportIdentityUseCase @Inject constructor(
             // Catalog restore failure is non-fatal: identity is already restored.
         }
 
-        return Result.success(Unit)
+        // Retourner l'ancien hash seulement s'il diffère du nouveau (identité réellement changée).
+        val newPubKeyHash = sha256Hex(identity.publicKeyBytes)
+        val hasPriorData = previousPubKeyHash != null && previousPubKeyHash != newPubKeyHash
+        return Result.success(ImportIdentityResult(if (hasPriorData) previousPubKeyHash else null))
     }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(bytes)
+            .joinToString("") { "%02x".format(it) }
 }

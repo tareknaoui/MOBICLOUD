@@ -206,4 +206,9 @@ class CatalogRepositoryImpl(
         withContext(Dispatchers.IO) {
             runCatching { catalogDao.moveFilesToRoot(folderPath) }
         }
+
+    override suspend fun deleteAllByOwner(ownerPubKeyHash: String): Result<Unit> =
+        withContext(Dispatchers.IO) {
+            runCatching { catalogDao.deleteAllEntriesByOwner(ownerPubKeyHash) }
+        }
 }

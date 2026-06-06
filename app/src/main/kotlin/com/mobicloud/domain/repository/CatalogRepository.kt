@@ -92,4 +92,7 @@ interface CatalogRepository {
 
     /** Supprime un dossier : déplace tous ses fichiers vers la racine. */
     suspend fun deleteFolder(folderPath: String): Result<Unit>
+
+    /** Supprime définitivement toutes les entrées catalogue appartenant à un propriétaire donné. */
+    suspend fun deleteAllByOwner(ownerPubKeyHash: String): Result<Unit>
 }

@@ -106,6 +106,17 @@ interface CatalogDao {
         }
     }
 
+    @Query("SELECT file_hash FROM catalog_entry WHERE owner_pub_key_hash = :ownerPubKeyHash")
+    suspend fun getHashesByOwner(ownerPubKeyHash: String): List<String>
+
+    @Transaction
+    suspend fun deleteAllEntriesByOwner(ownerPubKeyHash: String) {
+        val hashes = getHashesByOwner(ownerPubKeyHash)
+        for (h in hashes) {
+            permanentlyDeleteEntry(h)
+        }
+    }
+
     // Story 13.5 — organisation en dossiers (local uniquement, non distribué dans le DHT)
 
     @Query("UPDATE catalog_entry SET folder_path = :folder WHERE file_hash = :hash")
