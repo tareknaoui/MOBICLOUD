@@ -31,7 +31,7 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.Serializable
 
 @Serializable
-object PinSetupRoute
+data class PinSetupRoute(val fromOnboarding: Boolean = false)
 
 private val IosBlue = Color(0xFF0A84FF)
 private val IosText1 = Color(0xFF1C1C1E)
