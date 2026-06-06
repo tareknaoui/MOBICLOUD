@@ -19,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material3.Switch
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -61,12 +63,14 @@ private const val HALF_GB = 512L * 1024 * 1024
 @Composable
 fun SettingsScreen(
     onRestoreIdentity: () -> Unit = {},
+    onSetupPin: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val settings by viewModel.settings.collectAsStateWithLifecycle()
     val usedBytes by viewModel.usedStorageBytes.collectAsStateWithLifecycle()
     val freeBytes by viewModel.freeSpaceBytes.collectAsStateWithLifecycle()
+    val hasPinSet by viewModel.hasPinSet.collectAsStateWithLifecycle()
     val showWarning by viewModel.showWarningDialog.collectAsStateWithLifecycle()
     val recoveryCode by viewModel.recoveryCode.collectAsStateWithLifecycle()
     val exportError by viewModel.exportError.collectAsStateWithLifecycle()
@@ -159,6 +163,45 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFF8E8E93)
                     )
+                }
+            }
+        }
+
+        AnimatedVisibility(visible = storageVisible, enter = sectionEnter) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                border = BorderStroke(1.dp, Color(0xFFF1F1F5)),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(imageVector = Icons.Outlined.Lock, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(24.dp))
+                            Text("Code PIN", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF1C1C1E))
+                        }
+                        Switch(
+                            checked = hasPinSet,
+                            onCheckedChange = { enabled ->
+                                if (enabled) onSetupPin() else viewModel.disablePin()
+                            }
+                        )
+                    }
+                    Text(
+                        text = if (hasPinSet) "Le code PIN est activé. L'app le demandera à chaque ouverture." else "Activez un code PIN pour protéger l'accès à l'application.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF8E8E93),
+                    )
+                    if (hasPinSet) {
+                        TextButton(onClick = onSetupPin) {
+                            Text("Changer le code PIN", color = Color(0xFF0A84FF))
+                        }
+                    }
                 }
             }
         }

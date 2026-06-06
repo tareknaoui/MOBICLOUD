@@ -8,6 +8,7 @@ import com.mobicloud.data.network.service.MobicloudP2PService
 import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
+import com.mobicloud.core.preferences.data.UserPreferencesDataSource
 import com.mobicloud.domain.usecase.m00_identity.CloudLoginAndSaveUseCase
 import com.mobicloud.domain.usecase.m00_identity.CloudRegisterUseCase
 import com.mobicloud.domain.usecase.m00_identity.ExportIdentityUseCase
@@ -17,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -29,8 +31,17 @@ class SettingsViewModel @Inject constructor(
     private val sendDepartureNoticeUseCase: SendDepartureNoticeUseCase,
     private val exportIdentityUseCase: ExportIdentityUseCase,
     private val cloudRegisterUseCase: CloudRegisterUseCase,
-    private val cloudLoginAndSaveUseCase: CloudLoginAndSaveUseCase
+    private val cloudLoginAndSaveUseCase: CloudLoginAndSaveUseCase,
+    private val userPreferencesDataSource: UserPreferencesDataSource,
 ) : AndroidViewModel(application) {
+
+    val hasPinSet: StateFlow<Boolean> = userPreferencesDataSource.observePinHash()
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
+
+    fun disablePin() {
+        viewModelScope.launch { userPreferencesDataSource.clearPin() }
+    }
 
     val settings: StateFlow<NodeSettings> = settingsRepository.observeSettings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), NodeSettings(0L))

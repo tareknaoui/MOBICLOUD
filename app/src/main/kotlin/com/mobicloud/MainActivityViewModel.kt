@@ -74,4 +74,9 @@ class MainActivityViewModel @Inject constructor(
         userPreferencesDataSource.getUserDataPreferences()
             .map<UserDataPreferences, Boolean?> { it.hasCompletedOnboarding }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), null)
+
+    val hasPinSet: StateFlow<Boolean?> =
+        userPreferencesDataSource.observePinHash()
+            .map<String, Boolean?> { it.isNotEmpty() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), null)
 }

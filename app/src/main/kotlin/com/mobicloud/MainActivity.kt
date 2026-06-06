@@ -146,6 +146,7 @@ class MainActivity : AppCompatActivity() {
         setContent {
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val hasCompletedOnboarding by viewModel.hasCompletedOnboarding.collectAsStateWithLifecycle()
+            val hasPinSet by viewModel.hasPinSet.collectAsStateWithLifecycle()
 
             val appState = rememberJetpackAppState(
                 isUserLoggedIn = isUserLoggedIn(uiState),
@@ -154,7 +155,7 @@ class MainActivity : AppCompatActivity() {
                 networkUtils = networkUtils,
             )
             JetpackTheme {
-                JetpackApp(appState, hasCompletedOnboarding = hasCompletedOnboarding)
+                JetpackApp(appState, hasCompletedOnboarding = hasCompletedOnboarding, hasPinSet = hasPinSet)
             }
         }
 

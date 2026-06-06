@@ -122,4 +122,19 @@ internal class UserPreferencesDataSourceImpl @Inject constructor(
 
     override fun observeHasCompletedOnboarding(): Flow<Boolean> =
         datastore.data.map { it.hasCompletedOnboarding }.flowOn(ioDispatcher)
+
+    override suspend fun setPin(pinHash: String) {
+        withContext(ioDispatcher) {
+            datastore.updateData { it.copy(pinHash = pinHash) }
+        }
+    }
+
+    override suspend fun clearPin() {
+        withContext(ioDispatcher) {
+            datastore.updateData { it.copy(pinHash = "") }
+        }
+    }
+
+    override fun observePinHash(): Flow<String> =
+        datastore.data.map { it.pinHash }.flowOn(ioDispatcher)
 }

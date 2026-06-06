@@ -38,6 +38,10 @@ import com.mobicloud.presentation.onboarding.RestoreIdentityRoute
 import com.mobicloud.presentation.onboarding.RestoreIdentityScreen
 import com.mobicloud.presentation.onboarding.WelcomeRoute
 import com.mobicloud.presentation.onboarding.WelcomeScreen
+import com.mobicloud.presentation.pin.PinLockRoute
+import com.mobicloud.presentation.pin.PinLockScreen
+import com.mobicloud.presentation.pin.PinSetupRoute
+import com.mobicloud.presentation.pin.PinSetupScreen
 import com.mobicloud.presentation.settings.SettingsRoute
 import com.mobicloud.presentation.settings.SettingsScreen
 import com.mobicloud.presentation.trash.TrashRoute
@@ -50,10 +54,15 @@ fun JetpackNavHost(
     appState: JetpackAppState,
     onShowSnackbar: suspend (String, SnackbarAction, Throwable?) -> Boolean,
     hasCompletedOnboarding: Boolean,
+    hasPinSet: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val navController = appState.navController
-    val startDestination = if (hasCompletedOnboarding) DashboardRoute else WelcomeRoute
+    val startDestination = when {
+        !hasCompletedOnboarding -> WelcomeRoute
+        hasPinSet -> PinLockRoute
+        else -> DashboardRoute
+    }
 
     NavHost(
         navController = navController,
@@ -120,6 +129,21 @@ fun JetpackNavHost(
                 },
             )
         }
+        composable<PinLockRoute> {
+            PinLockScreen(
+                onUnlocked = {
+                    navController.navigate(DashboardRoute) {
+                        popUpTo(PinLockRoute) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable<PinSetupRoute> {
+            PinSetupScreen(
+                onDone = { navController.popBackStack() },
+                onSkip = { navController.popBackStack() },
+            )
+        }
         composable<DashboardRoute> {
             DashboardScreen()
         }
@@ -135,7 +159,8 @@ fun JetpackNavHost(
         }
         composable<SettingsRoute> {
             SettingsScreen(
-                onRestoreIdentity = { navController.navigate(RestoreIdentityRoute) }
+                onRestoreIdentity = { navController.navigate(RestoreIdentityRoute) },
+                onSetupPin = { navController.navigate(PinSetupRoute) },
             )
         }
         composable<NetworkRoute> {
