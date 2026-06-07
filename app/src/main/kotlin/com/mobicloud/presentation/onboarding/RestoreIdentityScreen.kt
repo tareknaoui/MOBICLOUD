@@ -69,11 +69,11 @@ fun RestoreIdentityScreen(
         val oldHash = (state as RestoreState.SuccessWithPriorData).oldOwnerPubKeyHash
         AlertDialog(
             onDismissRequest = { viewModel.skipDeleteOldData() },
-            title = { Text("Données précédentes détectées", fontWeight = FontWeight.Bold) },
+            title = { Text("Previous data detected", fontWeight = FontWeight.Bold) },
             text = {
                 Text(
-                    "Cet appareil contenait des données liées à une autre identité. " +
-                    "Voulez-vous les supprimer définitivement ?",
+                    "This device contained data linked to another identity. " +
+                    "Do you want to permanently delete it?",
                     fontSize = 14.sp,
                     color = IosText2,
                     lineHeight = 20.sp
@@ -84,12 +84,12 @@ fun RestoreIdentityScreen(
                     onClick = { viewModel.deleteOldData(oldHash) },
                     colors = ButtonDefaults.buttonColors(containerColor = IosRed)
                 ) {
-                    Text("Supprimer", color = Color.White)
+                    Text("Delete", color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { viewModel.skipDeleteOldData() }) {
-                    Text("Conserver", color = IosText2)
+                    Text("Keep", color = IosText2)
                 }
             }
         )
@@ -117,7 +117,7 @@ fun RestoreIdentityScreen(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = "Restaurer mon compte",
+                text = "Restore my account",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = IosText1,
@@ -127,7 +127,7 @@ fun RestoreIdentityScreen(
             Spacer(Modifier.height(12.dp))
 
             Text(
-                text = "Entrez le code de récupération affiché sur votre ancien téléphone. Vos fichiers distribués seront accessibles une fois reconnecté au réseau.",
+                text = "Enter the recovery code from your old device. Your files will be accessible again once you reconnect to a group.",
                 fontSize = 14.sp,
                 color = IosText2,
                 textAlign = TextAlign.Center,
@@ -142,8 +142,8 @@ fun RestoreIdentityScreen(
                     code = it
                     if (state is RestoreState.Error) viewModel.reset()
                 },
-                label = { Text("Code de récupération") },
-                placeholder = { Text("Collez votre code ici") },
+                label = { Text("Recovery code") },
+                placeholder = { Text("Paste your code here") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
@@ -180,7 +180,7 @@ fun RestoreIdentityScreen(
                     )
                 } else {
                     Text(
-                        text = "Restaurer",
+                        text = "Restore",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
                         color = Color.White
@@ -191,7 +191,7 @@ fun RestoreIdentityScreen(
             Spacer(Modifier.height(12.dp))
 
             TextButton(onClick = onBack) {
-                Text("Retour", color = IosText2, fontSize = 14.sp)
+                Text("Back", color = IosText2, fontSize = 14.sp)
             }
         }
     }

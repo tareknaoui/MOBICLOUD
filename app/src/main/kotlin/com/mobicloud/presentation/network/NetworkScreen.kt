@@ -56,7 +56,7 @@ fun NetworkScreen(
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                text = "MEMBRES DU GROUPE",
+                text = "GROUP MEMBERS",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 1.2.sp,

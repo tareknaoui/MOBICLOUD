@@ -183,7 +183,7 @@ fun SettingsScreen(
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Icon(imageVector = Icons.Outlined.Lock, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(24.dp))
-                            Text("Code PIN", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF1C1C1E))
+                            Text("PIN Code", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF1C1C1E))
                         }
                         Switch(
                             checked = hasPinSet,
@@ -193,13 +193,13 @@ fun SettingsScreen(
                         )
                     }
                     Text(
-                        text = if (hasPinSet) "Le code PIN est activé. L'app le demandera à chaque ouverture." else "Activez un code PIN pour protéger l'accès à l'application.",
+                        text = if (hasPinSet) "PIN is enabled. The app will ask for it every time you open it." else "Enable a PIN to protect access to the app.",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color(0xFF8E8E93),
                     )
                     if (hasPinSet) {
                         TextButton(onClick = onSetupPin) {
-                            Text("Changer le code PIN", color = Color(0xFF0A84FF))
+                            Text("Change PIN", color = Color(0xFF0A84FF))
                         }
                     }
                 }
@@ -217,19 +217,19 @@ fun SettingsScreen(
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(imageVector = Icons.Outlined.Key, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(24.dp))
-                        Text("Récupération", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF1C1C1E))
+                        Text("Recovery", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color(0xFF1C1C1E))
                     }
-                    Text("Exportez votre code de récupération pour restaurer vos données sur un nouvel appareil.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8E8E93))
+                    Text("Export your recovery code to restore your identity on a new device.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF8E8E93))
                     TextButton(onClick = { viewModel.exportIdentity() }) {
-                        Text("Afficher le code de récupération", color = Color(0xFF0A84FF))
+                        Text("Show recovery code", color = Color(0xFF0A84FF))
                     }
                     TextButton(onClick = { onRestoreIdentity() }) {
-                        Text("Restaurer avec un code", color = Color(0xFF8E8E93))
+                        Text("Restore with a code", color = Color(0xFF8E8E93))
                     }
                     TextButton(onClick = { viewModel.requestCloudBackup() }) {
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(imageVector = Icons.Outlined.CloudUpload, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(16.dp))
-                            Text("Sauvegarder dans le cloud", color = Color(0xFF0A84FF))
+                            Text("Back up to cloud", color = Color(0xFF0A84FF))
                         }
                     }
                 }
@@ -242,24 +242,34 @@ fun SettingsScreen(
         var copied by remember { mutableStateOf(false) }
         AlertDialog(
             onDismissRequest = { viewModel.dismissRecoveryCode() },
-            title = { Text("Code de récupération") },
+            title = { Text("Recovery code", fontWeight = FontWeight.Bold) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Notez ce code ou prenez une capture d'écran. Il vous permettra de restaurer votre compte sur un nouvel appareil.", fontSize = 13.sp, color = Color(0xFF8E8E93))
-                    Text(code, fontSize = 11.sp, color = Color(0xFF1C1C1E), fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Write this code down or take a screenshot. It lets you restore your account on a new device.",
+                        fontSize = 13.sp,
+                        color = Color(0xFF8E8E93)
+                    )
+                    Text(
+                        text = code,
+                        fontSize = 15.sp,
+                        color = Color(0xFF1C1C1E),
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        lineHeight = 22.sp
+                    )
                 }
             },
             confirmButton = {
-                TextButton(onClick = { viewModel.dismissRecoveryCode() }) { Text("Fermer") }
-            },
-            dismissButton = {
                 TextButton(onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText("recovery_code", code))
                     copied = true
                 }) {
-                    Text(if (copied) "Copié ✓" else "Copier", color = Color(0xFF0A84FF))
+                    Text(if (copied) "Copied ✓" else "Copy code", color = Color(0xFF0A84FF), fontWeight = FontWeight.SemiBold)
                 }
+            },
+            dismissButton = {
+                TextButton(onClick = { viewModel.dismissRecoveryCode() }) { Text("Close") }
             }
         )
     }
@@ -267,7 +277,7 @@ fun SettingsScreen(
     exportError?.let { error ->
         AlertDialog(
             onDismissRequest = { viewModel.dismissExportError() },
-            title = { Text("Export impossible") },
+            title = { Text("Export failed") },
             text = { Text(error) },
             confirmButton = {
                 TextButton(onClick = { viewModel.dismissExportError() }) { Text("OK") }
@@ -278,14 +288,14 @@ fun SettingsScreen(
     if (showCloudDialog) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissCloudDialog() },
-            title = { Text(if (cloudIsRegister) "Créer un compte cloud" else "Mettre à jour la sauvegarde") },
+            title = { Text(if (cloudIsRegister) "Create a cloud account" else "Update cloud backup") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
                         if (cloudIsRegister)
-                            "Créez un compte pour sauvegarder votre identité de façon chiffrée."
+                            "Create an account to back up your identity in an encrypted form."
                         else
-                            "Connectez-vous à votre compte existant pour mettre à jour la sauvegarde.",
+                            "Sign in to your existing account to update the backup.",
                         fontSize = 13.sp, color = Color(0xFF8E8E93)
                     )
                     OutlinedTextField(
@@ -299,7 +309,7 @@ fun SettingsScreen(
                     OutlinedTextField(
                         value = cloudPassword,
                         onValueChange = { cloudPassword = it },
-                        label = { Text("Mot de passe") },
+                        label = { Text("Password") },
                         singleLine = true,
                         visualTransformation = PasswordVisualTransformation(),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -308,12 +318,12 @@ fun SettingsScreen(
                     cloudError?.let { Text(it, color = Color(0xFFFF3B30), fontSize = 12.sp) }
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            if (cloudIsRegister) "Déjà un compte ?" else "Nouveau compte ?",
+                            if (cloudIsRegister) "Already have an account?" else "New account?",
                             fontSize = 12.sp, color = Color(0xFF8E8E93)
                         )
                         TextButton(onClick = { cloudIsRegister = !cloudIsRegister; viewModel.clearCloudError() }) {
                             Text(
-                                if (cloudIsRegister) "Se connecter" else "S'inscrire",
+                                if (cloudIsRegister) "Sign in" else "Sign up",
                                 fontSize = 12.sp, color = Color(0xFF0A84FF)
                             )
                         }
@@ -327,10 +337,10 @@ fun SettingsScreen(
                         else viewModel.doCloudLogin(cloudEmail, cloudPassword)
                     },
                     enabled = cloudEmail.isNotBlank() && cloudPassword.isNotBlank()
-                ) { Text(if (cloudIsRegister) "Créer & sauvegarder" else "Connecter & sauvegarder") }
+                ) { Text(if (cloudIsRegister) "Create & back up" else "Sign in & back up") }
             },
             dismissButton = {
-                TextButton(onClick = { viewModel.dismissCloudDialog() }) { Text("Annuler") }
+                TextButton(onClick = { viewModel.dismissCloudDialog() }) { Text("Cancel") }
             }
         )
     }
@@ -338,8 +348,8 @@ fun SettingsScreen(
     if (cloudSuccess) {
         AlertDialog(
             onDismissRequest = { viewModel.dismissCloudSuccess() },
-            title = { Text("Sauvegardé") },
-            text = { Text("Votre identité est sauvegardée dans le cloud. Vous pourrez la restaurer sur un nouveau téléphone avec vos identifiants.") },
+            title = { Text("Backup saved") },
+            text = { Text("Your identity is backed up in the cloud. You can restore it on a new device using your credentials.") },
             confirmButton = {
                 TextButton(onClick = { viewModel.dismissCloudSuccess() }) { Text("OK") }
             }

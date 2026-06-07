@@ -73,14 +73,14 @@ fun PinSetupScreen(
     }
 
     val title = when (state) {
-        is PinSetupState.Confirm -> "Confirmez le code"
-        is PinSetupState.Mismatch -> "Codes différents"
-        else -> "Choisissez un code"
+        is PinSetupState.Confirm -> "Confirm your PIN"
+        is PinSetupState.Mismatch -> "PINs don't match"
+        else -> "Choose a PIN"
     }
     val subtitle = when (state) {
-        is PinSetupState.Confirm -> "Saisissez à nouveau votre code"
-        is PinSetupState.Mismatch -> "Recommencez depuis le début"
-        else -> "Code à 4 chiffres pour déverrouiller l'app"
+        is PinSetupState.Confirm -> "Enter your PIN again to confirm"
+        is PinSetupState.Mismatch -> "Please start over"
+        else -> "4-digit code to unlock the app"
     }
 
     Scaffold(modifier = modifier, containerColor = Color.White) { innerPadding ->
@@ -130,7 +130,7 @@ fun PinSetupScreen(
             Spacer(Modifier.height(24.dp))
 
             TextButton(onClick = onSkip) {
-                Text("Ignorer", color = IosText2, fontSize = 14.sp)
+                Text("Skip", color = IosText2, fontSize = 14.sp)
             }
         }
     }

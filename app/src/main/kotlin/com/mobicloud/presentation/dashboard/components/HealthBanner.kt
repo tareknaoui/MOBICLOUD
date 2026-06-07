@@ -42,13 +42,13 @@ sealed class HealthState(val title: String, val subtitle: String, val color: Col
         color    = Color(0xFFFF9F0A)
     )
     data object Searching : HealthState(
-        title    = "Looking for members…",
-        subtitle = "Your device is searching for nearby devices",
+        title    = "Looking for group members…",
+        subtitle = "Open the Network tab to check your connection status",
         color    = Color(0xFF0A84FF)
     )
     data class Degraded(val peerCount: Int) : HealthState(
         title    = "Limited protection",
-        subtitle = "Only $peerCount member${if (peerCount > 1) "s" else ""} available",
+        subtitle = "Only $peerCount member${if (peerCount > 1) "s" else ""} online — check the Network tab",
         color    = Color(0xFFFF3B30)
     )
 }

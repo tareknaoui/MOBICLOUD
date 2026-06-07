@@ -184,14 +184,14 @@ fun WelcomeScreen(
                 } else {
                     TextButton(onClick = { onCloudAuth() }) {
                         Text(
-                            text = "Se connecter avec un compte",
+                            text = "Sign in with an account",
                             color = IosBlue,
                             fontSize = 14.sp,
                         )
                     }
                     TextButton(onClick = { onRestoreAccount() }) {
                         Text(
-                            text = "Restaurer avec un code",
+                            text = "Restore with a recovery code",
                             color = IosText2,
                             fontSize = 14.sp,
                         )

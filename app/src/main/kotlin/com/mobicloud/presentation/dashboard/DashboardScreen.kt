@@ -19,10 +19,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BatteryFull
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -130,10 +130,10 @@ fun DashboardScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             KpiDiagnosticCard(
-                label       = "Battery",
-                value       = "${diagnostics.batteryPercent}%",
-                hint        = "App impact: minimal",
-                icon        = Icons.Filled.BatteryFull,
+                label       = "Network",
+                value       = networkLabel,
+                hint        = "Active connection type",
+                icon        = Icons.Filled.Wifi,
                 accentColor = Color(0xFF0A84FF),
                 modifier    = Modifier.weight(1f)
             )
@@ -201,9 +201,10 @@ private fun DashboardHero(
     isExpertMode: Boolean,
     isUnstable: Boolean
 ) {
-    val isSuperPair = nodeRole == NodeRole.SUPER_PAIR
-    val roleColor   = if (isSuperPair) Color(0xFF0A84FF) else MaterialTheme.colorScheme.onSurfaceVariant
-    val roleLabel   = if (isSuperPair) "You manage this group" else "Group member"
+    val isSuperPair  = nodeRole == NodeRole.SUPER_PAIR
+    val roleColor    = if (isSuperPair) Color(0xFF0A84FF) else MaterialTheme.colorScheme.onSurfaceVariant
+    val roleLabel    = if (isSuperPair) "Group coordinator" else "Group member"
+    val roleHint     = if (isSuperPair) "You relay traffic for this cluster" else "Your files are replicated across the group"
 
     Box(
         modifier = Modifier
@@ -240,6 +241,14 @@ private fun DashboardHero(
                     modifier   = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                 )
             }
+
+            Spacer(Modifier.height(6.dp))
+
+            Text(
+                text  = roleHint,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            )
 
             if (isExpertMode && isUnstable) {
                 Spacer(Modifier.height(10.dp))
