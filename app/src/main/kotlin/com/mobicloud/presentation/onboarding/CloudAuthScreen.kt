@@ -83,7 +83,7 @@ fun CloudAuthScreen(
             Spacer(Modifier.height(20.dp))
 
             Text(
-                text = if (isLoginMode) "Restaurer mon compte" else "Créer un compte cloud",
+                text = if (isLoginMode) "Restore my account" else "Create a cloud account",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
                 color = IosText1,
@@ -94,9 +94,9 @@ fun CloudAuthScreen(
 
             Text(
                 text = if (isLoginMode)
-                    "Entrez les identifiants que vous avez utilisés sur votre ancien appareil pour restaurer votre identité et vos fichiers."
+                    "Enter the credentials you used on your previous device to restore your identity and files."
                 else
-                    "Créez un compte pour sauvegarder votre identité dans le cloud. Vous pourrez la restaurer sur un nouvel appareil.",
+                    "Create an account to back up your identity to the cloud. You can restore it on a new device.",
                 fontSize = 13.sp,
                 color = IosText2,
                 textAlign = TextAlign.Center,
@@ -121,7 +121,7 @@ fun CloudAuthScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; viewModel.reset() },
-                label = { Text("Mot de passe") },
+                label = { Text("Password") },
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp),
                 visualTransformation = PasswordVisualTransformation(),
@@ -155,7 +155,7 @@ fun CloudAuthScreen(
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                 } else {
                     Text(
-                        text = if (isLoginMode) "Restaurer" else "Créer le compte",
+                        text = if (isLoginMode) "Restore" else "Create account",
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 16.sp,
                         color = Color.White
@@ -167,7 +167,7 @@ fun CloudAuthScreen(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = if (isLoginMode) "Pas encore de compte ?" else "Déjà un compte ?",
+                    text = if (isLoginMode) "No account yet?" else "Already have an account?",
                     fontSize = 13.sp,
                     color = IosText2
                 )
@@ -176,7 +176,7 @@ fun CloudAuthScreen(
                     viewModel.reset()
                 }) {
                     Text(
-                        text = if (isLoginMode) "S'inscrire" else "Se connecter",
+                        text = if (isLoginMode) "Sign up" else "Sign in",
                         fontSize = 13.sp,
                         color = IosBlue,
                         fontWeight = FontWeight.SemiBold
@@ -185,7 +185,7 @@ fun CloudAuthScreen(
             }
 
             TextButton(onClick = onBack) {
-                Text("Retour", color = IosText2, fontSize = 14.sp)
+                Text("Back", color = IosText2, fontSize = 14.sp)
             }
         }
     }

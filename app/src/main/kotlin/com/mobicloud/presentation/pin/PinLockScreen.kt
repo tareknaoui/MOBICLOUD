@@ -81,7 +81,7 @@ fun PinLockScreen(
             Spacer(Modifier.height(24.dp))
 
             Text(
-                text = "Entrez votre code",
+                text = "Enter your PIN",
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = IosText1,
@@ -90,7 +90,7 @@ fun PinLockScreen(
             Spacer(Modifier.height(8.dp))
 
             Text(
-                text = if (state is PinLockState.WrongPin) "Code incorrect" else "MobiCloud",
+                text = if (state is PinLockState.WrongPin) "Incorrect PIN" else "MobiCloud",
                 fontSize = 14.sp,
                 color = if (state is PinLockState.WrongPin) IosRed else IosText2,
             )
