@@ -333,7 +333,7 @@ class ExplorerViewModel @Inject constructor(
 
                 val optimalResult = selectOptimalPeersUseCase(
                     fileSizeBytes = fileSizeBytes ?: 0L,
-                    baseK = 1,  // TEMP démo soutenance : RS(1,1) au lieu de RS(2,1) — 2 peers suffisent
+                    baseK = 2,  // RS(2,1) : 2 data + 1 parité = 3 fragments sur 3 peers (4 phones : uploadeur encode, SP + 2 membres stockent)
                     allowDuplicatePeers = false
                 ).getOrElse { e ->
                     val userMessage = when (e) {
