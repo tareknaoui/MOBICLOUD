@@ -111,7 +111,7 @@ class CloudIdentityRepositoryImpl @Inject constructor(
     }
 
     private suspend fun exportCatalogJson(): String {
-        val all = catalogDao.getAllWithFragmentsOnce()
+        val all = catalogDao.getAllWithFragmentsOnce().filter { !it.catalogEntry.isInTrash }
         val entries = all.map { entry ->
             CatalogEntrySnapshot(
                 fileHash = entry.catalogEntry.fileHash,

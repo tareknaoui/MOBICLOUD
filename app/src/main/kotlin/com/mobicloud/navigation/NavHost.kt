@@ -101,7 +101,7 @@ fun JetpackNavHost(
             CloudAuthScreen(
                 onSuccess = {
                     navController.navigate(DashboardRoute) {
-                        popUpTo(WelcomeRoute) { inclusive = true }
+                        popUpTo(0) { inclusive = true }
                     }
                 },
                 onBack = { navController.popBackStack() }

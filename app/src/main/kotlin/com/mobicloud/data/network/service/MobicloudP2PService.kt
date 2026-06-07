@@ -195,7 +195,7 @@ class MobicloudP2PService : Service() {
             "MobiCloud:P2PServiceWakeLock"
         ).apply {
             setReferenceCounted(false)
-            acquire()
+            acquire(10 * 60 * 1000L) // 10 min safety timeout — relancé par le keepalive 30s
         }
         Log.i(LOGTAG, "[WAKE-LOCK] acquired — CPU reste éveillé pendant écran off")
     }
@@ -255,7 +255,7 @@ class MobicloudP2PService : Service() {
 
     private fun startP2PNetworkLoops() {
         serviceScope.launch {
-            val identityResult = securityRepository.generateIdentity()
+            val identityResult = identityRepository.getIdentity()
             if (identityResult.isFailure) {
                 Log.e("MobicloudP2PService", "Failed to retrieve identity: ${identityResult.exceptionOrNull()}")
                 stopSelf()
@@ -567,6 +567,8 @@ class MobicloudP2PService : Service() {
                         if (it is kotlinx.coroutines.CancellationException) throw it
                         Log.w(LOGTAG, "[RELAY-REG] joinAndFetch cycle throw — retry next tick: ${it.message}")
                     }
+                    // Re-acquiert le wake lock à chaque cycle pour repousser le timeout de 10 min.
+                    wakeLock?.takeIf { !it.isHeld }?.acquire(10 * 60 * 1000L)
                     delay(30_000L)
                 }
             }
