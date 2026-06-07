@@ -8,12 +8,17 @@ import com.mobicloud.data.network.service.MobicloudP2PService
 import com.mobicloud.domain.models.NodeSettings
 import com.mobicloud.domain.repository.HostedBlockRepository
 import com.mobicloud.domain.repository.NodeSettingsRepository
+import com.mobicloud.core.preferences.data.UserPreferencesDataSource
+import com.mobicloud.domain.usecase.m00_identity.CloudLoginAndSaveUseCase
+import com.mobicloud.domain.usecase.m00_identity.CloudRegisterUseCase
+import com.mobicloud.domain.usecase.m00_identity.ExportIdentityUseCase
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.SendDepartureNoticeUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -23,8 +28,20 @@ class SettingsViewModel @Inject constructor(
     application: Application,
     private val settingsRepository: NodeSettingsRepository,
     hostedBlockRepository: HostedBlockRepository,
-    private val sendDepartureNoticeUseCase: SendDepartureNoticeUseCase
+    private val sendDepartureNoticeUseCase: SendDepartureNoticeUseCase,
+    private val exportIdentityUseCase: ExportIdentityUseCase,
+    private val cloudRegisterUseCase: CloudRegisterUseCase,
+    private val cloudLoginAndSaveUseCase: CloudLoginAndSaveUseCase,
+    private val userPreferencesDataSource: UserPreferencesDataSource,
 ) : AndroidViewModel(application) {
+
+    val hasPinSet: StateFlow<Boolean> = userPreferencesDataSource.observePinHash()
+        .map { it.isNotEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), false)
+
+    fun disablePin() {
+        viewModelScope.launch { userPreferencesDataSource.clearPin() }
+    }
 
     val settings: StateFlow<NodeSettings> = settingsRepository.observeSettings()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), NodeSettings(0L))
@@ -79,6 +96,59 @@ class SettingsViewModel @Inject constructor(
 
     fun requestLeaveCluster() { _showLeaveDialog.value = true }
     fun dismissLeaveDialog() { _showLeaveDialog.value = false }
+
+    private val _recoveryCode = MutableStateFlow<String?>(null)
+    val recoveryCode: StateFlow<String?> = _recoveryCode.asStateFlow()
+
+    private val _exportError = MutableStateFlow<String?>(null)
+    val exportError: StateFlow<String?> = _exportError.asStateFlow()
+
+    fun exportIdentity() {
+        viewModelScope.launch {
+            exportIdentityUseCase()
+                .onSuccess { _recoveryCode.value = it }
+                .onFailure { _exportError.value = it.message }
+        }
+    }
+
+    fun dismissRecoveryCode() { _recoveryCode.value = null }
+    fun dismissExportError() { _exportError.value = null }
+
+    private val _showCloudDialog = MutableStateFlow(false)
+    val showCloudDialog: StateFlow<Boolean> = _showCloudDialog.asStateFlow()
+
+    private val _cloudError = MutableStateFlow<String?>(null)
+    val cloudError: StateFlow<String?> = _cloudError.asStateFlow()
+
+    private val _cloudSuccess = MutableStateFlow(false)
+    val cloudSuccess: StateFlow<Boolean> = _cloudSuccess.asStateFlow()
+
+    fun requestCloudBackup() { _showCloudDialog.value = true; _cloudError.value = null }
+    fun dismissCloudDialog() { _showCloudDialog.value = false; _cloudError.value = null }
+    fun dismissCloudSuccess() { _cloudSuccess.value = false }
+    fun clearCloudError() { _cloudError.value = null }
+
+    fun doCloudBackup(email: String, password: String) {
+        viewModelScope.launch {
+            cloudRegisterUseCase(email, password)
+                .onSuccess {
+                    _showCloudDialog.value = false
+                    _cloudSuccess.value = true
+                }
+                .onFailure { _cloudError.value = it.message }
+        }
+    }
+
+    fun doCloudLogin(email: String, password: String) {
+        viewModelScope.launch {
+            cloudLoginAndSaveUseCase(email, password)
+                .onSuccess {
+                    _showCloudDialog.value = false
+                    _cloudSuccess.value = true
+                }
+                .onFailure { _cloudError.value = it.message }
+        }
+    }
 
     fun confirmLeaveCluster() {
         _showLeaveDialog.value = false

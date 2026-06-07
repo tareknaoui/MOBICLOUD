@@ -2,8 +2,10 @@ package com.mobicloud.data.repository
 
 import android.util.Log
 import com.mobicloud.core.format.MobiCloudProtoBuf
+import com.mobicloud.data.p2p.websocket.RELAY_SERVER_URLS
 import com.mobicloud.data.p2p.websocket.RelayWebSocketClient
 import com.mobicloud.domain.models.BlockTransferMessage
+import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.RelayEvent
 import com.mobicloud.domain.models.RelayPeer
 import com.mobicloud.domain.repository.RelayConnectionState
@@ -13,8 +15,12 @@ import com.mobicloud.domain.usecase.m08_hosting.RespondToBlockRequestUseCase
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.serialization.ExperimentalSerializationApi
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.IOException
+import java.net.HttpURLConnection
 import java.net.SocketTimeoutException
+import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Provider
@@ -172,6 +178,60 @@ class RelayRepositoryImpl @Inject constructor(
      * et neutraliserait W-9.3-7. On gère explicitement `CancellationException` (re-throw)
      * vs autres exceptions (Result.failure).
      */
+    override suspend fun announceFragments(entry: CatalogEntry): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val httpBase = (RELAY_SERVER_URLS.firstOrNull() ?: return@runCatching)
+                .replace("wss://", "https://").replace("ws://", "http://")
+            val fragSizeBytes = if (entry.k > 0) entry.originalFileSize / entry.k else 0L
+            val mimeType = mimeTypeFromFileName(entry.originalFileName)
+            val fragments = JSONArray()
+            for (loc in entry.fragmentLocations) {
+                for (nodeId in loc.nodeIds) {
+                    fragments.put(JSONObject().apply {
+                        put("nodeId", nodeId)
+                        put("index", loc.fragmentIndex)
+                        put("sizeBytes", fragSizeBytes)
+                    })
+                }
+            }
+            val body = JSONObject().apply {
+                put("fileId",    entry.fileHash)
+                put("fileName",  entry.originalFileName.ifBlank { entry.fileHash.take(16) })
+                put("mimeType",  mimeType)
+                put("totalSize", entry.originalFileSize)
+                put("k",         entry.k)
+                put("n",         entry.n)
+                put("fragments", fragments)
+            }.toString().toByteArray(Charsets.UTF_8)
+
+            val conn = URL("$httpBase/fragments/announce").openConnection() as HttpURLConnection
+            conn.requestMethod  = "POST"
+            conn.doOutput       = true
+            conn.connectTimeout = 8_000
+            conn.readTimeout    = 8_000
+            conn.setRequestProperty("Content-Type", "application/json")
+            conn.outputStream.use { it.write(body) }
+            val code = conn.responseCode
+            conn.disconnect()
+            if (code !in 200..299) throw IOException("fragments/announce HTTP $code")
+            Log.d("RelayRepo", "announceFragments ok — fileId=${entry.fileHash.take(12)} frags=${fragments.length()}")
+        }
+    }
+
+    private fun mimeTypeFromFileName(name: String): String {
+        return when (name.substringAfterLast('.', "").lowercase()) {
+            "jpg", "jpeg" -> "image/jpeg"
+            "png"         -> "image/png"
+            "gif"         -> "image/gif"
+            "webp"        -> "image/webp"
+            "mp4"         -> "video/mp4"
+            "mp3"         -> "audio/mpeg"
+            "pdf"         -> "application/pdf"
+            "zip"         -> "application/zip"
+            else          -> "application/octet-stream"
+        }
+    }
+
     override suspend fun requestBlock(
         remoteNodeId: String,
         blockId: String,

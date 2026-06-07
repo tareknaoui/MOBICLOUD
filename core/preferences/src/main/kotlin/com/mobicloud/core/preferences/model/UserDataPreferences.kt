@@ -38,4 +38,5 @@ data class UserDataPreferences(
     val darkThemeConfigPreferences: DarkThemeConfigPreferences = DarkThemeConfigPreferences.FOLLOW_SYSTEM,
     val useDynamicColor: Boolean = true,
     val hasCompletedOnboarding: Boolean = false,  // Story 13.4 — affiché une seule fois au premier lancement
+    val pinHash: String = "",  // SHA-256 du PIN ; vide = pas de PIN actif
 )

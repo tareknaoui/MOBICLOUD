@@ -1,6 +1,7 @@
 package com.mobicloud.domain.usecase.m08_m09_erasure_coding
 
 import android.content.Context
+import android.webkit.MimeTypeMap
 import com.mobicloud.core.security.hkdfSha256
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.DownloadException
@@ -12,12 +13,15 @@ import com.mobicloud.domain.repository.SecurityRepository
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.mockkStatic
+import io.mockk.unmockkAll
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -69,6 +73,20 @@ class AssembleDownloadedFileUseCaseTest {
         every { context.filesDir } returns finalDir
 
         keyPair = KeyPairGenerator.getInstance("EC").apply { initialize(256) }.generateKeyPair()
+
+        // Le chemin de finalisation (download non-preview) appelle inferMimeType → MimeTypeMap
+        // .getSingleton(), une API Android non disponible en unit-test JVM pur (lèverait
+        // "Method not mocked"). On la stub ; SDK_INT=0 en JVM → publishToMediaStore est sauté,
+        // donc le pipeline retombe sur le fallback getExternalFilesDir(...) = finalDir.
+        mockkStatic(MimeTypeMap::class)
+        val mimeTypeMap = mockk<MimeTypeMap>()
+        every { MimeTypeMap.getSingleton() } returns mimeTypeMap
+        every { mimeTypeMap.getMimeTypeFromExtension(any()) } returns "application/octet-stream"
+    }
+
+    @After
+    fun tearDown() {
+        unmockkAll()
     }
 
     private fun newUseCase() = AssembleDownloadedFileUseCase(

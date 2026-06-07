@@ -1,0 +1,1295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MobiCloud — Big Data Interview Questions</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
+
+    :root {
+      --bg: #0d1117;
+      --card: #161b22;
+      --card2: #1c2230;
+      --border: #30363d;
+      --accent: #58a6ff;
+      --accent2: #3fb950;
+      --accent3: #d2a8ff;
+      --accent4: #f78166;
+      --accent5: #ffa657;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --tag-bg: rgba(88,166,255,0.12);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      padding: 40px 20px;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; }
+
+    /* ─── Header ─────────────────────────────────────────────── */
+    .header {
+      text-align: center;
+      margin-bottom: 56px;
+      padding: 48px 40px;
+      background: linear-gradient(135deg, #161b22 0%, #1c2a3a 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      position: relative;
+      overflow: hidden;
+    }
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -60px; left: -60px;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(88,166,255,0.15) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .header::after {
+      content: '';
+      position: absolute;
+      bottom: -60px; right: -60px;
+      width: 250px; height: 250px;
+      background: radial-gradient(circle, rgba(211,168,255,0.1) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .badge {
+      display: inline-block;
+      background: var(--tag-bg);
+      border: 1px solid rgba(88,166,255,0.3);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      padding: 4px 14px;
+      border-radius: 20px;
+      margin-bottom: 16px;
+    }
+    .header h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(90deg, #58a6ff, #d2a8ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+    .header .subtitle {
+      color: var(--muted);
+      font-size: 1rem;
+      font-weight: 400;
+      margin-bottom: 24px;
+    }
+    .meta-row {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .meta-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+    .meta-item span { color: var(--text); font-weight: 500; }
+
+    /* ─── Section headers ────────────────────────────────────── */
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 48px 0 20px;
+    }
+    .section-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .section-count {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--muted);
+      background: #21262d;
+      border: 1px solid var(--border);
+      padding: 2px 10px;
+      border-radius: 12px;
+    }
+
+    /* ─── Question Card ──────────────────────────────────────── */
+    .q-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 20px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+    .q-card:hover { border-color: rgba(88,166,255,0.4); }
+
+    .q-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 20px 24px 16px;
+    }
+    .q-num {
+      flex-shrink: 0;
+      width: 32px; height: 32px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .q-text {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.5;
+      flex: 1;
+    }
+    .difficulty {
+      flex-shrink: 0;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.5px;
+    }
+    .diff-easy   { background: rgba(63,185,80,0.15);  color: #3fb950; border: 1px solid rgba(63,185,80,0.3); }
+    .diff-medium { background: rgba(255,166,87,0.15); color: #ffa657; border: 1px solid rgba(255,166,87,0.3); }
+    .diff-hard   { background: rgba(247,129,102,0.15); color: #f78166; border: 1px solid rgba(247,129,102,0.3); }
+
+    .q-answer {
+      background: var(--card2);
+      border-top: 1px solid var(--border);
+      padding: 16px 24px;
+    }
+    .q-answer-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .q-answer p {
+      font-size: 0.92rem;
+      color: #c9d1d9;
+      line-height: 1.75;
+    }
+    .q-answer ul {
+      list-style: none;
+      padding: 0;
+      margin: 8px 0 0;
+    }
+    .q-answer ul li {
+      font-size: 0.9rem;
+      color: #c9d1d9;
+      padding: 3px 0 3px 20px;
+      position: relative;
+    }
+    .q-answer ul li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-weight: 700;
+    }
+
+    code {
+      font-family: 'JetBrains Mono', monospace;
+      background: #21262d;
+      border: 1px solid #30363d;
+      padding: 2px 7px;
+      border-radius: 5px;
+      font-size: 0.82em;
+      color: #d2a8ff;
+    }
+
+    .code-block {
+      font-family: 'JetBrains Mono', monospace;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-left: 3px solid var(--accent);
+      padding: 14px 18px;
+      border-radius: 8px;
+      font-size: 0.82rem;
+      color: #e6edf3;
+      margin-top: 10px;
+      white-space: pre;
+      overflow-x: auto;
+      line-height: 1.6;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 0 24px 16px;
+    }
+    .tag {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 9px;
+      border-radius: 12px;
+      background: rgba(88,166,255,0.1);
+      color: #58a6ff;
+      border: 1px solid rgba(88,166,255,0.2);
+    }
+    .tag.green  { background: rgba(63,185,80,0.1);  color: #3fb950; border-color: rgba(63,185,80,0.2); }
+    .tag.purple { background: rgba(210,168,255,0.1); color: #d2a8ff; border-color: rgba(210,168,255,0.2); }
+    .tag.orange { background: rgba(255,166,87,0.1); color: #ffa657; border-color: rgba(255,166,87,0.2); }
+    .tag.red    { background: rgba(247,129,102,0.1); color: #f78166; border-color: rgba(247,129,102,0.2); }
+
+    /* ─── summary table ──────────────────────────────────────── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 20px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(90deg, #58a6ff, #d2a8ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* ─── Footer ─────────────────────────────────────────────── */
+    .footer {
+      margin-top: 64px;
+      padding-top: 24px;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    @media print {
+      body { background: #fff; color: #111; padding: 0; }
+      .header { background: #f0f6ff; color: #111; }
+      .q-card { border: 1px solid #ccc; break-inside: avoid; }
+      .q-answer { background: #f8f9fa; }
+      code { background: #f0f0f0; color: #333; }
+      .code-block { background: #f8f8f8; color: #222; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ═══════════════════  HEADER  ══════════════════════════ -->
+  <div class="header">
+    <div class="badge">Final Year Project — PFE 2026</div>
+    <h1>MobiCloud — Big Data Questions</h1>
+    <p class="subtitle">Interview & Defense Preparation — Distributed Storage on Mobile P2P Networks</p>
+    <div class="meta-row">
+      <div class="meta-item">👤 Author: <span>Anis Naoui</span></div>
+      <div class="meta-item">📅 <span>June 2026</span></div>
+      <div class="meta-item">🗂 Source: <span>MobiCloud Android App + Relay Server + PeerSim Simulation</span></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════  SUMMARY STATS  ══════════════════════════ -->
+  <div class="summary-grid">
+    <div class="stat-card"><div class="stat-num">30</div><div class="stat-label">Total Questions</div></div>
+    <div class="stat-card"><div class="stat-num">7</div><div class="stat-label">Thematic Sections</div></div>
+    <div class="stat-card"><div class="stat-num">10</div><div class="stat-label">Hard-level Questions</div></div>
+    <div class="stat-card"><div class="stat-num">12</div><div class="stat-label">Medium-level Questions</div></div>
+    <div class="stat-card"><div class="stat-num">8</div><div class="stat-label">Easy-level Questions</div></div>
+  </div>
+
+  <!-- ═══════════════════  SECTION 1 — DISTRIBUTED STORAGE  ══════════ -->
+  <div class="section-label">
+    <div class="section-icon" style="background:rgba(88,166,255,0.15);">🗄</div>
+    <div>
+      <div class="section-title" style="color:#58a6ff;">Section 1 — Distributed Storage & Erasure Coding</div>
+      <div class="section-count">5 questions</div>
+    </div>
+  </div>
+
+  <!-- Q1 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(88,166,255,0.15);color:#58a6ff;">1</div>
+      <div class="q-text">Why did you choose Reed-Solomon erasure coding over simple block replication for MobiCloud?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag">Reed-Solomon</span>
+      <span class="tag">Fault Tolerance</span>
+      <span class="tag green">Storage Efficiency</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Simple replication (k copies) introduces a storage overhead of k×. With Reed-Solomon RS(k=3, n=2), a file is split into 3 data blocks and 2 parity blocks, producing only <strong>5 blocks total</strong>, meaning a storage overhead of 5/3 ≈ 1.67× — compared to 3× with triple replication for the same fault tolerance (2 node failures). On mobile devices where storage is scarce, this difference is significant.</p>
+      <ul>
+        <li>Simple replication (k=3): 3× overhead, tolerates 2 failures</li>
+        <li>RS(k=3, n=2): 1.67× overhead, tolerates 2 failures — <strong>same resilience, 45% less storage</strong></li>
+        <li>Recovery: any K=3 blocks out of 5 are sufficient to reconstruct the file</li>
+        <li>Constraint from the code: <code>k + n ≤ 255</code> (GF(256) arithmetic limit)</li>
+      </ul>
+      <div class="code-block">// From DEFENSE_PREP.md / EncodeErasureFragmentsUseCase.kt
+// File → zero-padded → split into K data blocks
+// Codec (Reed-Solomon GF(256)) → N parity blocks
+// Recovery: any K out of K+N blocks → full reconstruction</div>
+    </div>
+  </div>
+
+  <!-- Q2 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(88,166,255,0.15);color:#58a6ff;">2</div>
+      <div class="q-text">Explain the complete file upload pipeline in MobiCloud from the moment the user taps "Store file" to DHT propagation.</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag">Pipeline</span>
+      <span class="tag purple">Erasure Coding</span>
+      <span class="tag purple">AES-GCM</span>
+      <span class="tag">DHT</span>
+      <span class="tag green">Gossip</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The upload pipeline follows 7 sequential stages, each implemented as a dedicated use case:</p>
+      <div class="code-block">User taps "Store file"
+  ↓  ExplorerViewModel.store()
+  ↓  EncodeErasureFragmentsUseCase  → K data + N parity fragments (Reed-Solomon GF(256))
+  ↓  FragmentCipherUseCase          → AES-256-GCM encrypt each fragment
+                                       (HKDF-SHA256 derives a per-fragment key)
+  ↓  ConsistentHashRing             → assigns each fragment to a responsible peer node
+  ↓  BlockTransferChannel (TCP)     → sends encrypted fragment to target peer
+                                       (falls back to WebSocket relay if NAT)
+  ↓  InsertDhtEntryUseCase          → logs blockId → nodeId in local DHT
+  ↓  Gossip (M03-04)                → BloomFilter delta-sync propagates DHT entry</div>
+      <ul>
+        <li>The relay server (<code>server.js</code>) handles <code>UPLOAD</code> (opcode 0x06) with store-and-forward buffering</li>
+        <li>Zero-knowledge: encrypted blocs pass through the relay opaque — the relay never sees plaintext</li>
+        <li>Download reverses the pipeline: lookup DHT → fetch K fragments → Reed-Solomon decode → AES-GCM decrypt</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q3 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(88,166,255,0.15);color:#58a6ff;">3</div>
+      <div class="q-text">Why does the erasure codec work over GF(256) specifically? What is the significance of this Galois Field?</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag">GF(256)</span>
+      <span class="tag purple">Galois Field</span>
+      <span class="tag">Mathematics</span>
+      <span class="tag orange">JNI / C++</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Reed-Solomon codes require arithmetic in a <strong>finite field (Galois Field)</strong>. GF(256) = GF(2^8) was chosen because:</p>
+      <ul>
+        <li>256 = 2^8 maps <strong>exactly to one byte</strong> — each field element is a single byte, making implementation natural for binary data</li>
+        <li>Arithmetic (addition, multiplication, inversion) is performed at the byte level using lookup tables in C++</li>
+        <li>Constraint: <code>k + n ≤ 255</code> because GF(256) has 256 elements (0–255), and the Vandermonde matrix requires distinct non-zero evaluation points</li>
+        <li>The codec is implemented in native C++ and called from Kotlin via JNI (<code>ErasureCodingJni</code>) using a <code>DirectByteBuffer</code> for zero-copy data transfer</li>
+      </ul>
+      <p style="margin-top:8px;">Alternative fields (GF(2^16)) would support larger k+n but double the per-element size and slow down operations.</p>
+    </div>
+  </div>
+
+  <!-- Q4 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(88,166,255,0.15);color:#58a6ff;">4</div>
+      <div class="q-text">How does MobiCloud handle automatic data repair when a peer goes offline permanently?</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag green">Self-Healing</span>
+      <span class="tag">Repair Protocol</span>
+      <span class="tag orange">Circuit Breaker</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>MobiCloud implements a proactive repair mechanism orchestrated by the Super-Peer:</p>
+      <ul>
+        <li><strong>Detection (10s scan):</strong> The Super-Peer scans every 10 seconds for under-replicated blocks (blocks with fewer than K+N live replicas)</li>
+        <li><strong>Graceful departure:</strong> A node sends a <code>DepartureNoticeMessage</code> → <code>DepartureNoticeHandler</code> immediately identifies orphaned blocks without waiting for the 10s scan</li>
+        <li><strong>Migration planning:</strong> <code>LocalRepairBuffer</code> queues re-replication tasks; <code>ConsistentHashRing</code> assigns orphaned blocks to the next responsible node</li>
+        <li><strong>Cryptographic signing:</strong> The repair plan is signed with EC P-256 (anti-replay window ±30s) to prevent malicious migration directives</li>
+        <li><strong>Execution:</strong> <code>BlockTransferChannel</code> migrates fragments to new hosts via TCP or relay</li>
+        <li><strong>Circuit Breaker:</strong> If churn > 30% in a 5-minute sliding window, repair is suspended to avoid a repair storm; resumes when churn drops below 10%</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q5 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(88,166,255,0.15);color:#58a6ff;">5</div>
+      <div class="q-text">What does the relay server's <code>relayBuffer</code> store and why is it bounded to 500 entries?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag">Store-and-Forward</span>
+      <span class="tag orange">Memory Management</span>
+      <span class="tag">NAT Traversal</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The <code>relayBuffer</code> in <code>server.js</code> is a <code>Map&lt;blockId, [{fromNodeId, destNodeId, data, ttlTimer}]&gt;</code> that temporarily stores encrypted block fragments when the destination peer is offline at delivery time.</p>
+      <ul>
+        <li>Cap of <strong>500 entries</strong> (<code>MAX_RELAY_BUFFER_ENTRIES</code>) prevents unbounded RAM consumption on the Node.js relay server — the relay is stateless by design</li>
+        <li>Each entry has a <strong>TTL of 3 minutes</strong> (180,000 ms) — sufficient to survive Android Doze mode pauses (~90s)</li>
+        <li>When the destination peer reconnects, <code>flushPendingBlocks()</code> delivers buffered blocks immediately</li>
+        <li>Deduplication: if <code>(blockId, destNodeId)</code> already exists in the buffer, the old entry is replaced</li>
+        <li>The relay stores <strong>only encrypted ciphertext</strong> — zero-knowledge property is preserved</li>
+      </ul>
+      <div class="code-block">// server.js line ~41
+const MAX_RELAY_BUFFER_ENTRIES = 500;
+const TTL_MS = 180_000; // 3 min — outlasts Android Doze (~90s)</div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════  SECTION 2 — DHT & GOSSIP  ══════════════════ -->
+  <div class="section-label">
+    <div class="section-icon" style="background:rgba(63,185,80,0.15);">🌐</div>
+    <div>
+      <div class="section-title" style="color:#3fb950;">Section 2 — DHT, Gossip Protocol & Consistent Hashing</div>
+      <div class="section-count">5 questions</div>
+    </div>
+  </div>
+
+  <!-- Q6 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(63,185,80,0.15);color:#3fb950;">6</div>
+      <div class="q-text">Explain the Bloom Filter gossip protocol used in MobiCloud. Why not send the full DHT catalog to each peer?</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag green">Bloom Filter</span>
+      <span class="tag green">Delta-Sync</span>
+      <span class="tag">Bandwidth Efficiency</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Sending the full DHT catalog is O(entries × entry_size) per gossip round — unsustainable on mobile networks. MobiCloud uses a <strong>1024-bit Bloom Filter with 3 SHA-256-based hash functions</strong> as a compact summary:</p>
+      <ul>
+        <li><strong>add(blockId):</strong> sets 3 bits determined by 3 hash functions; <strong>mightContain(blockId):</strong> checks those 3 bits</li>
+        <li>False positives are possible (rare) — false negatives are <strong>impossible</strong></li>
+        <li>A node sends its 128-byte BloomFilter to peers → peers identify entries <em>not</em> in the filter → send only those delta entries</li>
+        <li>Bandwidth is O(delta) instead of O(full catalog) — critical on 4G/mobile</li>
+        <li>Pre-allocated <code>MessageDigest</code> instances avoid 300 <code>getInstance()</code> calls per gossip round (optimization noted in the codebase)</li>
+      </ul>
+      <div class="code-block">// MobiCloudGossipDht.java (PeerSim model — simplified, no Bloom filter)
+// Real Android code: GossipSyncUseCase.runGossipCycle()
+// Every 2 seconds: send BloomFilter(128 bytes) to fanout=2 peers
+// Peer responds with delta entries NOT in the filter</div>
+    </div>
+  </div>
+
+  <!-- Q7 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(63,185,80,0.15);color:#3fb950;">7</div>
+      <div class="q-text">How does the Consistent Hash Ring in MobiCloud map a file block to a responsible peer node?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag green">Consistent Hashing</span>
+      <span class="tag">Load Balancing</span>
+      <span class="tag">DHT</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The <code>ConsistentHashRing</code> maps a <code>blockId</code> to a node using a single deterministic computation:</p>
+      <div class="code-block">// ConsistentHashRing.kt
+// blockId (string) → SHA-256 → take first 4 bytes → big-endian int
+// responsibleNode = floorMod(hash4bytes, numNodes)
+
+blockId → SHA-256 → first 4 bytes → int → floorMod(int, N) → nodeIndex</div>
+      <ul>
+        <li>The key advantage of consistent hashing: when a node joins or leaves, only <strong>1/N fraction</strong> of blocks need redistribution (vs. full reshuffle with modulo hashing)</li>
+        <li>SHA-256 ensures <strong>uniform distribution</strong> across all nodes</li>
+        <li>The same ring is used for repair: after a departure, orphaned blocks are reassigned to the <em>next</em> responsible node on the ring</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q8 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(63,185,80,0.15);color:#3fb950;">8</div>
+      <div class="q-text">What is a CRDT tombstone and why does MobiCloud's DHT need them?</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag green">CRDT</span>
+      <span class="tag green">Tombstone</span>
+      <span class="tag purple">Conflict Resolution</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>A <strong>tombstone</strong> is a special DHT entry that marks a block as <em>logically deleted</em> (with a timestamp). Without tombstones:</p>
+      <ul>
+        <li>A peer deletes a block locally, then goes offline</li>
+        <li>It rejoins and gossips its DHT — the deleted entry <strong>re-appears</strong> because the deletion was never propagated</li>
+        <li>Tombstones carry the deletion timestamp → gossip Last-Writer-Wins (LWW) resolution keeps the delete if it is more recent than any re-insert</li>
+        <li>MobiCloud tombstones expire after <strong>1 hour</strong> to avoid unbounded storage</li>
+        <li>Implemented as a CRDT (Conflict-free Replicated Data Type): merge is commutative, associative, idempotent — no central coordination needed</li>
+      </ul>
+      <div class="code-block">// MobiCloudGossipDht.java — mergeDht() implements LWW
+private static void mergeDht(Map&lt;Integer, DhtEntry&gt; target, Map&lt;Integer, DhtEntry&gt; source) {
+    for (Map.Entry&lt;Integer, DhtEntry&gt; e : source.entrySet()) {
+        DhtEntry existing = target.get(e.getKey());
+        // Keep entry with HIGHER timestamp (Last-Writer-Wins)
+        if (existing == null || e.getValue().timestamp &gt; existing.timestamp) {
+            target.put(e.getKey(), e.getValue());
+        }
+    }
+}</div>
+    </div>
+  </div>
+
+  <!-- Q9 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(63,185,80,0.15);color:#3fb950;">9</div>
+      <div class="q-text">What convergence time did your PeerSim simulation show for the gossip DHT, and what does O(log N) convergence mean in practice for 1000 nodes?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag green">PeerSim</span>
+      <span class="tag">Simulation</span>
+      <span class="tag orange">Scalability</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The PeerSim simulation (<code>MobiCloudGossipDht.java</code> + <code>ConvergenceObserver.java</code>) demonstrated epidemic convergence:</p>
+      <ul>
+        <li>With <strong>fanout=2</strong> (each node gossips with 2 random neighbors per cycle), the DHT converges in O(log N) cycles</li>
+        <li>For N=1000: log₂(1000) ≈ 10 cycles → at 2 seconds per cycle → <strong>~20 seconds</strong> to full convergence</li>
+        <li>For N=10,000: log₂(10000) ≈ 13 cycles → ~26 seconds — the convergence scales gracefully</li>
+        <li>Even under 30% churn (nodes randomly going offline), the gossip remained robust (results: <code>churn30-results.csv</code>)</li>
+        <li>fanout=2 is the optimal trade-off: fanout=5 converges in 2 cycles but <strong>drains battery 2.5× faster</strong> (BatteryProtocol simulation)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q10 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(63,185,80,0.15);color:#3fb950;">10</div>
+      <div class="q-text">How does the relay server route a SIGNAL message for gossip between two peers that are both online?</div>
+      <div class="difficulty diff-easy">Easy</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag">WebSocket</span>
+      <span class="tag green">Gossip Relay</span>
+      <span class="tag orange">Opcode</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The SIGNAL opcode (0x0E) in <code>server.js</code> handles ephemeral P2P forwarding (used for DHT gossip between peers):</p>
+      <div class="code-block">// server.js — handleSignal()
+// Payload: 16 bytes destNodeId (UTF-8, NUL-padded) + arbitrary data
+function handleSignal(fromNodeId, payload) {
+  const destNodeId = payload.slice(0, 16).toString('utf8').replace(/\0+$/, '').trim();
+  const data = payload.slice(16);
+  const destSession = sessions.get(destNodeId);
+  if (destSession &amp;&amp; destSession.ws.readyState === WebSocket.OPEN) {
+    // Forward immediately — NO buffering
+    safeSend(destSession.ws, buildFrame(MSG.SIGNAL_RECEIVED, out));
+    eventCounters.signalsSent++;
+  } else {
+    eventCounters.droppedSignals++; // signal dropped if dest offline
+  }
+}</div>
+      <ul>
+        <li><strong>No buffering</strong>: signals are fire-and-forget — if the destination is offline, the signal is dropped (gossip is self-healing anyway)</li>
+        <li>Contrasts with UPLOAD (0x06) which <em>does</em> buffer in <code>relayBuffer</code></li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════  SECTION 3 — SECURITY & IDENTITY  ═══════════ -->
+  <div class="section-label">
+    <div class="section-icon" style="background:rgba(210,168,255,0.15);">🔐</div>
+    <div>
+      <div class="section-title" style="color:#d2a8ff;">Section 3 — Security, Cryptography & Identity</div>
+      <div class="section-count">5 questions</div>
+    </div>
+  </div>
+
+  <!-- Q11 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(210,168,255,0.15);color:#d2a8ff;">11</div>
+      <div class="q-text">How does MobiCloud prevent Sybil attacks? What does "18-bit difficulty" mean in terms of computational cost?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag purple">Hashcash PoW</span>
+      <span class="tag purple">Anti-Sybil</span>
+      <span class="tag">SHA-256</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>MobiCloud uses a <strong>Hashcash Proof-of-Work</strong> (M01 module) to make mass identity creation computationally expensive:</p>
+      <ul>
+        <li>A node must find a nonce such that SHA-256(<code>nodeId:timestamp:nonce</code>) starts with <strong>18 zero bits</strong></li>
+        <li>Expected iterations: 2^18 = 262,144 SHA-256 hashes ≈ <strong>~1 second on ARM mobile</strong></li>
+        <li>A Sybil attacker wanting to create 1000 fake identities must invest ~1000 CPU-seconds — economically infeasible at scale</li>
+        <li>The PoW token is cached → avoids recomputation on reconnect</li>
+        <li>A signature is appended to prove the PoW was done by <em>this</em> node's private key (Android Keystore)</li>
+      </ul>
+      <div class="code-block">// GenerateHashcashProofUseCase.kt (M01)
+// CPU loop: nodeId:timestamp:nonce → SHA-256 → check 18 leading zero bits → nonce++
+// Difficulty = 18 bits → E[iterations] = 2^18 ≈ 262,144 ≈ ~1s on ARM</div>
+    </div>
+  </div>
+
+  <!-- Q12 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(210,168,255,0.15);color:#d2a8ff;">12</div>
+      <div class="q-text">Explain how a node's identity (nodeId) is generated and why it cannot be cloned or forged.</div>
+      <div class="difficulty diff-easy">Easy</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag purple">Android Keystore</span>
+      <span class="tag purple">EC P-256</span>
+      <span class="tag">TEE / StrongBox</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Node identity generation:</p>
+      <div class="code-block">Android Keystore (TEE/StrongBox) → generate EC P-256 key pair
+→ export public key (SPKI-DER format)
+→ SHA-256(publicKey)[0..7] → nodeId = 16-character hex string</div>
+      <ul>
+        <li>The private key is generated inside the <strong>Trusted Execution Environment (TEE)</strong> or StrongBox and <em>never leaves the hardware</em></li>
+        <li>It is <strong>device-bound</strong>: cannot be extracted, exported, or cloned — even root access cannot read it</li>
+        <li>Identity is <strong>persistent across app reinstalls</strong> (Android Keystore survives reinstallation)</li>
+        <li>The relay verifies identity at every connection with EC P-256 signature + 30-second anti-replay window</li>
+        <li>nodeId collision probability: 2^(-64) — negligible for mobile network sizes</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q13 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(210,168,255,0.15);color:#d2a8ff;">13</div>
+      <div class="q-text">Describe the encryption pipeline for a single file fragment in MobiCloud. What does "zero-knowledge relay" mean?</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag purple">AES-256-GCM</span>
+      <span class="tag purple">HKDF-SHA256</span>
+      <span class="tag purple">ECIES</span>
+      <span class="tag">Zero-Knowledge</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Each fragment receives its own derived encryption key:</p>
+      <div class="code-block">File → generate random 256-bit master key
+Master key + fragment_index → HKDF-SHA256 → per-fragment key (256 bits)
+Fragment plaintext + per-fragment key → AES-256-GCM → ciphertext + 128-bit auth tag
+Master key → ECIES wrap: ECDH(sender_priv, recipient_pub) + HKDF + AES → wrapped key
+Stored alongside metadata: blockId, ownerNodeId, encryptedMasterKey</div>
+      <ul>
+        <li><strong>HKDF-SHA256 (RFC 5869)</strong>: derives a unique key per fragment from the master key — compromise of one fragment key does not expose others</li>
+        <li><strong>AES-256-GCM</strong>: authenticated encryption — provides both confidentiality and integrity</li>
+        <li><strong>Zero-knowledge relay</strong>: the relay server (<code>server.js</code>) stores and forwards <code>payload.slice(80)</code> (the raw ciphertext) without any decryption. Even with full relay access, an attacker cannot read the data</li>
+        <li>Comment in <code>server.js</code>: <em>"bloc chiffré AES-256 GCM — JAMAIS transformé (AC#4 Zero-Knowledge)"</em></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q14 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(210,168,255,0.15);color:#d2a8ff;">14</div>
+      <div class="q-text">How does the relay server authenticate connecting nodes? What prevents replay attacks?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag purple">EC P-256</span>
+      <span class="tag purple">Anti-Replay</span>
+      <span class="tag orange">AUTH Protocol</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Authentication uses opcode AUTH (0x01) with a challenge-response mechanism:</p>
+      <div class="code-block">// verifyAuth() in server.js
+Client sends: { nodeId, pubKeySpkiDer (base64), timestamp (Unix ms), signature (base64) }
+Server verifies:
+  1. nodeId format: /^[0-9a-fA-F]{16}$/ (16 hex chars)
+  2. timestamp within 30-second window → prevents replay (AUTH_WINDOW_MS = 30_000)
+  3. pubKey is EC P-256 (prime256v1) — curve validated
+  4. signature = ECDSA(SHA-256, "MobiCloud-HA-AUTH:nodeId:timestamp")</div>
+      <ul>
+        <li><strong>Anti-replay:</strong> timestamp must be within ±30 seconds of server time; a captured token becomes invalid after 30 seconds</li>
+        <li><strong>AUTH timeout:</strong> if a client doesn't authenticate within 10 seconds, the connection is closed</li>
+        <li>nodeId must be exactly 16 hex chars (ASCII only, no multi-byte UTF-8 bypass possible)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q15 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(210,168,255,0.15);color:#d2a8ff;">15</div>
+      <div class="q-text">What is ECIES and why is it used in MobiCloud's key wrapping scheme?</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag purple">ECIES</span>
+      <span class="tag purple">ECDH</span>
+      <span class="tag">Key Wrapping</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>ECIES (Elliptic Curve Integrated Encryption Scheme) allows encrypting data to a recipient knowing only their public key:</p>
+      <ul>
+        <li><strong>Why ECIES?</strong> The master encryption key must be stored so the <em>file owner</em> can later decrypt. AES alone can't do asymmetric access control — ECIES enables encrypting the AES master key to the owner's EC P-256 public key</li>
+        <li><strong>Mechanism:</strong> ECDH(ephemeral_priv, recipient_pub) → shared secret → HKDF → wrapping key → AES-encrypt master key</li>
+        <li>Only the holder of the EC P-256 private key (in Android Keystore TEE) can unwrap the master key</li>
+        <li>Cryptographic table: AES-256-GCM (fragment encryption), HKDF-SHA256 (key derivation), EC P-256 (identity + ECIES), SHA-256 with ECDSA (signatures)</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════  SECTION 4 — SUPER-PEER ELECTION  ═══════════ -->
+  <div class="section-label">
+    <div class="section-icon" style="background:rgba(255,166,87,0.15);">🏆</div>
+    <div>
+      <div class="section-title" style="color:#ffa657;">Section 4 — Super-Peer Election & Topology</div>
+      <div class="section-count">5 questions</div>
+    </div>
+  </div>
+
+  <!-- Q16 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(255,166,87,0.15);color:#ffa657;">16</div>
+      <div class="q-text">Describe the Bully election algorithm as implemented in MobiCloud. How does it avoid split-brain?</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag orange">Bully Algorithm</span>
+      <span class="tag orange">Super-Peer</span>
+      <span class="tag">Distributed Consensus</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The election is <strong>local and deterministic</strong> — no extra round-trip is required:</p>
+      <div class="code-block">// MobiCloudBullyElection.java (PeerSim simulation model)
+// Each cycle: node scans neighbors' scores
+if (higherSuperPeerExists) {
+    this.isSuperPeer = false;          // Rule 1/2: stronger SP exists → abdicate
+} else if (this.score >= maxNeighborScore) {
+    this.isSuperPeer = true;           // Rule 3: I'm the best visible → become SP
+}</div>
+      <ul>
+        <li><strong>Step 1:</strong> Collect <code>ReliabilityScore</code> for all peers concurrently (via <code>async/awaitAll</code> in Android code)</li>
+        <li><strong>Step 2:</strong> Keep only peers with the maximum score</li>
+        <li><strong>Step 3:</strong> Tiebreak → <strong>lexicographic max of nodeId</strong> (deterministic — no extra message needed)</li>
+        <li><strong>Split-brain prevention:</strong> The algorithm is deterministic on the same input — everyone locally computes the same winner. No voting round, no coordinator. The relay server also enforces uniqueness: a second Super-Peer for the same <code>clusterId</code> is rejected if one is already connected (<code>REGISTER_PEER</code> logic in <code>server.js</code>)</li>
+        <li>Super-Peer mandate: 30 minutes → automatic abdication → rotation prevents power concentration</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q17 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(255,166,87,0.15);color:#ffa657;">17</div>
+      <div class="q-text">How is the ReliabilityScore calculated and what factors does it measure?</div>
+      <div class="difficulty diff-easy">Easy</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag orange">Reliability Score</span>
+      <span class="tag">Node Ranking</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The ReliabilityScore is a composite [0.0, 1.0] metric recalculated every 30 seconds:</p>
+      <ul>
+        <li><strong>Uptime:</strong> how long the node has been continuously available (stable nodes are preferred)</li>
+        <li><strong>Network responsiveness:</strong> round-trip time to other peers</li>
+        <li><strong>Block transfer success rate:</strong> successful uploads and downloads as a fraction of attempts</li>
+        <li><strong>Network stability:</strong> WiFi (stable) vs 4G (intermittent) — WiFi nodes get a higher coefficient</li>
+        <li>Score is clamped to [0, 1] in the relay (<code>Math.min(1, Math.max(0, reliabilityScore))</code>)</li>
+        <li>It is broadcast in the relay signaling registry (<code>reliabilityScore</code> field in <code>REGISTER_PEER</code>) so all cluster members can make independent, consistent election decisions</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q18 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(255,166,87,0.15);color:#ffa657;">18</div>
+      <div class="q-text">What happens when the Super-Peer crashes without sending a departure notice?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag orange">Failure Detection</span>
+      <span class="tag orange">Re-election</span>
+      <span class="tag">Heartbeat</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>MobiCloud uses two complementary failure detection mechanisms:</p>
+      <ul>
+        <li><strong>WebSocket-level heartbeat:</strong> The relay server sends a ping every 60 seconds (<code>HEARTBEAT_INTERVAL_MS = 60_000</code>); after 2 missed pongs (120s), the connection is declared dead → session is cleaned up</li>
+        <li><strong>Application-level heartbeat:</strong> Peers detect Super-Peer liveness loss after a timeout (15-second dead-peer detection per project metrics)</li>
+        <li><strong>Re-election trigger:</strong> When the Super-Peer's session closes on the relay, the relay broadcasts implicitly via the next <code>GET_PEERS</code> response which no longer lists the failed SP as connected</li>
+        <li><strong>New election:</strong> Remaining peers run the Bully algorithm → new Super-Peer inherits the cluster relay session and re-registers with <code>REGISTER_PEER</code></li>
+        <li>PeerSim simulation (<code>bully-churn-results.csv</code>) shows: after the Super-Peer is killed, re-election completes in <strong>2-3 gossip cycles</strong> (~4-6 seconds)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q19 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(255,166,87,0.15);color:#ffa657;">19</div>
+      <div class="q-text">How does a new peer discover and join a cluster? What is the BitTorrent-style tracker role of the relay?</div>
+      <div class="difficulty diff-easy">Easy</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag orange">Peer Discovery</span>
+      <span class="tag">mDNS</span>
+      <span class="tag">Tracker</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Discovery is multi-mode depending on network context:</p>
+      <div class="code-block">New peer joins:
+  ↓  Sends JOIN (0x0B) to relay → announces presence without Super-Peer status
+  ↓  Sends GET_PEERS (0x04) to relay → receives list of registered Super-Peers
+  ↓  Connects to nearest/best Super-Peer → joins its cluster
+  ↓  (LAN only) mDNS/UDP broadcast → discovers peers on the same WiFi network directly</div>
+      <ul>
+        <li>Only <strong>Super-Peers announce themselves</strong> via <code>REGISTER_PEER</code> (0x03) — acts like a BitTorrent tracker where only seeds/supernodes register</li>
+        <li>Regular peers are invisible to the tracker — they consume the peer list but don't pollute it</li>
+        <li>Cluster size is load-balanced: <code>currentMemberCount</code> is sent in <code>REGISTER_PEER</code>; the relay enforces <code>MAX_CLUSTER_SIZE = 2</code> per cluster in the signaling registry</li>
+        <li>JOIN deliberately resets <code>isSuperPair=false</code> to prevent ghost Super-Peer entries after reconnection</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q20 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(255,166,87,0.15);color:#ffa657;">20</div>
+      <div class="q-text">Your relay server is centralized — isn't that a contradiction for a P2P system?</div>
+      <div class="difficulty diff-easy">Easy</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag orange">Architecture</span>
+      <span class="tag">NAT Traversal</span>
+      <span class="tag red">Trade-offs</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>This is the <strong>minimum viable centralization</strong> justified by the constraints of mobile networks:</p>
+      <ul>
+        <li><strong>Role:</strong> The relay is purely a <em>transport relay + signaling directory</em> — it stores no user data, no plaintext, no business logic</li>
+        <li><strong>Zero-knowledge:</strong> Blocs pass through encrypted and opaque; the relay cannot read them</li>
+        <li><strong>Replaceable:</strong> Any WebSocket-capable relay can be swapped in; the relay address is a configuration parameter</li>
+        <li><strong>2-instance HA:</strong> Deployed as 2 independent Node.js instances on Render — no single point of failure at the infrastructure level</li>
+        <li><strong>No data at rest:</strong> All relay state (<code>sessions</code>, <code>relayBuffer</code>, <code>signalingRegistry</code>) is in-process RAM — a relay crash loses nothing permanent</li>
+        <li>Alternative (STUN/TURN) was considered but WebSocket relay offered simpler implementation with equivalent semantic guarantees for the mobile context</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════  SECTION 5 — SIMULATION & SCALABILITY  ══════ -->
+  <div class="section-label">
+    <div class="section-icon" style="background:rgba(247,129,102,0.15);">📊</div>
+    <div>
+      <div class="section-title" style="color:#f78166;">Section 5 — Simulation, Scalability & Performance</div>
+      <div class="section-count">5 questions</div>
+    </div>
+  </div>
+
+  <!-- Q21 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(247,129,102,0.15);color:#f78166;">21</div>
+      <div class="q-text">What is PeerSim and why did you use it to validate MobiCloud's protocols instead of a real device test?</div>
+      <div class="difficulty diff-easy">Easy</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag red">PeerSim</span>
+      <span class="tag">Simulation</span>
+      <span class="tag orange">Scalability Testing</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>PeerSim is a <strong>Java-based P2P network simulator</strong> designed for large-scale distributed protocol evaluation:</p>
+      <ul>
+        <li>It allows simulating 10 to 10,000+ nodes on a single machine in seconds — impossible with real Android devices</li>
+        <li>PeerSim uses a cycle-driven model: each simulation cycle corresponds to real protocol rounds (e.g., 2 seconds of gossip)</li>
+        <li>MobiCloud implemented: <code>MobiCloudGossipDht.java</code> (gossip convergence), <code>MobiCloudBullyElection.java</code> (Bully re-election), <code>BatteryProtocol.java</code> (energy model), <code>ChurnControl.java</code> (random node departures)</li>
+        <li>Results quantified: convergence curves, churn resilience, battery impact of different fan-out values, re-election speed after Super-Peer crash</li>
+        <li>The PeerSim gossip model simplifies by removing the Bloom Filter (full DHT exchange) — the Android production code uses the full Bloom Filter delta-sync</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q22 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(247,129,102,0.15);color:#f78166;">22</div>
+      <div class="q-text">What is the circuit breaker pattern and why is it critical for MobiCloud's repair subsystem?</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag red">Circuit Breaker</span>
+      <span class="tag red">Churn</span>
+      <span class="tag orange">Resilience Pattern</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The circuit breaker is a <strong>fault-tolerance pattern</strong> from distributed systems that prevents cascading failures:</p>
+      <ul>
+        <li><strong>Problem scenario:</strong> 50% of peers go offline simultaneously (e.g., mass WiFi disconnection). The repair system tries to re-replicate all affected blocks at once → network storm → the few surviving peers get overwhelmed → they crash too → full data loss</li>
+        <li><strong>Solution:</strong> The circuit breaker monitors churn over a 5-minute sliding window (<code>churnEvents</code> in <code>server.js</code>)</li>
+        <li><strong>OPEN state (repairs suspended):</strong> triggered when churn > 30% — prevents the repair storm</li>
+        <li><strong>CLOSED state (repairs active):</strong> restored when churn drops below 10% — hysteresis prevents oscillation</li>
+        <li>The relay server also maintains <code>getChurnRate()</code> which computes unique departed nodes over the window as a fraction of total nodes</li>
+        <li>This is the distributed systems equivalent of a home circuit breaker: accept a partial outage rather than risk total collapse</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q23 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(247,129,102,0.15);color:#f78166;">23</div>
+      <div class="q-text">What were the real-world performance results of MobiCloud? What was the bottleneck?</div>
+      <div class="difficulty diff-easy">Easy</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag red">Benchmark</span>
+      <span class="tag">4G / WiFi</span>
+      <span class="tag orange">IRL Test</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Real-world test validated end-to-end file transfer over 4G ↔ WiFi:</p>
+      <ul>
+        <li><strong>Throughput:</strong> bounded by 4G upload speed (~10 Mbps), not by any logic bottleneck in MobiCloud</li>
+        <li><strong>Connectivity matrix tested:</strong>
+          <ul>
+            <li>4G ↔ 4G: TCP direct ✅</li>
+            <li>4G ↔ WiFi: WebSocket relay ✅</li>
+            <li>WiFi ↔ WiFi (different NAT): WebSocket relay ✅</li>
+            <li>WiFi ↔ WiFi (same LAN): TCP direct + mDNS ✅</li>
+          </ul>
+        </li>
+        <li>Dead peer detection: 15 seconds</li>
+        <li>Repair scan: 10 seconds</li>
+        <li>Gossip convergence: 2-second interval, O(log N) cycles</li>
+        <li>The relay is deployed on Render with 2 HA instances tested in production</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q24 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(247,129,102,0.15);color:#f78166;">24</div>
+      <div class="q-text">How does the battery energy model in PeerSim justify the choice of gossip fanout=2?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag red">Battery Model</span>
+      <span class="tag">Fan-out</span>
+      <span class="tag orange">Trade-off Analysis</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The <code>BatteryProtocol.java</code> models radio energy consumption per gossip exchange:</p>
+      <div class="code-block">// BatteryProtocol.java
+costPerSend    = 0.5%  // TX cost per gossip emission
+costPerReceive = 0.3%  // RX cost per gossip reception
+// Node goes DOWN when batteryLevel ≤ 0</div>
+      <ul>
+        <li><strong>fanout=2 results:</strong> 80%+ of nodes remain active over 4 minutes simulated — acceptable battery life</li>
+        <li><strong>fanout=5 results:</strong> Battery drains 2.5× faster; nodes exhaust in ~40 cycles (80 seconds simulated) — incompatible with mobile use</li>
+        <li><strong>fanout=3 results:</strong> Intermediate — faster convergence than fanout=2 but significant battery penalty</li>
+        <li>Conclusion: <strong>fanout=2 is the Pareto-optimal choice</strong> — it achieves O(log N) convergence (sufficient for MobiCloud's 2-second gossip interval) while maximizing node availability</li>
+        <li>This quantitative result justifies a key architectural decision in the production code</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q25 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(247,129,102,0.15);color:#f78166;">25</div>
+      <div class="q-text">How does the relay server track and compute the churn rate? What data structure is used?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag red">Churn Rate</span>
+      <span class="tag">Sliding Window</span>
+      <span class="tag orange">Monitoring</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The relay server implements a sliding-window churn tracker in pure in-memory JavaScript:</p>
+      <div class="code-block">// server.js — churn tracking
+const CHURN_WINDOW_MS = 5 * 60 * 1000;  // 5-minute window
+const churnEvents = []; // array of { ts, nodeId }
+
+function recordChurn(nodeId) {
+  churnEvents.push({ ts: Date.now(), nodeId });
+  // Evict events older than 5 minutes (sliding window)
+  while (churnEvents[0].ts < Date.now() - CHURN_WINDOW_MS) churnEvents.shift();
+}
+
+function getChurnRate() {
+  const recent = churnEvents.filter(e => Date.now() - e.ts <= CHURN_WINDOW_MS);
+  const uniqueDeparted = new Set(recent.map(e => e.nodeId));
+  const total = signalingRegistry.size + uniqueDeparted.size;
+  return Math.round((uniqueDeparted.size / total) * 100); // percentage
+}</div>
+      <ul>
+        <li>Data structure: a sorted <strong>FIFO array</strong> as an approximation of a sliding window (O(1) insert, O(k) evict where k=events in expired window)</li>
+        <li>Uses a <code>Set</code> to count <em>unique</em> departed nodes — prevents double-counting nodes that reconnected and left multiple times</li>
+        <li>Cap at 10,000 events to bound memory</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════  SECTION 6 — PROTOCOL DESIGN  ════════════════ -->
+  <div class="section-label">
+    <div class="section-icon" style="background:rgba(88,166,255,0.12);">📡</div>
+    <div>
+      <div class="section-title" style="color:#58a6ff;">Section 6 — Protocol Design & Binary Framing</div>
+      <div class="section-count">3 questions</div>
+    </div>
+  </div>
+
+  <!-- Q26 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(88,166,255,0.15);color:#58a6ff;">26</div>
+      <div class="q-text">Describe the binary frame format used in the MobiCloud relay protocol. Why binary instead of JSON?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag">Binary Protocol</span>
+      <span class="tag">WebSocket</span>
+      <span class="tag green">Performance</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Each WebSocket message follows a fixed binary frame format:</p>
+      <div class="code-block">// buildFrame() / parseFrame() in server.js
+Frame layout:
+  [0]       : opcode (1 byte, uint8) — e.g. 0x06 = UPLOAD
+  [1..4]    : payload length (4 bytes, uint32 LE)
+  [5..5+len]: payload (variable, ≤ 20 MB)
+
+// For UPLOAD specifically:
+payload: [0..15]  = destNodeId  (16 bytes UTF-8 NUL-padded)
+         [16..79] = blockId     (64 bytes hex SHA-256)
+         [80..]   = ciphertext  (variable)</div>
+      <ul>
+        <li><strong>Why binary:</strong> Block data is binary ciphertext — base64 encoding for JSON would add 33% size overhead; binary framing is zero-overhead</li>
+        <li><strong>Deterministic parsing:</strong> Fixed-offset fields avoid JSON parsing ambiguity and injection attacks</li>
+        <li><strong>14 distinct opcodes</strong> defined (0x01–0x0E, 0xFF) covering auth, signaling, transfer, gossip, election</li>
+        <li>Validation in <code>parseFrame()</code>: exact length match, max size cap (20MB + 128 bytes header), prevents buffer overflow</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q27 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(88,166,255,0.15);color:#58a6ff;">27</div>
+      <div class="q-text">How does the ELECTION_BROADCAST opcode prevent an election in cluster A from disturbing peers in cluster B?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag">Election Isolation</span>
+      <span class="tag orange">clusterId</span>
+      <span class="tag">Multi-cluster</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>The <code>handleElectionBroadcast()</code> function in <code>server.js</code> filters by <code>clusterId</code>:</p>
+      <div class="code-block">// server.js — handleElectionBroadcast()
+// Extract clusterId from the JSON payload
+let senderClusterId = JSON.parse(payload).clusterId ?? '';
+
+for (const [nodeId, session] of sessions.entries()) {
+  if (nodeId === fromNodeId) continue;
+  if (senderClusterId) {
+    const peerEntry = signalingRegistry.get(nodeId);
+    // Only forward to nodes in the SAME cluster
+    if (peerEntry?.clusterId && peerEntry.clusterId !== senderClusterId) continue;
+  }
+  safeSend(session.ws, buildFrame(MSG.ELECTION_RECEIVED, payload));
+}</div>
+      <ul>
+        <li>Without this filter, a Bully ELECTION message from cluster A would be received by all nodes on the relay, causing spurious re-elections in unrelated clusters</li>
+        <li>Legacy nodes (empty clusterId) receive all broadcasts for backward compatibility</li>
+        <li>Cluster IDs are UUID v4 strings validated by regex: <code>/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q28 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(88,166,255,0.15);color:#58a6ff;">28</div>
+      <div class="q-text">How does cross-cluster block retrieval work? What is the REQUEST_BLOCK opcode used for?</div>
+      <div class="difficulty diff-hard">Hard</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag">Inter-cluster</span>
+      <span class="tag orange">REQUEST_BLOCK</span>
+      <span class="tag">Pull Model</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p><code>REQUEST_BLOCK</code> (0x0C) implements a pull-based inter-cluster block retrieval:</p>
+      <div class="code-block">// handleRequestBlock() in server.js — Story 9.4
+// Requester sends: REQUEST_BLOCK(destNodeId=16, blockId=64) — exactly 80 bytes
+// Server pivots to destination: REQUEST_BLOCK_FORWARDED(fromNodeId=16, blockId=64)
+
+Requester peer            Relay Server              Target peer
+    |                         |                         |
+    |---REQUEST_BLOCK(0x0C)-->|                         |
+    |   [destNodeId, blockId] |                         |
+    |                         |--REQUEST_BLOCK_FORWARDED|
+    |                         |      (0x0D)------------>|
+    |                         |                         | (responds via UPLOAD)
+    |&lt;--------FORWARD (0x07)--|---------UPLOAD (0x06)--|</div>
+      <ul>
+        <li><strong>No buffering:</strong> unlike UPLOAD, REQUEST_BLOCK is rejected immediately if the destination is offline (requester times out and retries via a different replica)</li>
+        <li><strong>Anti-loop:</strong> <code>destNodeId == fromNodeId</code> is rejected (case-insensitive comparison)</li>
+        <li>Uses <code>Buffer.alloc(80)</code> (zero-initialized) not <code>allocUnsafe</code> — prevents memory leakage in the forwarded payload</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════  SECTION 7 — ARCHITECTURE & DATABASE  ═════════ -->
+  <div class="section-label">
+    <div class="section-icon" style="background:rgba(63,185,80,0.12);">🏗</div>
+    <div>
+      <div class="section-title" style="color:#3fb950;">Section 7 — App Architecture, Database & Android Specifics</div>
+      <div class="section-count">2 questions</div>
+    </div>
+  </div>
+
+  <!-- Q29 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(63,185,80,0.15);color:#3fb950;">29</div>
+      <div class="q-text">Why is Room (SQLite) used for local storage instead of a full distributed database? What does each of the 7 DAOs manage?</div>
+      <div class="difficulty diff-easy">Easy</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag green">Room / SQLite</span>
+      <span class="tag green">DAO Pattern</span>
+      <span class="tag">Android Architecture</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>Room is used as the <strong>local persistence layer</strong> — it represents only the data this device owns or indexes locally. The distributed database <em>is</em> the DHT itself.</p>
+      <ul>
+        <li>Room manages structured local state: DHT entries, hosted blocks, peer metadata, tombstones, file catalog, fragment location cache, and settings</li>
+        <li>7 DAOs across 8 entity types: <code>DhtEntryDao</code>, <code>HostedBlockDao</code>, <code>PeerDao</code>, <code>TombstoneDao</code>, <code>FileMetadataDao</code>, <code>FragmentLocationDao</code>, <code>LocalRepairBufferDao</code></li>
+        <li>Room provides compile-time SQL validation, LiveData/Flow reactive queries, and coroutine support — essential for the MVVM architecture</li>
+        <li>DataStore (not Room) handles key-value preferences (nodeId, settings)</li>
+        <li>The 8 Room entities + 7 DAOs provide exactly the persistence needed for the local DHT replica, peer registry, and repair queue — nothing more (no user data is stored here)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Q30 -->
+  <div class="q-card">
+    <div class="q-header">
+      <div class="q-num" style="background:rgba(63,185,80,0.15);color:#3fb950;">30</div>
+      <div class="q-text">How does the Clean Architecture structure in MobiCloud enforce separation of concerns, especially regarding the DHT use cases?</div>
+      <div class="difficulty diff-medium">Medium</div>
+    </div>
+    <div class="tag-row">
+      <span class="tag green">Clean Architecture</span>
+      <span class="tag green">MVVM</span>
+      <span class="tag purple">Dependency Injection</span>
+    </div>
+    <div class="q-answer">
+      <div class="q-answer-label">✦ Model Answer</div>
+      <p>MobiCloud uses Clean Architecture with 4 distinct layers:</p>
+      <div class="code-block">presentation/   → Jetpack Compose UI + ViewModels (state holders, no business logic)
+domain/         → UseCases + Models + Repository interfaces
+                  Pure Kotlin — ZERO Android dependencies (testable on JVM)
+data/           → Repository implementations, DAOs, JNI bridges
+                  → Adapters between domain and Android infrastructure
+core/           → ErasureCodec (JNI), CryptoPrimitives, HkdfSha256
+di/             → Dagger/Hilt modules wiring 16+ injection bindings</div>
+      <ul>
+        <li>The <strong>domain layer</strong> (pure Kotlin) contains all business rules: <code>InsertDhtEntryUseCase</code>, <code>LookupBlockLocationUseCase</code>, <code>RunBullyElectionUseCase</code>, <code>GenerateHashcashProofUseCase</code>, etc.</li>
+        <li>Domain use cases depend only on interfaces → swappable data sources (Room, in-memory, mock)</li>
+        <li>This is why <strong>65+ test classes</strong> can exercise full business logic without an Android device</li>
+        <li>Hilt with 16+ modules provides compile-time dependency injection across all layers</li>
+        <li>Kotlin Coroutines + StateFlow + Flow handle reactive data propagation from data layer to UI without coupling</li>
+      </ul>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════  FOOTER  ═══════════════════════════ -->
+  <div class="footer">
+    <p>MobiCloud — Big Data Interview Questions &amp; Answers &nbsp;·&nbsp; Generated from source code analysis &nbsp;·&nbsp; June 2026</p>
+    <p style="margin-top:6px;">Covers: <code>relay-server/server.js</code> · <code>simulation/peersim-mobicloud/src/*</code> · Domain use cases · Core algorithms</p>
+  </div>
+
+</div>
+</body>
+</html>

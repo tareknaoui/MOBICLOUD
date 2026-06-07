@@ -135,6 +135,7 @@ class ErasureProgressViewModelTest {
         downloadFileBlocksUseCase = downloadFileBlocksUseCase,
         assembleDownloadedFileUseCase = assembleDownloadedFileUseCase,
         selectOptimalPeersUseCase = selectOptimalPeersUseCase,
+        relayRepository = mockk(relaxed = true),
         context = context,
         ioDispatcher = Dispatchers.Unconfined  // court-circuite les vrais threads IO dans les tests
     )

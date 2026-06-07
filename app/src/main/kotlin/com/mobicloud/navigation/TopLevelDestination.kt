@@ -20,11 +20,11 @@ import androidx.annotation.StringRes
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Hub
-import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Hub
-import androidx.compose.material.icons.outlined.Radar
+import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.mobicloud.compose.R
@@ -51,8 +51,8 @@ enum class TopLevelDestination(
     val route: KClass<*>,
 ) {
     DASHBOARD(
-        selectedIcon = Icons.Filled.Radar,
-        unselectedIcon = Icons.Outlined.Radar,
+        selectedIcon = Icons.Filled.Security,
+        unselectedIcon = Icons.Outlined.Security,
         iconTextId = R.string.dashboard,
         titleTextId = R.string.dashboard,
         route = DashboardRoute::class,

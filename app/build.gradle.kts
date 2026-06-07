@@ -26,6 +26,12 @@ val keystorePropertiesFile: File = rootProject.file("keystore.properties")
 val formatter = DateTimeFormatter.ofPattern("yyyy_MM_dd_hh_mm_a")
 val currentTime: String = LocalDateTime.now().format(formatter)
 
+val localPropertiesFile: File = rootProject.file("local.properties")
+val localProperties = Properties()
+if (localPropertiesFile.exists()) {
+    localProperties.load(FileInputStream(localPropertiesFile))
+}
+
 plugins {
     alias(libs.plugins.jetpack.application)
     alias(libs.plugins.jetpack.dagger.hilt)
@@ -53,6 +59,9 @@ android {
         versionName = mVersionName
         applicationId = "com.mobicloud"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL", "")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${localProperties.getProperty("SUPABASE_ANON_KEY", "")}\"")
+
 
         externalNativeBuild {
             cmake {

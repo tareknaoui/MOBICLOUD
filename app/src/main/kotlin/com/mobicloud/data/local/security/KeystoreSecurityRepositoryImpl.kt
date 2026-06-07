@@ -77,31 +77,14 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
     }
 
     override suspend fun generateIdentity(): Result<NodeIdentity> = withContext(Dispatchers.IO) {
-        // Guard: return existing identity (hardware or software) rather than overwriting
-        val existing = getIdentity()
-        if (existing.isSuccess) return@withContext existing
-
-        try {
-            val keyPairGenerator = KeyPairGenerator.getInstance(
-                KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEYSTORE
-            )
-            val parameterSpec = KeyGenParameterSpec.Builder(
-                KEY_ALIAS,
-                KeyProperties.PURPOSE_SIGN or KeyProperties.PURPOSE_VERIFY
-            ).setDigests(KeyProperties.DIGEST_SHA256, KeyProperties.DIGEST_SHA512)
-             .build()
-
-            keyPairGenerator.initialize(parameterSpec)
-            val keyBytes = keyPairGenerator.generateKeyPair().public.encoded
-            Result.success(NodeIdentity(sha256Id(keyBytes), keyBytes))
-
-        } catch (e: Exception) {
-            when (e) {
-                is KeyStoreException, is ProviderException, is StrongBoxUnavailableException ->
-                    generateSoftwareFallback()
-                else -> Result.failure(e)
-            }
+        // Guard: only skip if a software key already exists (exportable).
+        // If only a hardware key exists (non-exportable), generate a software key so
+        // exportRecoveryCode() can work. Hardware key identity is abandoned at this point.
+        val prefs = getEncryptedPrefs()
+        if (prefs.getString(PREF_KEY_PRIVATE, null) != null) {
+            return@withContext getIdentity()
         }
+        generateSoftwareFallback()
     }
 
     /**
@@ -225,6 +208,72 @@ class KeystoreSecurityRepositoryImpl @Inject constructor(
     private fun decodePrivateKey(pkcs8Bytes: ByteArray): PrivateKey =
         KeyFactory.getInstance(KeyProperties.KEY_ALGORITHM_EC)
             .generatePrivate(PKCS8EncodedKeySpec(pkcs8Bytes))
+
+    override suspend fun exportRecoveryCode(): Result<String> = withContext(Dispatchers.IO) {
+        try {
+            val prefs = getEncryptedPrefs()
+            // If no software identity key yet (hardware key from older install), generate one now.
+            if (prefs.getString(PREF_KEY_PRIVATE, null) == null) {
+                generateSoftwareFallback().getOrElse { return@withContext Result.failure(it) }
+            }
+            // If no encryption key yet, generate it now (auto-generates and persists).
+            if (prefs.getString(PREF_ENC_KEY_PRIVATE, null) == null) {
+                getEncryptionIdentity().getOrElse { return@withContext Result.failure(it) }
+            }
+            val identityPriv = prefs.getString(PREF_KEY_PRIVATE, null)
+                ?: return@withContext Result.failure(
+                    IllegalStateException("Échec de génération de la clé logicielle.")
+                )
+            val identityPub = prefs.getString(PREF_KEY_PUBLIC, null)
+                ?: return@withContext Result.failure(IllegalStateException("Clé publique introuvable."))
+            val encPriv = prefs.getString(PREF_ENC_KEY_PRIVATE, null)
+                ?: return@withContext Result.failure(IllegalStateException("Clé de chiffrement introuvable."))
+            val encPub = prefs.getString(PREF_ENC_KEY_PUBLIC, null)
+                ?: return@withContext Result.failure(IllegalStateException("Clé publique de chiffrement introuvable."))
+
+            val combined = "$identityPriv|$identityPub|$encPriv|$encPub"
+            val code = Base64.encodeToString(combined.toByteArray(Charsets.UTF_8), Base64.URL_SAFE or Base64.NO_WRAP)
+            Result.success(code)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    override suspend fun importFromRecoveryCode(code: String): Result<NodeIdentity> = withContext(Dispatchers.IO) {
+        try {
+            val combined = Base64.decode(code.trim(), Base64.URL_SAFE).toString(Charsets.UTF_8)
+            val parts = combined.split("|")
+            if (parts.size != 4) return@withContext Result.failure(IllegalArgumentException("Code de récupération invalide."))
+
+            val (identityPriv, identityPub, encPriv, encPub) = parts
+
+            // Bug 4: validate keys before writing — fail fast with clear message
+            runCatching {
+                decodePrivateKey(Base64.decode(identityPriv, Base64.NO_WRAP))
+                decodePrivateKey(Base64.decode(encPriv, Base64.NO_WRAP))
+            }.onFailure {
+                return@withContext Result.failure(IllegalArgumentException("Code invalide : clé privée corrompue."))
+            }
+
+            val identityPubBytes = Base64.decode(identityPub, Base64.NO_WRAP)
+            val nodeId = sha256Id(identityPubBytes)
+
+            // Bug 2: clear cache inside mutex so no concurrent coroutine recaches stale keys
+            encryptionIdentityMutex.withLock {
+                getEncryptedPrefs().edit()
+                    .putString(PREF_KEY_PRIVATE, identityPriv)
+                    .putString(PREF_KEY_PUBLIC, identityPub)
+                    .putString(PREF_ENC_KEY_PRIVATE, encPriv)
+                    .putString(PREF_ENC_KEY_PUBLIC, encPub)
+                    .commit()
+                cachedEncryptionIdentity = null
+            }
+
+            Result.success(NodeIdentity(nodeId = nodeId, publicKeyBytes = identityPubBytes))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
 
     override suspend fun signData(data: ByteArray): Result<ByteArray> = withContext(Dispatchers.IO) {
         try {

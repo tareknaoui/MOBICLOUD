@@ -56,6 +56,7 @@ class ExplorerViewModelCancelUploadTest {
             downloadFileBlocksUseCase = mockk(relaxed = true),
             assembleDownloadedFileUseCase = mockk(relaxed = true),
             selectOptimalPeersUseCase = mockk(relaxed = true),
+            relayRepository = mockk(relaxed = true),
             context = mockk<Context>(relaxed = true)
         )
     }

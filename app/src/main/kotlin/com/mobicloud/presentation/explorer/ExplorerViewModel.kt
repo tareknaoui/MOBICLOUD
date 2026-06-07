@@ -11,6 +11,7 @@ import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.ErasureParameters
 import com.mobicloud.domain.models.ResolvedBlockLocation
 import com.mobicloud.domain.repository.CatalogRepository
+import com.mobicloud.domain.repository.RelayRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
 import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
@@ -56,6 +57,7 @@ class ExplorerViewModel @Inject constructor(
     private val downloadFileBlocksUseCase: DownloadFileBlocksUseCase,
     private val assembleDownloadedFileUseCase: AssembleDownloadedFileUseCase,
     private val selectOptimalPeersUseCase: SelectOptimalPeersUseCase,
+    private val relayRepository: RelayRepository,
     @ApplicationContext private val context: Context,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) : ViewModel() {
@@ -407,6 +409,9 @@ class ExplorerViewModel @Inject constructor(
                         }
                         val updatedEntry = if (folder != null) entry.copy(folderPath = folder) else entry
                         _storeState.value = StoreState.Success(updatedEntry, entry.fragmentLocations.size)
+                        // Best-effort : announce fragment map to relay dashboard
+                        relayRepository.announceFragments(updatedEntry)
+                            .onFailure { Log.w("ExplorerVM", "announceFragments échoué: ${it.message}") }
                         scheduleReset()
                     }
                     .onFailure { e ->

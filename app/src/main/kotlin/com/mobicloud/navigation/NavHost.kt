@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.toRoute
 import com.mobicloud.presentation.dashboard.DashboardRoute
 import com.mobicloud.presentation.dashboard.DashboardScreen
 import com.mobicloud.presentation.explorer.ExplorerRoute
@@ -32,8 +33,16 @@ import com.mobicloud.presentation.onboarding.PermissionsRoute
 import com.mobicloud.presentation.onboarding.PermissionsScreen
 import com.mobicloud.presentation.onboarding.ProfileSetupRoute
 import com.mobicloud.presentation.onboarding.ProfileSetupScreen
+import com.mobicloud.presentation.onboarding.CloudAuthRoute
+import com.mobicloud.presentation.onboarding.CloudAuthScreen
+import com.mobicloud.presentation.onboarding.RestoreIdentityRoute
+import com.mobicloud.presentation.onboarding.RestoreIdentityScreen
 import com.mobicloud.presentation.onboarding.WelcomeRoute
 import com.mobicloud.presentation.onboarding.WelcomeScreen
+import com.mobicloud.presentation.pin.PinLockRoute
+import com.mobicloud.presentation.pin.PinLockScreen
+import com.mobicloud.presentation.pin.PinSetupRoute
+import com.mobicloud.presentation.pin.PinSetupScreen
 import com.mobicloud.presentation.settings.SettingsRoute
 import com.mobicloud.presentation.settings.SettingsScreen
 import com.mobicloud.presentation.trash.TrashRoute
@@ -46,10 +55,15 @@ fun JetpackNavHost(
     appState: JetpackAppState,
     onShowSnackbar: suspend (String, SnackbarAction, Throwable?) -> Boolean,
     hasCompletedOnboarding: Boolean,
+    hasPinSet: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val navController = appState.navController
-    val startDestination = if (hasCompletedOnboarding) DashboardRoute else WelcomeRoute
+    val startDestination = when {
+        !hasCompletedOnboarding -> WelcomeRoute
+        hasPinSet -> PinLockRoute
+        else -> DashboardRoute
+    }
 
     NavHost(
         navController = navController,
@@ -59,10 +73,38 @@ fun JetpackNavHost(
         composable<WelcomeRoute> {
             WelcomeScreen(
                 onFinish = {
-                    navController.navigate(PermissionsRoute) {
+                    navController.navigate(ProfileSetupRoute) {
                         popUpTo(WelcomeRoute) { inclusive = true }
                     }
                 },
+                onRestoreAccount = {
+                    navController.navigate(RestoreIdentityRoute)
+                },
+                onCloudAuth = {
+                    navController.navigate(CloudAuthRoute)
+                },
+            )
+        }
+        composable<RestoreIdentityRoute> {
+            RestoreIdentityScreen(
+                onRestored = {
+                    // popUpTo(0) clears the whole back stack up to root, works whether we came
+                    // from WelcomeScreen (onboarding) or SettingsScreen (in-app restore).
+                    navController.navigate(DashboardRoute) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable<CloudAuthRoute> {
+            CloudAuthScreen(
+                onSuccess = {
+                    navController.navigate(DashboardRoute) {
+                        popUpTo(WelcomeRoute) { inclusive = true }
+                    }
+                },
+                onBack = { navController.popBackStack() }
             )
         }
         composable<PermissionsRoute> {
@@ -82,10 +124,31 @@ fun JetpackNavHost(
         composable<InitRoute> {
             InitScreen(
                 onNavigateToDashboard = {
-                    navController.navigate(DashboardRoute) {
-                        popUpTo(PermissionsRoute) { inclusive = true }
+                    navController.navigate(PinSetupRoute(fromOnboarding = true)) {
+                        popUpTo(0) { inclusive = true }
                     }
                 },
+            )
+        }
+        composable<PinLockRoute> {
+            PinLockScreen(
+                onUnlocked = {
+                    navController.navigate(DashboardRoute) {
+                        popUpTo(PinLockRoute) { inclusive = true }
+                    }
+                },
+            )
+        }
+        composable<PinSetupRoute> { backStackEntry ->
+            val route = backStackEntry.toRoute<PinSetupRoute>()
+            val goToDashboard: () -> Unit = {
+                navController.navigate(DashboardRoute) {
+                    popUpTo(0) { inclusive = true }
+                }
+            }
+            PinSetupScreen(
+                onDone = { if (route.fromOnboarding) goToDashboard() else navController.popBackStack() },
+                onSkip = { if (route.fromOnboarding) goToDashboard() else navController.popBackStack() },
             )
         }
         composable<DashboardRoute> {
@@ -102,7 +165,10 @@ fun JetpackNavHost(
             )
         }
         composable<SettingsRoute> {
-            SettingsScreen()
+            SettingsScreen(
+                onRestoreIdentity = { navController.navigate(RestoreIdentityRoute) },
+                onSetupPin = { navController.navigate(PinSetupRoute(fromOnboarding = false)) },
+            )
         }
         composable<NetworkRoute> {
             NetworkScreen()

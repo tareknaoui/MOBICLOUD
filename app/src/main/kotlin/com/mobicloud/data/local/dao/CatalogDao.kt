@@ -80,6 +80,10 @@ interface CatalogDao {
     }
 
     @Transaction
+    @Query("SELECT * FROM catalog_entry")
+    suspend fun getAllWithFragmentsOnce(): List<CatalogEntryWithFragments>
+
+    @Transaction
     @Query("SELECT * FROM catalog_entry WHERE is_in_trash = 1 AND deleted_at < :expiryTs")
     suspend fun getExpiredEntries(expiryTs: Long): List<CatalogEntryWithFragments>
 
@@ -97,6 +101,17 @@ interface CatalogDao {
     @Transaction
     suspend fun emptyTrash() {
         val hashes = getAllTrashHashes()
+        for (h in hashes) {
+            permanentlyDeleteEntry(h)
+        }
+    }
+
+    @Query("SELECT file_hash FROM catalog_entry WHERE owner_pub_key_hash = :ownerPubKeyHash")
+    suspend fun getHashesByOwner(ownerPubKeyHash: String): List<String>
+
+    @Transaction
+    suspend fun deleteAllEntriesByOwner(ownerPubKeyHash: String) {
+        val hashes = getHashesByOwner(ownerPubKeyHash)
         for (h in hashes) {
             permanentlyDeleteEntry(h)
         }

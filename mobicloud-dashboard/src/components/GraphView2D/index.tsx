@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import Cytoscape from 'cytoscape';
 import coseBilkent from 'cytoscape-cose-bilkent';
 import type { TopologyData, RelayNode, TransferEvent, FragmentFile } from '../../services/api';
-import { killNode } from '../../services/api';
 import type { Theme } from '../../hooks/useTheme';
 
 // Register layout plugin once (try/catch survives HMR re-imports)
@@ -24,6 +23,7 @@ interface Props {
   fragmentFiles?: FragmentFile[];
   onHighlightChange?: (fileId: string | null) => void;
   onRegisterFocus?: (fn: (nodeId: string) => void) => void;
+  onSelectNode?: (node: SelectedNode | null) => void;
 }
 
 interface Particle {
@@ -39,7 +39,7 @@ interface KnownNode {
   ip: string; port: number; lastSeen: number; departedAt: number | null;
 }
 
-interface SelectedNode {
+export interface SelectedNode {
   id: string; isSuperPair: boolean; isConnected: boolean;
   clusterId: string; reliabilityScore: number; freeBytes: number; totalBytes: number;
   ip: string; port: number; lastSeen: number; color: string;
@@ -83,12 +83,12 @@ function reliabilityColor(score: number): string {
 }
 
 function mimeIcon(mime: string) {
-  if (mime.startsWith('image/'))  return '🖼';
-  if (mime.startsWith('video/'))  return '🎬';
-  if (mime.startsWith('audio/'))  return '🎵';
-  if (mime === 'application/pdf') return '📄';
-  if (mime === 'application/zip') return '📦';
-  return '📁';
+  if (mime.startsWith('image/'))  return 'IMG';
+  if (mime.startsWith('video/'))  return 'VID';
+  if (mime.startsWith('audio/'))  return 'AUD';
+  if (mime === 'application/pdf') return 'PDF';
+  if (mime === 'application/zip') return 'ZIP';
+  return 'FILE';
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -208,7 +208,7 @@ function animateIn(ids: string[], cy: Cytoscape.Core) {
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function GraphView2D({ topology, error, theme, latestTransfer, fragmentFiles, onHighlightChange, onRegisterFocus }: Props) {
+export default function GraphView2D({ topology, error, theme, latestTransfer, fragmentFiles, onHighlightChange, onRegisterFocus, onSelectNode }: Props) {
   const containerRef   = useRef<HTMLDivElement>(null);
   const canvasRef      = useRef<HTMLCanvasElement>(null);
   const particlesRef   = useRef<Particle[]>([]);
@@ -227,45 +227,25 @@ export default function GraphView2D({ topology, error, theme, latestTransfer, fr
   const [tooltipPos, setTooltipPos]         = useState({ x: 0, y: 0 });
   const [highlightedFileId, setHighlightedFileId] = useState<string | null>(null);
   const [connectedCount, setConnectedCount] = useState(0);
-  const [killing, setKilling]               = useState<string | null>(null);
-
   function setHighlight(fileId: string | null) {
     setHighlightedFileId(fileId);
     onHighlightChange?.(fileId);
   }
 
-  // Chaos demo : simule la panne du nœud sélectionné. Le secret admin est saisi une seule
-  // fois par session (sessionStorage) puis réutilisé. Le nœud passera "offline" au prochain
-  // poll de topologie (3s) via la logique de départ existante.
-  async function handleKill(nodeId: string) {
-    let secret = sessionStorage.getItem('mc_admin_secret') ?? '';
-    if (!secret) {
-      secret = window.prompt('Admin secret (ADMIN_SECRET) :') ?? '';
-      if (!secret) return;
-      sessionStorage.setItem('mc_admin_secret', secret);
-    }
-    setKilling(nodeId);
-    try {
-      await killNode(nodeId, secret);
-      setSelected(null);
-    } catch (e: unknown) {
-      if (e instanceof Error && e.message === 'Secret incorrect') {
-        sessionStorage.removeItem('mc_admin_secret'); // permet de re-saisir au prochain essai
-      }
-      window.alert(`Kill échoué : ${e instanceof Error ? e.message : 'erreur inconnue'}`);
-    } finally {
-      setKilling(null);
-    }
+  function selectNode(node: SelectedNode | null) {
+    setSelected(node);
+    onSelectNode?.(node);
   }
 
-  // Code review P10 : clear le panel selectionne si le nœud disparait de la topologie
-  // (typique apres /admin/reset ou departure naturelle d'un peer).
+
+
+  // Clear le panel si le nœud disparait de la topologie (reset ou departure naturelle).
   useEffect(() => {
     if (!selected || !topology) return;
     if (!topology.nodes.some(n => n.id === selected.id)) {
-      setSelected(null);
+      selectNode(null);
     }
-  }, [topology, selected]);
+  }, [topology, selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Clear le highlight de fragments quand on change de nœud sélectionné
   useEffect(() => { setHighlight(null); }, [selected?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -317,7 +297,7 @@ export default function GraphView2D({ topology, error, theme, latestTransfer, fr
 
     cy.on('tap', evt => {
       if (evt.target === cy) {
-        setSelected(null);
+        selectNode(null);
         setSelectedCluster(null);
       } else if (evt.target.isNode && evt.target.isNode()) {
         const rp = evt.target.renderedPosition();
@@ -342,10 +322,10 @@ export default function GraphView2D({ topology, error, theme, latestTransfer, fr
             totalAllocatedBytes: totalAllocated,
             avgReliability: avgRel,
           });
-          setSelected(null);
+          selectNode(null);
         } else {
           const d = evt.target.data() as SelectedNode;
-          setSelected(d);
+          selectNode(d);
           setSelectedCluster(null);
         }
       }
@@ -632,177 +612,6 @@ export default function GraphView2D({ topology, error, theme, latestTransfer, fr
         ref={canvasRef}
         style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 5 }}
       />
-
-      {selected && (
-        <div style={{
-          position: 'absolute',
-          left: tooltipPos.x > cw * 0.6 ? Math.max(tooltipPos.x - 262, 8) : Math.min(tooltipPos.x + 16, cw - 310),
-          top: Math.min(Math.max(tooltipPos.y - 12, 8), ch - 340),
-          zIndex: 30,
-          background: isDark ? '#111827' : '#ffffff',
-          border: `1px solid ${isDark ? '#1e3a5f' : '#bfdbfe'}`,
-          borderRadius: 10, padding: '10px 14px', fontSize: 12,
-          color: isDark ? '#e2e8f0' : '#0f172a',
-          boxShadow: isDark
-            ? '0 4px 24px rgba(0,0,0,0.6), 0 0 0 1px rgba(96,165,250,0.1)'
-            : '0 4px 24px rgba(0,0,0,0.14)',
-          minWidth: 230, pointerEvents: 'auto',
-        }}>
-          {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
-            <span style={{
-              width: 11, height: 11, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
-              background: selected.isSuperPair ? '#facc15' : selected.isConnected ? selected.color : '#6b7280',
-              boxShadow: selected.isSuperPair ? '0 0 6px rgba(250,204,21,0.7)' : 'none',
-            }} />
-            <span style={{ fontWeight: 700, fontSize: 13 }}>
-              {selected.isSuperPair ? 'Super-Peer' : selected.isConnected ? 'Member' : 'Offline'}
-            </span>
-            <button
-              onClick={() => setSelected(null)}
-              style={{
-                marginLeft: 'auto', background: 'none', border: 'none', cursor: 'pointer',
-                color: isDark ? '#64748b' : '#94a3b8', fontSize: 14, lineHeight: 1, padding: '0 2px',
-              }}
-              title="Fermer"
-            >✕</button>
-          </div>
-
-          {/* Node ID */}
-          <div style={{
-            fontFamily: 'monospace', fontSize: 10,
-            color: isDark ? '#94a3b8' : '#64748b',
-            background: isDark ? '#1f2937' : '#f1f5f9',
-            borderRadius: 4, padding: '3px 6px', marginBottom: 10,
-            wordBreak: 'break-all', lineHeight: 1.5,
-          }}>
-            {selected.id}
-          </div>
-
-          {/* Detail rows */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 12px', alignItems: 'baseline' }}>
-            <span style={{ color: isDark ? '#64748b' : '#94a3b8', whiteSpace: 'nowrap' }}>Cluster</span>
-            <span style={{ fontFamily: 'monospace', fontSize: 10, color: isDark ? '#93c5fd' : '#2563eb' }}>
-              {selected.clusterId ? selected.clusterId.slice(0, 12) + '…' : '—'}
-            </span>
-
-            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Fiabilité</span>
-            <span>
-              <span style={{ fontWeight: 600, color: reliabilityColor(selected.reliabilityScore) }}>
-                {clampPct(selected.reliabilityScore).toFixed(1)}%
-              </span>
-              <div style={{ marginTop: 3, height: 5, borderRadius: 3, background: isDark ? '#1f2937' : '#e2e8f0', overflow: 'hidden' }}>
-                <div style={{ width: `${clampPct(selected.reliabilityScore)}%`, height: '100%', background: reliabilityColor(selected.reliabilityScore), borderRadius: 3, transition: 'width 0.4s ease' }} />
-              </div>
-            </span>
-
-            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Stockage</span>
-            <span>
-              {selected.totalBytes > 0 ? (() => {
-                const used = Math.max(0, selected.totalBytes - selected.freeBytes);
-                const libre = selected.totalBytes - used;
-                const pct = Math.min(100, (used / selected.totalBytes) * 100);
-                const barColor = pct >= 90 ? '#ff3b30' : pct >= 70 ? '#ff9f0a' : '#34c759';
-                return (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3, color: isDark ? '#94a3b8' : '#64748b' }}>
-                      <span>Utilisé : <strong style={{ color: isDark ? '#e2e8f0' : '#0f172a' }}>{fmtBytes(used)}</strong></span>
-                      <span>Total : <strong style={{ color: isDark ? '#e2e8f0' : '#0f172a' }}>{fmtBytes(selected.totalBytes)}</strong></span>
-                    </div>
-                    <div style={{ height: 7, borderRadius: 4, background: isDark ? '#1f2937' : '#e2e8f0', overflow: 'hidden' }}>
-                      <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 4, transition: 'width 0.4s ease' }} />
-                    </div>
-                    <div style={{ fontSize: 10, marginTop: 3, color: isDark ? '#64748b' : '#94a3b8' }}>
-                      Libre : {fmtBytes(libre)} ({(100 - pct).toFixed(1)}%)
-                    </div>
-                  </div>
-                );
-              })() : (
-                <span>{fmtBytes(selected.freeBytes)} libre</span>
-              )}
-            </span>
-
-            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Adresse</span>
-            <span style={{ fontFamily: 'monospace', fontSize: 10 }}>
-              {selected.ip || '—'}:{selected.port || '—'}
-            </span>
-
-            <span style={{ color: isDark ? '#64748b' : '#94a3b8' }}>Vu</span>
-            <span style={{ color: isDark ? '#94a3b8' : '#64748b', fontSize: 11 }}>
-              {selected.lastSeen ? fmtAgo(selected.lastSeen) : '—'}
-            </span>
-          </div>
-
-          {/* Fichiers hébergés sur ce nœud */}
-          {fragmentFiles && (() => {
-            const nodeFiles = fragmentFiles.filter(f => f.fragments.some(fr => fr.nodeId === selected.id));
-            if (nodeFiles.length === 0) return null;
-            return (
-              <div style={{ marginTop: 10, borderTop: `1px solid ${isDark ? '#1e3a5f' : '#e2e8f0'}`, paddingTop: 8 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#a855f7', marginBottom: 6 }}>
-                  Fragments hébergés ({nodeFiles.length})
-                </div>
-                {nodeFiles.map(f => {
-                  const isHl = highlightedFileId === f.fileId;
-                  const myFrag = f.fragments.find(fr => fr.nodeId === selected.id);
-                  const aliveCount = f.fragments.filter(fr => fr.nodeConnected).length;
-                  const statusColor = aliveCount < f.k ? '#ef4444' : aliveCount < f.n ? '#f97316' : '#22c55e';
-                  return (
-                    <div
-                      key={f.fileId}
-                      onClick={() => setHighlight(isHl ? null : f.fileId)}
-                      title={isHl ? 'Cliquer pour retirer le surlignage' : `Surligner les ${f.n} nœuds portant ce fichier`}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '4px 6px', borderRadius: 5, cursor: 'pointer', marginBottom: 3,
-                        background: isHl ? (isDark ? '#3b0764' : '#ede9fe') : (isDark ? '#1f2937' : '#f8fafc'),
-                        border: `1px solid ${isHl ? '#a855f7' : (isDark ? '#374151' : '#e2e8f0')}`,
-                        transition: 'background 0.15s, border-color 0.15s',
-                      }}
-                    >
-                      <span style={{ fontSize: 13, flexShrink: 0 }}>{mimeIcon(f.mimeType)}</span>
-                      <span style={{ flex: 1, fontSize: 10, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: isDark ? '#e2e8f0' : '#0f172a', fontWeight: 600 }}>
-                        {f.fileName}
-                      </span>
-                      {myFrag !== undefined && (
-                        <span style={{ fontSize: 9, fontFamily: 'monospace', color: '#a855f7', fontWeight: 700 }}>#{myFrag.index}</span>
-                      )}
-                      <span style={{ fontSize: 9, fontWeight: 700, color: statusColor }}>{aliveCount}/{f.n}</span>
-                      <span style={{ fontSize: 9, color: isHl ? '#a855f7' : (isDark ? '#64748b' : '#94a3b8') }}>
-                        {isHl ? '●' : '○'}
-                      </span>
-                    </div>
-                  );
-                })}
-                {highlightedFileId && nodeFiles.some(f => f.fileId === highlightedFileId) && (
-                  <div style={{ fontSize: 9, color: '#a855f7', marginTop: 4, textAlign: 'center', opacity: 0.8 }}>
-                    {fragmentFiles.find(f => f.fileId === highlightedFileId)?.n} nœuds mis en évidence sur le graphe
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* Chaos demo : tuer ce nœud pour démontrer la résilience erasure coding */}
-          {selected.isConnected && (
-            <button
-              onClick={() => handleKill(selected.id)}
-              disabled={killing === selected.id}
-              title="Simuler une panne de ce nœud (démo résilience). Le fichier reste récupérable tant qu'il reste k fragments."
-              style={{
-                marginTop: 12, width: '100%',
-                background: killing === selected.id ? '#7f1d1d' : '#dc2626',
-                color: '#fff', border: 'none', borderRadius: 6,
-                padding: '7px 0', fontSize: 11, fontWeight: 700,
-                cursor: killing === selected.id ? 'wait' : 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-              }}
-            >
-              {killing === selected.id ? 'Kill en cours…' : 'Kill (chaos demo)'}
-            </button>
-          )}
-        </div>
-      )}
 
       {selectedCluster && (
         <div style={{

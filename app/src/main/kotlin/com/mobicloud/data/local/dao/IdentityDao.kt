@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Transaction
 import com.mobicloud.data.local.entity.NodeIdentityEntity
 
 @Dao
@@ -19,4 +20,10 @@ interface IdentityDao {
 
     @Query("DELETE FROM node_identity")
     suspend fun clearIdentity()
+
+    @Transaction
+    suspend fun replaceIdentity(identity: NodeIdentityEntity) {
+        clearIdentity()
+        insertIdentity(identity)
+    }
 }

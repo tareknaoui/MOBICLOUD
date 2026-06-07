@@ -146,7 +146,7 @@ fun ExplorerScreen(
         val s = terminalDownloadState as? DownloadState.Error ?: return@LaunchedEffect
         android.util.Log.d("MobiCloud:Explorer", "[DOWNLOAD-ERROR] ${s.message}")
         val friendlyMessage = if (s.message.contains("blocs valides") || s.message.contains("nœuds actifs"))
-            "Not enough members online to retrieve this file"
+            "Not enough members online — check the Network tab and try again later."
         else
             "An error occurred. Please try again."
         snackbarHostState.showSnackbar(friendlyMessage)
@@ -255,12 +255,12 @@ fun ExplorerScreen(
         )
     }
 
-    // Story 13.5 — dialogue contextuel dossier (long-press sur FolderItem)
+    // Story 13.5 — folder context dialog (long-press on FolderItem)
     folderContextTarget?.let { folder ->
         AlertDialog(
             onDismissRequest = { folderContextTarget = null },
             title = { Text(folder, fontWeight = FontWeight.Bold) },
-            text = { Text("Que voulez-vous faire avec ce dossier ?") },
+            text = { Text("What do you want to do with this folder?") },
             confirmButton = {
                 TextButton(onClick = {
                     folderContextTarget = null
@@ -269,7 +269,7 @@ fun ExplorerScreen(
                 }) {
                     Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Renommer")
+                    Text("Rename")
                 }
             },
             dismissButton = {
@@ -279,22 +279,22 @@ fun ExplorerScreen(
                 }) {
                     Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF3B30))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("Supprimer", color = Color(0xFFFF3B30))
+                    Text("Delete", color = Color(0xFFFF3B30))
                 }
             }
         )
     }
 
-    // Story 13.5 — dialogue renommage dossier
+    // Story 13.5 — folder rename dialog
     renameDialogTarget?.let { oldName ->
         AlertDialog(
             onDismissRequest = { renameDialogTarget = null; renameInput = "" },
-            title = { Text("Renommer le dossier", fontWeight = FontWeight.Bold) },
+            title = { Text("Rename folder", fontWeight = FontWeight.Bold) },
             text = {
                 OutlinedTextField(
                     value = renameInput,
                     onValueChange = { renameInput = it },
-                    label = { Text("Nouveau nom") },
+                    label = { Text("New name") },
                     singleLine = true
                 )
             },
@@ -308,24 +308,24 @@ fun ExplorerScreen(
                         renameInput = ""
                     },
                     enabled = renameInput.isNotBlank()
-                ) { Text("Valider") }
+                ) { Text("Confirm") }
             },
             dismissButton = {
-                TextButton(onClick = { renameDialogTarget = null; renameInput = "" }) { Text("Annuler") }
+                TextButton(onClick = { renameDialogTarget = null; renameInput = "" }) { Text("Cancel") }
             }
         )
     }
 
-    // Story 13.5 — dialogue création dossier
+    // Story 13.5 — create folder dialog
     if (showCreateFolderDialog) {
         AlertDialog(
             onDismissRequest = { showCreateFolderDialog = false; folderInput = "" },
-            title = { Text("Nouveau dossier", fontWeight = FontWeight.Bold) },
+            title = { Text("New folder", fontWeight = FontWeight.Bold) },
             text = {
                 OutlinedTextField(
                     value = folderInput,
                     onValueChange = { folderInput = it },
-                    label = { Text("Nom du dossier") },
+                    label = { Text("Folder name") },
                     singleLine = true
                 )
             },
@@ -339,10 +339,10 @@ fun ExplorerScreen(
                         folderInput = ""
                     },
                     enabled = folderInput.isNotBlank()
-                ) { Text("Valider") }
+                ) { Text("Create") }
             },
             dismissButton = {
-                TextButton(onClick = { showCreateFolderDialog = false; folderInput = "" }) { Text("Annuler") }
+                TextButton(onClick = { showCreateFolderDialog = false; folderInput = "" }) { Text("Cancel") }
             }
         )
     }

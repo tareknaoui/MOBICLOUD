@@ -89,6 +89,8 @@ private val pages = listOf(
 @Composable
 fun WelcomeScreen(
     onFinish: () -> Unit,
+    onRestoreAccount: () -> Unit = {},
+    onCloudAuth: () -> Unit = {},
     modifier: Modifier = Modifier,
     viewModel: PermissionsViewModel = hiltViewModel(),
 ) {
@@ -180,7 +182,20 @@ fun WelcomeScreen(
                         )
                     }
                 } else {
-                    Spacer(Modifier.height(36.dp))
+                    TextButton(onClick = { onCloudAuth() }) {
+                        Text(
+                            text = "Sign in with an account",
+                            color = IosBlue,
+                            fontSize = 14.sp,
+                        )
+                    }
+                    TextButton(onClick = { onRestoreAccount() }) {
+                        Text(
+                            text = "Restore with a recovery code",
+                            color = IosText2,
+                            fontSize = 14.sp,
+                        )
+                    }
                 }
             }
         }

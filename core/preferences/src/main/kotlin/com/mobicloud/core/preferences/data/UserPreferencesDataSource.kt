@@ -279,4 +279,13 @@ interface UserPreferencesDataSource {
 
     /** Émet `true` une fois l'onboarding complété (Story 13.4). */
     fun observeHasCompletedOnboarding(): Flow<Boolean>
+
+    /** Persiste le hash SHA-256 du PIN (activer ou changer le PIN). */
+    suspend fun setPin(pinHash: String)
+
+    /** Supprime le PIN (désactiver le verrou). */
+    suspend fun clearPin()
+
+    /** Émet en continu le hash du PIN courant (vide = pas de PIN). */
+    fun observePinHash(): Flow<String>
 }

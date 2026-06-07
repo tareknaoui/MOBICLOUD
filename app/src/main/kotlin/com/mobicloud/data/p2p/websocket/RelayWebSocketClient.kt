@@ -303,12 +303,17 @@ class RelayWebSocketClient @Inject constructor(
      * connectés s'auto-déclarent Super-Pair via REGISTER_PEER et l'élection ne fire jamais).
      * ip/port sont optionnels — pertinents uniquement pour les nœuds joignables directement.
      */
-    fun sendJoin(nodeId: String, ip: String?, port: Int?, reliabilityScore: Float): Boolean {
+    fun sendJoin(
+        nodeId: String, ip: String?, port: Int?, reliabilityScore: Float,
+        freeBytes: Long = 0L, totalBytes: Long = 0L
+    ): Boolean {
         val ws = activeWebSocket ?: return false
         val json = org.json.JSONObject().apply {
             if (ip != null) put("ip", ip)
             if (port != null) put("port", port)
             put("reliabilityScore", reliabilityScore.toDouble())
+            if (freeBytes > 0) put("freeBytes", freeBytes)
+            if (totalBytes > 0) put("totalBytes", totalBytes)
         }
         val payload = json.toString().toByteArray(Charsets.UTF_8)
         return ws.send(RelayFraming.buildFrame(RelayMsg.JOIN, payload).toByteString())

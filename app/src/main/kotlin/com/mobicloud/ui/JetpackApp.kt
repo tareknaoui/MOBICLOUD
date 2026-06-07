@@ -86,6 +86,7 @@ import timber.log.Timber
 fun JetpackApp(
     appState: JetpackAppState,
     hasCompletedOnboarding: Boolean?,
+    hasPinSet: Boolean? = null,
     modifier: Modifier = Modifier,
     windowAdaptiveInfo: WindowAdaptiveInfo = currentWindowAdaptiveInfo(),
 ) {
@@ -120,6 +121,7 @@ fun JetpackApp(
                 snackbarHostState = snackbarHostState,
                 showSettingsDialog = showSettingsDialog,
                 hasCompletedOnboarding = hasCompletedOnboarding,
+                hasPinSet = hasPinSet,
                 onDismissSettings = { showSettingsDialog = false },
                 onTopAppBarActionClick = { showSettingsDialog = true },
                 windowAdaptiveInfo = windowAdaptiveInfo,
@@ -145,6 +147,7 @@ private fun JetpackApp(
     snackbarHostState: SnackbarHostState,
     showSettingsDialog: Boolean,
     hasCompletedOnboarding: Boolean?,
+    hasPinSet: Boolean? = null,
     onDismissSettings: () -> Unit,
     onTopAppBarActionClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -166,6 +169,7 @@ private fun JetpackApp(
             appState = appState,
             snackbarHostState = snackbarHostState,
             hasCompletedOnboarding = hasCompletedOnboarding,
+            hasPinSet = hasPinSet,
             onTopAppBarActionClick = onTopAppBarActionClick,
             modifier = modifier,
         )
@@ -187,6 +191,7 @@ private fun JetpackApp(
             appState = appState,
             snackbarHostState = snackbarHostState,
             hasCompletedOnboarding = hasCompletedOnboarding,
+            hasPinSet = hasPinSet,
             onTopAppBarActionClick = onTopAppBarActionClick,
             modifier = modifier,
         )
@@ -206,6 +211,7 @@ private fun JetpackScaffold(
     appState: JetpackAppState,
     snackbarHostState: SnackbarHostState,
     hasCompletedOnboarding: Boolean?,
+    hasPinSet: Boolean? = null,
     onTopAppBarActionClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -267,12 +273,13 @@ private fun JetpackScaffold(
 
                 // Resolve context once in composable scope for use in suspend callbacks
                 // Suppressing lint because we need context in suspend callback where composables aren't allowed
-                // Story 13.4 — ne pas composer NavHost tant que hasCompletedOnboarding est null (DataStore pas encore chargé)
-                if (hasCompletedOnboarding != null) {
+                // Story 13.4 — ne pas composer NavHost tant que hasCompletedOnboarding ou hasPinSet est null
+                if (hasCompletedOnboarding != null && hasPinSet != null) {
                     @Suppress("LocalContextGetResourceValueCall")
                     JetpackNavHost(
                         appState = appState,
                         hasCompletedOnboarding = hasCompletedOnboarding,
+                        hasPinSet = hasPinSet,
                         onShowSnackbar = { message, action, throwable ->
                             val actionPerformed = snackbarHostState.showSnackbar(
                                 message = message,

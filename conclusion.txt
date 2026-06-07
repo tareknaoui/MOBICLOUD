@@ -1,0 +1,101 @@
+\chapter*{General Conclusion}
+\addcontentsline{toc}{chapter}{General Conclusion}
+
+The work presented in this thesis addressed a central challenge of modern Big
+Data engineering: providing reliable, secure, and decentralized storage without
+depending on a costly centralized cloud infrastructure. Starting from the
+observation that smartphones collectively hold a considerable and largely
+unused storage capacity, we proposed \textbf{MobiCloud}, a distributed storage
+system that transforms a federation of ordinary smartphones into a
+collaborative, resilient, and privacy-preserving storage network.
+
+\section*{Summary of the Work Carried Out}
+
+Throughout this thesis, we first established the conceptual foundations of
+distributed computing paradigms (Cloud, Edge, and Fog Computing) and of
+distributed storage systems. We then conducted a state-of-the-art review that
+revealed a clear research gap: no existing system simultaneously combines Big
+Data scalability, exclusive operation on mobile terminals, persistent storage
+through erasure coding, and modern resilience mechanisms.
+
+Building on this analysis, we designed a complete architecture answering the
+five fundamental questions of any distributed storage system: who composes the
+network (membership and cluster formation), what is stored and how (adaptive
+Reed-Solomon erasure coding), where the data resides and how to find it
+(distributed catalog and gossip synchronization), how the system survives
+failures (reliability-aware election, heartbeat-based failure detection, and
+self-healing), and who may access the data (a zero-knowledge security pipeline).
+This design was formalized through a set of UML models covering the functional,
+structural, and behavioral views of the system.
+
+Finally, we implemented the design as a real Android application, relying on a
+modern technology stack (Kotlin, Jetpack Compose, Hilt, Room, Ktor, the Android
+NDK for native erasure coding, and a React administration dashboard). The system
+was validated on a real cluster of seven smartphones.
+
+\section*{Objectives Achieved}
+
+The tests carried out confirmed that the main objectives set at the beginning of
+this work were met:
+
+\begin{itemize}
+    \item \textbf{Decentralization}: the system operates on ordinary smartphones
+    with only a minimal relay server for signaling, which never stores user data.
+    \item \textbf{Resilience}: file distribution and retrieval succeeded across
+    the cluster, and the $(K=4, N=2)$ erasure coding scheme tolerated the loss of
+    nodes; cluster head failure was handled automatically by the Bully election
+    mechanism while data remained fully available.
+    \item \textbf{Security and privacy}: a zero-knowledge model was enforced
+    through hardware-backed cryptographic identity (Android Keystore),
+    AES-256-GCM fragment encryption, and ECDH-HKDF key distribution.
+    \item \textbf{Adaptability and transparency}: redundancy adapts to cluster
+    reliability, and all distributed complexity is hidden behind a simple mobile
+    interface.
+\end{itemize}
+
+Overall, MobiCloud demonstrates that the founding principles of Big Data storage,
+namely horizontal scalability across commodity nodes, erasure-coded redundancy, and
+decentralized coordination, can be applied effectively on heterogeneous and
+resource-constrained mobile hardware.
+
+\section*{Perspectives}
+
+Although the proposed system fulfills its core objectives, several directions
+remain open for future work:
+
+\begin{itemize}
+    \item \textbf{Extended performance evaluation}: the current validation
+    involved seven devices. Further tests should assess the system at a larger
+    scale, with a higher number of nodes, larger files, higher churn rates, and
+    measurements of energy consumption, latency, and throughput under diverse
+    network conditions, including large-scale simulation.
+
+    \item \textbf{Embedded AI for predictive resilience}: a particularly
+    promising direction is the integration of lightweight on-device machine
+    learning models to predict node departures before they occur. By analyzing
+    local metrics (battery level, connectivity history, usage patterns), the
+    system could proactively redistribute fragments before a node disconnects,
+    rather than reacting after the failure has happened.
+
+    \item \textbf{User-configurable participation parameters}: the application
+    could give the user finer control over their involvement in the network,
+    for instance by choosing the conditions under which the device is allowed to
+    become a cluster head (e.g. only while charging, on Wi-Fi, or above a given
+    battery level), and defining when the application is active and contributes
+    storage. This would better balance the coordination cost across users while
+    respecting each device owner's preferences.
+
+    \item \textbf{Post-partition consistency}: integrating CRDTs with tombstones
+    would strengthen consistency guarantees when the network splits and later
+    heals, preventing data resurrection after partition recovery.
+
+    \item \textbf{Pure device-to-device communication}: extending the system to
+    direct D2D protocols (such as Wi-Fi Direct) would further reduce its reliance
+    on the relay server and enable operation in fully infrastructure-less
+    environments.
+\end{itemize}
+
+In conclusion, this work constitutes a concrete step toward a viable, mobile-first
+alternative to centralized cloud storage. Beyond the prototype itself, it opens
+the way to intelligent, user-controlled, and fully decentralized storage networks
+built from the devices users already own.

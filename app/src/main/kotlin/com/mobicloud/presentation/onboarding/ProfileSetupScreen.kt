@@ -50,10 +50,12 @@ import kotlinx.serialization.Serializable
 @Serializable
 object ProfileSetupRoute
 
-private val Amber = Color(0xFFFFB300)
-private val DarkBg = Color(0xFF1C1C1E)
-private val DarkSurface = Color(0xFF2C2C2E)
-private val TextHint = Color(0xFF8E8E93)
+private val IosBlue   = Color(0xFF0A84FF)
+private val Amber     = Color(0xFFFFB300)
+private val LightBg   = Color(0xFFFFFFFF)
+private val LightSurface = Color(0xFFF2F2F7)
+private val TextHint  = Color(0xFF8E8E93)
+private val TextPrimary = Color(0xFF1C1C1E)
 
 @Composable
 fun ProfileSetupScreen(
@@ -71,14 +73,14 @@ fun ProfileSetupScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(DarkBg)
+            .background(LightBg)
             .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         Text(
             text = "MobiCloud",
-            color = Amber,
+            color = IosBlue,
             fontSize = 28.sp,
             fontWeight = FontWeight.Bold
         )
@@ -87,7 +89,7 @@ fun ProfileSetupScreen(
 
         Text(
             text = "Create your profile",
-            color = Color.White,
+            color = TextPrimary,
             fontSize = 20.sp,
             fontWeight = FontWeight.SemiBold
         )
@@ -95,7 +97,7 @@ fun ProfileSetupScreen(
         Spacer(Modifier.height(8.dp))
 
         Text(
-            text = "Your name and photo will be visible to peers in your group.",
+            text = "Your name will be visible to peers in your group. Photo is optional.",
             color = TextHint,
             fontSize = 13.sp,
             textAlign = TextAlign.Center,
@@ -109,8 +111,8 @@ fun ProfileSetupScreen(
             modifier = Modifier
                 .size(96.dp)
                 .clip(CircleShape)
-                .background(DarkSurface)
-                .border(2.dp, Amber.copy(alpha = 0.5f), CircleShape)
+                .background(LightSurface)
+                .border(2.dp, IosBlue.copy(alpha = 0.4f), CircleShape)
                 .clickable { photoPickerLauncher.launch("image/*") },
             contentAlignment = Alignment.Center
         ) {
@@ -126,12 +128,12 @@ fun ProfileSetupScreen(
                     Icon(
                         imageVector = Icons.Outlined.Person,
                         contentDescription = null,
-                        tint = Amber,
+                        tint = IosBlue,
                         modifier = Modifier.size(36.dp)
                     )
                     Text(
                         text = "Add photo",
-                        color = Amber,
+                        color = IosBlue,
                         fontSize = 10.sp
                     )
                 }
@@ -144,7 +146,7 @@ fun ProfileSetupScreen(
         OutlinedTextField(
             value = name,
             onValueChange = { if (it.length <= 30) name = it },
-            label = { Text("Your name", color = TextHint) },
+            label = { Text("Your name") },
             placeholder = { Text("e.g. Anis", color = TextHint.copy(alpha = 0.6f)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(
@@ -152,12 +154,12 @@ fun ProfileSetupScreen(
                 imeAction = ImeAction.Done
             ),
             colors = OutlinedTextFieldDefaults.colors(
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White,
-                focusedBorderColor = Amber,
+                focusedTextColor = TextPrimary,
+                unfocusedTextColor = TextPrimary,
+                focusedBorderColor = IosBlue,
                 unfocusedBorderColor = TextHint,
-                cursorColor = Amber,
-                focusedLabelColor = Amber
+                cursorColor = IosBlue,
+                focusedLabelColor = IosBlue
             ),
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp)
@@ -167,20 +169,20 @@ fun ProfileSetupScreen(
 
         Button(
             onClick = {
-                if (name.isNotBlank()) {
-                    viewModel.saveProfile(
-                        displayName = name,
-                        avatarUri = avatarUri?.toString()
-                    )
-                }
+                viewModel.saveProfile(
+                    displayName = name,
+                    avatarUri = avatarUri?.toString()
+                )
                 onContinue()
             },
+            enabled = name.isNotBlank(),
             modifier = Modifier
                 .fillMaxWidth()
                 .height(52.dp),
             shape = RoundedCornerShape(14.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (name.isNotBlank()) Amber else TextHint
+                containerColor = IosBlue,
+                disabledContainerColor = TextHint
             )
         ) {
             Text(

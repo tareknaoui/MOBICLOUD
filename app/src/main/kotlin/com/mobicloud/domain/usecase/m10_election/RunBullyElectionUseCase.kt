@@ -44,13 +44,12 @@ class RunBullyElectionUseCase @Inject constructor(
     private val defaultDispatcher: CoroutineDispatcher = Dispatchers.Default
 ) {
     companion object {
-        const val MONITORING_WINDOW_MS = 20_000L
-        // P15 (incident 2026-05-17) : fallback isolation totale. Si après ce délai aucun peer
-        // ni SP n'a été découvert (ex. 3ème device sur subnet WiFi distinct + relay filtre les
-        // SPs au cluster plein), on considère le nœud "isolé légitimement" comme prévu par le
-        // commentaire original du garde-fou hasOtherKnownPeer, et on déclenche BullySolo via
-        // l'élection. Évite le blocage indéfini en état Undiscovered.
-        const val SOLO_BOOTSTRAP_TIMEOUT_MS = 45_000L
+        // Réduit 20s→6s : la latence relay HA ≤ 5s, 6s suffit pour filtrer les
+        // fausses détections SP-absent. Gain : convergence ~14s plus rapide en démo.
+        const val MONITORING_WINDOW_MS = 6_000L
+        // Réduit 45s→20s : le relay Render warm répond en < 5s, cold-start ≤ 40s.
+        // Si aucun pair trouvé en 20s → solo bootstrap légitime (nœud vraiment isolé).
+        const val SOLO_BOOTSTRAP_TIMEOUT_MS = 20_000L
     }
 
     operator fun invoke(): Flow<Result<SuperPairElection>> = flow {
