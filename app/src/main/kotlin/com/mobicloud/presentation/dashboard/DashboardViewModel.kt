@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.mobicloud.domain.models.NetworkLogEvent
 import com.mobicloud.domain.models.NodeDiagnostics
 import com.mobicloud.domain.models.NodeRole
+import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.ServiceStatus
 import com.mobicloud.domain.models.TransferChannelState
 import com.mobicloud.domain.repository.DiagnosticsRepository
@@ -13,7 +14,6 @@ import com.mobicloud.domain.repository.IdentityRepository
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.NetworkServiceController
 import com.mobicloud.domain.repository.NodeSettingsRepository
-import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.usecase.m06_m07_repair_migration.CircuitBreakerUseCase
 import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -33,7 +33,6 @@ class DashboardViewModel @Inject constructor(
     networkServiceController: NetworkServiceController,
     diagnosticsRepository: DiagnosticsRepository,
     networkEventRepository: NetworkEventRepository,
-    private val peerRepository: PeerRepository,
     private val identityRepository: IdentityRepository,
     circuitBreakerUseCase: CircuitBreakerUseCase,
     private val nodeSettingsRepository: NodeSettingsRepository,
@@ -59,12 +58,20 @@ class DashboardViewModel @Inject constructor(
         emit(identityRepository.getIdentity().getOrNull()?.nodeId)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    // [FIX 2026-06-08] Source de vérité du rôle = annuaire de membres (inMemory), identique à
+    // l'onglet Communauté (NetworkViewModel). L'ancienne logique cherchait self dans
+    // `peerRepository.peers` (liste de DÉCOUVERTE LAN/relais) où un nœud ne s'auto-inscrit
+    // jamais → le SP local se voyait toujours "membre" sur le dashboard alors que Communauté
+    // l'affichait correctement en SP. On matche self par le nodeId d'identityRepository, celui
+    // sous lequel MarkSelfAsSuperPairUseCase enregistre self dans le registre.
     val nodeRole: StateFlow<NodeRole> = combine(
-        peerRepository.peers,
+        memberSnapshotCacheUseCase.inMemory,
         localNodeIdFlow
-    ) { peers, localNodeId ->
-        val match = localNodeId != null && peers.any { p -> p.isSuperPair && p.isActive && p.identity.nodeId == localNodeId }
-        android.util.Log.i("DashboardVM", "[ROLE-DIAG] localNodeId=${localNodeId?.take(8)} peersCount=${peers.size} → ${if (match) "SUPER_PAIR" else "PEER"}")
+    ) { members, localNodeId ->
+        val match = localNodeId != null && members.any { m ->
+            m.role == MemberRole.SUPER_PAIR && m.nodeId.toHexString().equals(localNodeId, ignoreCase = true)
+        }
+        android.util.Log.i("DashboardVM", "[ROLE-DIAG] localNodeId=${localNodeId?.take(8)} members=${members.size} → ${if (match) "SUPER_PAIR" else "PEER"}")
         if (match) NodeRole.SUPER_PAIR else NodeRole.PEER
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000L), NodeRole.PEER)
 

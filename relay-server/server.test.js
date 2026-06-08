@@ -259,19 +259,22 @@ describe('handleRegisterPeer', () => {
 
   // Story 12.1 — currentMemberCount (remplace GPS)
   test('Story 12.1 — REGISTER_PEER avec currentMemberCount valide → stocké et retourné par GET_PEERS', () => {
-    const { handleRegisterPeer, handleGetPeers, signalingRegistry, parseFrame } = mod;
+    const { handleRegisterPeer, handleGetPeers, signalingRegistry, parseFrame, MAX_CLUSTER_SIZE_SERVER } = mod;
+    // Agnostique au cap : on utilise une valeur ≤ MAX_CLUSTER_SIZE_SERVER (ajustable selon la
+    // config démo — actuellement 2). Évite que le test casse quand le cap change.
+    const validCount = MAX_CLUSTER_SIZE_SERVER;
     const payload = Buffer.from(JSON.stringify({
-      ip: '10.0.0.1', port: 5000, currentMemberCount: 7
+      ip: '10.0.0.1', port: 5000, currentMemberCount: validCount
     }));
     expect(handleRegisterPeer('a1b2c3d4e5f60708', payload)).toBe(true);
     const entry = signalingRegistry.get('a1b2c3d4e5f60708');
-    expect(entry.currentMemberCount).toBe(7);
+    expect(entry.currentMemberCount).toBe(validCount);
 
     const sent = [];
     const fakeWs = { send: buf => sent.push(buf), readyState: 1 };
     handleGetPeers(fakeWs);
     const peers = JSON.parse(parseFrame(sent[0]).payload.toString('utf8'));
-    expect(peers[0].currentMemberCount).toBe(7);
+    expect(peers[0].currentMemberCount).toBe(validCount);
     clearTimeout(entry.ttlTimer);
   });
 
@@ -302,10 +305,12 @@ describe('handleRegisterPeer', () => {
   });
 
   test('Story 12.1 — handleJoin préserve currentMemberCount du REGISTER_PEER précédent', () => {
-    const { handleRegisterPeer, handleJoin, handleGetPeers, signalingRegistry, parseFrame } = mod;
+    const { handleRegisterPeer, handleJoin, handleGetPeers, signalingRegistry, parseFrame, MAX_CLUSTER_SIZE_SERVER } = mod;
+    // Agnostique au cap : valeur ≤ MAX_CLUSTER_SIZE_SERVER pour ne pas être coercée en 0.
+    const validCount = MAX_CLUSTER_SIZE_SERVER;
     // 1. REGISTER_PEER avec currentMemberCount
     const regPayload = Buffer.from(JSON.stringify({
-      ip: '10.0.0.1', port: 5000, currentMemberCount: 12
+      ip: '10.0.0.1', port: 5000, currentMemberCount: validCount
     }));
     expect(handleRegisterPeer('a1b2c3d4e5f60708', regPayload)).toBe(true);
 
@@ -318,7 +323,7 @@ describe('handleRegisterPeer', () => {
     const fakeWs = { send: buf => sent.push(buf), readyState: 1 };
     handleGetPeers(fakeWs);
     const peers = JSON.parse(parseFrame(sent[0]).payload.toString('utf8'));
-    expect(peers[0].currentMemberCount).toBe(12);
+    expect(peers[0].currentMemberCount).toBe(validCount);
     clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
   });
 
@@ -363,12 +368,20 @@ describe('handleJoin', () => {
     clearTimeout(entry.ttlTimer);
   });
 
-  test('JOIN après REGISTER_PEER NE dégrade PAS le statut Super-Pair', () => {
+  // [MAJ 2026-06-08] Comportement inversé depuis le fix SP-fantôme (2026-06-01) : JOIN
+  // réinitialise TOUJOURS isSuperPair=false. Préserver le statut SP au JOIN faisait apparaître
+  // un nœud redémarré comme SP fantôme dans GET_PEERS → le vrai vainqueur Bully abdiquait à
+  // tort. Un SP actif reclame le statut via REGISTER_PEER (re-envoyé dans les ms suivant le JOIN).
+  test('JOIN réinitialise isSuperPair=false (statut SP reclamé via REGISTER_PEER)', () => {
     const { handleRegisterPeer, handleJoin, signalingRegistry } = mod;
     handleRegisterPeer('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({ ip: '10.0.0.5', port: 5000 })));
     expect(signalingRegistry.get('a1b2c3d4e5f60708').isSuperPair).toBe(true);
+    // JOIN dégrade le statut (anti SP-fantôme)
     handleJoin('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({ ip: '10.0.0.5', port: 5000 })));
-    expect(signalingRegistry.get('a1b2c3d4e5f60708').isSuperPair).toBe(true);  // préservé
+    expect(signalingRegistry.get('a1b2c3d4e5f60708').isSuperPair).toBe(false);
+    // REGISTER_PEER suivant reclame le statut SP
+    handleRegisterPeer('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({ ip: '10.0.0.5', port: 5000 })));
+    expect(signalingRegistry.get('a1b2c3d4e5f60708').isSuperPair).toBe(true);
     clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
   });
 
@@ -449,7 +462,7 @@ describe('handleGetPeers', () => {
     })));
     // 2) Le même nœud envoie un JOIN heartbeat (sans clusterId/freeBytes dans le payload)
     handleJoin('a1b2c3d4e5f60708', Buffer.from(JSON.stringify({ ip: '10.0.0.5', port: 48999 })));
-    // 3) GET_PEERS doit toujours retourner clusterId + freeBytes initiaux
+    // 3) GET_PEERS doit toujours retourner clusterId + freeBytes initiaux (préservés au JOIN)
     const sent = [];
     const fakeWs = { send: (buf) => sent.push(buf), readyState: 1 };
     handleGetPeers(fakeWs);
@@ -457,7 +470,10 @@ describe('handleGetPeers', () => {
     expect(peers.length).toBe(1);
     expect(peers[0].clusterId).toBe(validUuid);
     expect(peers[0].freeBytes).toBe(1024);
-    expect(peers[0].isSuperPair).toBe(true);
+    // [MAJ 2026-06-08] isSuperPair est volontairement réinitialisé à false au JOIN (fix
+    // SP-fantôme du 2026-06-01) — contrairement à clusterId/freeBytes qui restent préservés.
+    // Le statut SP est reclamé via le REGISTER_PEER que le SP renvoie aussitôt après le JOIN.
+    expect(peers[0].isSuperPair).toBe(false);
     clearTimeout(signalingRegistry.get('a1b2c3d4e5f60708').ttlTimer);
   });
 
@@ -729,6 +745,34 @@ describe('flushPendingBlocks', () => {
 
     // Entrée supprimée du buffer
     expect(relayBuffer.has(blockId)).toBe(false);
+  });
+});
+
+// ─── Tests isNodeConnected (grâce d'affichage — fix flicker arête SP↔membre) ───
+
+describe('isNodeConnected (grâce CONN_GRACE_MS)', () => {
+  test('session WS vive → connecté', () => {
+    const { isNodeConnected, sessions } = mod;
+    sessions.set('node000000000001', { ws: {}, publicKey: null });
+    expect(isNodeConnected('node000000000001', { lastSeen: 0 })).toBe(true);
+  });
+
+  test('pas de session mais vu récemment (< grâce) → reste connecté (absorbe le flap WS)', () => {
+    const { isNodeConnected, CONN_GRACE_MS } = mod;
+    const entry = { lastSeen: Date.now() - (CONN_GRACE_MS - 5_000) };
+    expect(isNodeConnected('node000000000001', entry)).toBe(true);
+  });
+
+  test('pas de session et vu il y a longtemps (> grâce) → déconnecté', () => {
+    const { isNodeConnected, CONN_GRACE_MS } = mod;
+    const entry = { lastSeen: Date.now() - (CONN_GRACE_MS + 5_000) };
+    expect(isNodeConnected('node000000000001', entry)).toBe(false);
+  });
+
+  test('lastSeen absent/0 et pas de session → déconnecté (pas de faux positif)', () => {
+    const { isNodeConnected } = mod;
+    expect(isNodeConnected('node000000000001', {})).toBe(false);
+    expect(isNodeConnected('node000000000001', { lastSeen: 0 })).toBe(false);
   });
 });
 

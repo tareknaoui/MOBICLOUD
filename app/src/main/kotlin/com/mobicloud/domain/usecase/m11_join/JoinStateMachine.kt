@@ -234,6 +234,9 @@ class JoinStateMachine @Inject constructor(
                 val newState = NodeJoinState.Member(state.clusterId, event.senderNodeId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
+                // HIGH-1 fix : promouvoir le nouveau SP dans inMemory (swap sans re-JOIN) — sinon
+                // ses keepalives sont rejetés (role=MEMBER) → faux SP_TIMEOUT → ré-élection en boucle.
+                memberSnapshotCacheUseCaseLazy.get().promoteSuperPair(event.senderNodeId)
                 memberHeartbeatUseCaseLazy.get().stop()
                 memberHeartbeatUseCaseLazy.get().start(event.senderNodeId)
                 memberHeartbeatUseCaseLazy.get().markSpSeen()
@@ -249,6 +252,8 @@ class JoinStateMachine @Inject constructor(
                 val newState = NodeJoinState.Member(state.clusterId, memberId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
+                // HIGH-1 fix : promouvoir le nouveau SP dans inMemory (swap sans re-JOIN).
+                memberSnapshotCacheUseCaseLazy.get().promoteSuperPair(memberId)
                 memberHeartbeatUseCaseLazy.get().stop()
                 memberHeartbeatUseCaseLazy.get().start(memberId)
             }
@@ -291,6 +296,9 @@ class JoinStateMachine @Inject constructor(
                 val newState = NodeJoinState.Member(state.clusterId, event.senderNodeId)
                 _currentState.value = newState
                 logStateChange(state, newState, event)
+                // HIGH-1 fix : promouvoir le nouveau SP dans inMemory (swap sans re-JOIN) — sinon
+                // ses keepalives sont rejetés (role=MEMBER) → faux SP_TIMEOUT → ré-élection en boucle.
+                memberSnapshotCacheUseCaseLazy.get().promoteSuperPair(event.senderNodeId)
                 memberHeartbeatUseCaseLazy.get().stop()
                 memberHeartbeatUseCaseLazy.get().start(event.senderNodeId)
                 memberHeartbeatUseCaseLazy.get().markSpSeen()

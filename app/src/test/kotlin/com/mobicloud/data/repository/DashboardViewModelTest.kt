@@ -84,11 +84,12 @@ class DashboardViewModelTest {
         Dispatchers.resetMain()
     }
 
+    // [Bug 2 fix 2026-06-08] peerRepository retiré du constructeur — nodeRole lit désormais
+    // memberSnapshotCacheUseCase.inMemory (annuaire de membres) au lieu de peerRepository.peers.
     private fun createViewModel() = DashboardViewModel(
         networkServiceController,
         diagnosticsRepository,
         networkEventRepository,
-        peerRepository,
         identityRepository,
         circuitBreakerUseCase,
         nodeSettingsRepository,

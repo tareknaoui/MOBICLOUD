@@ -10,6 +10,7 @@ import com.mobicloud.domain.models.m11_join.RejoinReason
 import com.mobicloud.domain.models.m11_join.SuperPeerHint
 import com.mobicloud.domain.repository.NetworkEventRepository
 import io.mockk.coEvery
+import io.mockk.coVerify
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -263,6 +264,65 @@ class JoinStateMachineTest {
         val newSpId = byteArrayOf(0xEE.toByte())
         fsm.transition(JoinEvent.CoordinatorReceived(senderNodeId = newSpId, clusterId = "autre-cluster"))
         assertTrue("Doit rester Rejoining (cluster différent ignoré)", fsm.currentState.value is NodeJoinState.Rejoining)
+    }
+
+    // ---- HIGH-1 : promotion du nouveau SP dans inMemory sur swap COORDINATOR (sans re-JOIN) ----
+    // Sans ça, le nouveau SP reste role=MEMBER chez les membres → keepalives rejetés → faux
+    // SP_TIMEOUT → ré-élection en boucle. On vérifie que la FSM promeut bien le nouveau SP.
+
+    @Test
+    fun `HIGH-1 Rejoining + CoordinatorReceived promeut le nouveau SP dans le cache`() = runTest(dispatcher) {
+        val snap = mockk<MemberSnapshotCacheUseCase>(relaxed = true)
+        val localFsm = JoinStateMachine(
+            networkEventRepository,
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { snap },
+            mockk(relaxed = true), dispatcher
+        )
+        // Member → Rejoining
+        localFsm.transition(JoinEvent.NewCandidateDetected(spHint))
+        localFsm.transition(
+            JoinEvent.JoinAcceptReceived(
+                JoinResponse.JoinAccept(clusterId, spNodeId, emptyList(), 1L, byteArrayOf(1))
+            )
+        )
+        localFsm.transition(JoinEvent.SpTimeoutDetected(spNodeId))
+        // Swap via COORDINATOR du nouveau SP
+        val newSpId = byteArrayOf(0xEE.toByte())
+        localFsm.transition(JoinEvent.CoordinatorReceived(senderNodeId = newSpId, clusterId = clusterId))
+
+        coVerify { snap.promoteSuperPair(match { it.contentEquals(newSpId) }) }
+    }
+
+    @Test
+    fun `HIGH-1 Member + CoordinatorReceived nouveau SP promeut dans le cache`() = runTest(dispatcher) {
+        val snap = mockk<MemberSnapshotCacheUseCase>(relaxed = true)
+        val localFsm = JoinStateMachine(
+            networkEventRepository,
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { mockk(relaxed = true) },
+            dagger.Lazy { snap },
+            mockk(relaxed = true), dispatcher
+        )
+        // Member (SP = spNodeId)
+        localFsm.transition(JoinEvent.NewCandidateDetected(spHint))
+        localFsm.transition(
+            JoinEvent.JoinAcceptReceived(
+                JoinResponse.JoinAccept(clusterId, spNodeId, emptyList(), 1L, byteArrayOf(1))
+            )
+        )
+        // COORDINATOR d'un AUTRE SP, même cluster → swap sans re-JOIN
+        val newSpId = byteArrayOf(0xEE.toByte())
+        localFsm.transition(JoinEvent.CoordinatorReceived(senderNodeId = newSpId, clusterId = clusterId))
+
+        coVerify { snap.promoteSuperPair(match { it.contentEquals(newSpId) }) }
     }
 
     // ---- Fix D2 : Rejoining + NewCandidateDetected → Joining (fallback COORDINATOR perdu) ----

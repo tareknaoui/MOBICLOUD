@@ -39,6 +39,12 @@ class MemberSnapshotCacheUseCaseTest {
     private fun member(nodeId: ByteArray) =
         MemberInfo(nodeId, sig, "1.2.3.4", 80, 100L, MemberRole.MEMBER)
 
+    private fun superPair(nodeId: ByteArray) =
+        MemberInfo(nodeId, sig, "1.2.3.4", 80, 100L, MemberRole.SUPER_PAIR)
+
+    private fun roleOf(useCase: MemberSnapshotCacheUseCase, nodeId: ByteArray): MemberRole? =
+        useCase.inMemory.value.firstOrNull { it.nodeId.contentEquals(nodeId) }?.role
+
     @Before
     fun setUp() {
         snapshotDao = mockk(relaxed = true)
@@ -99,6 +105,48 @@ class MemberSnapshotCacheUseCaseTest {
         useCase.applyUpdate(update)
         assertEquals(1, useCase.inMemory.value.size)
         assertTrue(useCase.inMemory.value[0].nodeId.contentEquals(nodeA))
+    }
+
+    // HIGH-1 : promoteSuperPair promeut le nouveau SP et rétrograde l'ancien (swap COORDINATOR)
+    @Test
+    fun `promoteSuperPair promeut le nouveau SP et retrograde l ancien`() = runTest(testDispatcher) {
+        val useCase = makeUseCase(this)
+        // Snapshot initial : spNode est SUPER_PAIR, nodeA et nodeB sont MEMBER
+        useCase.seedFromJoinAccept("cid", spNode, listOf(superPair(spNode), member(nodeA), member(nodeB)))
+
+        // nodeB gagne Bully → swap via COORDINATOR
+        useCase.promoteSuperPair(nodeB)
+
+        assertEquals(MemberRole.SUPER_PAIR, roleOf(useCase, nodeB))
+        assertEquals(MemberRole.MEMBER, roleOf(useCase, spNode))   // ancien SP rétrogradé
+        assertEquals(MemberRole.MEMBER, roleOf(useCase, nodeA))    // inchangé
+        assertEquals(3, useCase.inMemory.value.size)               // pas de perte de membre
+    }
+
+    // HIGH-1 : promoteSuperPair persiste le snapshot disque (cohérent avec applyUpdate)
+    @Test
+    fun `promoteSuperPair persiste le snapshot disque`() = runTest(testDispatcher) {
+        val useCase = makeUseCase(this)
+        useCase.seedFromJoinAccept("cid", spNode, listOf(superPair(spNode), member(nodeB)))
+        coEvery { snapshotDao.get("cid") } returns MemberSnapshotEntity("cid", "11", 1L, "[]")
+
+        useCase.promoteSuperPair(nodeB)
+
+        coVerify { snapshotDao.get("cid") }
+        coVerify(atLeast = 2) { snapshotDao.upsert(match { it.clusterId == "cid" }) } // seed + promote
+    }
+
+    // HIGH-1 : no-op si le nouveau SP est absent du cache (membre devra re-JOIN)
+    @Test
+    fun `promoteSuperPair est un no-op si le nouveau SP est absent`() = runTest(testDispatcher) {
+        val useCase = makeUseCase(this)
+        useCase.seedFromJoinAccept("cid", spNode, listOf(superPair(spNode), member(nodeA)))
+        val before = useCase.inMemory.value
+
+        useCase.promoteSuperPair(nodeB) // nodeB jamais vu
+
+        assertEquals(before, useCase.inMemory.value)              // inchangé
+        assertEquals(MemberRole.SUPER_PAIR, roleOf(useCase, spNode)) // ancien SP préservé
     }
 
     // C5 régression : applyUpdate doit PERSISTER le snapshot sur disque avec le bon clusterId

@@ -31,8 +31,12 @@ const MSG = {
   ERROR: 0xFF
 };
 
-// Story 12.1 — MIRROR: app/.../ClusterConstants.kt#MAX_CLUSTER_SIZE
-const MAX_CLUSTER_SIZE_SERVER = 2;
+// Story 12.1 — MIRROR: app/.../ClusterConstants.kt#MAX_CLUSTER_SIZE (= 50).
+// Aligné sur la valeur Android le 2026-06-08 (était 2, divergeait du commentaire MIRROR) :
+// un SP Android admet jusqu'à 50 membres ; avec un cap relais à 2, tout currentMemberCount > 2
+// était coercé en 0 → un SP avec 3+ membres se déclarait "vide" au tracker → la découverte par
+// charge (Epic 12.2) sur-admettait sans balancer. 50 rétablit la cohérence d'admission.
+const MAX_CLUSTER_SIZE_SERVER = 50;
 
 const TTL_MS = 180_000;              // TTL registre signaling — 3 min pour survivre aux pauses Doze Android (~90s)
 const AUTH_WINDOW_MS = 30_000;       // fenêtre anti-replay auth
@@ -41,6 +45,11 @@ const MAX_BLOCK_SIZE = 20_000_000;   // 20 MB — support de plus gros blocs
 const MAX_RELAY_BUFFER_ENTRIES = 500; // cap total des blocs en attente en RAM
 const MAX_SIGNALING_PEERS = 100;      // cap total des Super-Pairs enregistrés
 const HEARTBEAT_INTERVAL_MS = 60_000; // ping ws protocol-level — 60s pour tolérer les pauses réseau Doze (kill après 2 cycles = 120s sans pong)
+// Grâce d'affichage : un nœud reste "connecté" pour le rendu jusqu'à 45s après une coupure WS
+// transitoire (reconnexion radio 4G ↔ relais 10-40s documentée). Sans ça, `sessions.has()`
+// passe false le temps d'un poll → les arêtes SP↔membre clignotent sur le dashboard React.
+// 45s > latence reconnexion, < TTL_MS (le nœud reste membre logique 180s), > heartbeat (30s).
+const CONN_GRACE_MS = 45_000;
 
 // Regex IP : IPv4 ou IPv6 compacte — pas de hostname
 const IP_RE = /^[\d.:a-fA-F]{2,45}$/;
@@ -218,6 +227,16 @@ function getChurnRate() {
   return Math.round((uniqueDeparted.size / total) * 100);
 }
 
+// Un nœud est "connecté" pour l'AFFICHAGE s'il a une session WS vive OU s'il a été vu très
+// récemment (grâce CONN_GRACE_MS). Absorbe les reconnexions transport transitoires qui sinon
+// faisaient clignoter les arêtes SP↔membre. Cohérent avec la rétention TTL_MS du registre.
+// NB : on garde `sessions.has()` strict pour la joignabilité transfert (fragments).
+function isNodeConnected(nodeId, entry) {
+  if (sessions.has(nodeId)) return true;
+  const lastSeen = entry?.lastSeen ?? 0;
+  return lastSeen > 0 && (Date.now() - lastSeen) < CONN_GRACE_MS;
+}
+
 // ─── Vue agrégée par cluster ──────────────────────────────────────────────────
 function buildClusterView() {
   const clusters = new Map(); // clusterId → { superPeer, members[], totalFreeBytes, avgReliability }
@@ -233,7 +252,7 @@ function buildClusterView() {
       isSuperPair: entry.isSuperPair,
       reliabilityScore: entry.reliabilityScore ?? 0,
       freeBytes: entry.freeBytes ?? 0,
-      isConnected: sessions.has(nodeId),
+      isConnected: isNodeConnected(nodeId, entry),
       lastSeen: entry.lastSeen
     });
     c.totalFreeBytes += entry.freeBytes ?? 0;
@@ -952,7 +971,7 @@ const httpServer = http.createServer((req, res) => {
         ip: entry.ip ?? '',
         port: entry.port ?? 0,
         lastSeen: entry.lastSeen ?? 0,
-        isConnected: sessions.has(nodeId)
+        isConnected: isNodeConnected(nodeId, entry)
       });
     }
     // Liens intra-cluster : full mesh entre nœuds connectés du même cluster
@@ -1259,7 +1278,9 @@ if (require.main === module) {
 module.exports = {
   buildFrame, parseFrame, sendError, safeSend, verifyAuth,
   handleRegisterPeer, handleJoin, handleGetPeers, handleUpload, handleRequestBlock, flushPendingBlocks,
+  isNodeConnected,
   sessions, signalingRegistry, relayBuffer,
+  CONN_GRACE_MS, MAX_CLUSTER_SIZE_SERVER,
   MSG, TTL_MS, AUTH_WINDOW_MS, AUTH_TIMEOUT_MS, MAX_BLOCK_SIZE,
   MAX_RELAY_BUFFER_ENTRIES, MAX_SIGNALING_PEERS,
   httpServer, startServer
