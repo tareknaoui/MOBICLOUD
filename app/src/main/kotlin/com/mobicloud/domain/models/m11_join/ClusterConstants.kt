@@ -1,8 +1,8 @@
 package com.mobicloud.domain.models.m11_join
 
 // Plafond batterie côté SP + critère unique d'admission (Story 12.1)
-// 50 membres × heartbeat 30 s = 1 667 msg/min.
-const val MAX_CLUSTER_SIZE = 50
+// Le SP se compte lui-même (il s'ajoute à son registre) → 3 = 1 SP + 2 membres max par cluster.
+const val MAX_CLUSTER_SIZE = 3
 
 // Bump de version protocole JOIN suite au retrait GPS du payload signé (Story 12.1).
 const val JOIN_PROTOCOL_VERSION = 2

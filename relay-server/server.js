@@ -31,12 +31,11 @@ const MSG = {
   ERROR: 0xFF
 };
 
-// Story 12.1 — MIRROR: app/.../ClusterConstants.kt#MAX_CLUSTER_SIZE (= 50).
-// Aligné sur la valeur Android le 2026-06-08 (était 2, divergeait du commentaire MIRROR) :
-// un SP Android admet jusqu'à 50 membres ; avec un cap relais à 2, tout currentMemberCount > 2
-// était coercé en 0 → un SP avec 3+ membres se déclarait "vide" au tracker → la découverte par
-// charge (Epic 12.2) sur-admettait sans balancer. 50 rétablit la cohérence d'admission.
-const MAX_CLUSTER_SIZE_SERVER = 50;
+// Story 12.1 — MIRROR: app/.../ClusterConstants.kt#MAX_CLUSTER_SIZE (= 3).
+// Doit rester synchronisé avec la valeur Android : si MAX_CLUSTER_SIZE_SERVER < MAX_CLUSTER_SIZE
+// Android, tout currentMemberCount > MAX_CLUSTER_SIZE_SERVER est coercé à 0 → le guard
+// Isolated côté Android ne fire jamais → boucle JOIN→rejet→retry infinie sur cluster plein.
+const MAX_CLUSTER_SIZE_SERVER = 3;
 
 const TTL_MS = 180_000;              // TTL registre signaling — 3 min pour survivre aux pauses Doze Android (~90s)
 const AUTH_WINDOW_MS = 30_000;       // fenêtre anti-replay auth

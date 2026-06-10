@@ -40,7 +40,8 @@ sealed class NodeJoinState {
 
     data class Isolated(
         val rejectionCount: Int,
-        val lastRejectionTimeMs: Long
+        val lastRejectionTimeMs: Long,
+        val lastRejectedSPId: String = ""
     ) : NodeJoinState()
 }
 

@@ -599,11 +599,18 @@ class MobicloudP2PService : Service() {
                                 // En Isolated : ignorer les SPs pleins pour laisser le timer d'isolation
                                 // expirer → BullySolo. Sans ça, GET_PEERS toutes les 10s remet le timer
                                 // à zéro et BullySolo ne démarre jamais.
+                                // Fix boucle infinie (cluster plein, currentMemberCount=0 relay) :
+                                // le relay retourne toujours currentMemberCount=0 (champ optionnel non
+                                // garanti), donc le guard currentMemberCount >= MAX_CLUSTER_SIZE ne fire
+                                // jamais. On complète avec lastRejectedSPId : si ce SP nous a déjà rejeté
+                                // (stocké dans Isolated.lastRejectedSPId), on préserve le timer même si
+                                // le relay dit qu'il a de la place.
                                 // En Rejoining : fallback si le COORDINATOR a été perdu via relay —
                                 // le nœud trouve le nouveau SP dans le tracker et envoie JOIN directement.
                                 if (fsmState is NodeJoinState.Isolated &&
-                                    hint.currentMemberCount >= com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE) {
-                                    Log.i(LOGTAG, "[JOIN] SP ${peer.nodeId.take(8)} plein (${hint.currentMemberCount}/${ com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE}) — Isolated timer préservé")
+                                    (hint.currentMemberCount >= com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE ||
+                                     peer.nodeId == fsmState.lastRejectedSPId)) {
+                                    Log.i(LOGTAG, "[JOIN] SP ${peer.nodeId.take(8)} plein ou déjà rejeté (count=${hint.currentMemberCount}, lastRejected=${fsmState.lastRejectedSPId.take(8)}) — Isolated timer préservé")
                                 } else {
                                     joinStateMachine.transition(JoinEvent.NewCandidateDetected(hint))
                                     Log.i(LOGTAG, "[JOIN] NewCandidateDetected → SP ${peer.nodeId.take(8)} (state=${fsmState::class.simpleName})")

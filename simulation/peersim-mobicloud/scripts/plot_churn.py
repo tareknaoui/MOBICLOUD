@@ -76,7 +76,7 @@ files = sys.argv[2:]
 
 # ── Mode DHT churn ────────────────────────────────────────────────────────────
 if mode == '--dht':
-    labels = ['Sans churn (0%)', 'Churn 10%', 'Churn 20%', 'Churn 30%']
+    labels = ['No churn (0%)', 'Churn 10%', 'Churn 20%', 'Churn 30%']
     colors = ['#2ecc71', '#3498db', '#e67e22', '#e74c3c']
 
     fig, ax = plt.subplots(figsize=(11, 6))
@@ -89,12 +89,12 @@ if mode == '--dht':
                 linewidth=2, marker='o', markersize=3)
 
     ax.axhline(y=95, color='gray', linestyle='--', alpha=0.5,
-               label='Seuil 95% (operationnel)')
+               label='95% threshold (operational)')
 
-    ax.set_xlabel('Cycles de gossip (1 cycle = 2s simulees)', fontsize=12)
-    ax.set_ylabel('% de noeuds actifs avec DHT complete', fontsize=12)
-    ax.set_title('Robustesse du gossip CRDT LWW sous churn mobile\n'
-                 '(N=1000 noeuds, fanout=2, blocs=100)', fontsize=13)
+    ax.set_xlabel('Gossip cycles (1 cycle = 2 simulated seconds)', fontsize=12)
+    ax.set_ylabel('% of active nodes with complete DHT', fontsize=12)
+    ax.set_title('DHT Robustness Under Mobile Churn\n'
+                 '(N=1000 nodes, fanout=2, blocks=100)', fontsize=13)
     ax.legend(loc='lower right', fontsize=10)
     ax.set_ylim(-5, 105)
     ax.grid(True, alpha=0.3)
@@ -109,17 +109,13 @@ elif mode == '--bully':
     for path in files:
         cycles, counts = read_bully_csv(path)
         ax.plot(cycles, counts, linewidth=2, color='#3498db',
-                marker='o', markersize=4, label='Nb super-peers actifs')
+                marker='o', markersize=4, label='Active super-peers')
 
-    # Annotation : moment de la panne
     ax.axvline(x=20, color='#e74c3c', linestyle='--', linewidth=1.5,
-               label='Panne super-peer (cycle 20)')
-    ax.annotate('Panne\nsuper-peer', xy=(20, 1), xytext=(22, 1.3),
+               label='Super-peer failure (cycle 20)')
+    ax.annotate('Super-peer\nfailure', xy=(20, 1), xytext=(22, 1.3),
                 fontsize=9, color='#e74c3c',
                 arrowprops=dict(arrowstyle='->', color='#e74c3c'))
-
-    ax.axhline(y=1, color='#2ecc71', linestyle=':', alpha=0.7,
-               label='Cible : 1 super-peer')
 
     # Zoom sur la fenêtre autour de la panne pour mieux voir le dip/recovery
     kill_cycle = 20
@@ -130,10 +126,10 @@ elif mode == '--bully':
     y_base   = max(visible_counts) if visible_counts else 1
     y_margin = max(3, int(y_base * 0.10))
 
-    ax.set_xlabel('Cycles d\'election Bully (1 cycle = 2s simulees)', fontsize=12)
-    ax.set_ylabel('Nombre de super-peers actifs', fontsize=12)
-    ax.set_title('Re-election Bully apres panne du super-peer\n'
-                 '(N=1000 noeuds, panne au cycle 20 -- zoom cycles 10-35)', fontsize=13)
+    ax.set_xlabel('Bully election cycles (1 cycle = 2 simulated seconds)', fontsize=12)
+    ax.set_ylabel('Number of active super-peers', fontsize=12)
+    ax.set_title('Bully Re-election After Super-Peer Failure\n'
+                 '(N=1000 nodes, failure at cycle 20 — zoom cycles 10–35)', fontsize=13)
     ax.legend(loc='upper right', fontsize=10)
     ax.set_xlim(x_min, x_max)
     ax.set_ylim(max(0, y_base - y_margin - 1), y_base + y_margin)

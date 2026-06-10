@@ -131,7 +131,7 @@ class JoinStateMachine @Inject constructor(
                     _currentState.value = newState
                     logStateChange(state, newState, event)
                 } else {
-                    val iso = NodeJoinState.Isolated(1, System.currentTimeMillis())
+                    val iso = NodeJoinState.Isolated(1, System.currentTimeMillis(), state.targetSuperPair.nodeId.toHexString())
                     _currentState.value = iso
                     logStateChange(state, iso, event)
                     startIsolationTimer()
@@ -142,7 +142,8 @@ class JoinStateMachine @Inject constructor(
             state is NodeJoinState.Joining && event is JoinEvent.AllCandidatesExhausted -> {
                 val iso = NodeJoinState.Isolated(
                     state.attemptIndex + 1,
-                    System.currentTimeMillis()
+                    System.currentTimeMillis(),
+                    state.targetSuperPair.nodeId.toHexString()
                 )
                 _currentState.value = iso
                 logStateChange(state, iso, event)

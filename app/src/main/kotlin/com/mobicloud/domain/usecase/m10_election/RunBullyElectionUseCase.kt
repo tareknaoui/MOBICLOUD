@@ -113,7 +113,11 @@ class RunBullyElectionUseCase @Inject constructor(
             return@flow
         }
 
-        val timeoutMillis = 3_000L
+        // 8s (au lieu de 3s) : l'élection cède à un nœud de meilleur score via un ALIVE qui exige
+        // 2 sauts de relais (ELECTION aller + ALIVE retour). À 3s il fallait latence_relais < 1.5s ;
+        // le relay Render dépasse souvent ça → le nœud de plus bas score timeout et s'auto-promeut
+        // → vainqueur dépendant du timing, pas du score. 8s absorbe 2 sauts d'un relay warm (~2-3s).
+        val timeoutMillis = 8_000L
         val higherAliveReceived = withTimeoutOrNull(timeoutMillis) {
             networkClient.incomingMessages.firstOrNull { msg ->
                 when (msg.type) {
