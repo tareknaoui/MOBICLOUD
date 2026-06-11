@@ -83,117 +83,211 @@ function mimeIcon(mime: string) {
   if (mime === 'application/zip') return 'ZIP';
   return 'FILE';
 }
-function fmtAgo(ms: number) {
-  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
-  if (s < 5) return 'à l\'instant';
-  if (s < 60) return `il y a ${s}s`;
-  const m = Math.floor(s / 60);
-  return m < 60 ? `il y a ${m}m` : `il y a ${Math.floor(m / 60)}h`;
+
+function FileRow({ f, nodeId, onClick, accent = '#a855f7' }: { f: FragmentFile; nodeId: string; onClick: () => void; accent?: string }) {
+  const myFrag = f.fragments.find(fr => fr.nodeId === nodeId);
+  const alive  = f.fragments.filter(fr => fr.nodeConnected).length;
+  const sc     = alive < f.k ? '#ef4444' : alive === f.fragments.length ? '#22c55e' : '#f97316';
+  return (
+    <div onClick={onClick}
+      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 7, cursor: 'pointer', marginBottom: 5, background: 'var(--bg-card2)', border: '1px solid var(--border)', transition: 'border-color 0.15s' }}
+      onMouseEnter={e => (e.currentTarget.style.borderColor = accent)}
+      onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+    >
+      <span style={{ fontSize: 10, fontFamily: 'monospace', background: 'var(--bg-card)', color: accent, padding: '2px 5px', borderRadius: 3, flexShrink: 0 }}>{mimeIcon(f.mimeType)}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.fileName}</div>
+        <div style={{ fontSize: 10, color: 'var(--text-dim)', marginTop: 2 }}>
+          {fmtBytes(f.totalSize)} · RS({f.k},{f.n})
+          {myFrag && <span style={{ color: accent, marginLeft: 5 }}>fragment #{myFrag.index}</span>}
+        </div>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: sc }}>{alive}/{f.fragments.length}</div>
+        <div style={{ fontSize: 9, color: alive >= f.k ? '#22c55e' : '#ef4444', marginTop: 1 }}>{alive >= f.k ? '✓' : '✗'}</div>
+      </div>
+      <span style={{ color: 'var(--text-dim)', fontSize: 12 }}>›</span>
+    </div>
+  );
 }
 
-interface NodePanelProps {
+interface NodeSidebarProps {
   node: SelectedNode;
   fragmentFiles: FragmentFile[];
-  hlFileId: string | null;
   killing: string | null;
   onClose: () => void;
-  onHighlight: (id: string | null) => void;
+  onFocusNode: (nodeId: string) => void;
   onKill: (id: string) => void;
 }
 
-function NodePanel({ node, fragmentFiles, hlFileId, killing, onClose, onHighlight, onKill }: NodePanelProps) {
+function NodeSidebar({ node, fragmentFiles, killing, onClose, onFocusNode, onKill }: NodeSidebarProps) {
+  const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const used = Math.max(0, node.totalBytes - node.freeBytes);
-  const pct = node.totalBytes > 0 ? Math.min(100, (used / node.totalBytes) * 100) : 0;
+  const pct  = node.totalBytes > 0 ? Math.min(100, (used / node.totalBytes) * 100) : 0;
   const barColor = pct >= 90 ? '#ff3b30' : pct >= 70 ? '#ff9f0a' : '#34c759';
-  const relPct = Math.min(100, Math.max(0, node.reliabilityScore * 100));
-  const nodeFiles = fragmentFiles.filter(f => f.fragments.some(fr => fr.nodeId === node.id));
+  const relPct   = Math.min(100, Math.max(0, node.reliabilityScore * 100));
+  // Fichiers dont CE nœud héberge au moins un fragment
+  const hostedFiles  = fragmentFiles.filter(f => f.fragments.some(fr => fr.nodeId === node.id));
+  // Fichiers uploadés PAR ce nœud
+  const ownedFiles   = fragmentFiles.filter(f => f.uploaderNodeId === node.id && !f.fragments.some(fr => fr.nodeId === node.id));
+  const activeFile = activeFileId ? fragmentFiles.find(f => f.fileId === activeFileId) ?? null : null;
 
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column', padding: '8px 10px', fontSize: 11, color: 'var(--text-primary)', overflowY: 'auto' }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, flexShrink: 0 }}>
-        <span style={{
-          width: 9, height: 9, borderRadius: '50%', display: 'inline-block', flexShrink: 0,
-          background: node.isSuperPair ? '#facc15' : node.isConnected ? node.color : '#6b7280',
-          boxShadow: node.isSuperPair ? '0 0 5px rgba(250,204,21,0.7)' : 'none',
-        }} />
-        <span style={{ fontWeight: 700, fontSize: 12 }}>
-          {node.isSuperPair ? 'Super-Peer' : node.isConnected ? 'Member' : 'Offline'}
-        </span>
-        <span style={{ fontFamily: 'monospace', fontSize: 9, color: 'var(--text-dim)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {node.id.slice(0, 14)}…
-        </span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 13, padding: 0, lineHeight: 1 }}>✕</button>
-      </div>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', fontSize: 12, color: 'var(--text-primary)' }}>
 
-      {/* Grid info */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '4px 8px', alignItems: 'center', fontSize: 10, flexShrink: 0 }}>
-        <span style={{ color: 'var(--text-dim)' }}>Cluster</span>
-        <span style={{ fontFamily: 'monospace', fontSize: 9, color: 'var(--accent-blue)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {node.clusterId ? node.clusterId.slice(0, 12) + '…' : '—'}
-        </span>
-
-        <span style={{ color: 'var(--text-dim)' }}>Fiabilité</span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ fontWeight: 700, color: reliabilityColor(node.reliabilityScore), minWidth: 30 }}>{relPct.toFixed(0)}%</span>
-          <div style={{ flex: 1, height: 4, borderRadius: 2, background: 'var(--bg-card2)', overflow: 'hidden' }}>
-            <div style={{ width: `${relPct}%`, height: '100%', background: reliabilityColor(node.reliabilityScore), borderRadius: 2 }} />
-          </div>
-        </span>
-
-        <span style={{ color: 'var(--text-dim)' }}>Stockage</span>
-        <span>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, marginBottom: 2, color: 'var(--text-sec)' }}>
-            <span><strong style={{ color: 'var(--text-primary)' }}>{fmtBytes(used)}</strong> / {fmtBytes(node.totalBytes)}</span>
-            <span style={{ color: barColor }}>{pct.toFixed(0)}%</span>
-          </div>
-          <div style={{ height: 4, borderRadius: 2, background: 'var(--bg-card2)', overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 2, transition: 'width 0.4s ease' }} />
-          </div>
-          <div style={{ fontSize: 9, marginTop: 2, color: 'var(--text-dim)' }}>Libre : {fmtBytes(node.freeBytes)}</div>
-        </span>
-
-        <span style={{ color: 'var(--text-dim)' }}>Adresse</span>
-        <span style={{ fontFamily: 'monospace', fontSize: 9 }}>{node.ip || '—'}:{node.port || '—'}</span>
-
-        <span style={{ color: 'var(--text-dim)' }}>Vu</span>
-        <span style={{ fontSize: 9, color: 'var(--text-sec)' }}>{node.lastSeen ? fmtAgo(node.lastSeen) : '—'}</span>
-      </div>
-
-      {/* Fragments */}
-      {nodeFiles.length > 0 && (
-        <div style={{ marginTop: 7, borderTop: '1px solid var(--border)', paddingTop: 6, flexShrink: 0 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: '#a855f7', marginBottom: 4 }}>
-            Fragments ({nodeFiles.length})
-          </div>
-          {nodeFiles.map(f => {
-            const isHl = hlFileId === f.fileId;
-            const myFrag = f.fragments.find(fr => fr.nodeId === node.id);
-            const alive = f.fragments.filter(fr => fr.nodeConnected).length;
-            const sc = alive < f.k ? '#ef4444' : alive < f.n ? '#f97316' : '#22c55e';
-            return (
-              <div key={f.fileId} onClick={() => onHighlight(isHl ? null : f.fileId)}
-                style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '3px 5px', borderRadius: 4, cursor: 'pointer', marginBottom: 2,
-                  background: isHl ? '#3b0764' : 'var(--bg-card2)', border: `1px solid ${isHl ? '#a855f7' : 'var(--border)'}` }}>
-                <span style={{ fontSize: 8, fontFamily: 'monospace', background: 'var(--bg-card)', color: '#a855f7', padding: '1px 3px', borderRadius: 2, flexShrink: 0 }}>{mimeIcon(f.mimeType)}</span>
-                <span style={{ flex: 1, fontSize: 9, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{f.fileName}</span>
-                {myFrag && <span style={{ fontSize: 8, fontFamily: 'monospace', color: '#a855f7', fontWeight: 700 }}>#{myFrag.index}</span>}
-                <span style={{ fontSize: 8, fontWeight: 700, color: sc }}>{alive}/{f.n}</span>
-                <span style={{ fontSize: 8, color: isHl ? '#a855f7' : 'var(--text-dim)' }}>{isHl ? '●' : '○'}</span>
-              </div>
-            );
-          })}
+      {/* ── Header nœud ── */}
+      <div style={{ flexShrink: 0, padding: '10px 14px 8px', borderBottom: '1px solid var(--border)', background: 'var(--bg-surface)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}>
+          <span style={{
+            width: 11, height: 11, borderRadius: '50%', flexShrink: 0, display: 'inline-block',
+            background: node.isSuperPair ? '#facc15' : node.isConnected ? node.color : '#6b7280',
+            boxShadow: node.isSuperPair ? '0 0 6px rgba(250,204,21,0.8)' : 'none',
+          }} />
+          <span style={{ fontWeight: 700, fontSize: 13 }}>
+            {node.isSuperPair ? 'Super-Peer' : node.isConnected ? 'Member' : 'Offline'}
+          </span>
+          <span style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--text-dim)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {node.id.slice(0, 16)}…
+          </span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)', fontSize: 16, lineHeight: 1, padding: 0 }}>✕</button>
         </div>
-      )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '5px 10px', fontSize: 11 }}>
+          <span style={{ color: 'var(--text-dim)' }}>Cluster</span>
+          <span style={{ fontFamily: 'monospace', fontSize: 10, color: 'var(--accent-blue)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {node.clusterId ? node.clusterId.slice(0, 12) + '…' : '—'}
+          </span>
+          <span style={{ color: 'var(--text-dim)' }}>Fiabilité</span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontWeight: 700, color: reliabilityColor(node.reliabilityScore), minWidth: 32 }}>{relPct.toFixed(0)}%</span>
+            <div style={{ flex: 1, height: 5, borderRadius: 3, background: 'var(--bg-card2)', overflow: 'hidden' }}>
+              <div style={{ width: `${relPct}%`, height: '100%', background: reliabilityColor(node.reliabilityScore), borderRadius: 3 }} />
+            </div>
+          </span>
+          <span style={{ color: 'var(--text-dim)' }}>Stockage</span>
+          <span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, marginBottom: 3 }}>
+              <span><strong>{fmtBytes(used)}</strong> / {fmtBytes(node.totalBytes)}</span>
+              <span style={{ color: barColor }}>{pct.toFixed(0)}%</span>
+            </div>
+            <div style={{ height: 5, borderRadius: 3, background: 'var(--bg-card2)', overflow: 'hidden' }}>
+              <div style={{ width: `${pct}%`, height: '100%', background: barColor, borderRadius: 3, transition: 'width 0.4s' }} />
+            </div>
+          </span>
+          <span style={{ color: 'var(--text-dim)' }}>IP</span>
+          <span style={{ fontFamily: 'monospace', fontSize: 10 }}>{node.ip || '—'}:{node.port || '—'}</span>
+        </div>
+      </div>
 
-      {/* Kill */}
+      {/* ── Corps : liste fichiers OU détail fichier ── */}
+      <div style={{ flex: '1 1 0', minHeight: 0, overflowY: 'auto', padding: '10px 14px' }}>
+
+        {!activeFile ? (
+          /* ── Listes fichiers ── */
+          <>
+            {/* Fichiers dont ce nœud héberge un fragment */}
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a855f7', marginBottom: 8 }}>
+              Fragments hébergés — {hostedFiles.length}
+            </div>
+            {hostedFiles.length === 0 ? (
+              <div style={{ color: 'var(--text-dim)', fontSize: 11, fontStyle: 'italic', marginBottom: 14 }}>Aucun fragment stocké ici</div>
+            ) : hostedFiles.map(f => <FileRow key={f.fileId} f={f} nodeId={node.id} onClick={() => setActiveFileId(f.fileId)} />)}
+
+            {/* Fichiers uploadés par ce nœud (mais dont les fragments sont ailleurs) */}
+            {ownedFiles.length > 0 && (
+              <>
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#38bdf8', marginTop: 14, marginBottom: 8 }}>
+                  Fichiers uploadés — {ownedFiles.length}
+                </div>
+                {ownedFiles.map(f => <FileRow key={f.fileId} f={f} nodeId={node.id} onClick={() => setActiveFileId(f.fileId)} accent="#38bdf8" />)}
+              </>
+            )}
+          </>
+        ) : (
+          /* ── Détail d'un fichier : distribution des fragments ── */
+          <>
+            <button
+              onClick={() => setActiveFileId(null)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#a855f7', fontSize: 11, padding: 0, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 4 }}
+            >
+              ‹ Retour aux fichiers
+            </button>
+
+            {/* File header */}
+            <div style={{ background: '#3b0764', border: '1px solid #4c1d95', borderRadius: 8, padding: '10px 12px', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontFamily: 'monospace', background: '#4c1d95', color: '#d8b4fe', padding: '2px 6px', borderRadius: 3 }}>{mimeIcon(activeFile.mimeType)}</span>
+                <span style={{ fontWeight: 700, fontSize: 13, color: '#d8b4fe', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{activeFile.fileName}</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '4px 8px', fontSize: 10, color: '#a78bfa' }}>
+                <span>Taille : <strong style={{ color: '#d8b4fe' }}>{fmtBytes(activeFile.totalSize)}</strong></span>
+                <span>Schéma : <strong style={{ color: '#d8b4fe' }}>RS({activeFile.k},{activeFile.n})</strong></span>
+                <span>En ligne : <strong style={{ color: activeFile.onlineFragments >= activeFile.k ? '#22c55e' : '#ef4444' }}>{activeFile.onlineFragments}/{activeFile.fragments.length}</strong></span>
+              </div>
+            </div>
+
+            {/* Fragment holders */}
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a855f7', marginBottom: 8 }}>
+              Distribution des fragments
+            </div>
+            {activeFile.fragments.map((fr) => {
+              const isMine = fr.nodeId === node.id;
+              return (
+                <div key={fr.nodeId}
+                  onClick={() => onFocusNode(fr.nodeId)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px',
+                    borderRadius: 7, marginBottom: 5, cursor: 'pointer',
+                    background: isMine ? '#1e1b4b' : 'var(--bg-card2)',
+                    border: `1px solid ${isMine ? '#6366f1' : 'var(--border)'}`,
+                    transition: 'border-color 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!isMine) e.currentTarget.style.borderColor = '#7c3aed'; }}
+                  onMouseLeave={e => { if (!isMine) e.currentTarget.style.borderColor = 'var(--border)'; }}
+                >
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#a855f7', minWidth: 22, textAlign: 'center' }}>
+                    #{fr.index}
+                  </span>
+                  <span style={{
+                    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                    background: fr.nodeConnected ? '#22c55e' : '#6b7280',
+                  }} />
+                  <span style={{ fontFamily: 'monospace', fontSize: 10, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--text-sec)' }}>
+                    {fr.nodeId.slice(0, 14)}…
+                  </span>
+                  {isMine && (
+                    <span style={{ fontSize: 9, background: '#4338ca', color: '#c7d2fe', padding: '1px 5px', borderRadius: 3, flexShrink: 0 }}>ce nœud</span>
+                  )}
+                  <span style={{ fontSize: 10, fontWeight: 700, color: fr.nodeConnected ? '#22c55e' : '#ef4444', flexShrink: 0 }}>
+                    {fr.nodeConnected ? '● En ligne' : '○ Hors ligne'}
+                  </span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)', flexShrink: 0 }}>{fmtBytes(fr.sizeBytes)}</span>
+                  <span style={{ fontSize: 10, color: 'var(--text-dim)' }}>›</span>
+                </div>
+              );
+            })}
+
+            <div style={{ marginTop: 10, padding: '8px 10px', borderRadius: 7, background: 'var(--bg-card2)', border: '1px solid var(--border)', fontSize: 10 }}>
+              <span style={{ color: 'var(--text-dim)' }}>Récupérabilité : </span>
+              <span style={{ fontWeight: 700, color: activeFile.onlineFragments >= activeFile.k ? '#22c55e' : '#ef4444' }}>
+                {activeFile.onlineFragments >= activeFile.k
+                  ? `✓ Récupérable (${activeFile.onlineFragments} fragments en ligne ≥ k=${activeFile.k})`
+                  : `✗ Perdu (${activeFile.onlineFragments}/${activeFile.k} fragments minimum)`}
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* ── Kill button ── */}
       {node.isConnected && (
-        <button onClick={() => onKill(node.id)} disabled={killing === node.id}
-          style={{ marginTop: 'auto', paddingTop: 6, width: '100%', background: killing === node.id ? '#7f1d1d' : '#dc2626',
-            color: '#fff', border: 'none', borderRadius: 5, padding: '5px 0', fontSize: 10, fontWeight: 700,
-            cursor: killing === node.id ? 'wait' : 'pointer', flexShrink: 0 }}>
-          {killing === node.id ? 'Killing…' : 'Kill node'}
-        </button>
+        <div style={{ flexShrink: 0, padding: '8px 14px', borderTop: '1px solid var(--border)' }}>
+          <button onClick={() => onKill(node.id)} disabled={killing === node.id}
+            style={{ width: '100%', background: killing === node.id ? '#7f1d1d' : '#dc2626',
+              color: '#fff', border: 'none', borderRadius: 6, padding: '7px 0', fontSize: 11, fontWeight: 700,
+              cursor: killing === node.id ? 'wait' : 'pointer' }}>
+            {killing === node.id ? 'Killing…' : 'Kill node'}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -363,8 +457,20 @@ export default function App() {
           />
         </div>
 
-        {/* ── Panneau droit — 32% ── */}
-        <div style={{ flex: '0 0 32%', display: 'flex', flexDirection: 'column', overflowY: 'auto', gap: 8, padding: '10px 10px', background: 'var(--bg-base)' }}>
+        {/* ── Panneau droit — 32% : NodeSidebar si nœud sélectionné, sinon KPIs ── */}
+        <div style={{ flex: '0 0 32%', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--bg-base)' }}>
+
+          {selectedNode ? (
+            <NodeSidebar
+              node={selectedNode}
+              fragmentFiles={fragmentFiles}
+              killing={killing}
+              onClose={() => setSelectedNode(null)}
+              onFocusNode={(nodeId) => graphFocusRef.current(nodeId)}
+              onKill={handleKill}
+            />
+          ) : (
+          <div style={{ flex: '1 1 0', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '10px 10px' }}>
 
           {/* Navigation fragments — en haut pour être toujours visible */}
           {hlFileId && (() => {
@@ -451,6 +557,8 @@ export default function App() {
 
           {/* Fragment Map */}
           <FragmentMap nodeStatuses={nodeStatuses} />
+          </div>
+          )}
         </div>
       </div>
 
@@ -461,23 +569,9 @@ export default function App() {
         borderTop: '1px solid var(--border)',
         background: 'var(--bg-base)',
       }}>
-        {/* Nœud sélectionné ou chart réseau */}
-        <div style={{ borderRight: '1px solid var(--border)', overflow: 'hidden' }}>
-          {selectedNode ? (
-            <NodePanel
-              node={selectedNode}
-              fragmentFiles={fragmentFiles}
-              hlFileId={hlFileId}
-              killing={killing}
-              onClose={() => setSelectedNode(null)}
-              onHighlight={(id) => setHlFileId(id)}
-              onKill={handleKill}
-            />
-          ) : (
-            <div style={{ padding: 6, height: '100%' }}>
-              <NetworkPanel history={history} theme={theme} />
-            </div>
-          )}
+        {/* Chart réseau */}
+        <div style={{ borderRight: '1px solid var(--border)', overflow: 'hidden', padding: 6 }}>
+          <NetworkPanel history={history} theme={theme} />
         </div>
 
         {/* Log temps réel — grande zone */}

@@ -34,7 +34,7 @@ interface RelayRepository {
      * Annonce au relay dashboard quels fragments de [entry] sont distribués sur quels nœuds.
      * Best-effort : un échec ne doit pas bloquer l'upload.
      */
-    suspend fun announceFragments(entry: CatalogEntry): Result<Unit>
+    suspend fun announceFragments(entry: CatalogEntry, uploaderNodeId: String = ""): Result<Unit>
 }
 
 enum class RelayConnectionState { CONNECTING, CONNECTED, RELAY_HA, OFFLINE }

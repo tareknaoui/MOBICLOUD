@@ -13,15 +13,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Key
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,36 +59,6 @@ fun RestoreIdentityScreen(
         if (state is RestoreState.Success) {
             onRestored()
         }
-    }
-
-    if (state is RestoreState.SuccessWithPriorData) {
-        val oldHash = (state as RestoreState.SuccessWithPriorData).oldOwnerPubKeyHash
-        AlertDialog(
-            onDismissRequest = { viewModel.skipDeleteOldData() },
-            title = { Text("Previous data detected", fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    "This device contained data linked to another identity. " +
-                    "Do you want to permanently delete it?",
-                    fontSize = 14.sp,
-                    color = IosText2,
-                    lineHeight = 20.sp
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.deleteOldData(oldHash) },
-                    colors = ButtonDefaults.buttonColors(containerColor = IosRed)
-                ) {
-                    Text("Delete", color = Color.White)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.skipDeleteOldData() }) {
-                    Text("Keep", color = IosText2)
-                }
-            }
-        )
     }
 
     Scaffold(

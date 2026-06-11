@@ -448,7 +448,8 @@ class MobicloudP2PService : Service() {
                         port = tcpPort,
                         reliabilityScore = currentScore,
                         freeBytes = joinFreeBytes,
-                        totalBytes = settings.allocatedStorageBytes
+                        totalBytes = settings.allocatedStorageBytes,
+                        clusterId = settings.clusterId
                     ).onFailure { Log.w(LOGTAG, "auto-join relais échoué", it) }
                     signalingRepository.fetchActiveSuperPeers()
                         .onFailure { Log.w(LOGTAG, "fetchActiveSuperPeers échoué", it) }
@@ -486,9 +487,10 @@ class MobicloudP2PService : Service() {
                         // Sans ça, les fichiers uploadés avant la reconnexion n'apparaissent plus dans le dashboard.
                         serviceScope.launch {
                             runCatching {
+                                val localNodeId = identityRepository.getIdentity().getOrNull()?.nodeId?.toHexString() ?: ""
                                 val entries = catalogRepository.getActiveEntriesFlow().first()
                                 entries.filter { it.fragmentLocations.isNotEmpty() }.forEach { entry ->
-                                    relayRepository.announceFragments(entry)
+                                    relayRepository.announceFragments(entry, localNodeId)
                                         .onFailure { Log.w(LOGTAG, "[FRAG] re-announce échoué: ${it.message}") }
                                 }
                                 if (entries.isNotEmpty()) {

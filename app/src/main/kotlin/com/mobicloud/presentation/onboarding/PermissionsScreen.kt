@@ -57,7 +57,6 @@ fun PermissionsScreen(
     val permissionsToRequest = buildList {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
-            add(Manifest.permission.NEARBY_WIFI_DEVICES)
         }
     }
 
@@ -69,15 +68,6 @@ fun PermissionsScreen(
                 description = "Pour vous informer lorsqu'un fichier est disponible ou qu'un transfert est terminé.",
             )
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            add(
-                PermissionInfo(
-                    emoji = "📶",
-                    title = "Wi-Fi de proximité",
-                    description = "Pour découvrir et rejoindre le groupe de partage sécurisé à proximité.",
-                )
-            )
-        }
     }
 
     fun completeAndNavigate() {

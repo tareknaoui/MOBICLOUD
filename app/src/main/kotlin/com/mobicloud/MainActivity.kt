@@ -79,10 +79,7 @@ class MainActivity : AppCompatActivity() {
     private val permissions = mutableListOf<String>().apply {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
-            add(Manifest.permission.NEARBY_WIFI_DEVICES)  // Story 13.4 — requis pour Wi-Fi Direct sur API 33+
         }
-        // Story 12.1 : ACCESS_FINE_LOCATION supprimé — plus de GPS, plus de SSID-based clustering.
-        // L'admission cluster repose désormais uniquement sur memberCount < MAX_CLUSTER_SIZE.
     }
 
     @Inject

@@ -457,12 +457,14 @@ function handleJoin(nodeId, payload) {
     logEvent('WARN', 'DEPART', `Nœud TTL expiré (${TTL_MS / 1000}s sans heartbeat) : ${nodeId.slice(0, 8)}`, { nodeId, reason: 'TTL_EXPIRED' });
   }, TTL_MS);
 
-  // clusterId : préserver l'existant (re-JOIN heartbeat) ; sinon accepter du payload si UUID v4 valide.
+  // clusterId : utiliser la valeur fraîche du payload JOIN si UUID v4 valide (membre
+  // qui connaît déjà son cluster). Fallback sur l'existant si absent/invalide.
+  // L'ancienne logique préservait toujours l'existant → un nœud qui changeait de cluster
+  // restait associé à l'ancien clusterId dans le dashboard (faux positif topologie).
   const UUID_V4_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  let clusterIdStr = existing?.clusterId ?? '';
-  if (!clusterIdStr && typeof payloadClusterId === 'string' && UUID_V4_RE.test(payloadClusterId)) {
-    clusterIdStr = payloadClusterId;
-  }
+  let clusterIdStr = (typeof payloadClusterId === 'string' && UUID_V4_RE.test(payloadClusterId))
+    ? payloadClusterId
+    : (existing?.clusterId ?? '');
 
   // freeBytes : code review P2 — accepter la valeur du payload a chaque re-JOIN si
   // valide (heartbeat reflete le disque a jour). Fallback sur l'existant si absent/invalide.
@@ -919,7 +921,7 @@ const httpServer = http.createServer((req, res) => {
     req.on('data', d => { body += d; if (body.length > 64_000) req.destroy(); });
     req.on('end', () => {
       try {
-        const { fileId, fileName, mimeType, totalSize, k, n, fragments } = JSON.parse(body);
+        const { fileId, fileName, mimeType, totalSize, k, n, fragments, uploaderNodeId } = JSON.parse(body);
         if (typeof fileId !== 'string' || !fileId || typeof fileName !== 'string') {
           res.writeHead(400, CORS_HEADERS); res.end('{"error":"fileId/fileName requis"}'); return;
         }
@@ -929,7 +931,8 @@ const httpServer = http.createServer((req, res) => {
         fragmentRegistry.set(fileId, {
           fileName, mimeType: mimeType ?? 'application/octet-stream',
           totalSize: totalSize ?? 0, k: k ?? 1, n: n ?? fragments.length,
-          uploadedAt: Date.now(), fragments
+          uploadedAt: Date.now(), fragments,
+          uploaderNodeId: (typeof uploaderNodeId === 'string' && uploaderNodeId) ? uploaderNodeId : ''
         });
         res.writeHead(200, CORS_HEADERS);
         res.end(JSON.stringify({ ok: true, fileId, fragments: fragments.length }));
@@ -1025,7 +1028,7 @@ const httpServer = http.createServer((req, res) => {
         nodeExists: signalingRegistry.has(fr.nodeId),
       }));
       const onlineCount = fragments.filter(fr => fr.nodeConnected).length;
-      files.push({ fileId, fileName: f.fileName, mimeType: f.mimeType, totalSize: f.totalSize, k: f.k, n: f.n, uploadedAt: f.uploadedAt, fragments, onlineFragments: onlineCount, recoverable: onlineCount >= f.k });
+      files.push({ fileId, fileName: f.fileName, mimeType: f.mimeType, totalSize: f.totalSize, k: f.k, n: f.n, uploadedAt: f.uploadedAt, uploaderNodeId: f.uploaderNodeId ?? '', fragments, onlineFragments: onlineCount, recoverable: onlineCount >= f.k });
     }
     sendJson(res, { files });
 

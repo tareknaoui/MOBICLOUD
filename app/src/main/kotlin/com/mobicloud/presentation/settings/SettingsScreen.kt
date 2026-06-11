@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.outlined.CloudUpload
 import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.Switch
@@ -34,9 +33,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -74,13 +70,6 @@ fun SettingsScreen(
     val showWarning by viewModel.showWarningDialog.collectAsStateWithLifecycle()
     val recoveryCode by viewModel.recoveryCode.collectAsStateWithLifecycle()
     val exportError by viewModel.exportError.collectAsStateWithLifecycle()
-    val showCloudDialog by viewModel.showCloudDialog.collectAsStateWithLifecycle()
-    val cloudError by viewModel.cloudError.collectAsStateWithLifecycle()
-    val cloudSuccess by viewModel.cloudSuccess.collectAsStateWithLifecycle()
-    var cloudEmail by remember { mutableStateOf("") }
-    var cloudPassword by remember { mutableStateOf("") }
-    var cloudIsRegister by remember { mutableStateOf(true) }
-
     val minBytes = HALF_GB
     val maxBytes = ((freeBytes * 0.80f).toLong()).coerceAtLeast(minBytes)
     val steps = (((maxBytes - minBytes) / HALF_GB).toInt() - 1).coerceAtLeast(0)
@@ -226,12 +215,6 @@ fun SettingsScreen(
                     TextButton(onClick = { onRestoreIdentity() }) {
                         Text("Restore with a code", color = Color(0xFF8E8E93))
                     }
-                    TextButton(onClick = { viewModel.requestCloudBackup() }) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(imageVector = Icons.Outlined.CloudUpload, contentDescription = null, tint = Color(0xFF0A84FF), modifier = Modifier.size(16.dp))
-                            Text("Back up to cloud", color = Color(0xFF0A84FF))
-                        }
-                    }
                 }
             }
         }
@@ -281,77 +264,6 @@ fun SettingsScreen(
             text = { Text(error) },
             confirmButton = {
                 TextButton(onClick = { viewModel.dismissExportError() }) { Text("OK") }
-            }
-        )
-    }
-
-    if (showCloudDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissCloudDialog() },
-            title = { Text(if (cloudIsRegister) "Create a cloud account" else "Update cloud backup") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        if (cloudIsRegister)
-                            "Create an account to back up your identity in an encrypted form."
-                        else
-                            "Sign in to your existing account to update the backup.",
-                        fontSize = 13.sp, color = Color(0xFF8E8E93)
-                    )
-                    OutlinedTextField(
-                        value = cloudEmail,
-                        onValueChange = { cloudEmail = it },
-                        label = { Text("Email") },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = cloudPassword,
-                        onValueChange = { cloudPassword = it },
-                        label = { Text("Password") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    cloudError?.let { Text(it, color = Color(0xFFFF3B30), fontSize = 12.sp) }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            if (cloudIsRegister) "Already have an account?" else "New account?",
-                            fontSize = 12.sp, color = Color(0xFF8E8E93)
-                        )
-                        TextButton(onClick = { cloudIsRegister = !cloudIsRegister; viewModel.clearCloudError() }) {
-                            Text(
-                                if (cloudIsRegister) "Sign in" else "Sign up",
-                                fontSize = 12.sp, color = Color(0xFF0A84FF)
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        if (cloudIsRegister) viewModel.doCloudBackup(cloudEmail, cloudPassword)
-                        else viewModel.doCloudLogin(cloudEmail, cloudPassword)
-                    },
-                    enabled = cloudEmail.isNotBlank() && cloudPassword.isNotBlank()
-                ) { Text(if (cloudIsRegister) "Create & back up" else "Sign in & back up") }
-            },
-            dismissButton = {
-                TextButton(onClick = { viewModel.dismissCloudDialog() }) { Text("Cancel") }
-            }
-        )
-    }
-
-    if (cloudSuccess) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissCloudSuccess() },
-            title = { Text("Backup saved") },
-            text = { Text("Your identity is backed up in the cloud. You can restore it on a new device using your credentials.") },
-            confirmButton = {
-                TextButton(onClick = { viewModel.dismissCloudSuccess() }) { Text("OK") }
             }
         )
     }

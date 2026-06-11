@@ -147,7 +147,7 @@ function ClusterCard({ cluster, expanded, onToggle }: {
   expanded: boolean;
   onToggle: () => void;
 }) {
-  const healthOk = cluster.connectedCount === cluster.memberCount && cluster.superPeer;
+
   const healthColor = !cluster.superPeer
     ? 'var(--accent-red)'
     : cluster.connectedCount < cluster.memberCount

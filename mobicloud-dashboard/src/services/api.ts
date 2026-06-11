@@ -85,6 +85,7 @@ export interface FragmentFile {
   k: number;
   n: number;
   uploadedAt: number;
+  uploaderNodeId: string;
   fragments: FragmentEntry[];
   onlineFragments: number;
   recoverable: boolean;

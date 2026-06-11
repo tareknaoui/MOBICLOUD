@@ -32,11 +32,6 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
 
-    <!-- Android 13+ : NEARBY_WIFI_DEVICES pour multicast UDP sans permission de géolocalisation. -->
-    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
-        android:usesPermissionFlags="neverForLocation"
-        tools:targetApi="33" />
-
     <application
         android:name="com.mobicloud.MobicloudApplication"
         android:allowBackup="true"

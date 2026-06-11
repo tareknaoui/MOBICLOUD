@@ -178,7 +178,7 @@ class RelayRepositoryImpl @Inject constructor(
      * et neutraliserait W-9.3-7. On gère explicitement `CancellationException` (re-throw)
      * vs autres exceptions (Result.failure).
      */
-    override suspend fun announceFragments(entry: CatalogEntry): Result<Unit> = withContext(Dispatchers.IO) {
+    override suspend fun announceFragments(entry: CatalogEntry, uploaderNodeId: String): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
             val httpBase = (RELAY_SERVER_URLS.firstOrNull() ?: return@runCatching)
                 .replace("wss://", "https://").replace("ws://", "http://")
@@ -195,13 +195,14 @@ class RelayRepositoryImpl @Inject constructor(
                 }
             }
             val body = JSONObject().apply {
-                put("fileId",    entry.fileHash)
-                put("fileName",  entry.originalFileName.ifBlank { entry.fileHash.take(16) })
-                put("mimeType",  mimeType)
-                put("totalSize", entry.originalFileSize)
-                put("k",         entry.k)
-                put("n",         entry.n)
-                put("fragments", fragments)
+                put("fileId",         entry.fileHash)
+                put("fileName",       entry.originalFileName.ifBlank { entry.fileHash.take(16) })
+                put("mimeType",       mimeType)
+                put("totalSize",      entry.originalFileSize)
+                put("k",              entry.k)
+                put("n",              entry.n)
+                put("fragments",      fragments)
+                if (uploaderNodeId.isNotBlank()) put("uploaderNodeId", uploaderNodeId)
             }.toString().toByteArray(Charsets.UTF_8)
 
             val conn = URL("$httpBase/fragments/announce").openConnection() as HttpURLConnection

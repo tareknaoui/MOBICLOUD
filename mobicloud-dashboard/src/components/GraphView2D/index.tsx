@@ -64,31 +64,11 @@ function clampPct(ratio: number): number {
   return Math.min(100, Math.max(0, ratio * 100));
 }
 
-function fmtAgo(ms: number | undefined): string {
-  // Code review P9/P12 : guard undefined (drift API backend) + clamp negatif (horloge browser).
-  if (!ms || !Number.isFinite(ms)) return '—';
-  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
-  if (s < 5) return 'à l\'instant';
-  if (s < 60) return `il y a ${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `il y a ${m}m`;
-  return `il y a ${Math.floor(m / 60)}h`;
-}
-
 function reliabilityColor(score: number): string {
   const s = Number.isFinite(score) ? Math.min(1, Math.max(0, score)) : 0;
   if (s >= 0.7) return '#34c759';
   if (s >= 0.4) return '#ff9f0a';
   return '#ff3b30';
-}
-
-function mimeIcon(mime: string) {
-  if (mime.startsWith('image/'))  return 'IMG';
-  if (mime.startsWith('video/'))  return 'VID';
-  if (mime.startsWith('audio/'))  return 'AUD';
-  if (mime === 'application/pdf') return 'PDF';
-  if (mime === 'application/zip') return 'ZIP';
-  return 'FILE';
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

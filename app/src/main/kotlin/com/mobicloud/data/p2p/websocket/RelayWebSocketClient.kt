@@ -305,7 +305,7 @@ class RelayWebSocketClient @Inject constructor(
      */
     fun sendJoin(
         nodeId: String, ip: String?, port: Int?, reliabilityScore: Float,
-        freeBytes: Long = 0L, totalBytes: Long = 0L
+        freeBytes: Long = 0L, totalBytes: Long = 0L, clusterId: String = ""
     ): Boolean {
         val ws = activeWebSocket ?: return false
         val json = org.json.JSONObject().apply {
@@ -314,6 +314,7 @@ class RelayWebSocketClient @Inject constructor(
             put("reliabilityScore", reliabilityScore.toDouble())
             if (freeBytes > 0) put("freeBytes", freeBytes)
             if (totalBytes > 0) put("totalBytes", totalBytes)
+            if (clusterId.isNotBlank()) put("clusterId", clusterId)
         }
         val payload = json.toString().toByteArray(Charsets.UTF_8)
         return ws.send(RelayFraming.buildFrame(RelayMsg.JOIN, payload).toByteString())

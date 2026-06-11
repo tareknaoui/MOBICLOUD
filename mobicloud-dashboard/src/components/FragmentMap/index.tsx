@@ -42,7 +42,7 @@ function FragmentRow({ file, topology }: { file: FileEntry; topology: Map<string
   const [open, setOpen] = useState(false);
 
   const aliveCount = file.fragments.filter(f => topology.get(f.nodeId) ?? f.nodeConnected).length;
-  const recoverable = aliveCount >= file.k;
+
   const danger = aliveCount < file.k;
   const warn   = !danger && aliveCount < file.n;
 
