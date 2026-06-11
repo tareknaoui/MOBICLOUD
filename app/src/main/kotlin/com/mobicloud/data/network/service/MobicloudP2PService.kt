@@ -487,7 +487,7 @@ class MobicloudP2PService : Service() {
                         // Sans ça, les fichiers uploadés avant la reconnexion n'apparaissent plus dans le dashboard.
                         serviceScope.launch {
                             runCatching {
-                                val localNodeId = identityRepository.getIdentity().getOrNull()?.nodeId?.toHexString() ?: ""
+                                val localNodeId = identityRepository.getIdentity().getOrNull()?.nodeId ?: ""
                                 val entries = catalogRepository.getActiveEntriesFlow().first()
                                 entries.filter { it.fragmentLocations.isNotEmpty() }.forEach { entry ->
                                     relayRepository.announceFragments(entry, localNodeId)

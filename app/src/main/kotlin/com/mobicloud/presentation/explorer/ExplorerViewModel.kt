@@ -11,7 +11,6 @@ import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.ErasureParameters
 import com.mobicloud.domain.models.ResolvedBlockLocation
 import com.mobicloud.domain.repository.CatalogRepository
-import com.mobicloud.domain.models.m11_join.toHexString
 import com.mobicloud.domain.repository.RelayRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m03_m04_gossip_heartbeat.GossipSyncUseCase
@@ -411,7 +410,7 @@ class ExplorerViewModel @Inject constructor(
                         val updatedEntry = if (folder != null) entry.copy(folderPath = folder) else entry
                         _storeState.value = StoreState.Success(updatedEntry, entry.fragmentLocations.size)
                         // Best-effort : announce fragment map to relay dashboard
-                        val uploaderNodeId = securityRepository.getIdentity().getOrNull()?.nodeId?.toHexString() ?: ""
+                        val uploaderNodeId = securityRepository.getIdentity().getOrNull()?.nodeId ?: ""
                         relayRepository.announceFragments(updatedEntry, uploaderNodeId)
                             .onFailure { Log.w("ExplorerVM", "announceFragments échoué: ${it.message}") }
                         scheduleReset()
