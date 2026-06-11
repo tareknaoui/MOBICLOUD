@@ -4,7 +4,9 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,8 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -105,6 +109,30 @@ fun AssembledBottomSheet(
                     style = MaterialTheme.typography.bodySmall,
                     color = Color(0xFF8E8E93)
                 )
+                if (state.failedCount > 0) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFFFFF3CD), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = Color(0xFFFF9500),
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = "Self-healed — ${state.failedCount} fragment${if (state.failedCount > 1) "s" else ""} offline, reconstructed via erasure coding",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(0xFF7C5C00)
+                            )
+                        }
+                    }
+                }
                 Text(
                     text = state.filePath.takeLast(48),
                     style = MaterialTheme.typography.labelSmall,

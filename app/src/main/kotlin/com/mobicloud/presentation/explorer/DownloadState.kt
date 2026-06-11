@@ -40,6 +40,7 @@ sealed class DownloadState {
         val filePath: String,
         val durationMs: Long = 0L,
         val nodeCount: Int = 0,
+        val failedCount: Int = 0,
         val isPreview: Boolean = false
     ) : DownloadState()
 

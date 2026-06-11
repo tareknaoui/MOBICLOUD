@@ -143,6 +143,7 @@ class ExplorerViewModel @Inject constructor(
 
     @Volatile private var downloadStartMs: Long = 0L
     private var lastNodeCount: Int = 0
+    private var lastFailedCount: Int = 0
 
     fun setSearchQuery(query: String) {
         _searchQuery.value = query
@@ -218,6 +219,7 @@ class ExplorerViewModel @Inject constructor(
                             "fileHash=${fileHash.take(8)} progress=${state.received}/${state.k} failed=${state.failed}"
                         )
                         lastNodeCount = state.contributions.map { it.nodeId }.toSet().size
+                        lastFailedCount = state.failed
                         _downloadState.value = DownloadState.Downloading(
                             fileHash = fileHash,
                             received = state.received,
@@ -252,7 +254,7 @@ class ExplorerViewModel @Inject constructor(
                                         _downloadState.value = when (val r = progress.result) {
                                             is AssembleDownloadedFileUseCase.AssembleResult.Success -> {
                                                 val durationMs = System.currentTimeMillis() - downloadStartMs
-                                                DownloadState.Assembled(fileHash, r.filePath, durationMs, lastNodeCount, isPreview)
+                                                DownloadState.Assembled(fileHash, r.filePath, durationMs, lastNodeCount, lastFailedCount, isPreview)
                                             }
                                             is AssembleDownloadedFileUseCase.AssembleResult.Failure ->
                                                 DownloadState.Error(
