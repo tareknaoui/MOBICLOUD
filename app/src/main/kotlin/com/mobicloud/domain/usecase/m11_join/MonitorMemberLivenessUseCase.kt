@@ -3,6 +3,7 @@ package com.mobicloud.domain.usecase.m11_join
 import com.mobicloud.data.local.dao.MemberDao
 import com.mobicloud.di.ApplicationScope
 import com.mobicloud.domain.models.m11_join.LIVENESS_CHECK_INTERVAL_MS
+import com.mobicloud.domain.models.m11_join.MEMBER_BROADCAST_INTERVAL_MS
 import com.mobicloud.domain.models.m11_join.MemberInfo
 import com.mobicloud.domain.models.m11_join.MemberUpdate
 import com.mobicloud.domain.models.m11_join.MemberUpdateEvent
@@ -59,7 +60,7 @@ class MonitorMemberLivenessUseCase @Inject constructor(
             // exception transitoire (DB I/O, NPE) tuait la boucle pour toujours → cluster figé.
             launch {
                 while (isActive) {
-                    delay(SP_TIMEOUT_MS / 2L)
+                    delay(MEMBER_BROADCAST_INTERVAL_MS)
                     runCatching {
                         val now = clock()
                         val allMembers = memberSnapshotCacheUseCase.snapshot()

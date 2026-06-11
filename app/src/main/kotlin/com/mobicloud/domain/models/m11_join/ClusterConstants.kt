@@ -35,3 +35,8 @@ const val LIVENESS_CHECK_INTERVAL_MS = 15_000L
 // 10-40s de latence queue — la fenêtre doit être ≥ SP_TIMEOUT_MS pour ne pas rejeter des
 // heartbeats retardés valides. Mis à jour avec SP_TIMEOUT_MS le 2026-05-26.
 const val MEMBER_UPDATE_TIMESTAMP_WINDOW_MS = 120_000L
+
+// Intervalle de re-broadcast de la liste complète des membres par le SP.
+// Réduit à 10s (vs SP_TIMEOUT_MS/2 = 60s) pour que tout téléphone qui manque
+// le broadcast immédiat au JOIN récupère la liste complète en ≤10s.
+const val MEMBER_BROADCAST_INTERVAL_MS = 10_000L

@@ -30,9 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,8 +44,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mobicloud.domain.models.NetworkType
 import com.mobicloud.domain.models.NodeRole
 import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
-import com.mobicloud.presentation.dashboard.components.HealthBanner
-import com.mobicloud.presentation.dashboard.components.HealthState
 import com.mobicloud.presentation.dashboard.components.KpiDiagnosticCard
 import com.mobicloud.presentation.dashboard.components.RadarLogConsole
 import com.mobicloud.presentation.dashboard.components.ReliabilityGauge
@@ -64,7 +60,6 @@ fun DashboardScreen(
 ) {
     val diagnostics     by viewModel.diagnostics.collectAsStateWithLifecycle()
     val networkEvents   by viewModel.networkEvents.collectAsStateWithLifecycle()
-    val hasActivePeers  by viewModel.hasActivePeers.collectAsStateWithLifecycle()
     val nodeRole        by viewModel.nodeRole.collectAsStateWithLifecycle()
     val isNetworkUnstable by viewModel.isNetworkUnstable.collectAsStateWithLifecycle()
 
@@ -81,22 +76,6 @@ fun DashboardScreen(
         NetworkType.UNKNOWN  -> "—"
     }
 
-    val healthState by remember {
-        derivedStateOf {
-            val reliability = (diagnostics.reliabilityScore * 100).toInt()
-            val peerCount   = diagnostics.activePeerCount
-            // Architecture V5 100% relai HA — pas de canal TCP direct possible. Critere "sain"
-            // base uniquement sur la fiabilite + stabilite reseau (ancien check DIRECT toujours
-            // faux en V5 → noeud bloque a "Slow" en permanence meme avec un cluster sain).
-            when {
-                !hasActivePeers                       -> HealthState.Searching
-                reliability < 40 || isNetworkUnstable -> HealthState.Degraded(peerCount)
-                reliability >= 70                     -> HealthState.Healthy(peerCount, networkLabel)
-                else                                  -> HealthState.Slow(peerCount, networkLabel, reliability)
-            }
-        }
-    }
-
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -104,13 +83,6 @@ fun DashboardScreen(
             .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // ── Health banner (Mode Simple uniquement) ──
-        if (!isExpertMode) {
-            Spacer(Modifier.height(4.dp))
-            HealthBanner(state = healthState)
-            Spacer(Modifier.height(12.dp))
-        }
-
         // ── Hero gradient card ──
         DashboardHero(
             score        = diagnostics.reliabilityScore,
@@ -204,7 +176,6 @@ private fun DashboardHero(
     val isSuperPair  = nodeRole == NodeRole.SUPER_PAIR
     val roleColor    = if (isSuperPair) Color(0xFF0A84FF) else MaterialTheme.colorScheme.onSurfaceVariant
     val roleLabel    = if (isSuperPair) "Group coordinator" else "Group member"
-    val roleHint     = if (isSuperPair) "You relay traffic for this cluster" else "Your files are replicated across the group"
 
     Box(
         modifier = Modifier
@@ -241,14 +212,6 @@ private fun DashboardHero(
                     modifier   = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
                 )
             }
-
-            Spacer(Modifier.height(6.dp))
-
-            Text(
-                text  = roleHint,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-            )
 
             if (isExpertMode && isUnstable) {
                 Spacer(Modifier.height(10.dp))
