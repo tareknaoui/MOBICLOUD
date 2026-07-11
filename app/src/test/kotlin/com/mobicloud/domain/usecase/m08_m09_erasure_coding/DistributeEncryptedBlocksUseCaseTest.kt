@@ -166,8 +166,8 @@ class DistributeEncryptedBlocksUseCaseTest {
 
     /**
      * Test 1 — Happy path: K+N=6 fragments, 6 peers, toutes les livraisons réussissent.
-     * Vérifie que insertOwnerEntry et runGossipCycle sont appelés 1 fois chacun,
-     * et que insertDhtEntryUseCase est appelé 6 fois.
+     * n=2 ici => réplique secondaire SAUTÉE (dynamicN déjà >= 2, cf. tests de coût ci-dessous) :
+     * insertDhtEntryUseCase appelé 6 fois, pas 12.
      */
     @Test
     fun `distribute success - all blocks confirmed`() = runTest {
@@ -189,6 +189,119 @@ class DistributeEncryptedBlocksUseCaseTest {
         coVerify(exactly = 1) { catalogRepository.insertOwnerEntry(any()) }
         coVerify(exactly = 1) { gossipSyncUseCase.runGossipCycle() }
         coVerify(exactly = 6) { insertDhtEntryUseCase(any(), any(), any(), any()) }
+    }
+
+    // -------------------------------------------------------------------------
+    // Réplication secondaire best-effort (ferme le trou de re-réplication —
+    // cf. TriggerAutoRepairUseCase.UNDER_REPLICATION_THRESHOLD = 2)
+    // Ne se déclenche QUE si params.n <= 1 : dès que dynamicN >= 2, la tolérance vient
+    // déjà de vrais fragments de parité (moins cher en octets qu'une duplication brute).
+    // -------------------------------------------------------------------------
+
+    /**
+     * n=1 (RS(2,1), palier de parité le plus faible) : chaque fragment doit obtenir un 2e hôte
+     * (best-effort), portant fragmentLocations.nodeIds à 2 entrées par fragment.
+     */
+    @Test
+    fun `distribute success - secondary replica gives 2 distinct hosts per fragment when n=1`() = runTest {
+        // 8 pairs pour 3 fragments (k=2,n=1) : marge confortable pour un candidat secondaire distinct.
+        val peers = (1..8).map { fakePeer("node_$it", it) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val bundle = fakeBundle(k = 2, n = 1)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
+            val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
+            val peer = secondArg<Peer>()
+            Result.success(fakeAck(msg.blockId, peer.identity.nodeId))
+        }
+
+        val result = useCase.distribute(bundle, "filehash_secondary", ErasureParameters(k = 2, n = 1), selectedPeers = peers)
+
+        assertTrue(result.isSuccess)
+        val entry = result.getOrThrow()
+        assertEquals(3, entry.fragmentLocations.size)
+        entry.fragmentLocations.forEach { loc ->
+            assertEquals("chaque fragment doit avoir 2 hôtes distincts", 2, loc.nodeIds.distinct().size)
+        }
+        coVerify(exactly = 6) { insertDhtEntryUseCase(any(), any(), any(), any()) }
+    }
+
+    /**
+     * Vérification du coût : dès que n >= 2 (dynamicN a déjà relevé la parité), la réplique
+     * secondaire est SAUTÉE — pas de duplication brute payée pour une garantie déjà couverte
+     * par l'erasure coding. insertDhtEntryUseCase appelé 1x/fragment, pas 2x.
+     */
+    @Test
+    fun `distribute success - secondary replica skipped when n greater than 1 (cost control)`() = runTest {
+        val peers = (1..8).map { fakePeer("node_$it", it) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val bundle = fakeBundle(k = 4, n = 2)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
+            val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
+            Result.success(fakeAck(msg.blockId, "node_receiver"))
+        }
+
+        val result = useCase.distribute(bundle, "filehash_no_secondary", ErasureParameters(k = 4, n = 2), selectedPeers = peers)
+
+        assertTrue(result.isSuccess)
+        val entry = result.getOrThrow()
+        entry.fragmentLocations.forEach { loc ->
+            assertEquals("n>=2 : pas de réplique secondaire, 1 seul hôte par fragment", 1, loc.nodeIds.size)
+        }
+        coVerify(exactly = 6) { insertDhtEntryUseCase(any(), any(), any(), any()) }
+    }
+
+    /**
+     * L'échec de la réplique secondaire est best-effort : la distribution globale doit
+     * quand même réussir avec 1 seul hôte par fragment (comportement pré-existant préservé).
+     */
+    @Test
+    fun `distribute success - secondary replica failure does not fail distribution`() = runTest {
+        val peers = (1..6).map { fakePeer("node_$it", it) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        var callCount = 0
+        val bundle = fakeBundle(k = 2, n = 1)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
+            callCount++
+            val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
+            // 1 succès sur 2 : simule un donneur secondaire indisponible pour la moitié des blocs.
+            if (callCount % 2 == 1) {
+                Result.success(fakeAck(msg.blockId, "node_receiver"))
+            } else {
+                Result.failure(SocketTimeoutException("secondary unreachable"))
+            }
+        }
+
+        val result = useCase.distribute(bundle, "filehash_secondary_fail", ErasureParameters(k = 2, n = 1), selectedPeers = peers)
+
+        assertTrue("l'échec de la réplique secondaire ne doit jamais faire échouer la distribution", result.isSuccess)
+    }
+
+    /**
+     * Cluster minimal (1 seul pair) : pas de candidat distinct pour une réplique secondaire.
+     * La distribution doit rester en succès avec 1 seul hôte par fragment, sans exception.
+     */
+    @Test
+    fun `distribute success - single peer cluster skips secondary replica gracefully`() = runTest {
+        val peers = listOf(fakePeer("solo_node", 1))
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val bundle = fakeBundle(k = 2, n = 1)
+        coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
+            val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
+            Result.success(fakeAck(msg.blockId, "solo_node"))
+        }
+
+        val result = useCase.distribute(bundle, "filehash_solo", ErasureParameters(k = 2, n = 1), selectedPeers = peers)
+
+        assertTrue(result.isSuccess)
+        val entry = result.getOrThrow()
+        entry.fragmentLocations.forEach { loc ->
+            assertEquals(1, loc.nodeIds.size)
+        }
+        coVerify(exactly = 3) { insertDhtEntryUseCase(any(), any(), any(), any()) }
     }
 
     /**

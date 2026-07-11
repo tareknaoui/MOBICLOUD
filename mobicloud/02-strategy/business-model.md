@@ -33,11 +33,11 @@ MobiCloud est une **entreprise d'infrastructure**, pas une application. La disti
 
 ---
 
-### Stream 2 — Bundle Opérateur Téléphonique (B2B2C)
+### Stream 2 — Bundle Opérateur Téléphonique (B2B2C) ★ Levier d'échelle
 
 **Ce qu'on vend :** Un accord de distribution avec Mobilis/Djezzy/Ooredoo pour inclure MobiCloud dans leurs forfaits grand public.
 
-**Modèle :** Revenue share per abonné actif.
+**Modèle :** Revenue share par abonné actif.
 - L'opérateur intègre MobiCloud comme feature dans ses bundles premium.
 - MobiCloud reçoit X DZD/mois par abonné actif utilisant le service.
 - Revenue share typique en Afrique : opérateur garde 50–70%, MobiCloud reçoit 30–50%. [Estimation, benchmarks services bundlés Afrique]
@@ -45,6 +45,60 @@ MobiCloud est une **entreprise d'infrastructure**, pas une application. La disti
 **Contrainte technique :** Le bundle "stockage" nécessite que l'abonné ait des contacts dans le même cluster. L'opérateur peut résoudre cela via des packs famille/groupe.
 
 **Prérequis :** Premier contrat B2G signé + relay algérien opérationnel + SLA démontré avant toute négociation opérateur. Un opérateur ne signera jamais avec un produit sans référence client et sans infrastructure locale.
+
+---
+
+#### Comment MobiCloud gagne de l'argent quand l'opérateur ET les contributeurs prennent leur part
+
+**Le piège : compter 3 bouches alors qu'il n'y en a que 2.**
+
+Le réflexe est de raisonner comme un marché ouvert type Storj/Filecoin : l'opérateur prend sa part, MobiCloud prend la sienne, et « les gens qui contribuent leur stockage » réclament la leur — trois mains tendues sur le même revenu. **Ce n'est pas l'architecture de MobiCloud.**
+
+Dans le modèle MobiCloud, **le contributeur EST l'abonné**. Karim prête 10 Go de son téléphone → Karim reçoit 10 Go de sauvegarde répartie dans son cluster. Yasmine fait de même. Personne ne paie personne en cash : ils **échangent un service (mutualisation / troc)**. La rétribution du contributeur, c'est **son propre backup**.
+
+> **Conséquence :** il n'y a pas de troisième part à découper. Le partage monétaire est à **2 parties** : Opérateur ↔ MobiCloud. Le contributeur est payé **en nature**.
+
+**Pourquoi c'est l'avantage économique structurel (et pas un détail) :**
+
+| | Cloud centralisé (Google Drive) | MobiCloud |
+|---|---|---|
+| Qui paie le stockage ? | L'éditeur (datacenters) | Les téléphones des abonnés |
+| Coût marginal du stockage | Élevé (€/Go/mois) | **≈ 0** |
+| Coût relay MobiCloud | — | Routage seul, quasi nul |
+
+Le stockage coûte **zéro** à MobiCloud, car les abonnés le fournissent. Payer les contributeurs en cash détruirait précisément cet avantage — et rouvrirait le système d'incitation/Karma **volontairement retiré du scope technique**. La mutualisation en nature garde ce scope fermé. *Formulation défendable : « la contribution n'est pas un marché monétisé, c'est une mutualisation entre membres d'un cluster. »*
+
+**Le flux d'argent concret** (mode revenue-share, bundle à 300 DZD/mois) :
+
+| Partie | Part | Montant | Justification de la part |
+|---|---|---|---|
+| **Opérateur** | 60 % | 180 DZD | Distribution, facturation, marque, réseau, support N1, nœuds-ancre |
+| **MobiCloud** | 40 % | 120 DZD | Techno, relay, conformité ARPCE, support N2 |
+| **Contributeur** | en nature | 0 DZD cash | Payé par **son propre backup** |
+| − Coût relay MobiCloud | | ~5–10 DZD | Bande passante de routage |
+| **= Net MobiCloud** | | **~110 DZD/abonné actif/mois** | |
+
+**Le déséquilibre de contribution — le vrai problème — se règle sans cash.** La mutualisation pure suppose que chacun donne autant qu'il prend. Or certains ont un grand téléphone toujours allumé (bons nœuds), d'autres un petit souvent éteint. Solution : **le crédit de facture opérateur**. Celui qui contribue plus que sa part reçoit un crédit data/minutes sur sa facture mobile.
+- Le crédit **coûte presque rien à l'opérateur** (coût réel d'un crédit data ≪ valeur faciale).
+- Il **sort de la part opérateur**, pas de la marge MobiCloud.
+- Il transforme « prêter mon stockage » en « baisser ma facture » → incitation forte, partenariat opérateur approfondi.
+
+**Cas du super-peer :** le membre dont le téléphone joue le rôle de super-peer porte une charge supérieure (batterie, bande passante). C'est le **seul** cas justifiant une récompense ciblée — un crédit « super-peer fiable ». Incitation **bornée**, qui ne rouvre pas toute l'économie de tokens.
+
+**Cold-start (dispo au démarrage) :** tant qu'il n'y a pas assez de pairs en ligne, l'opérateur fournit quelques **nœuds-ancre** toujours allumés (edge nodes de son réseau ou petite allocation cloud) comme plancher de disponibilité. Le coût de ce plancher fait partie de ce qui justifie sa part de 60 %.
+
+**Deux modes de monétisation à arbitrer avec l'opérateur :**
+
+| | Mode A — Revenue-share | Mode B — Licence / ARPU |
+|---|---|---|
+| L'abonné paie | 300 DZD explicite | Inclus « gratuit » dans forfait premium |
+| MobiCloud reçoit | 40 % du prix | Fee fixe/abonné actif (~50 DZD) |
+| Intérêt opérateur | Nouveau revenu | Rétention + différenciation (anti-churn) |
+| Risque MobiCloud | Dépend du volume payant | Revenu prévisible |
+
+L'opérateur **préfère souvent le Mode B** : il ne veut pas facturer au détail, il veut une feature qui retient l'abonné et justifie un forfait plus cher. À mettre en avant dans le pitch Mobilis.
+
+**Synthèse défendable :** *MobiCloud ne paie pas les contributeurs en argent — il les paie en service (leur backup). L'argent se partage à deux : opérateur et plateforme. Les déséquilibres de contribution se règlent par crédit de facture, qui coûte presque rien à l'opérateur et n'entame pas la marge MobiCloud.*
 
 ---
 
@@ -70,7 +124,7 @@ MobiCloud est une **entreprise d'infrastructure**, pas une application. La disti
 
 | Métrique | Estimation | Confiance |
 |---|---|---|
-| ACV (Average Contract Value) | 500K–2M DZD/an (~3,500–14,000 USD) | Faible |
+| ACV (Average Contract Value) | 500K–2M DZD/an (~1 800–7 200 EUR) | Faible |
 | CAC | Très élevé (12–24 mois de cycle de vente + temps fondateur) | Faible |
 | LTV | 3–5 ans de contrat si satisfaction → 1.5M–10M DZD par client | Très faible |
 | Churn | Faible une fois déployé (coûts de migration) | Très faible |
@@ -107,7 +161,31 @@ MobiCloud est une **entreprise d'infrastructure**, pas une application. La disti
 - **Limite actuelle :** Le relay est une instance unique (Render, US). Migration vers infrastructure algérienne = prérequis avant toute scale.
 - **Limite à moyen terme :** Si l'adoption croît (bundle opérateur), le relay devra être scalé horizontalement (plusieurs instances) avec un store partagé pour éviter le split-brain (incident documenté en mai 2026). [Données, historique projet]
 
+### Modèle de Coût du Relay — Par Palier d'Usage
+
+**Point clé : le coût du relay ne se calcule PAS par utilisateur.** Le relay ne stocke aucune donnée — il ne route que du trafic chiffré en transit. Son coût dépend donc du **trafic simultané** (bande passante + connexions concurrentes + nombre d'instances pour la haute disponibilité), pas du volume de données stockées ni linéairement du nombre d'utilisateurs.
+
+Conséquence : le coût croît **par paliers** (par seuils), pas en continu. Entre deux seuils, ajouter un utilisateur coûte ≈ 0. C'est l'avantage économique structurel de l'architecture vs. un cloud centralisé (où le coût croît avec chaque Go stocké).
+
+| Palier | Usage typique | Infrastructure relay | Coût estimé [Estimation] |
+|---|---|---|---|
+| **Pilot** | 1–3 institutions, ~20–200 utilisateurs actifs, 1–10 clusters | 1 petit VPS algérien | **8 000–15 000 DZD/mois** (~100K–180K DZD/an) |
+| **Croissance B2G** | 4–15 institutions, ~500–3 000 utilisateurs, 10–80 clusters | 1 VPS moyen + 1 instance de secours (HA) | **25 000–60 000 DZD/mois** (~300K–720K DZD/an) |
+| **Scale Opérateur** | Bundle opérateur, 10K–200K+ utilisateurs, 1 000+ clusters | Plusieurs instances + store partagé (Redis) anti split-brain | **80 000–300 000 DZD/mois** (~1M–3,6M DZD/an) |
+
+**Lecture stratégique :** En Year 1 (palier Pilot), le relay coûte ~10–15K DZD/mois — pas 80K. Le palier à 80K+ ne survient qu'au stade bundle opérateur, où le revenu correspondant (millions d'abonnés) couvre largement le coût. **Le coût d'infrastructure suit le revenu, il ne le précède pas.**
+
 **App Android :** Open-source possible → réduit les coûts de distribution, augmente la confiance des institutions (audit du code), facilite les intégrations opérateur. La valeur est dans le relay et le support, pas dans l'app.
+
+### Coûts d'Outillage (Développement)
+
+À distinguer des coûts du produit : l'outillage que le fondateur utilise pour *construire* MobiCloud ne scale pas avec le nombre de clients. Poste principal : abonnement IA de développement (Claude Max). Voir `05-financial/projections.md`.
+
+| Poste | Coût | Nature |
+|---|---|---|
+| Claude Max (assistant IA de dev) | 5× : ~25 300 DZD/mois (~304K/an) · 20× : ~50 600 DZD/mois (~607K/an) | Outillage — remplace une partie du coût d'un dev junior (~45K DZD/mois) — base : $100/mois × 253 DZD/USD (1 EUR = 276 DZD) |
+
+*Argument fondateur solo : ~162K DZD/an d'outillage IA permet de tenir le rôle d'une équipe technique et réduit le besoin de financement initial. Confirmer le plan réellement souscrit (5× ou 20×).*
 
 ---
 

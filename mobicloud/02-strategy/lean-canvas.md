@@ -84,10 +84,13 @@
 
 | Coût | Type | Estimation |
 |---|---|---|
-| Relay server algérien (hébergement) | Variable mensuel | 30K–150K DZD/mois [Estimation] |
+| Relay server algérien (hébergement) | Variable **par palier d'usage** | Pilot ~10–15K/mois · Croissance ~25–60K/mois · Scale ~80–300K/mois [Estimation] |
 | Conformité ARPCE + ANPDP (légal, one-time) | Fixe unique | 200K–500K DZD [Estimation] |
+| Outillage IA (Claude Max) | Fixe mensuel (développement) | ~25 300 DZD/mois (5×) — ~304K/an ($100/mois × 253 DZD/USD) |
 | Développement et maintenance | Founder time (pas de salaire externe) | — |
 | Support institutionnel (SLA) | Variable selon contrats | À facturer dans ACV |
+
+**Note coût relay :** le relay ne stocke rien (il route le trafic chiffré) → son coût dépend du trafic/clusters, pas du nombre d'utilisateurs. Il croît par paliers, pas linéairement. Au démarrage (palier Pilot) : ~10–15K DZD/mois, pas 80K. Modèle détaillé dans `business-model.md`.
 
 **Break-even B2G :** 1–2 contrats institutionnels couvrent les coûts d'infrastructure. [Estimation]
 

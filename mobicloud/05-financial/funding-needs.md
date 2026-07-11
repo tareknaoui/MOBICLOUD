@@ -15,16 +15,17 @@
 
 | Poste | Montant DZD | Type | Incontournable |
 |---|---|---|---|
-| Relay hébergement algérien (6 mois × 80 000 DZD) | 480 000 | Variable | Oui — prérequis absolu |
+| Relay hébergement algérien (6 mois × 12 500 DZD, palier Pilot) | 75 000 | Variable | Oui — prérequis absolu |
 | Setup infrastructure relay (migration Render → Algérie) | 50 000–150 000 | One-time | Oui |
 | Conformité légale ARPCE (avocat + dossier) | 200 000–350 000 | One-time | Oui — avant toute vente B2G |
 | Conformité ANPDP (enregistrement sous-traitant) | 50 000–100 000 | One-time | Oui |
+| Outillage IA Claude Max (6 mois × 25 300 DZD) | 152 000 | Fixe dev | Oui — productivité fondateur solo |
 | Déplacements commerciaux (DSI, AYRADE, ARPCE) | 50 000–100 000 | Variable | Non — peut se faire à distance |
 | Fondateur — frais de vie (6 mois) | 0–300 000 | Personnel | Selon situation personnelle |
-| **Total minimum absolu** | **~830 000 DZD** | | |
-| **Total réaliste (avec marge 20%)** | **~1 500 000 DZD** | | |
+| **Total minimum absolu** | **~527 000 DZD** | | |
+| **Total réaliste (avec marge 20%)** | **~1 100 000 DZD** | | |
 
-**Traduction USD :** ~6 100 USD minimum / ~11 100 USD réaliste.
+**Traduction EUR :** ~1 900 EUR minimum / ~4 000 EUR réaliste (276 DZD / 1 EUR).
 
 *Conclusion : le seuil d'entrée est faible en valeur absolue. Le projet peut avancer avec 1,5M DZD (~11 000 USD) de capital initial.*
 
@@ -34,7 +35,7 @@
 
 ### Source 1 — Fonds Algerie Telecom (Cybersécurité/IA) ★ Priorité maximale
 
-**Montant disponible :** ~11M USD (~1,5 milliard DZD) — fonds dédié aux startups technologiques algériennes dans les domaines cybersécurité, IA, et infrastructure numérique.
+**Montant disponible :** ~11M USD (~2,8 milliards DZD au taux 253 DZD/USD) — fonds dédié aux startups technologiques algériennes dans les domaines cybersécurité, IA, et infrastructure numérique.
 
 **Éligibilité MobiCloud :**
 - Produit algérien ✅
@@ -128,14 +129,14 @@ Mois 12–18 : Lever angel ou accélérateur si scale B2C ou opérateur visé
 
 *Combien de mois peut survivre le projet selon le capital disponible, sans aucun revenu ?*
 
-| Capital initial | Coûts mensuels (relay + légal amorti) | Runway |
+| Capital initial | Coûts récurrents mensuels (relay + Claude Max, hors setup) | Runway |
 |---|---|---|
-| 500 000 DZD | ~115 000 DZD/mois | 4 mois |
-| 1 000 000 DZD | ~115 000 DZD/mois | 8 mois |
-| 2 000 000 DZD | ~115 000 DZD/mois | 17 mois |
-| 2 000 000 DZD + fonds AT 3M DZD | ~115 000 DZD/mois | **43 mois** |
+| 500 000 DZD | ~38 000 DZD/mois | 13 mois |
+| 1 000 000 DZD | ~38 000 DZD/mois | 26 mois |
+| 2 000 000 DZD | ~38 000 DZD/mois | 52 mois |
+| 2 000 000 DZD + fonds AT 3M DZD | ~38 000 DZD/mois | **131 mois** |
 
-*Avec 2M DZD de capital initial, le projet peut atteindre le premier contrat B2G (Mois 6) avec une marge confortable. C'est le seuil minimum recommandé.*
+*Note : les coûts mensuels récurrents sont ~38 000 DZD/mois (relay Pilot 12 500 + Claude Max 25 300). Les coûts one-time (setup relay ~100K + conformité ~450K) sont à déduire du capital initial — ils représentent ~550 000 DZD à absorber en Mois 0–3. Avec 1,1M DZD de capital réaliste : ~550K de setup laisse ~550K en réserve récurrente, soit ~14 mois de runway supplémentaire.*
 
 ---
 

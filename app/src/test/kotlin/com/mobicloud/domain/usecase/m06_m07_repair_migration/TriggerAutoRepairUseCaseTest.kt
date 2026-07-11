@@ -163,7 +163,12 @@ class TriggerAutoRepairUseCaseTest {
     }
 
     @Test
-    fun `test 4 - bloc avec donneur actif suffisant - skip sans plan ni enqueue (MVP seuil=1)`() = runTest {
+    fun `test 4 - bloc avec donneur actif suffisant - skip sans plan ni enqueue (seuil=1 explicite, legacy)`() = runTest {
+        // Seuil=1 explicite : préserve la couverture de l'ancien comportement MVP.
+        // Le défaut de production est désormais 2 (cf. test 10) depuis que
+        // DistributeEncryptedBlocksUseCase place une réplique secondaire par fragment.
+        useCase.threshold = 1
+
         val blockA = "a".repeat(64)
         peersFlow.value = listOf(
             peer(selfIdentity, isSuperPair = true),
@@ -179,7 +184,7 @@ class TriggerAutoRepairUseCaseTest {
         val result = useCase.scanAndRepair()
 
         assertTrue(result.isSuccess)
-        // MVP threshold=1 et 1 hôte actif => bloc considéré comme OK => skip
+        // threshold=1 et 1 hôte actif => bloc considéré comme OK => skip
         coVerify(exactly = 0) { gossipRelayChannel.sendReplicationPlan(any(), any()) }
         coVerify(exactly = 0) { localRepairBuffer.enqueue(any()) }
         coVerify(exactly = 0) { securityRepository.signData(any()) }
@@ -241,11 +246,13 @@ class TriggerAutoRepairUseCaseTest {
     }
 
     @Test
-    fun `test 8 - sendReplicationPlan jamais appele avec threshold MVP (inaccessibilite documentee)`() = runTest {
+    fun `test 8 - sendReplicationPlan jamais appele avec threshold=1 explicite (legacy)`() = runTest {
         // Scénario : inactive hébergeait le bloc, un donneur actif l'héberge aussi.
-        // Avec UNDER_REPLICATION_THRESHOLD=1, activeHosts.size=1 >= 1 => skip.
-        // Avec activeHosts.isEmpty() => log PERDU => skip.
-        // Donc la branche sendReplicationPlan n'est atteinte QUE si threshold >= 2 (futur multi-replica).
+        // Avec threshold=1, activeHosts.size=1 >= 1 => skip (branche donneur non atteinte).
+        // Depuis DistributeEncryptedBlocksUseCase (réplique secondaire par fragment), le défaut
+        // de production est passé à 2 — cette branche EST atteinte par défaut (cf. test 10).
+        // Ce test fige explicitement l'ancien comportement à seuil=1 pour ne pas perdre sa couverture.
+        useCase.threshold = 1
         val planSlot = slot<ReplicationPlanMessage>()
         coEvery {
             gossipRelayChannel.sendReplicationPlan(any(), capture(planSlot))
@@ -266,10 +273,11 @@ class TriggerAutoRepairUseCaseTest {
         useCase.scanAndRepair()
 
         assertTrue(
-            "sendReplicationPlan ne doit pas être capturé avec threshold=1 MVP",
+            "sendReplicationPlan ne doit pas être capturé avec threshold=1 explicite",
             !planSlot.isCaptured
         )
-        assertEquals(1, TriggerAutoRepairUseCase.UNDER_REPLICATION_THRESHOLD)
+        // Le défaut de production est désormais 2, pas 1 (cf. test 10 pour la branche donneur).
+        assertEquals(2, TriggerAutoRepairUseCase.UNDER_REPLICATION_THRESHOLD)
     }
 
     @Test

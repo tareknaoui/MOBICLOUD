@@ -13,12 +13,13 @@
 
 | Hypothèse | Valeur retenue | Justification |
 |---|---|---|
-| Taux de change | 135 DZD / 1 USD | Référence juin 2026 |
+| Taux de change | 276 DZD / 1 EUR ; 1 USD ≈ 253 DZD | Référence juin 2026 — marché officiel Algérie |
 | Prix contrat B2G moyen (base) | 800 000 DZD/an | Milieu de la fourchette 500K–2M DZD |
 | Cycle de vente B2G | 6 mois (base) ; 12 mois (conservateur) | Sans partenariat AYRADE |
 | Abonnement B2C moyen | 300 DZD/mois | Milieu du range 200–500 DZD |
 | Churn mensuel B2C | 15% (base) | Hypothèse — aucune donnée algérienne disponible |
-| Coût relay algérien | 80 000 DZD/mois | Estimation datacenter local Algérie |
+| Coût relay algérien | **Par palier d'usage, pas fixe** : Pilot ~10–15K/mois · Croissance ~25–60K/mois · Scale ~80–300K/mois | Le relay ne stocke rien → coût par trafic, pas par utilisateur. Voir modèle dans `02-strategy/business-model.md` |
+| Outillage IA (Claude Max 5×) | ~25 300 DZD/mois (~304K/an) | $100/mois × 253 DZD/USD ; coût de développement, pas d'infrastructure produit |
 | Fondateur : salaire Year 1 | 0 DZD | Bootstrapping pur ; Year 2 : SMIG algérien (~45 000 DZD/mois) |
 | Relay AT fund accordé | Non inclus dans le scénario de base | Variable externe non contrôlable |
 
@@ -45,20 +46,21 @@
 
 | Ligne | Year 1 | Year 2 | Year 3 |
 |---|---|---|---|
-| Relay hébergement (80K/mois × 12) | 960 000 | 960 000 | 1 200 000 |
+| Relay hébergement (palier : Pilot → Croissance) | 150 000 | 300 000 | 480 000 |
 | Conformité légale ARPCE/ANPDP (one-time) | 350 000 | 0 | 0 |
+| Outillage IA (Claude Max 5×) | 304 000 | 304 000 | 304 000 |
 | Salaire fondateur | 0 | 540 000 | 540 000 |
 | Développement (fondateur seul) | — | — | — |
-| **Total Coûts** | **1 310 000** | **1 500 000** | **1 740 000** |
+| **Total Coûts** | **804 000** | **1 144 000** | **1 324 000** |
 
 ### Résultat
 
 | | Year 1 | Year 2 | Year 3 |
 |---|---|---|---|
-| Résultat | **-1 310 000** | **-338 000** | **+1 408 000** |
-| Cash cumulé (si 2M DZD levés au départ) | +690 000 | +352 000 | +1 760 000 |
+| Résultat | **-804 000** | **+18 000** | **+1 824 000** |
+| Cash cumulé (si 2M DZD levés au départ) | +1 196 000 | +1 214 000 | +3 038 000 |
 
-**Break-even :** Year 3 (Mois 28–30 environ)
+**Break-even :** Year 2 (~Mois 22–24). *Claude Max au taux réel (25 300 DZD/mois, calculé sur 1 USD ≈ 253 DZD) creuse légèrement le Year 1 mais le modèle reste viable.*
 
 ---
 
@@ -81,20 +83,21 @@
 
 | Ligne | Year 1 | Year 2 | Year 3 |
 |---|---|---|---|
-| Relay hébergement | 960 000 | 1 200 000 | 2 400 000 |
+| Relay hébergement (palier : Pilot → Croissance → Scale bas) | 150 000 | 420 000 | 960 000 |
 | Conformité légale ARPCE/ANPDP (one-time) | 350 000 | 0 | 0 |
+| Outillage IA (Claude Max 5×) | 304 000 | 304 000 | 304 000 |
 | Salaire fondateur | 0 | 540 000 | 540 000 |
 | Recrutement (1 profil commercial Year 2) | 0 | 600 000 | 720 000 |
-| **Total Coûts** | **1 310 000** | **2 340 000** | **3 660 000** |
+| **Total Coûts** | **804 000** | **1 864 000** | **2 524 000** |
 
 ### Résultat
 
 | | Year 1 | Year 2 | Year 3 |
 |---|---|---|---|
-| Résultat | **-510 000** | **+1 346 000** | **+7 270 000** |
-| Cash cumulé (si 2M DZD levés au départ) | +1 490 000 | +2 836 000 | +10 106 000 |
+| Résultat | **-4 000** | **+1 822 000** | **+8 406 000** |
+| Cash cumulé (si 2M DZD levés au départ) | +1 996 000 | +3 818 000 | +12 224 000 |
 
-**Break-even :** Year 2 (Mois 14–16 environ)
+**Break-even :** début Year 2 (~Mois 13–15). *Le premier contrat (800K) et les coûts Year 1 (804K) sont quasi à l'équilibre — le taux de change corrigé décale le break-even de 2 mois vs. l'estimation précédente.*
 
 ---
 
@@ -117,19 +120,20 @@
 
 | Ligne | Year 1 | Year 2 | Year 3 |
 |---|---|---|---|
-| Relay hébergement + scale | 960 000 | 2 400 000 | 4 800 000 |
+| Relay hébergement + scale (palier : Croissance → Scale) | 360 000 | 1 200 000 | 3 000 000 |
 | Conformité légale | 350 000 | 100 000 | 100 000 |
+| Outillage IA (Claude Max) | 304 000 | 304 000 | 304 000 |
 | Équipe (fondateur + 1 commercial + 1 dev) | 0 | 1 260 000 | 1 800 000 |
 | Marketing (events Algérie Numérique) | 0 | 300 000 | 600 000 |
-| **Total Coûts** | **1 310 000** | **4 060 000** | **7 300 000** |
+| **Total Coûts** | **1 014 000** | **3 164 000** | **5 804 000** |
 
 ### Résultat
 
 | | Year 1 | Year 2 | Year 3 |
 |---|---|---|---|
-| Résultat | **+3 090 000** | **+6 520 000** | **+26 100 000** |
+| Résultat | **+3 386 000** | **+7 416 000** | **+27 596 000** |
 
-**Break-even :** Year 1 (Mois 6 avec premier contrat + fonds AT)
+**Break-even :** Year 1 (Mois 6 avec premier contrat + fonds AT). *Au palier Scale (Year 3), le relay atteint 3M DZD/an — mais le revenu correspondant dépasse 33M DZD : le coût d'infrastructure suit le revenu.*
 
 ---
 
@@ -138,10 +142,10 @@
 | Indicateur | Conservateur | Base | Optimiste |
 |---|---|---|---|
 | Revenu total Year 3 | 3,1M DZD | 10,9M DZD | 33,4M DZD |
-| Résultat Year 3 | +1,4M DZD | +7,3M DZD | +26,1M DZD |
+| Résultat Year 3 | +1,8M DZD | +8,4M DZD | +27,6M DZD |
 | Contrats B2G actifs | 5 | 10 | 25 |
-| Break-even | Mois 28–30 | Mois 14–16 | Mois 6 |
-| Equivalent USD Year 3 revenu | ~23K | ~81K | ~247K |
+| Break-even | ~Mois 22–24 | ~Mois 13–15 | Mois 6 |
+| Équivalent EUR Year 3 revenu | ~11K EUR | ~40K EUR | ~121K EUR |
 
 **Le scénario de référence pour le pitch est le scénario Base.** Le conservateur est utilisé pour rassurer (le pire cas reste positif en Year 3). L'optimiste est utilisé pour montrer le potentiel au fonds AT.
 
@@ -153,7 +157,7 @@
 |---|---|
 | Prix contrat B2G (800K DZD) | ±2M DZD sur le Year 3 base |
 | Nombre de contrats B2G Year 2 (4) | ±1,6M DZD sur Year 2 base |
-| Coût relay (80K DZD/mois) | ±480K DZD/an — impact faible |
+| Coût relay (par palier) | Non linéaire — croît par seuils d'usage, pas par utilisateur. Impact quasi-nul en Year 1 (palier Pilot ~10–15K/mois) ; modéré seulement au palier Scale (Year 3+) où le revenu le couvre |
 | Churn B2C (15%) | Impact modéré en Year 2–3, fort en Year 4+ |
 | Cycle de vente B2G (6 mois) | Si 12 mois : décale tout le scénario base de 6 mois |
 

@@ -1,410 +1,410 @@
-# Direct Competitors: MobiCloud
+# Concurrents Directs : MobiCloud
 
-> Research conducted: June 2026. Labels: [Data] = verified fact from source, [Estimate] = derived figure, [Assumption] = reasoned inference, [Opinion] = editorial judgment.
+> Recherche conduite : juin 2026. Étiquettes : [Données] = fait vérifié à partir d'une source, [Estimation] = chiffre dérivé, [Hypothèse] = inférence raisonnée, [Opinion] = jugement éditorial.
 
 ---
 
 ## Hivenet
 
-- **Website:** https://www.hivenet.com
-- **Founded:** 2022 [Data]
-- **Headquarters:** Switzerland (Swiss incorporated) [Data]
-- **Funding:** €12M Series A (March 2024, led by SC Ventures); total ~$20.5M over 2 rounds [Data]
+- **Site web :** https://www.hivenet.com
+- **Fondé :** 2022 [Données]
+- **Siège :** Suisse (incorporée en Suisse) [Données]
+- **Financement :** 12M€ Série A (mars 2024, mené par SC Ventures) ; total ~20,5M$ sur 2 rounds [Données]
 
-### Product
+### Produit
 
-- **Core offering:** Distributed cloud storage (consumer/prosumer) + distributed GPU compute, built on a network of contributed hard-drive space and computing resources from participants worldwide
-- **Key features (top 5):**
-  1. End-to-end encryption with cryptographic sharding — data fragmented across EU nodes
-  2. Android + iOS + Windows + macOS apps [Data]
-  3. Contributors earn credits by sharing unused hard drive space (up to 55.56% bill reduction) [Data]
-  4. Unlimited Send transfers (large file sharing) [Data]
-  5. GPU compute marketplace (RTX 4090/5090) for AI/ML workloads [Data]
-- **Tech approach:** Distributed node network; data encrypted and sharded before leaving device; no central server holds complete data; EU-based nodes only for storage [Data]
+- **Offre centrale :** Stockage cloud distribué (grand public/prosumer) + calcul GPU distribué, construit sur un réseau d'espace disque dur et de ressources de calcul contribués par des participants dans le monde entier
+- **Fonctionnalités clés (top 5) :**
+  1. Chiffrement de bout en bout avec sharding cryptographique — données fragmentées sur des nœuds UE
+  2. Apps Android + iOS + Windows + macOS [Données]
+  3. Les contributeurs gagnent des crédits en partageant l'espace disque inutilisé (jusqu'à 55,56 % de réduction de facture) [Données]
+  4. Transferts Send illimités (partage de gros fichiers) [Données]
+  5. Marketplace de calcul GPU (RTX 4090/5090) pour charges de travail IA/ML [Données]
+- **Approche technique :** Réseau de nœuds distribués ; données chiffrées et shardées avant de quitter l'appareil ; aucun serveur central ne détient les données complètes ; nœuds basés en UE uniquement pour le stockage [Données]
 
-### Pricing
+### Tarification
 
-- **Model:** Freemium + tiered subscription [Data]
-- **Tiers (storage):**
-  - Free: 25 GB (some sources say 10 GB — likely updated tier) [Data/Estimate]
-  - Paid: ~€0.01/GB; 5 TB plan = ~€3.30/TB/month [Data]
-  - 200 GB, 1 TB, 2 TB, 5 TB tiers available [Data]
-- **GPU compute:** From $0.10/hour; CPU from €0.035/h; per-second billing [Data]
-- **Free plan:** Yes, 10–25 GB [Data]
+- **Modèle :** Freemium + abonnement à paliers [Données]
+- **Paliers (stockage) :**
+  - Gratuit : 25 Go (certaines sources disent 10 Go — probablement palier mis à jour) [Données/Estimation]
+  - Payant : ~0,01 €/Go ; plan 5 To = ~3,30 €/To/mois [Données]
+  - Paliers 200 Go, 1 To, 2 To, 5 To disponibles [Données]
+- **Calcul GPU :** À partir de 0,10 $/heure ; CPU à partir de 0,035 €/h ; facturation à la seconde [Données]
+- **Plan gratuit :** Oui, 10–25 Go [Données]
 
-### Market Position
+### Position sur le Marché
 
-- **Target customer:** Privacy-conscious consumers, developers, small teams; pivoting upmarket toward AI compute buyers [Data/Opinion]
-- **Positioning tagline:** "The Sustainable Cloud" — green, decentralized, cheaper than AWS/Azure [Data]
-- **Key differentiator:** Users can monetize spare hard drive space to offset subscription cost; sustainability angle (77% lower carbon emissions claimed) [Data]
+- **Client cible :** Consommateurs soucieux de la confidentialité, développeurs, petites équipes ; pivot vers le haut de marché vers les acheteurs de calcul IA [Données/Opinion]
+- **Slogan de positionnement :** « The Sustainable Cloud » — vert, décentralisé, moins cher qu'AWS/Azure [Données]
+- **Différenciateur clé :** Les utilisateurs peuvent monétiser l'espace disque dur libre pour compenser le coût d'abonnement ; angle durabilité (77 % d'émissions de carbone en moins revendiquées) [Données]
 
-### Traction Signals
+### Signaux de Traction
 
-- **Reviews (G2):** 5.0/5 from 2 verified reviews (storage); Compute product rated 4+ stars with 6 Trustpilot reviews [Data]
-- **Social/Awards:** Received Bpifrance Deep Tech label (June 2024) [Data]
-- **Notable customers:** No major institutional customers named publicly; primarily consumer/developer segment [Assumption]
-- **App:** Android app exists on Play Store ("Secure Cloud Storage – Hivenet") with user reviews citing slow upload speeds and missing features [Data]
+- **Avis (G2) :** 5,0/5 sur 2 avis vérifiés (stockage) ; produit Compute noté 4+ étoiles avec 6 avis Trustpilot [Données]
+- **Social/Récompenses :** A reçu le label Bpifrance Deep Tech (juin 2024) [Données]
+- **Clients notables :** Aucun client institutionnel majeur nommé publiquement ; principalement segment grand public/développeur [Hypothèse]
+- **App :** L'app Android existe sur le Play Store (« Secure Cloud Storage – Hivenet ») avec des avis utilisateurs citant des vitesses d'upload lentes et des fonctionnalités manquantes [Données]
 
-### Strengths
+### Forces
 
-- Consumer-ready Android app already shipping [Data]
-- Sustainability narrative resonates in EU regulatory climate [Opinion]
-- Series A funded — runway to compete [Data]
-- Pricing undercuts Dropbox/Google Drive significantly on $/GB [Data]
-- EU-sovereign nodes — GDPR compliant [Data]
+- App Android grand public déjà en production [Données]
+- La narrative durabilité résonne dans le climat réglementaire UE [Opinion]
+- Financée en Série A — runway pour concurrencer [Données]
+- La tarification sous-cote significativement Dropbox/Google Drive sur le $/Go [Données]
+- Nœuds UE-souverains — conforme RGPD [Données]
 
-### Weaknesses (from reviews/complaints)
+### Faiblesses (d'après les avis/plaintes)
 
-- Android app review complaints: slow/unreliable uploads, missing folder-upload feature, no streaming, weak file management (delete/download issues) [Data]
-- Very small review base (2 G2 reviews) — limited trust signal for enterprise buyers [Data]
-- No Africa presence, no Algerian territory nodes [Assumption]
-- Compute offering potentially expensive vs. specialized GPU clouds (A100 for $0.75/h elsewhere) [Data]
-- Storage product separate from compute — not an integrated mobile-native experience [Opinion]
-- No offline-first / local-network P2P capability — requires internet for all transfers [Assumption]
+- Plaintes dans les avis de l'app Android : uploads lents/non fiables, fonctionnalité d'upload de dossier manquante, pas de streaming, gestion de fichiers faible (problèmes de suppression/téléchargement) [Données]
+- Base d'avis très petite (2 avis G2) — signal de confiance limité pour les acheteurs entreprise [Données]
+- Pas de présence en Afrique, pas de nœuds sur territoire algérien [Hypothèse]
+- Offre de calcul potentiellement chère vs. les clouds GPU spécialisés (A100 à 0,75 $/h ailleurs) [Données]
+- Produit de stockage séparé du calcul — pas une expérience mobile-native intégrée [Opinion]
+- Pas de capacité offline-first / P2P réseau local — nécessite internet pour tous les transferts [Hypothèse]
 
-### Threat Level to MobiCloud: **Medium**
+### Niveau de Menace pour MobiCloud : **Moyen**
 
-- **Why:** Hivenet is the closest product analogy (consumer Android, distributed storage, sustainability) but targets a European privacy-tech consumer niche. It has no Algerian territory presence, no B2G sales motion, and does not solve the offline/local-network use case. It could threaten MobiCloud in a future consumer market, but today is irrelevant to the B2G Algeria SAM. If Hivenet ever builds Algerian nodes, threat level becomes High for non-regulated segment.
+- **Pourquoi :** Hivenet est l'analogie produit la plus proche (Android grand public, stockage distribué, durabilité) mais cible une niche grand public privacy-tech européenne. Il n'a aucune présence sur territoire algérien, aucune dynamique de vente B2G, et ne résout pas le cas d'usage offline/réseau local. Il pourrait menacer MobiCloud dans un futur marché grand public, mais aujourd'hui est sans pertinence pour le SAM B2G Algérie. Si Hivenet construit un jour des nœuds algériens, le niveau de menace devient Élevé pour le segment non régulé.
 
 ---
 
 ## Cubbit
 
-- **Website:** https://www.cubbit.io
-- **Founded:** 2016 [Data — based on seed rounds and 40-year SI partnership timelines]
-- **Headquarters:** Bologna, Italy [Data]
-- **Funding:** $19.7M total over 8 rounds (last round July 2024: LocalGlobe, ETF Partners, Verve Ventures, CDP Venture Capital, Primo Ventures, 2100 Ventures, Datalogic) [Data]
+- **Site web :** https://www.cubbit.io
+- **Fondé :** 2016 [Données — basé sur les rounds seed et les calendriers de partenariat SI de 40 ans]
+- **Siège :** Bologne, Italie [Données]
+- **Financement :** 19,7M$ au total sur 8 rounds (dernier round juillet 2024 : LocalGlobe, ETF Partners, Verve Ventures, CDP Venture Capital, Primo Ventures, 2100 Ventures, Datalogic) [Données]
 
-### Product
+### Produit
 
-- **Core offering:** DS3 (Distributed S3) — software-defined geo-distributed object storage enabling enterprises and managed service providers (MSPs) to deploy sovereign, S3-compatible cloud storage on their own or partner infrastructure
-- **Key features (top 5):**
-  1. S3-compatible API — drop-in replacement for AWS S3 workloads [Data]
-  2. Geo-distribution with erasure coding — data split and replicated across multiple locations [Data]
-  3. DS3 Composer — white-label, customizable cloud storage platform for MSPs and enterprises [Data]
-  4. Zero egress fees, no API call charges, no deletion fees [Data]
-  5. Ransomware-resilient by design (no single failure point) [Data]
-- **Tech approach:** Software layer that orchestrates distributed storage nodes across existing hardware (on-prem, edge, cloud); does not require new hardware investment; S3-protocol compatibility [Data]
+- **Offre centrale :** DS3 (Distributed S3) — stockage objet géo-distribué défini par logiciel permettant aux entreprises et fournisseurs de services managés (MSP) de déployer un stockage cloud souverain, compatible S3, sur leur propre infrastructure ou celle de partenaires
+- **Fonctionnalités clés (top 5) :**
+  1. API compatible S3 — remplacement drop-in pour les charges de travail AWS S3 [Données]
+  2. Géo-distribution avec erasure coding — données découpées et répliquées sur plusieurs emplacements [Données]
+  3. DS3 Composer — plateforme de stockage cloud white-label et personnalisable pour MSP et entreprises [Données]
+  4. Zéro frais d'egress, pas de frais d'appels API, pas de frais de suppression [Données]
+  5. Résiliente aux ransomwares par conception (pas de point de défaillance unique) [Données]
+- **Approche technique :** Couche logicielle qui orchestre des nœuds de stockage distribués sur du matériel existant (on-prem, edge, cloud) ; ne nécessite pas de nouvel investissement matériel ; compatibilité protocole S3 [Données]
 
-### Pricing
+### Tarification
 
-- **Model:** Enterprise software license (DS3 Composer); DS3 Cloud subscription for SMB/MSP [Data]
-- **Tiers:**
-  - DS3 Cloud: flat rate per TB/month — exact figure not publicly listed; contact sales required [Data]
-  - DS3 Composer: licensed per raw TB of total installed storage — custom quote only [Data]
-- **Free plan:** No public free tier [Data]
+- **Modèle :** Licence logicielle entreprise (DS3 Composer) ; abonnement DS3 Cloud pour PME/MSP [Données]
+- **Paliers :**
+  - DS3 Cloud : tarif forfaitaire par To/mois — chiffre exact non listé publiquement ; contact commercial requis [Données]
+  - DS3 Composer : licence par To brut de stockage total installé — devis sur mesure uniquement [Données]
+- **Plan gratuit :** Pas de palier gratuit public [Données]
 
-### Market Position
+### Position sur le Marché
 
-- **Target customer:** European enterprises, MSPs, system integrators, government/defense institutions [Data]
-- **Positioning tagline:** "Outsmart cloud storage. Sovereign & geo-resilient by design." [Data]
-- **Key differentiator:** The only geo-distributed S3-compatible storage software that lets enterprises stay 100% sovereign on their own hardware while achieving cloud-like resilience [Opinion]
+- **Client cible :** Entreprises européennes, MSP, intégrateurs de systèmes, institutions gouvernement/défense [Données]
+- **Slogan de positionnement :** « Outsmart cloud storage. Sovereign & geo-resilient by design. » [Données]
+- **Différenciateur clé :** Le seul logiciel de stockage géo-distribué compatible S3 qui permet aux entreprises de rester 100 % souveraines sur leur propre matériel tout en atteignant une résilience de type cloud [Opinion]
 
-### Traction Signals
+### Signaux de Traction
 
-- **Reviews (Gartner Peer Insights):** Listed on Gartner Peer Insights for Public Cloud Storage 2025 [Data]
-- **Customers:** 400+ companies and MSPs across Europe; Leonardo (€14B+ defense company); Rai Way (Italian state broadcaster); Eurosystem SpA (580% revenue increase from storage after adopting Cubbit) [Data]
-- **Partnerships:** Commvault (cyber resilience), Worldstream (Netherlands, first Dutch partner), Scaleway marketplace listing [Data]
-- **Market signal:** Gartner projects EU sovereign cloud IaaS to grow 3.3x from $6.9B (2025) to $23.1B (2027) — Cubbit is positioned directly in this wave [Data]
+- **Avis (Gartner Peer Insights) :** Listé sur Gartner Peer Insights pour Public Cloud Storage 2025 [Données]
+- **Clients :** 400+ entreprises et MSP à travers l'Europe ; Leonardo (entreprise de défense de 14 Md€+) ; Rai Way (radiodiffuseur d'État italien) ; Eurosystem SpA (augmentation de revenu de 580 % grâce au stockage après adoption de Cubbit) [Données]
+- **Partenariats :** Commvault (cyber-résilience), Worldstream (Pays-Bas, premier partenaire néerlandais), listing sur la marketplace Scaleway [Données]
+- **Signal de marché :** Gartner projette que l'IaaS cloud souverain UE croîtra de 3,3x de 6,9 Md$ (2025) à 23,1 Md$ (2027) — Cubbit est positionné directement dans cette vague [Données]
 
-### Strengths
+### Forces
 
-- Proven enterprise deployments including defense-grade customers [Data]
-- No consumer app complexity — pure B2B/B2G SaaS model with clear ROI [Opinion]
-- S3 compatibility means zero migration friction for existing cloud workloads [Data]
-- Strong European regulatory alignment (GDPR, NIS2, data residency) [Data]
-- 580% revenue uplift case study is a powerful sales asset [Data]
+- Déploiements entreprise éprouvés incluant des clients de niveau défense [Données]
+- Pas de complexité d'app grand public — modèle SaaS B2B/B2G pur avec ROI clair [Opinion]
+- La compatibilité S3 signifie zéro friction de migration pour les charges de travail cloud existantes [Données]
+- Fort alignement réglementaire européen (RGPD, NIS2, résidence des données) [Données]
+- L'étude de cas de hausse de revenu de 580 % est un puissant atout commercial [Données]
 
-### Weaknesses (from reviews/complaints)
+### Faiblesses (d'après les avis/plaintes)
 
-- Pricing opacity — no published rates; high friction for SME/government procurement [Assumption]
-- DS3 Composer "available to a selected cluster of partners and customers" — gated access limits adoption [Data]
-- Zero Africa presence; zero Algerian-territory nodes or partnerships announced [Data]
-- Requires enterprise infrastructure investment — not mobile-native, no Android app [Data]
-- European-centric brand; lacks local-market knowledge for North Africa regulatory landscape [Opinion]
-- No offline/local-network storage capability [Assumption]
+- Opacité tarifaire — pas de tarifs publiés ; forte friction pour les marchés publics PME/gouvernement [Hypothèse]
+- DS3 Composer « disponible pour un cluster sélectionné de partenaires et clients » — l'accès restreint limite l'adoption [Données]
+- Zéro présence en Afrique ; zéro nœud ou partenariat sur territoire algérien annoncé [Données]
+- Nécessite un investissement en infrastructure entreprise — pas mobile-native, pas d'app Android [Données]
+- Marque eurocentrée ; manque de connaissance du marché local pour le paysage réglementaire d'Afrique du Nord [Opinion]
+- Pas de capacité de stockage offline/réseau local [Hypothèse]
 
-### Threat Level to MobiCloud: **Low (current) → Medium (3-year horizon)**
+### Niveau de Menace pour MobiCloud : **Faible (actuel) → Moyen (horizon 3 ans)**
 
-- **Why:** Cubbit is a pure enterprise B2B/B2G player with zero consumer or mobile play, and no Africa footprint. It does not compete on the same product axis (mobile P2P) and cannot fulfill Algeria's territorial data requirements today. However, if a Cubbit-style actor were to set up Algerian nodes or partner with AYRADE, they could threaten MobiCloud's institutional sales pitch. Monitoring needed.
+- **Pourquoi :** Cubbit est un acteur B2B/B2G entreprise pur avec zéro jeu grand public ou mobile, et aucune empreinte en Afrique. Il ne concurrence pas sur le même axe produit (P2P mobile) et ne peut pas satisfaire les exigences territoriales de données de l'Algérie aujourd'hui. Cependant, si un acteur de style Cubbit installait des nœuds algériens ou s'associait à AYRADE, ils pourraient menacer le pitch de vente institutionnel de MobiCloud. Surveillance nécessaire.
 
 ---
 
-## AYRADE (Algeria)
+## AYRADE (Algérie)
 
-- **Website:** https://www.ayrade.com
-- **Founded:** 2009 [Data]
-- **Headquarters:** Algiers, Algeria [Data]
-- **Funding/Capital:** IPO on Algiers Stock Exchange (June 2026), raising ~1B dinars ($7.4M USD at ~135 DZD/USD) by opening 20% of capital at 800 DZD/share [Data]
+- **Site web :** https://www.ayrade.com
+- **Fondé :** 2009 [Données]
+- **Siège :** Alger, Algérie [Données]
+- **Financement/Capital :** IPO sur la Bourse d'Alger (juin 2026), levant ~1 Md de dinars (7,4M$ USD à ~135 DZD/$) en ouvrant 20 % du capital à 800 DZD/action [Données]
 
-### Product
+### Produit
 
-- **Core offering:** Traditional centralized cloud hosting and data center services for Algerian institutions — colocation, IaaS, cybersecurity, and data sovereignty compliance [Data]
-- **Key features (top 5):**
-  1. Two operational data centers on Algerian territory [Data]
-  2. Sovereign cloud compliance with Algerian data residency law [Data]
-  3. Cybersecurity solutions (regulatory compliance automation, AI integration) [Data]
-  4. Research & innovation arm for AI/regulatory tech [Data]
-  5. 10,000+ clients including ~3,700 active cloud customers across banking, energy, healthcare, public administration [Data]
-- **Tech approach:** Traditional centralized data center / IaaS model; NOT distributed, NOT P2P, NOT mobile-native [Data]
+- **Offre centrale :** Hébergement cloud centralisé traditionnel et services de data center pour les institutions algériennes — colocation, IaaS, cybersécurité et conformité souveraineté des données [Données]
+- **Fonctionnalités clés (top 5) :**
+  1. Deux data centers opérationnels sur territoire algérien [Données]
+  2. Conformité cloud souverain avec la loi algérienne de résidence des données [Données]
+  3. Solutions de cybersécurité (automatisation de la conformité réglementaire, intégration IA) [Données]
+  4. Bras recherche & innovation pour IA/regtech [Données]
+  5. 10 000+ clients incluant ~3 700 clients cloud actifs à travers banque, énergie, santé, administration publique [Données]
+- **Approche technique :** Modèle data center / IaaS centralisé traditionnel ; PAS distribué, PAS P2P, PAS mobile-natif [Données]
 
-### Pricing
+### Tarification
 
-- **Model:** Enterprise/B2G contracts — no public pricing [Data]
-- **Tiers:** Custom quotes for colocation, cloud VM, cybersecurity bundles [Assumption]
-- **Free plan:** No [Assumption]
+- **Modèle :** Contrats entreprise/B2G — pas de tarification publique [Données]
+- **Paliers :** Devis sur mesure pour colocation, VM cloud, bundles cybersécurité [Hypothèse]
+- **Plan gratuit :** Non [Hypothèse]
 
-### Market Position
+### Position sur le Marché
 
-- **Target customer:** Algerian public institutions (ministries, hospitals, banks, energy companies), large enterprises [Data]
-- **Positioning tagline:** First Algerian sovereign cloud operator [Data]
-- **Key differentiator:** Only dedicated Algerian cloud operator with physical infrastructure on Algerian territory and a 16-year track record serving local institutions [Data]
+- **Client cible :** Institutions publiques algériennes (ministères, hôpitaux, banques, entreprises énergétiques), grandes entreprises [Données]
+- **Slogan de positionnement :** Premier opérateur de cloud souverain algérien [Données]
+- **Différenciateur clé :** Seul opérateur cloud algérien dédié avec infrastructure physique sur territoire algérien et un historique de 16 ans au service des institutions locales [Données]
 
-### Traction Signals
+### Signaux de Traction
 
-- **Revenue:** 192M DZD (2024) → 416M DZD (2025), +117% YoY; projected 1.66B DZD in 2026 [Data]
-- **Clients:** 10,000+ total, ~3,700 active cloud customers [Data]
-- **IPO:** First sovereign cloud operator to list on Algiers Stock Exchange — June 2026 [Data]
-- **Infrastructure:** 2 data centers + planned expansion with 294 new servers funded by IPO [Data]
+- **Revenu :** 192M DZD (2024) → 416M DZD (2025), +117 % GA ; projeté 1,66 Md DZD en 2026 [Données]
+- **Clients :** 10 000+ au total, ~3 700 clients cloud actifs [Données]
+- **IPO :** Premier opérateur de cloud souverain à entrer en Bourse d'Alger — juin 2026 [Données]
+- **Infrastructure :** 2 data centers + expansion planifiée avec 294 nouveaux serveurs financés par l'IPO [Données]
 
-### Strengths
+### Forces
 
-- Sole established Algerian-territory cloud provider with institutional track record [Data]
-- 10,000+ client relationships in exactly MobiCloud's target vertical [Data]
-- Regulatory moat identical to MobiCloud's (data residency law compliance) [Data]
-- IPO capital influx will fund infrastructure expansion [Data]
-- Deep institutional trust from 16 years in market [Data]
+- Seul fournisseur cloud établi sur territoire algérien avec un historique institutionnel [Données]
+- 10 000+ relations clients exactement dans le vertical cible de MobiCloud [Données]
+- Moat réglementaire identique à celui de MobiCloud (conformité loi de résidence des données) [Données]
+- L'afflux de capital de l'IPO financera l'expansion de l'infrastructure [Données]
+- Profonde confiance institutionnelle issue de 16 ans sur le marché [Données]
 
-### Weaknesses (from reviews/complaints)
+### Faiblesses (d'après les avis/plaintes)
 
-- Centralized architecture — single point of failure, no distributed resilience [Opinion]
-- Traditional IaaS model — does not leverage mobile devices, P2P, or edge computing [Opinion]
-- 10,000 clients but primarily VMs/colocation — no mobile-first storage UX [Assumption]
-- No Android mobile app for end-users [Assumption]
-- Revenue still small (~€3M equivalent 2025) relative to institutional market potential [Estimate]
-- Cloud infrastructure model means OPEX for institutions (servers, network, SLAs) vs. MobiCloud's device-reuse model [Opinion]
+- Architecture centralisée — point de défaillance unique, pas de résilience distribuée [Opinion]
+- Modèle IaaS traditionnel — n'exploite pas les appareils mobiles, le P2P ou l'edge computing [Opinion]
+- 10 000 clients mais principalement VM/colocation — pas d'UX de stockage mobile-first [Hypothèse]
+- Pas d'app mobile Android pour les utilisateurs finaux [Hypothèse]
+- Revenu encore petit (~3M€ équivalent 2025) relativement au potentiel du marché institutionnel [Estimation]
+- Le modèle d'infrastructure cloud signifie de l'OPEX pour les institutions (serveurs, réseau, SLA) vs. le modèle de réutilisation d'appareils de MobiCloud [Opinion]
 
-### Threat Level to MobiCloud: **Medium**
+### Niveau de Menace pour MobiCloud : **Moyen**
 
-- **Why:** AYRADE is the incumbent Algerian sovereign cloud player. It does NOT offer P2P or mobile-native storage — it is a classical data center operator. However, it controls the key institutional relationships MobiCloud needs to win. AYRADE is more likely a potential channel partner or validation reference than a direct competitor on the product axis, but institutions could choose "AYRADE VMs" over "MobiCloud P2P" for storage compliance. Threat is on the sales/relationship layer, not product.
+- **Pourquoi :** AYRADE est l'acteur incumbent du cloud souverain algérien. Il N'offre PAS de stockage P2P ou mobile-natif — c'est un opérateur de data center classique. Cependant, il contrôle les relations institutionnelles clés dont MobiCloud a besoin pour gagner. AYRADE est plus probablement un partenaire de canal potentiel ou une référence de validation qu'un concurrent direct sur l'axe produit, mais les institutions pourraient choisir « les VM AYRADE » plutôt que « le P2P MobiCloud » pour la conformité du stockage. La menace est sur la couche vente/relation, pas produit.
 
 ---
 
 ## UniCloud Africa
 
-- **Website:** https://unicloudafrica.africa
-- **Founded:** ~2024–2025 (launched November 2025) [Data]
-- **Headquarters:** Nigeria (pan-African) [Data]
-- **Funding:** Partnership with OADC (Open Access Data Centres); funding details not disclosed [Data]
+- **Site web :** https://unicloudafrica.africa
+- **Fondé :** ~2024–2025 (lancé en novembre 2025) [Données]
+- **Siège :** Nigeria (pan-africain) [Données]
+- **Financement :** Partenariat avec OADC (Open Access Data Centres) ; détails de financement non divulgués [Données]
 
-### Product
+### Produit
 
-- **Core offering:** Pan-African sovereign IaaS/PaaS cloud platform deployed across 6 African countries (Nigeria, Ghana, South Africa, Zambia, Senegal, Mozambique) with 100% in-country data hosting [Data]
-- **Key features (top 5):**
-  1. 99.999% uptime SLA with two active-active availability zones per country [Data]
-  2. Zero data egress fees [Data]
-  3. Local currency billing [Data]
-  4. GPU-as-a-Service for AI/ML workloads [Data]
-  5. ISO 27001 and ISO 22301 compliance [Data]
-- **Tech approach:** Traditional hyperscaler-style infrastructure deployed locally in each country; NOT distributed P2P; centralised data center per country [Data]
+- **Offre centrale :** Plateforme cloud souverain IaaS/PaaS pan-africaine déployée dans 6 pays africains (Nigeria, Ghana, Afrique du Sud, Zambie, Sénégal, Mozambique) avec hébergement des données 100 % dans le pays [Données]
+- **Fonctionnalités clés (top 5) :**
+  1. SLA d'uptime de 99,999 % avec deux zones de disponibilité active-active par pays [Données]
+  2. Zéro frais d'egress de données [Données]
+  3. Facturation en monnaie locale [Données]
+  4. GPU-as-a-Service pour charges de travail IA/ML [Données]
+  5. Conformité ISO 27001 et ISO 22301 [Données]
+- **Approche technique :** Infrastructure de style hyperscaler traditionnel déployée localement dans chaque pays ; PAS de P2P distribué ; data center centralisé par pays [Données]
 
-### Pricing
+### Tarification
 
-- **Model:** Pay-per-use operational expenditure; local currency [Data]
-- **Tiers:** Not publicly listed [Data]
-- **Free plan:** No [Assumption]
+- **Modèle :** Dépense opérationnelle pay-per-use ; monnaie locale [Données]
+- **Paliers :** Non listés publiquement [Données]
+- **Plan gratuit :** Non [Hypothèse]
 
-### Market Position
+### Position sur le Marché
 
-- **Target customer:** African enterprises, government, healthcare, finance [Data]
-- **Positioning tagline:** "The First Connected Sovereign Cloud Platform" for Africa [Data]
-- **Key differentiator:** Multi-country African sovereign infrastructure with local currency billing and zero egress fees — targeting "data colonialism" narrative [Data]
+- **Client cible :** Entreprises africaines, gouvernement, santé, finance [Données]
+- **Slogan de positionnement :** « The First Connected Sovereign Cloud Platform » pour l'Afrique [Données]
+- **Différenciateur clé :** Infrastructure souveraine africaine multi-pays avec facturation en monnaie locale et zéro frais d'egress — ciblant la narrative du « colonialisme des données » [Données]
 
-### Traction Signals
+### Signaux de Traction
 
-- **Geographic reach:** 6 countries launched (2025); expanding to Kenya, Tanzania, Rwanda, Uganda, Cote d'Ivoire, Egypt, Morocco [Data]
-- **Notable:** No Algeria in either current or announced rollout — significant gap [Data]
-- **Reviews:** No public G2/Capterra reviews found [Data]
+- **Portée géographique :** 6 pays lancés (2025) ; expansion vers Kenya, Tanzanie, Rwanda, Ouganda, Côte d'Ivoire, Égypte, Maroc [Données]
+- **Notable :** Pas d'Algérie dans le déploiement actuel ou annoncé — gap significatif [Données]
+- **Avis :** Aucun avis public G2/Capterra trouvé [Données]
 
-### Strengths
+### Forces
 
-- Sovereign-cloud narrative aligned with African government sentiment [Data]
-- Multi-country reach — could capture pan-African institutional deals [Data]
-- Zero egress fees is a competitive advantage vs. AWS/Azure [Data]
-- Local currency billing removes FX risk for institutional clients [Data]
+- Narrative cloud-souverain alignée avec le sentiment des gouvernements africains [Données]
+- Portée multi-pays — pourrait capturer des deals institutionnels pan-africains [Données]
+- Zéro frais d'egress est un avantage concurrentiel vs. AWS/Azure [Données]
+- La facturation en monnaie locale supprime le risque de change pour les clients institutionnels [Données]
 
-### Weaknesses
+### Faiblesses
 
-- No Algerian presence or announced plans [Data]
-- Very new (launched November 2025) — unproven track record [Data]
-- Classical data center model — no P2P, no mobile-native, no distributed edge [Opinion]
-- No consumer/end-user mobile app [Assumption]
-- Funding/financial backing not transparent [Data]
+- Pas de présence ou de plans annoncés en Algérie [Données]
+- Très récent (lancé novembre 2025) — historique non prouvé [Données]
+- Modèle data center classique — pas de P2P, pas de mobile-natif, pas d'edge distribué [Opinion]
+- Pas d'app mobile grand public/utilisateur final [Hypothèse]
+- Soutien financier/de financement non transparent [Données]
 
-### Threat Level to MobiCloud: **Low (Algeria-specific)**
+### Niveau de Menace pour MobiCloud : **Faible (spécifique Algérie)**
 
-- **Why:** UniCloud Africa does not operate in Algeria and has not announced plans to enter Algeria. Even if it did, it is a traditional IaaS platform, not a mobile P2P storage competitor. Relevant only as a macro signal that the African sovereign cloud space is attracting investment.
-
----
-
-## Storj / Filecoin / IPFS (Crypto-native Decentralized Storage)
-
-- **Website:** https://www.storj.io / https://www.filecoin.io
-- **Founded:** Storj: 2014; Filecoin/Protocol Labs: 2014 [Data]
-- **Headquarters:** Storj: Atlanta, USA; Filecoin: San Francisco, USA [Data]
-- **Funding:** Both well-funded via token sales and VC; Filecoin raised $257M ICO; Storj multiple VC rounds [Data]
-
-### Product
-
-- **Core offering:** Decentralized cloud storage using globally distributed storage nodes incentivized by cryptocurrency tokens (STORJ token / FIL token) [Data]
-- **Key features:**
-  1. Cryptographic erasure coding for redundancy
-  2. S3-compatible API (Storj)
-  3. Token-based economic incentives for node operators
-  4. Global node network (thousands of operators)
-  5. End-to-end encryption
-- **Tech approach:** Blockchain/crypto-incentive model; nodes are always-on servers/desktops — NOT mobile-native [Data]
-
-### Pricing
-
-- **Model:** Pay-per-use [Data]
-- **Storj rates:** $0.004/GB/month storage; $0.007/GB egress (as of Feb 2025) [Data]
-- **Filecoin:** ~$2.50/TiB/month for archival [Data]
-- **Free plan:** Storj offers a free trial tier [Data]
-
-### Market Position
-
-- **Target customer:** Developers, enterprises needing cheap redundant S3 storage; NOT consumers, NOT mobile, NOT Africa/Algeria [Data]
-- **Key differentiator:** Cheapest globally distributed storage at scale; crypto-native incentive model [Data]
-
-### Traction Signals
-
-- Storj has thousands of independent node operators globally [Data]
-- No Africa-specific deployments or marketing found [Assumption]
-- No mobile Android consumer app for end users [Data]
-- No Algerian regulatory compliance positioning [Assumption]
-
-### Strengths
-
-- Extremely low cost (78% cheaper than AWS S3 for archival) [Data]
-- Already proven at scale globally [Data]
-- Developer-friendly S3-compatible API [Data]
-
-### Weaknesses (relative to MobiCloud)
-
-- Requires crypto wallet/tokens — massive UX friction for Algerian institutions [Opinion]
-- No mobile-native Android app for consumers [Data]
-- Node operators are always-on servers, not mobile devices — different economic model [Data]
-- Not compliant with Algerian data residency law (nodes in non-Algerian territory) [Assumption]
-- Zero local presence, zero B2G sales capability in Algeria [Assumption]
-- Crypto regulatory exposure in Algeria (crypto highly restricted) [Data — Algeria banned crypto transactions]
-
-### Threat Level to MobiCloud: **Low**
-
-- **Why:** Crypto legal prohibition in Algeria alone eliminates Storj/Filecoin as competitors in the B2G Algeria SAM. Their architecture (always-on desktop/server nodes, developer API, token incentives) is fundamentally different from MobiCloud's mobile-native P2P model.
+- **Pourquoi :** UniCloud Africa n'opère pas en Algérie et n'a pas annoncé de plans d'entrée en Algérie. Même si c'était le cas, c'est une plateforme IaaS traditionnelle, pas un concurrent de stockage P2P mobile. Pertinent uniquement comme signal macro que l'espace cloud souverain africain attire l'investissement.
 
 ---
 
-## AventureCloudz (Algeria — Djezzy + Algeria Venture + Taubyte)
+## Storj / Filecoin / IPFS (Stockage Décentralisé Crypto-natif)
 
-- **Website:** Referenced via Djezzy/Algeria Venture press releases; platform at aventurecloudz.dz [Estimate]
-- **Founded/Launched:** April 30, 2025 [Data]
-- **Headquarters:** Algeria [Data]
-- **Funding:** Backed by Djezzy (Veon subsidiary, major Algerian telecom) + Algeria Venture (government accelerator) [Data]
+- **Site web :** https://www.storj.io / https://www.filecoin.io
+- **Fondé :** Storj : 2014 ; Filecoin/Protocol Labs : 2014 [Données]
+- **Siège :** Storj : Atlanta, USA ; Filecoin : San Francisco, USA [Données]
+- **Financement :** Les deux bien financés via ventes de tokens et VC ; Filecoin a levé 257M$ d'ICO ; Storj plusieurs rounds VC [Données]
 
-### Product
+### Produit
 
-- **Core offering:** Developer-focused cloud platform for Algerian startups and enterprises — IaaS, PaaS, AI development tools; hosted exclusively on Djezzy Cloud infrastructure on Algerian soil [Data]
-- **Tech approach:** Traditional cloud hosting (Djezzy data center) + Taubyte's developer platform layer; NOT P2P, NOT distributed mobile-native [Data]
+- **Offre centrale :** Stockage cloud décentralisé utilisant des nœuds de stockage distribués mondialement, incités par des tokens de cryptomonnaie (token STORJ / token FIL) [Données]
+- **Fonctionnalités clés :**
+  1. Erasure coding cryptographique pour la redondance
+  2. API compatible S3 (Storj)
+  3. Incitations économiques basées sur tokens pour les opérateurs de nœuds
+  4. Réseau de nœuds mondial (milliers d'opérateurs)
+  5. Chiffrement de bout en bout
+- **Approche technique :** Modèle blockchain/crypto-incitation ; les nœuds sont des serveurs/desktops toujours allumés — PAS mobile-natif [Données]
 
-### Pricing
+### Tarification
 
-- Not publicly disclosed [Data]
-- **Free plan:** Developer sandbox likely included [Assumption]
+- **Modèle :** Pay-per-use [Données]
+- **Tarifs Storj :** 0,004 $/Go/mois de stockage ; 0,007 $/Go d'egress (en date de fév. 2025) [Données]
+- **Filecoin :** ~2,50 $/Tio/mois pour l'archivage [Données]
+- **Plan gratuit :** Storj offre un palier d'essai gratuit [Données]
 
-### Market Position
+### Position sur le Marché
 
-- **Target customer:** Algerian software developers, startups, tech enterprises [Data]
-- **Key differentiator:** Only developer cloud platform natively integrated with Algerian telecom infrastructure [Data]
+- **Client cible :** Développeurs, entreprises nécessitant un stockage S3 redondant bon marché ; PAS les consommateurs, PAS le mobile, PAS l'Afrique/l'Algérie [Données]
+- **Différenciateur clé :** Le stockage distribué mondialement le moins cher à grande échelle ; modèle d'incitation crypto-natif [Données]
 
-### Traction Signals
+### Signaux de Traction
 
-- Backed by dominant Algerian telco (Djezzy has 20M+ subscribers) [Data]
-- Government endorsement through Algeria Venture partnership [Data]
-- No public user numbers or revenue disclosed [Data]
+- Storj a des milliers d'opérateurs de nœuds indépendants mondialement [Données]
+- Aucun déploiement ou marketing spécifique à l'Afrique trouvé [Hypothèse]
+- Pas d'app mobile Android grand public pour les utilisateurs finaux [Données]
+- Pas de positionnement de conformité réglementaire algérienne [Hypothèse]
 
-### Strengths
+### Forces
 
-- Telco distribution power (Djezzy's existing institutional/enterprise relationships) [Data]
-- Government legitimacy via Algeria Venture [Data]
-- Sovereign by design — Algerian territory [Data]
+- Coût extrêmement bas (78 % moins cher qu'AWS S3 pour l'archivage) [Données]
+- Déjà éprouvé à l'échelle mondialement [Données]
+- API compatible S3 développeur-friendly [Données]
 
-### Weaknesses
+### Faiblesses (relatives à MobiCloud)
 
-- Developer/startup focus — NOT targeting storage for hospitals/universities/ministries directly [Data]
-- No mobile-native P2P storage product [Data]
-- Very new — no track record [Data]
+- Nécessite un wallet/des tokens crypto — friction UX massive pour les institutions algériennes [Opinion]
+- Pas d'app Android mobile-native pour les consommateurs [Données]
+- Les opérateurs de nœuds sont des serveurs toujours allumés, pas des appareils mobiles — modèle économique différent [Données]
+- Non conforme à la loi algérienne de résidence des données (nœuds en territoire non algérien) [Hypothèse]
+- Zéro présence locale, zéro capacité de vente B2G en Algérie [Hypothèse]
+- Exposition réglementaire crypto en Algérie (crypto fortement restreinte) [Données — l'Algérie a interdit les transactions crypto]
 
-### Threat Level to MobiCloud: **Low**
+### Niveau de Menace pour MobiCloud : **Faible**
 
-- **Why:** Different product (developer cloud platform vs. institutional P2P storage). Could become relevant if Djezzy decided to launch a consumer/institutional storage product, but no evidence of such plans.
+- **Pourquoi :** L'interdiction légale de la crypto en Algérie à elle seule élimine Storj/Filecoin comme concurrents dans le SAM B2G Algérie. Leur architecture (nœuds desktop/serveur toujours allumés, API développeur, incitations par tokens) est fondamentalement différente du modèle P2P mobile-natif de MobiCloud.
 
 ---
 
-## Competitive Landscape Summary
+## AventureCloudz (Algérie — Djezzy + Algeria Venture + Taubyte)
 
-### Market Concentration
+- **Site web :** Référencé via les communiqués de presse Djezzy/Algeria Venture ; plateforme sur aventurecloudz.dz [Estimation]
+- **Fondé/Lancé :** 30 avril 2025 [Données]
+- **Siège :** Algérie [Données]
+- **Financement :** Soutenu par Djezzy (filiale Veon, opérateur télécom algérien majeur) + Algeria Venture (accélérateur gouvernemental) [Données]
 
-The distributed P2P mobile storage space for consumers and institutions in Africa is effectively **vacant** [Opinion]. The global market has:
-- European consumer distributed storage: Hivenet (Series A, Swiss, Android app exists)
-- European enterprise sovereign storage: Cubbit ($19.7M, Italy, S3/enterprise only)
-- Algerian traditional sovereign cloud: AYRADE (IPO 2026, centralized data center)
-- Pan-African IaaS: UniCloud Africa (new entrant, no Algeria)
-- Crypto-decentralized storage: Storj, Filecoin (developer/enterprise, no mobile, no Africa)
+### Produit
 
-No single competitor occupies the intersection of: (1) mobile-native P2P, (2) Algerian territory data sovereignty, (3) institutional B2G sales motion.
+- **Offre centrale :** Plateforme cloud orientée développeur pour les startups et entreprises algériennes — IaaS, PaaS, outils de développement IA ; hébergée exclusivement sur l'infrastructure Djezzy Cloud sur sol algérien [Données]
+- **Approche technique :** Hébergement cloud traditionnel (data center Djezzy) + couche de plateforme développeur de Taubyte ; PAS de P2P, PAS de mobile-natif distribué [Données]
 
-### Gaps in Market (What No Competitor Does Well)
+### Tarification
 
-1. **Mobile-native P2P storage that leverages end-user Android devices as the storage layer** — zero competitors do this [Opinion]
-2. **Algerian-territory compliant P2P/distributed storage** — AYRADE is centralized IaaS, not P2P [Data]
-3. **Offline-capable / local-network storage** (WiFi LAN transfers without internet) — no competitor offers this [Assumption based on product review]
-4. **Consumer-priced storage with institutional B2G compliance** — the market is bifurcated between consumer apps (Hivenet, low trust) and enterprise deals (Cubbit, no mobile) [Opinion]
-5. **Relay-based encrypted transport over WebSocket for cross-network P2P on mobile** — no public competitor has productized this for the Algerian institutional context [Opinion]
+- Non divulguée publiquement [Données]
+- **Plan gratuit :** Sandbox développeur probablement incluse [Hypothèse]
 
-### MobiCloud's Positioning Opportunity
+### Position sur le Marché
 
-MobiCloud occupies a **structurally unique position**:
+- **Client cible :** Développeurs logiciels, startups, entreprises tech algériennes [Données]
+- **Différenciateur clé :** Seule plateforme cloud développeur nativement intégrée à l'infrastructure télécom algérienne [Données]
 
-1. **Legal moat**: Algeria's Law 11-25 (July 2025) + Decrees 25-320/321 + 26-07 + ARPCE Decision 48 mandate on-Algerian-territory data storage for public institutions. No hyperscaler has Algerian territory infrastructure. AYRADE has it but is centralized IaaS. MobiCloud's relay server can be hosted in Algeria, with data staying on Algerian devices — a legally defensible interpretation of data residency. [Data + Opinion]
+### Signaux de Traction
 
-2. **Zero capex for institutions**: Existing Android devices of staff become the storage nodes. No server rack procurement. For a public hospital or university with 200 Android devices and a constrained IT budget, MobiCloud's model could cost dramatically less than AYRADE colocation. [Opinion]
+- Soutenu par un opérateur télécom algérien dominant (Djezzy a 20M+ abonnés) [Données]
+- Endossement gouvernemental via le partenariat Algeria Venture [Données]
+- Aucun nombre d'utilisateurs public ou revenu divulgué [Données]
 
-3. **Consumer story for later**: Hivenet proves there is an appetite for distributed mobile storage (consumer segment), but Hivenet cannot enter Algeria legally without Algerian nodes. MobiCloud starts B2G, builds distribution, then captures consumer segment from a sovereign position. [Opinion]
+### Forces
 
-### Competitive Moat Assessment
+- Puissance de distribution télécom (relations institutionnelles/entreprise existantes de Djezzy) [Données]
+- Légitimité gouvernementale via Algeria Venture [Données]
+- Souverain par conception — territoire algérien [Données]
 
-| Moat Type | Strength | Notes |
+### Faiblesses
+
+- Focus développeur/startup — NE cible PAS le stockage pour hôpitaux/universités/ministères directement [Données]
+- Pas de produit de stockage P2P mobile-natif [Données]
+- Très récent — pas d'historique [Données]
+
+### Niveau de Menace pour MobiCloud : **Faible**
+
+- **Pourquoi :** Produit différent (plateforme cloud développeur vs. stockage P2P institutionnel). Pourrait devenir pertinent si Djezzy décidait de lancer un produit de stockage grand public/institutionnel, mais aucune preuve de tels plans.
+
+---
+
+## Résumé du Paysage Concurrentiel
+
+### Concentration du Marché
+
+L'espace du stockage mobile P2P distribué pour les consommateurs et institutions en Afrique est effectivement **vacant** [Opinion]. Le marché mondial a :
+- Stockage distribué grand public européen : Hivenet (Série A, suisse, app Android existe)
+- Stockage souverain entreprise européen : Cubbit (19,7M$, Italie, S3/entreprise uniquement)
+- Cloud souverain traditionnel algérien : AYRADE (IPO 2026, data center centralisé)
+- IaaS pan-africain : UniCloud Africa (nouvel entrant, pas d'Algérie)
+- Stockage crypto-décentralisé : Storj, Filecoin (développeur/entreprise, pas de mobile, pas d'Afrique)
+
+Aucun concurrent unique n'occupe l'intersection de : (1) P2P mobile-natif, (2) souveraineté des données sur territoire algérien, (3) dynamique de vente institutionnelle B2G.
+
+### Gaps dans le Marché (Ce qu'Aucun Concurrent ne Fait Bien)
+
+1. **Stockage P2P mobile-natif qui exploite les appareils Android des utilisateurs finaux comme couche de stockage** — zéro concurrent fait cela [Opinion]
+2. **Stockage P2P/distribué conforme au territoire algérien** — AYRADE est de l'IaaS centralisé, pas du P2P [Données]
+3. **Stockage offline-capable / réseau local** (transferts WiFi LAN sans internet) — aucun concurrent n'offre cela [Hypothèse basée sur la revue produit]
+4. **Stockage à prix grand public avec conformité institutionnelle B2G** — le marché est bifurqué entre apps grand public (Hivenet, faible confiance) et deals entreprise (Cubbit, pas de mobile) [Opinion]
+5. **Transport chiffré basé relay sur WebSocket pour P2P cross-network sur mobile** — aucun concurrent public n'a productisé cela pour le contexte institutionnel algérien [Opinion]
+
+### Opportunité de Positionnement de MobiCloud
+
+MobiCloud occupe une **position structurellement unique** :
+
+1. **Moat légal** : La Loi 11-25 (juillet 2025) + Décrets 25-320/321 + 26-07 + ARPCE Décision 48 de l'Algérie imposent le stockage des données sur territoire algérien pour les institutions publiques. Aucun hyperscaler n'a d'infrastructure sur territoire algérien. AYRADE l'a mais est de l'IaaS centralisé. Le serveur relay de MobiCloud peut être hébergé en Algérie, avec les données restant sur les appareils algériens — une interprétation légalement défendable de la résidence des données. [Données + Opinion]
+
+2. **Zéro capex pour les institutions** : Les appareils Android existants du personnel deviennent les nœuds de stockage. Pas d'acquisition de racks serveur. Pour un hôpital public ou une université avec 200 appareils Android et un budget IT contraint, le modèle de MobiCloud pourrait coûter dramatiquement moins que la colocation AYRADE. [Opinion]
+
+3. **Story grand public pour plus tard** : Hivenet prouve qu'il y a un appétit pour le stockage mobile distribué (segment grand public), mais Hivenet ne peut pas entrer en Algérie légalement sans nœuds algériens. MobiCloud commence en B2G, construit la distribution, puis capture le segment grand public depuis une position souveraine. [Opinion]
+
+### Évaluation du Moat Concurrentiel
+
+| Type de Moat | Force | Notes |
 |---|---|---|
-| Legal/Regulatory | **Strong** | Law 11-25 is a hard barrier for non-Algerian competitors [Data] |
-| Technology | **Medium** | P2P relay + super-peer topology is non-trivial but replicable [Opinion] |
-| Network Effects | **Medium** | More devices = more storage = lower cost per institution [Opinion] |
-| Local Market Knowledge | **Strong** | Algerian-built, Arabic/French UX, understand procurement cycles [Assumption] |
-| First-Mover in Algeria | **Strong** | No comparable product exists today [Opinion] |
-| Distribution | **Weak (today)** | No institutional sales relationships yet; must build vs. AYRADE's 10K clients [Data] |
+| Légal/Réglementaire | **Fort** | La Loi 11-25 est une barrière dure pour les concurrents non algériens [Données] |
+| Technologie | **Moyen** | Le relay P2P + la topologie super-peer est non triviale mais réplicable [Opinion] |
+| Effets de Réseau | **Moyen** | Plus d'appareils = plus de stockage = coût plus faible par institution [Opinion] |
+| Connaissance du Marché Local | **Fort** | Construit en Algérie, UX arabe/français, compréhension des cycles de marchés publics [Hypothèse] |
+| Premier Arrivant en Algérie | **Fort** | Aucun produit comparable n'existe aujourd'hui [Opinion] |
+| Distribution | **Faible (aujourd'hui)** | Pas encore de relations de vente institutionnelle ; doit construire vs. les 10K clients d'AYRADE [Données] |
 
 ---
 
-## Data Gaps
+## Lacunes de Données
 
-- **Hivenet**: Total registered user count not disclosed; Android app MAU unknown; whether they have any enterprise/B2G clients [Unknown]
-- **Cubbit**: Exact per-TB pricing for DS3 Cloud not public; no information on any Africa/MENA expansion plans [Unknown]
-- **AYRADE**: Pricing per VM/TB not public; whether they have signed contracts with ministries or universities specifically (vs. banks/energy) is unclear [Unknown]
-- **AventureCloudz**: User adoption, pricing, whether any institutional non-developer clients [Unknown]
-- **UniCloud Africa**: Funding details, exact pricing, likelihood of Algeria expansion timing [Unknown]
-- **Market**: No reliable data on how many Algerian public institutions have signed cloud contracts of any kind — the 600-700 institutional targets is an estimate, not a measured addressable universe [Estimate per Wave 1 brief]
-- **Regulatory enforcement**: Whether ARPCE Decision 48 is actively enforced (contracts being denied to non-compliant providers) or currently aspirational — this materially affects moat strength [Unknown]
+- **Hivenet** : Nombre total d'utilisateurs enregistrés non divulgué ; MAU de l'app Android inconnus ; s'ils ont des clients entreprise/B2G [Inconnu]
+- **Cubbit** : Tarification exacte par To pour DS3 Cloud non publique ; aucune information sur d'éventuels plans d'expansion Afrique/MENA [Inconnu]
+- **AYRADE** : Tarification par VM/To non publique ; s'ils ont signé des contrats avec des ministères ou universités spécifiquement (vs. banques/énergie) n'est pas clair [Inconnu]
+- **AventureCloudz** : Adoption utilisateur, tarification, s'ils ont des clients institutionnels non-développeurs [Inconnu]
+- **UniCloud Africa** : Détails de financement, tarification exacte, probabilité du timing d'expansion en Algérie [Inconnu]
+- **Marché** : Aucune donnée fiable sur combien d'institutions publiques algériennes ont signé des contrats cloud de quelque type que ce soit — les 600-700 cibles institutionnelles est une estimation, pas un univers adressable mesuré [Estimation selon le brief Wave 1]
+- **Application réglementaire** : Si l'ARPCE Décision 48 est activement appliquée (contrats refusés aux fournisseurs non conformes) ou actuellement aspirationnelle — cela affecte matériellement la force du moat [Inconnu]
 
 ---
 
-*Sources used: Hivenet.com, Cubbit.io, Crunchbase, Tracxn, G2, Trustpilot, Gartner Peer Insights, TechAfrica News, Ecofin Agency, DealRoom, AlgeriaTech.news, Ecofinagency.com, DevTeam.Space, Villpress, Algerianewsgate.com — June 2026.*
+*Sources utilisées : Hivenet.com, Cubbit.io, Crunchbase, Tracxn, G2, Trustpilot, Gartner Peer Insights, TechAfrica News, Ecofin Agency, DealRoom, AlgeriaTech.news, Ecofinagency.com, DevTeam.Space, Villpress, Algerianewsgate.com — juin 2026.*

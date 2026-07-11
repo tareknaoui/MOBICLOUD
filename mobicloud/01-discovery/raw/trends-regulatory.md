@@ -1,273 +1,273 @@
-# Industry Trends & Regulatory Landscape: MobiCloud
+# Tendances du Secteur & Paysage Réglementaire : MobiCloud
 
-**Research date:** 2026-06-21
-**Researcher:** Claude Code (claude-sonnet-4-6)
-**Scope:** Decentralized/distributed storage technology trends, investment signals in Africa, Algerian digital behavior, regulatory landscape for data sovereignty, enforcement posture, and timing assessment for MobiCloud (B2G sovereign storage, Algeria-hosted WebSocket relay + Android P2P erasure-coded storage).
-
----
-
-## Technology Trends
-
-### Trend 1: Decentralized Cloud Storage — High-Growth, Early Mainstream Phase
-
-- **Adoption stage:** Crossing the chasm from early adopter to early majority (2025–2027 window).
-- **Market size:** [Data] $9.2B in 2025, projected $62B by 2034 (CAGR 23.4%). Separate estimate pegs 2025 at $3B growing to $3.62B in 2026 (CAGR 21.0%). Note: estimates diverge significantly by analyst methodology; treat as directional. (Source: Verified Market Reports, 360iResearch — Tier 3 market research firms)
-- **Key driver:** AI workloads, data sovereignty regulations, and government procurement preferences for non-US hyperscalers are the three structural drivers in 2025–2026.
-- **Impact on MobiCloud:** [Estimate] Timing is favorable. The institutional appetite for alternatives to AWS/Azure/GCP is at a multi-year high. MobiCloud's "data never leaves Algeria" proposition maps directly to the strongest driver category (sovereignty).
-- **Timeline:** 2025–2027 is the entry window. By 2028–2030, established players (OVHcloud, local telcos) will have consolidated the institutional market in North Africa.
-- **Source tier:** Tier 3 (market research reports). Cross-validated by Tier 1 signals (Western Digital CEO, Storj ARR growth data below).
-
-### Trend 2: Erasure Coding — Proven Enterprise Technology, Now Displacing Replication
-
-- **Adoption stage:** Mature. Standard practice at hyperscalers (Ceph, MinIO). Entering mid-market.
-- **Key facts:** [Data] Erasure coding reduces storage overhead from ~200% (3-way replication) to ~50% or less while maintaining equivalent fault tolerance. Academic survey confirms it is now displacing replication in most new distributed storage systems. (Source: IEEE Xplore, ACM ToS survey 2024 — Tier 1)
-- **Walrus/RedStuff:** [Data] Researchers introduced Walrus, a BFT-DSN system using RedStuff erasure coding that supports 4.5x replication with self-healing recovery. Confirms research frontier is alive, MobiCloud's use of erasure coding is academically defensible. (Tier 2 — research publication)
-- **Computational cost:** [Data] Higher CPU cost vs. replication is the main drawback — relevant on low-end Android devices. MobiCloud must document its erasure coding parameter choices (k, m) and CPU budget for thesis defense.
-- **Impact on MobiCloud:** Positive. Using erasure coding is technically state-of-the-art for the mobile-native context. It differentiates from simple file duplication solutions. Defensible as a thesis contribution.
-- **Source tier:** Tier 1–2 for technical facts; Tier 3 for market size.
-
-### Trend 3: P2P Mobile Networks — Technically Mature, No Dominant Commercial App
-
-- **Adoption stage:** Infrastructure-mature (NAT traversal, DHT, heterogeneous node participation all solved). No dominant Android-native P2P storage app has emerged commercially.
-- **Key facts:** [Data] Modern P2P systems use layered abstraction with NAT traversal, DHT routing, and heterogeneous mobile/edge node participation. Practical deployment demonstrated post-Hurricane Fiona (2025) with MESHLink (BT/WiFi Direct, 1.2 km radius clusters). (Source: Alibaba product insights, MDPI journal — Tier 2/3)
-- **Gap:** [Data Gap] No publicly available usage data or commercial traction data for Android-native P2P storage apps specifically. Bittorrent-derived mobile storage remains niche.
-- **Impact on MobiCloud:** The absence of a dominant competitor in Android-native P2P storage in the Global South is an opportunity. The technology exists; the product does not.
-- **Source tier:** Tier 2–3. Gap declared.
-
-### Trend 4: AI Driving Storage Demand — Indirect Tailwind
-
-- **Key facts:** [Data] Western Digital CEO confirmed in February 2026 that its entire hard-drive supply for 2026 is sold out to AI datacenter customers through 2027–2028. Storj (decentralized storage) reported 7x ARR increase and 25% growth in paid data stored Jan–Apr 2025. (Source: KuCoin News, Gate Wiki — Tier 3, but corroborated by vendor disclosures)
-- **Impact on MobiCloud:** Indirect. Hyperscaler storage costs are rising with AI demand. This makes local alternatives economically more attractive for institutions that would otherwise compete for the same global cloud capacity.
+**Date de recherche :** 2026-06-21
+**Chercheur :** Claude Code (claude-sonnet-4-6)
+**Périmètre :** Tendances technologiques du stockage décentralisé/distribué, signaux d'investissement en Afrique, comportement numérique algérien, paysage réglementaire de la souveraineté des données, posture d'application, et évaluation du timing pour MobiCloud (stockage souverain B2G, relay WebSocket hébergé en Algérie + stockage P2P Android erasure-coded).
 
 ---
 
-## Investment Activity
+## Tendances Technologiques
 
-### Global Decentralized Storage Funding
+### Tendance 1 : Stockage Cloud Décentralisé — Forte Croissance, Phase Mainstream Précoce
 
-- [Data] Filecoin (FIL) up >50%, Arweave (AR) up 60%, Storj (STORJ) up 20% in November 2025. Storj ARR grew 7x year-over-year through April 2025. (Source: Gate.com, KuCoin News — Tier 3)
-- [Data] Decentralized cloud storage market growing at 21.2% CAGR through 2030 per industry report. (Source: National Law Review press release — Tier 3)
-- [Estimate] Most decentralized storage investment in 2025 is token/crypto-linked (Filecoin, Arweave ecosystem), not equity investment in enterprise infrastructure. MobiCloud is infrastructure + app, not a token project — this distinction matters for fundraising narrative.
+- **Stade d'adoption :** Traversée du gouffre de l'early adopter à l'early majority (fenêtre 2025–2027).
+- **Taille du marché :** [Données] 9,2 Md$ en 2025, projeté à 62 Md$ d'ici 2034 (TCAC 23,4 %). Une estimation distincte situe 2025 à 3 Md$ croissant à 3,62 Md$ en 2026 (TCAC 21,0 %). Note : les estimations divergent significativement selon la méthodologie des analystes ; traiter comme directionnel. (Source : Verified Market Reports, 360iResearch — cabinets de recherche de marché Tier 3)
+- **Moteur clé :** Les charges de travail IA, les réglementations de souveraineté des données et les préférences des marchés publics pour les hyperscalers non-US sont les trois moteurs structurels en 2025–2026.
+- **Impact sur MobiCloud :** [Estimation] Le timing est favorable. L'appétit institutionnel pour des alternatives à AWS/Azure/GCP est à un plus haut pluriannuel. La proposition « les données ne quittent jamais l'Algérie » de MobiCloud correspond directement à la plus forte catégorie de moteur (souveraineté).
+- **Calendrier :** 2025–2027 est la fenêtre d'entrée. D'ici 2028–2030, les acteurs établis (OVHcloud, télécoms locaux) auront consolidé le marché institutionnel en Afrique du Nord.
+- **Tier de source :** Tier 3 (rapports de recherche de marché). Recoupé par des signaux Tier 1 (PDG de Western Digital, données de croissance ARR de Storj ci-dessous).
 
-### African Tech Funding 2025
+### Tendance 2 : Erasure Coding — Technologie Entreprise Éprouvée, Remplaçant Désormais la Réplication
 
-- [Data] African startups raised $4.1B total in 2025 (59% increase year-on-year, decisive rebound from 2023–2024 slowdown). (Source: MohacAfrica.org — Tier 3)
-- [Data] Separate estimate: $442M in "powerful surge" in one tracked period of 2025. Numbers vary significantly by source methodology; $3.5B–$4.1B range appears in multiple sources. (Source: AfriTechBizHub — Tier 3)
-- [Data] Clean energy overtook fintech as Africa's top-funded sector by Q3 2025, accounting for 53% of total investment. (Source: BitKE — Tier 3)
-- [Data] One in every six funded tech startups in Africa in 2025 is crypto-focused. (Source: CoinGabbar — Tier 3)
-- [Data] Corporate venture investment in African startups reached a 3-year high in early 2025. (Source: Global Venturing — Tier 2)
-- [Estimate] No specific funding event for "decentralized storage + Africa" found. The sector intersection (decentralized storage + Algerian institutional market) is not yet a named category for investors.
+- **Stade d'adoption :** Mature. Pratique standard chez les hyperscalers (Ceph, MinIO). Entrant sur le mid-market.
+- **Faits clés :** [Données] L'erasure coding réduit le surcoût de stockage de ~200 % (réplication 3-way) à ~50 % ou moins tout en maintenant une tolérance aux pannes équivalente. Une étude académique confirme qu'il remplace désormais la réplication dans la plupart des nouveaux systèmes de stockage distribué. (Source : IEEE Xplore, étude ACM ToS 2024 — Tier 1)
+- **Walrus/RedStuff :** [Données] Des chercheurs ont introduit Walrus, un système BFT-DSN utilisant l'erasure coding RedStuff qui supporte une réplication 4,5x avec récupération auto-réparatrice. Confirme que la frontière de recherche est vivante, l'usage de l'erasure coding par MobiCloud est académiquement défendable. (Tier 2 — publication de recherche)
+- **Coût computationnel :** [Données] Un coût CPU plus élevé vs. la réplication est l'inconvénient principal — pertinent sur les appareils Android bas de gamme. MobiCloud doit documenter ses choix de paramètres d'erasure coding (k, m) et son budget CPU pour la soutenance de thèse.
+- **Impact sur MobiCloud :** Positif. Utiliser l'erasure coding est techniquement à l'état de l'art pour le contexte mobile-natif. Cela le différencie des solutions de simple duplication de fichiers. Défendable comme contribution de thèse.
+- **Tier de source :** Tier 1–2 pour les faits techniques ; Tier 3 pour la taille du marché.
 
-### Algeria-Specific Funding
+### Tendance 3 : Réseaux P2P Mobiles — Techniquement Matures, Pas d'App Commerciale Dominante
 
-- [Data] Algeria's Startup Fund (ASF) has invested in 130+ startups. First exit: VOLZ travel-tech raised $5M Series A in December 2025, generating 3.35x return for ASF. (Source: Launch Base Africa — Tier 2)
-- [Data] Algerie Telecom announced a 1.5 billion DZD (~$11M) fund in February 2025 targeting AI, cybersecurity, and robotics startups. (Source: AlgeriaTech.news — Tier 2)
-- [Data] Algeria launched a $1B continental fund in October 2025 to support African startups, signaling ambition to be a regional hub. (Source: Weetracker — Tier 2)
-- [Data] By mid-2025: 1,600 microenterprises, 130 ASF-funded startups, 1,175 innovative projects, 2,800 registered patents. Government target: 20,000 startups by 2029. (Source: StatsAndMarketInsights — Tier 3)
-- [Estimate] The cybersecurity focus of the $11M Algerie Telecom fund is directly adjacent to MobiCloud's positioning. Sovereign data infrastructure is close enough to cybersecurity/data sovereignty that this fund could be a funding avenue.
+- **Stade d'adoption :** Infrastructure-mature (traversée NAT, DHT, participation de nœuds hétérogènes tous résolus). Aucune app de stockage P2P Android-native dominante n'a émergé commercialement.
+- **Faits clés :** [Données] Les systèmes P2P modernes utilisent une abstraction en couches avec traversée NAT, routage DHT et participation de nœuds mobiles/edge hétérogènes. Déploiement pratique démontré après l'Ouragan Fiona (2025) avec MESHLink (BT/WiFi Direct, clusters de rayon 1,2 km). (Source : Alibaba product insights, journal MDPI — Tier 2/3)
+- **Gap :** [Lacune de Données] Aucune donnée d'usage publiquement disponible ou donnée de traction commerciale pour les apps de stockage P2P Android-natives spécifiquement. Le stockage mobile dérivé de Bittorrent reste niche.
+- **Impact sur MobiCloud :** L'absence d'un concurrent dominant dans le stockage P2P Android-natif dans le Sud Global est une opportunité. La technologie existe ; le produit non.
+- **Tier de source :** Tier 2–3. Lacune déclarée.
 
-### Sovereign Cloud Infrastructure Investment — Africa
+### Tendance 4 : L'IA Tirant la Demande de Stockage — Vent Favorable Indirect
 
-- [Data] Africa data center market projected to grow from 0.4 GW in 2025 to 2.2 GW by 2030, requiring $10–20B investment (McKinsey). (Source: McKinsey via TechInAfrica — Tier 1 for projection methodology)
-- [Data] Unicloud Africa deployed sovereign cloud in 6 African countries (Nigeria, Ghana, South Africa, Zambia, Senegal, Mozambique) in October 2025. (Source: Ecofin Agency — Tier 2)
-- [Data] AfriCloud launched with data centers in Kigali, Lagos, Cape Town backed by African Union and Smart Africa Alliance. (Source: ATPS Net — Tier 2)
-- [Data] Microsoft: $300M for AI infrastructure in South Africa + $1B geothermal data center in Kenya. MTN Nigeria: $235M data center (first phase complete 2025). IFC: $100M for carrier-neutral data centers. (Source: TechInAfrica — Tier 2)
-- [Observation] Algeria is notably absent from the list of countries where major sovereign cloud investments landed in 2025. No equivalent of the AfriCloud or Unicloud deployments is documented for Algeria. [Data Gap] No confirmed major data center investment in Algeria by a named hyperscaler in 2025.
-- **Signal for MobiCloud:** [Estimate] The gap in Algerian-hosted sovereign infrastructure means institutional buyers have fewer qualified local alternatives. This creates a window for MobiCloud's relay-as-a-service model before hyperscalers enter the Algerian market.
-
----
-
-## Behavioral Shifts
-
-### Algeria Digital Landscape
-
-- [Data] 36.2 million internet users in Algeria at start of 2025 (76.9% penetration). +488K users vs. January 2024. (Source: DataReportal Digital 2025 Algeria — Tier 1)
-- [Data] 54.8 million cellular mobile connections in Algeria at start of 2025 (+3M vs. 2024). (Source: DataReportal — Tier 1)
-- [Data] 25.6 million social media users (54.2% of population). Facebook and YouTube dominant platforms. (Source: DataReportal — Tier 1)
-- [Data] Median age of Algerian population: 28.6 years. (Source: DataReportal — Tier 1)
-- [Estimate] A population with median age 28.6, 77% internet penetration, and 54.8M mobile connections represents a structurally favorable demand base for a mobile-native storage app.
-- [Data Gap] No publicly available data on cloud storage subscription rates in Algeria (Google Drive/Dropbox paying users). Cannot quantify addressable consumer market size precisely.
-
-### Behavioral Shift: Preference for Local/Affordable Alternatives
-
-- [Estimate] With ~$3.5/day average income for a significant share of the Algerian population, Google One pricing ($2.99/month for 100GB) represents a meaningful spend. The freemium B2C angle (store for free by sharing device storage) is behaviorally aligned with the "young, mobile-first, cost-conscious" demographic.
-- [Data Gap] No survey data on Algerian willingness-to-pay for cloud storage or attitudes toward P2P data sharing found in search results.
-
-### Behavioral Shift: Institutional Digitization Under Government Pressure
-
-- [Data] Algeria's 2025–2029 National Cybersecurity Strategy (Decree 25-321) mandates cybersecurity units in every public institution. This creates institutional IT modernization pressure that naturally leads to procurement of compliant local storage. (Source: AlgeriaTech.news, TechAfricaNews — Tier 2)
-- [Estimate] Algerian universities, hospitals, and ministries are under regulatory pressure to formalize their data handling. IT departments that previously used US cloud providers informally now face legal exposure. This converts latent demand into active procurement need.
+- **Faits clés :** [Données] Le PDG de Western Digital a confirmé en février 2026 que toute son offre de disques durs pour 2026 est vendue aux clients data center IA jusqu'en 2027–2028. Storj (stockage décentralisé) a rapporté une augmentation d'ARR de 7x et 25 % de croissance des données payantes stockées de janvier à avril 2025. (Source : KuCoin News, Gate Wiki — Tier 3, mais corroboré par des divulgations de fournisseurs)
+- **Impact sur MobiCloud :** Indirect. Les coûts de stockage des hyperscalers augmentent avec la demande IA. Cela rend les alternatives locales économiquement plus attractives pour les institutions qui concurrenceraient autrement pour la même capacité cloud mondiale.
 
 ---
 
-## Timing Assessment
+## Activité d'Investissement
 
-### Is Now (2026) a Good Time to Launch MobiCloud?
+### Financement Mondial du Stockage Décentralisé
 
-**Assessment: YES — with two conditions.**
+- [Données] Filecoin (FIL) en hausse de >50 %, Arweave (AR) en hausse de 60 %, Storj (STORJ) en hausse de 20 % en novembre 2025. L'ARR de Storj a crû de 7x en glissement annuel jusqu'en avril 2025. (Source : Gate.com, KuCoin News — Tier 3)
+- [Données] Marché du stockage cloud décentralisé croissant à 21,2 % TCAC jusqu'en 2030 selon un rapport sectoriel. (Source : communiqué de presse National Law Review — Tier 3)
+- [Estimation] La majorité de l'investissement en stockage décentralisé en 2025 est lié aux tokens/crypto (écosystème Filecoin, Arweave), pas de l'investissement en equity dans l'infrastructure entreprise. MobiCloud est infrastructure + app, pas un projet token — cette distinction compte pour la narrative de levée de fonds.
 
-**Why now is favorable:**
+### Financement Tech Africain 2025
 
-1. [Data] The Algerian regulatory framework for data sovereignty just became fully operational in 2025–2026. Law 11-25 (July 2025), Decree 25-320 (December 2025), Decree 25-321 (December 2025), Decree 26-07 (January 2026) — four major instruments in six months. Public institutions are NOW under compliance pressure for the first time.
-2. [Data] No major sovereign cloud player has established infrastructure in Algeria as of June 2026. The window before OVHcloud, Scaleway, or Algerie Telecom-backed IaaS captures the institutional market is 18–36 months. [Estimate]
-3. [Data] Algeria's startup ecosystem is at a 3-year high in investment activity. The government is actively co-funding cybersecurity and data sovereignty startups ($11M Algerie Telecom fund). Institutional endorsement is available.
-4. [Data] Decentralized storage technology is mature enough (erasure coding, NAT traversal, WebSocket relay proven in production) to ship a defensible B2G product.
-5. [Data] 76.9% internet penetration + 54.8M mobile connections = infrastructure-ready consumer base.
+- [Données] Les startups africaines ont levé 4,1 Md$ au total en 2025 (augmentation de 59 % en glissement annuel, rebond décisif après le ralentissement 2023–2024). (Source : MohacAfrica.org — Tier 3)
+- [Données] Estimation distincte : 442M $ en « forte poussée » sur une période suivie de 2025. Les chiffres varient significativement selon la méthodologie des sources ; la fourchette 3,5–4,1 Md$ apparaît dans plusieurs sources. (Source : AfriTechBizHub — Tier 3)
+- [Données] L'énergie propre a dépassé la fintech comme secteur le plus financé d'Afrique au T3 2025, représentant 53 % de l'investissement total. (Source : BitKE — Tier 3)
+- [Données] Une startup tech financée sur six en Afrique en 2025 est focalisée crypto. (Source : CoinGabbar — Tier 3)
+- [Données] L'investissement corporate venture dans les startups africaines a atteint un plus haut de 3 ans début 2025. (Source : Global Venturing — Tier 2)
+- [Estimation] Aucun événement de financement spécifique pour « stockage décentralisé + Afrique » trouvé. L'intersection sectorielle (stockage décentralisé + marché institutionnel algérien) n'est pas encore une catégorie nommée pour les investisseurs.
 
-**Why caution is warranted:**
+### Financement Spécifique à l'Algérie
 
-1. [Data] Enforcement by ANPDP is nascent. No public enforcement actions documented as of mid-2026. Institutional buyers may not feel urgency yet — they may wait for enforcement to become real before procuring.
-2. [Estimate] MobiCloud's relay currently runs on Render (US). This is the single largest barrier to B2G sales. Until the relay moves to Algerian hosting, the product cannot be sold to institutional customers under Law 18-07 and Decree 25-320 constraints.
-3. [Estimate] The B2G sales cycle in Algeria is notoriously long (12–24 months for public procurement). The regulatory window is now open, but revenue will not follow immediately.
+- [Données] Le Fonds Algérien des Startups (ASF) a investi dans 130+ startups. Première sortie : VOLZ travel-tech a levé 5M $ Série A en décembre 2025, générant un retour de 3,35x pour l'ASF. (Source : Launch Base Africa — Tier 2)
+- [Données] Algerie Telecom a annoncé un fonds de 1,5 milliard DZD (~11M $) en février 2025 ciblant les startups IA, cybersécurité et robotique. (Source : AlgeriaTech.news — Tier 2)
+- [Données] L'Algérie a lancé un fonds continental de 1 Md$ en octobre 2025 pour soutenir les startups africaines, signalant l'ambition d'être un hub régional. (Source : Weetracker — Tier 2)
+- [Données] Mi-2025 : 1 600 microentreprises, 130 startups financées par l'ASF, 1 175 projets innovants, 2 800 brevets enregistrés. Objectif gouvernemental : 20 000 startups d'ici 2029. (Source : StatsAndMarketInsights — Tier 3)
+- [Estimation] Le focus cybersécurité du fonds Algerie Telecom de 11M $ est directement adjacent au positionnement de MobiCloud. L'infrastructure de données souveraine est suffisamment proche de la cybersécurité/souveraineté des données pour que ce fonds puisse être une voie de financement.
 
-**What would change timing:**
-- A well-publicized ANPDP enforcement action would create urgency and accelerate institutional procurement.
-- Algeria's Ministry of Higher Education issuing a circular requiring local data hosting for university platforms would be a direct trigger for university sales.
-- If a hyperscaler (OVHcloud, Azure) establishes Algerian-hosted infrastructure before MobiCloud closes its first institutional contract, the differentiation erodes.
+### Investissement en Infrastructure Cloud Souverain — Afrique
 
----
-
-## Regulatory Landscape — Algeria
-
-### Core Data Protection Law: Law 18-07 (2018) as amended by Law 11-25 (2025)
-
-- **Full name:** Law No. 18-07 of April 10, 2018, on the Protection of Personal Data, as amended by Law No. 11-25 of July 2025.
-- [Data] **Who it applies to:** Any controller or processor handling personal data of Algerian residents, including all public institutions (universities, hospitals, ministries). Foreign controllers using systems in Algeria must appoint a local representative.
-- [Data] **Cross-border transfer restriction:** Any cross-border transfer of personal data requires prior authorization from the ANPDP. No adequacy framework has been established. Authorization is required case-by-case. (Source: CMS Expert Guide, DLA Piper — Tier 1)
-- [Data] **Penalties for unauthorized transfer:** Imprisonment of 1–5 years AND fine of 500,000–1,000,000 DZD (approximately €3,300–€6,600 at current rates). General non-compliance: 20,000–1,000,000 DZD and/or 2 months–5 years imprisonment.
-- [Data] **New obligations under Law 11-25 (effective 2025):**
-  - Mandatory DPO appointment for all controllers
-  - Maintain a register of processing activities (Article 41 bis 2)
-  - Maintain automated logbook of processing operations (Article 41 bis 3)
-  - Conduct DPIA for high-risk processing (Article 45 bis 6)
-  - Breach notification to ANPDP within 5 days
-  - Adequacy-type assessment required before cross-border transfers (Articles 45 bis 13–14)
-  - Onward transfers restricted without original sender's prior consent
-- **Source:** CMS.law Expert Guide, DLA Piper Data Protection Laws of the World, DataGuidance — Tier 1
-
-### National Data Governance Framework: Decree 25-320 (December 30, 2025)
-
-- [Data] Establishes national data governance framework including data classification, cataloguing, and secure interoperability between public administrations.
-- [Data] Links explicitly to cybersecurity (ANSSI) and personal data protection (ANPDP) frameworks.
-- [Data] Creates structured requirements for how public administrations handle, classify, and interoperate data — essentially a data architecture mandate for government.
-- **Impact on MobiCloud:** [Estimate] Decree 25-320 is the institutional procurement trigger. Public administrations buying storage must now comply with classification and cataloguing requirements. A locally-hosted, encrypted, auditable storage solution is the natural procurement answer.
-- **Source:** CMS Expert Guide, AlgeriaTech.news — Tier 2
-
-### National Cybersecurity Strategy: Decree 25-321 (December 30, 2025)
-
-- [Data] Approves the National Information Systems Security Strategy 2025–2029.
-- [Data] Reinforces protection of state digital infrastructures and administrations.
-- [Data] Context: Algeria faced 70+ million attempted cyberattacks in 2024 (Kaspersky data, ranking Algeria 17th globally among most-targeted nations). (Source: AlgeriaTech.news — Tier 2)
-- **Impact on MobiCloud:** Strategy-level mandate that all public institutions modernize their security posture. Creates institutional IT spending budgets in the 2025–2029 window.
-
-### Cybersecurity Units in Public Institutions: Decree 26-07 (January 7, 2026)
-
-- [Data] Published in the Official Gazette January 21, 2026.
-- [Data] **Mandate:** Every public entity must establish a dedicated cybersecurity unit, separate from the IT management department, reporting directly to the head of the institution.
-- [Data] **Scope:** Coordinates all data protection and system security actions, including across agencies under its oversight.
-- [Data] **Procurement clause:** Contracts with ICT vendors must include cybersecurity clauses aligned with national standards. Security assessments of ICT suppliers and service providers required during procurement due diligence.
-- [Data] **DPO/CISO requirement:** CISOs must have demonstrable cybersecurity expertise.
-- **Impact on MobiCloud:** [Estimate] This is the most operationally significant decree for MobiCloud's sales. Every institutional customer must now have a named cybersecurity officer who must sign off on storage vendor selection. MobiCloud must be certifiable under ANSSI standards (a compliance pathway that does not yet exist for the product). This is a deal-qualifier, not a deal-killer, but it requires proactive engagement with ANSSI.
-- **Source:** Ecofin Agency, TechAfricaNews — Tier 2
-
-### Cloud Hosting Regulatory Framework: ARPCE / Law 22-39 (2022)
-
-- [Data] Law No. 22-39 of January 10, 2022 regulates cloud computing and data storage in Algeria.
-- [Data] Providers of cloud data hosting and storage must obtain a general authorization from ARPCE (Regulatory Authority for Post and Electronic Communications).
-- [Data] Article 10 of ARPCE Decision 48/SP/PC/ARPT/17 (November 2017, predating the law but still operative): operators of public cloud computing services must establish their infrastructure on Algerian territory and host/store data locally.
-- [Data] ARPCE-authorized cloud providers as of 2025: ISAAL, AYRADE, eBS, ADEX Cloud. (Source: ARPCE.dz, AlgeriaTech.news — Tier 2)
-- **Impact on MobiCloud:** [Data] MobiCloud's relay server must be hosted in Algeria and must obtain ARPCE authorization to serve institutional clients legally. This is a regulatory prerequisite, not optional. The current Render (US) hosting is non-compliant for B2G sales.
+- [Données] Le marché data center Afrique projeté pour croître de 0,4 GW en 2025 à 2,2 GW d'ici 2030, nécessitant 10–20 Md$ d'investissement (McKinsey). (Source : McKinsey via TechInAfrica — Tier 1 pour la méthodologie de projection)
+- [Données] Unicloud Africa a déployé un cloud souverain dans 6 pays africains (Nigeria, Ghana, Afrique du Sud, Zambie, Sénégal, Mozambique) en octobre 2025. (Source : Ecofin Agency — Tier 2)
+- [Données] AfriCloud a été lancé avec des data centers à Kigali, Lagos, Le Cap, soutenu par l'Union Africaine et la Smart Africa Alliance. (Source : ATPS Net — Tier 2)
+- [Données] Microsoft : 300M $ pour l'infrastructure IA en Afrique du Sud + 1 Md$ data center géothermique au Kenya. MTN Nigeria : 235M $ data center (première phase achevée 2025). IFC : 100M $ pour des data centers carrier-neutral. (Source : TechInAfrica — Tier 2)
+- [Observation] L'Algérie est notablement absente de la liste des pays où de grands investissements cloud souverain ont atterri en 2025. Aucun équivalent des déploiements AfriCloud ou Unicloud n'est documenté pour l'Algérie. [Lacune de Données] Aucun investissement majeur confirmé en data center en Algérie par un hyperscaler nommé en 2025.
+- **Signal pour MobiCloud :** [Estimation] Le gap dans l'infrastructure souveraine hébergée en Algérie signifie que les acheteurs institutionnels ont moins d'alternatives locales qualifiées. Cela crée une fenêtre pour le modèle relay-as-a-service de MobiCloud avant que les hyperscalers n'entrent sur le marché algérien.
 
 ---
 
-## Data Privacy Framework
+## Bascules Comportementales
 
-### Summary of Binding Obligations for Algerian Public Institutions (as of June 2026)
+### Paysage Numérique Algérie
 
-| Obligation | Legal Basis | Applies to MobiCloud as Vendor? |
+- [Données] 36,2 millions d'internautes en Algérie début 2025 (76,9 % de pénétration). +488K utilisateurs vs. janvier 2024. (Source : DataReportal Digital 2025 Algeria — Tier 1)
+- [Données] 54,8 millions de connexions mobiles cellulaires en Algérie début 2025 (+3M vs. 2024). (Source : DataReportal — Tier 1)
+- [Données] 25,6 millions d'utilisateurs de réseaux sociaux (54,2 % de la population). Facebook et YouTube plateformes dominantes. (Source : DataReportal — Tier 1)
+- [Données] Âge médian de la population algérienne : 28,6 ans. (Source : DataReportal — Tier 1)
+- [Estimation] Une population avec un âge médian de 28,6, 77 % de pénétration internet et 54,8M de connexions mobiles représente une base de demande structurellement favorable pour une app de stockage mobile-native.
+- [Lacune de Données] Aucune donnée publiquement disponible sur les taux d'abonnement au stockage cloud en Algérie (utilisateurs payants Google Drive/Dropbox). Impossible de quantifier précisément la taille du marché grand public adressable.
+
+### Bascule Comportementale : Préférence pour les Alternatives Locales/Abordables
+
+- [Estimation] Avec un revenu moyen de ~3,5 $/jour pour une part significative de la population algérienne, la tarification de Google One (2,99 $/mois pour 100 Go) représente une dépense significative. L'angle freemium B2C (stocker gratuitement en partageant le stockage de l'appareil) est comportementalement aligné avec le démographique « jeune, mobile-first, soucieux des coûts ».
+- [Lacune de Données] Aucune donnée d'enquête sur le consentement à payer algérien pour le stockage cloud ou les attitudes envers le partage de données P2P trouvée dans les résultats de recherche.
+
+### Bascule Comportementale : Numérisation Institutionnelle sous Pression Gouvernementale
+
+- [Données] La Stratégie Nationale de Cybersécurité 2025–2029 de l'Algérie (Décret 25-321) impose des unités de cybersécurité dans chaque institution publique. Cela crée une pression de modernisation IT institutionnelle qui mène naturellement à l'acquisition de stockage local conforme. (Source : AlgeriaTech.news, TechAfricaNews — Tier 2)
+- [Estimation] Les universités, hôpitaux et ministères algériens sont sous pression réglementaire pour formaliser leur traitement des données. Les départements IT qui utilisaient auparavant des fournisseurs cloud US de façon informelle font désormais face à une exposition légale. Cela convertit la demande latente en besoin actif de marché.
+
+---
+
+## Évaluation du Timing
+
+### Maintenant (2026) Est-il un Bon Moment pour Lancer MobiCloud ?
+
+**Évaluation : OUI — avec deux conditions.**
+
+**Pourquoi maintenant est favorable :**
+
+1. [Données] Le cadre réglementaire algérien pour la souveraineté des données vient de devenir pleinement opérationnel en 2025–2026. Loi 11-25 (juillet 2025), Décret 25-320 (décembre 2025), Décret 25-321 (décembre 2025), Décret 26-07 (janvier 2026) — quatre instruments majeurs en six mois. Les institutions publiques sont MAINTENANT sous pression de conformité pour la première fois.
+2. [Données] Aucun acteur majeur de cloud souverain n'a établi d'infrastructure en Algérie en date de juin 2026. La fenêtre avant qu'OVHcloud, Scaleway ou un IaaS adossé à Algerie Telecom ne capture le marché institutionnel est de 18–36 mois. [Estimation]
+3. [Données] L'écosystème de startups algérien est à un plus haut de 3 ans en activité d'investissement. Le gouvernement co-finance activement les startups cybersécurité et souveraineté des données (fonds Algerie Telecom de 11M $). L'endossement institutionnel est disponible.
+4. [Données] La technologie de stockage décentralisé est suffisamment mature (erasure coding, traversée NAT, relay WebSocket éprouvé en production) pour livrer un produit B2G défendable.
+5. [Données] 76,9 % de pénétration internet + 54,8M de connexions mobiles = base grand public infrastructure-ready.
+
+**Pourquoi la prudence est de mise :**
+
+1. [Données] L'application par l'ANPDP est naissante. Aucune action d'application publique documentée en date de mi-2026. Les acheteurs institutionnels peuvent ne pas ressentir d'urgence encore — ils peuvent attendre que l'application devienne réelle avant d'acquérir.
+2. [Estimation] Le relay de MobiCloud tourne actuellement sur Render (US). C'est la plus grande barrière unique aux ventes B2G. Tant que le relay ne migre pas vers un hébergement algérien, le produit ne peut pas être vendu aux clients institutionnels sous les contraintes de la Loi 18-07 et du Décret 25-320.
+3. [Estimation] Le cycle de vente B2G en Algérie est notoirement long (12–24 mois pour les marchés publics). La fenêtre réglementaire est maintenant ouverte, mais le revenu ne suivra pas immédiatement.
+
+**Ce qui changerait le timing :**
+- Une action d'application bien médiatisée de l'ANPDP créerait de l'urgence et accélérerait les marchés publics institutionnels.
+- Le Ministère de l'Enseignement Supérieur émettant une circulaire exigeant l'hébergement local des données pour les plateformes universitaires serait un déclencheur direct pour les ventes universitaires.
+- Si un hyperscaler (OVHcloud, Azure) établit une infrastructure hébergée en Algérie avant que MobiCloud ne ferme son premier contrat institutionnel, la différenciation s'érode.
+
+---
+
+## Paysage Réglementaire — Algérie
+
+### Loi de Protection des Données Centrale : Loi 18-07 (2018) amendée par la Loi 11-25 (2025)
+
+- **Nom complet :** Loi n° 18-07 du 10 avril 2018, sur la Protection des Données Personnelles, amendée par la Loi n° 11-25 de juillet 2025.
+- [Données] **À qui elle s'applique :** Tout responsable ou sous-traitant traitant des données personnelles de résidents algériens, y compris toutes les institutions publiques (universités, hôpitaux, ministères). Les responsables étrangers utilisant des systèmes en Algérie doivent nommer un représentant local.
+- [Données] **Restriction de transfert transfrontalier :** Tout transfert transfrontalier de données personnelles nécessite une autorisation préalable de l'ANPDP. Aucun cadre d'adéquation n'a été établi. L'autorisation est requise au cas par cas. (Source : CMS Expert Guide, DLA Piper — Tier 1)
+- [Données] **Pénalités pour transfert non autorisé :** Emprisonnement de 1–5 ans ET amende de 500 000–1 000 000 DZD (environ 3 300–6 600 € aux taux actuels). Non-conformité générale : 20 000–1 000 000 DZD et/ou 2 mois–5 ans d'emprisonnement.
+- [Données] **Nouvelles obligations sous la Loi 11-25 (effective 2025) :**
+  - Nomination obligatoire d'un DPO pour tous les responsables
+  - Maintien d'un registre des activités de traitement (Article 41 bis 2)
+  - Maintien d'un journal automatisé des opérations de traitement (Article 41 bis 3)
+  - Réalisation d'une DPIA pour le traitement à haut risque (Article 45 bis 6)
+  - Notification de violation à l'ANPDP sous 5 jours
+  - Évaluation de type adéquation requise avant les transferts transfrontaliers (Articles 45 bis 13–14)
+  - Transferts ultérieurs restreints sans le consentement préalable de l'expéditeur d'origine
+- **Source :** CMS.law Expert Guide, DLA Piper Data Protection Laws of the World, DataGuidance — Tier 1
+
+### Cadre National de Gouvernance des Données : Décret 25-320 (30 décembre 2025)
+
+- [Données] Établit un cadre national de gouvernance des données incluant la classification des données, le catalogage et l'interopérabilité sécurisée entre administrations publiques.
+- [Données] Lie explicitement aux cadres de cybersécurité (ANSSI) et de protection des données personnelles (ANPDP).
+- [Données] Crée des exigences structurées sur la façon dont les administrations publiques traitent, classifient et font interopérer les données — essentiellement un mandat d'architecture de données pour le gouvernement.
+- **Impact sur MobiCloud :** [Estimation] Le Décret 25-320 est le déclencheur de marché institutionnel. Les administrations publiques achetant du stockage doivent désormais se conformer aux exigences de classification et de catalogage. Une solution de stockage hébergée localement, chiffrée et auditable est la réponse de marché naturelle.
+- **Source :** CMS Expert Guide, AlgeriaTech.news — Tier 2
+
+### Stratégie Nationale de Cybersécurité : Décret 25-321 (30 décembre 2025)
+
+- [Données] Approuve la Stratégie Nationale de Sécurité des Systèmes d'Information 2025–2029.
+- [Données] Renforce la protection des infrastructures numériques de l'État et des administrations.
+- [Données] Contexte : L'Algérie a fait face à 70+ millions de tentatives de cyberattaques en 2024 (données Kaspersky, classant l'Algérie 17e mondialement parmi les nations les plus ciblées). (Source : AlgeriaTech.news — Tier 2)
+- **Impact sur MobiCloud :** Mandat au niveau stratégie pour que toutes les institutions publiques modernisent leur posture de sécurité. Crée des budgets de dépenses IT institutionnels dans la fenêtre 2025–2029.
+
+### Unités de Cybersécurité dans les Institutions Publiques : Décret 26-07 (7 janvier 2026)
+
+- [Données] Publié au Journal Officiel le 21 janvier 2026.
+- [Données] **Mandat :** Chaque entité publique doit établir une unité de cybersécurité dédiée, séparée du département de gestion IT, rapportant directement au chef de l'institution.
+- [Données] **Périmètre :** Coordonne toutes les actions de protection des données et de sécurité des systèmes, y compris à travers les agences sous sa supervision.
+- [Données] **Clause de marché :** Les contrats avec les fournisseurs TIC doivent inclure des clauses de cybersécurité alignées sur les standards nationaux. Évaluations de sécurité des fournisseurs et prestataires TIC requises pendant la due diligence des marchés.
+- [Données] **Exigence DPO/CISO :** Les CISO doivent avoir une expertise cybersécurité démontrable.
+- **Impact sur MobiCloud :** [Estimation] C'est le décret le plus opérationnellement significatif pour les ventes de MobiCloud. Chaque client institutionnel doit désormais avoir un officier de cybersécurité nommé qui doit valider la sélection du fournisseur de stockage. MobiCloud doit être certifiable selon les standards ANSSI (une voie de conformité qui n'existe pas encore pour le produit). C'est un qualificateur de deal, pas un tueur de deal, mais cela nécessite un engagement proactif avec l'ANSSI.
+- **Source :** Ecofin Agency, TechAfricaNews — Tier 2
+
+### Cadre Réglementaire d'Hébergement Cloud : ARPCE / Loi 22-39 (2022)
+
+- [Données] La Loi n° 22-39 du 10 janvier 2022 réglemente le cloud computing et le stockage de données en Algérie.
+- [Données] Les fournisseurs d'hébergement et de stockage de données cloud doivent obtenir une autorisation générale de l'ARPCE (Autorité de Régulation de la Poste et des Communications Électroniques).
+- [Données] L'Article 10 de la Décision ARPCE 48/SP/PC/ARPT/17 (novembre 2017, antérieure à la loi mais toujours opérative) : les opérateurs de services de cloud computing public doivent établir leur infrastructure sur territoire algérien et héberger/stocker les données localement.
+- [Données] Fournisseurs cloud autorisés par l'ARPCE en date de 2025 : ISAAL, AYRADE, eBS, ADEX Cloud. (Source : ARPCE.dz, AlgeriaTech.news — Tier 2)
+- **Impact sur MobiCloud :** [Données] Le serveur relay de MobiCloud doit être hébergé en Algérie et doit obtenir l'autorisation ARPCE pour servir légalement les clients institutionnels. C'est un prérequis réglementaire, pas optionnel. L'hébergement Render (US) actuel est non conforme pour les ventes B2G.
+
+---
+
+## Cadre de Confidentialité des Données
+
+### Résumé des Obligations Contraignantes pour les Institutions Publiques Algériennes (en date de juin 2026)
+
+| Obligation | Base Légale | S'applique à MobiCloud comme Fournisseur ? |
 |---|---|---|
-| No cross-border personal data transfer without ANPDP authorization | Law 18-07 Art. 45 bis 13 | YES — relay on Render (US) creates direct liability |
-| Appoint a DPO | Law 11-25 | On the institution's side; MobiCloud must support DPO audit access |
-| Maintain processing register | Law 11-25 Art. 41 bis 2 | Institution's obligation; MobiCloud must provide audit logs |
-| Automated processing logbook | Law 11-25 Art. 41 bis 3 | MobiCloud must generate this data |
-| DPIA for high-risk processing | Law 11-25 Art. 45 bis 6 | Health/education data likely high-risk; DPIA must be done before hospital deployment |
-| 5-day breach notification | Law 11-25 | MobiCloud must have incident response procedure |
-| ARPCE authorization for cloud hosting | Law 22-39 | MobiCloud relay infrastructure must be ARPCE-authorized |
-| Cybersecurity unit sign-off on vendor | Decree 26-07 | MobiCloud must pass the institutional cybersecurity unit's vetting |
-| Data classification per national framework | Decree 25-320 | MobiCloud must support data classification tagging |
+| Pas de transfert transfrontalier de données personnelles sans autorisation ANPDP | Loi 18-07 Art. 45 bis 13 | OUI — le relay sur Render (US) crée une responsabilité directe |
+| Nommer un DPO | Loi 11-25 | Du côté de l'institution ; MobiCloud doit supporter l'accès audit du DPO |
+| Maintenir un registre de traitement | Loi 11-25 Art. 41 bis 2 | Obligation de l'institution ; MobiCloud doit fournir les logs d'audit |
+| Journal automatisé de traitement | Loi 11-25 Art. 41 bis 3 | MobiCloud doit générer ces données |
+| DPIA pour traitement à haut risque | Loi 11-25 Art. 45 bis 6 | Données santé/éducation probablement à haut risque ; DPIA doit être faite avant déploiement hospitalier |
+| Notification de violation sous 5 jours | Loi 11-25 | MobiCloud doit avoir une procédure de réponse aux incidents |
+| Autorisation ARPCE pour hébergement cloud | Loi 22-39 | L'infrastructure relay de MobiCloud doit être autorisée ARPCE |
+| Validation de l'unité de cybersécurité sur le fournisseur | Décret 26-07 | MobiCloud doit passer le vetting de l'unité de cybersécurité institutionnelle |
+| Classification des données selon le cadre national | Décret 25-320 | MobiCloud doit supporter le tagging de classification des données |
 
-### Enforcement Authority
+### Autorité d'Application
 
-- **ANPDP** (National Authority for Protection of Personal Data): Handles Law 18-07 / Law 11-25 compliance. Installed August 2022. Law applicable since August 2023. [Data] No public enforcement actions documented as of mid-2026.
-- **ANSSI** (National Agency for Information Systems Security): Technical/operational cybersecurity arm. Coordinates with public institutions under Decree 26-07.
-- **CNSSI** (National Council for Information Systems Security): Strategic/coordination body under Decree 20-05.
-- **ARPCE**: Regulatory authority for telecom and cloud hosting authorization.
-
----
-
-## Upcoming Regulatory Changes
-
-### Confirmed (Already Published)
-
-1. **Law 11-25** (July 2025) — In force. Implementation period for DPO appointments and processing registers: [Data Gap] No specific compliance deadline found in search results. [Assumption] Likely 12–18 months from enactment based on comparable frameworks, meaning full compliance expected by mid-2027.
-2. **Decree 25-320** (December 30, 2025) — National data governance framework. In force. Implementation timelines for public administrations: [Data Gap] Not found.
-3. **Decree 25-321** (December 30, 2025) — Cybersecurity strategy 2025–2029. In force. Annual milestones expected but not publicly detailed.
-4. **Decree 26-07** (January 7, 2026) — Cybersecurity units mandate. In force. Deadline for establishment of units: [Data Gap] Not specified in available sources.
-
-### Expected / Probable (Not Yet Published)
-
-- [Estimate] ANPDP implementing regulations for Law 11-25 (DPO certification process, DPIA methodology): Expected 2026–2027. Will define the practical compliance burden for cloud vendors.
-- [Estimate] ARPCE update to cloud authorization procedures under Law 22-39: Expected to incorporate Law 11-25 data sovereignty requirements into authorization criteria. Timeline unknown.
-- [Estimate] Ministry of Higher Education circular on university data hosting: Multiple sources indicate sectoral data localization mandates are the next regulatory step across Africa (Nigeria, Ghana models). Algeria likely to follow. Timeline: [Data Gap].
+- **ANPDP** (Autorité Nationale de Protection des Données Personnelles) : Gère la conformité Loi 18-07 / Loi 11-25. Installée en août 2022. Loi applicable depuis août 2023. [Données] Aucune action d'application publique documentée en date de mi-2026.
+- **ANSSI** (Agence Nationale de Sécurité des Systèmes d'Information) : Bras technique/opérationnel de cybersécurité. Coordonne avec les institutions publiques sous le Décret 26-07.
+- **CNSSI** (Conseil National de Sécurité des Systèmes d'Information) : Organe stratégique/de coordination sous le Décret 20-05.
+- **ARPCE** : Autorité de régulation pour les télécoms et l'autorisation d'hébergement cloud.
 
 ---
 
-## Risk Assessment
+## Changements Réglementaires à Venir
 
-### Risk Level: MEDIUM-HIGH (for regulatory compliance path), LOW (for competitive structural position)
+### Confirmés (Déjà Publiés)
 
-| Risk | Level | Detail |
+1. **Loi 11-25** (juillet 2025) — En vigueur. Période d'implémentation pour les nominations de DPO et les registres de traitement : [Lacune de Données] Aucune échéance de conformité spécifique trouvée dans les résultats de recherche. [Hypothèse] Probablement 12–18 mois à partir de la promulgation sur la base de cadres comparables, signifiant une conformité complète attendue pour mi-2027.
+2. **Décret 25-320** (30 décembre 2025) — Cadre national de gouvernance des données. En vigueur. Calendriers d'implémentation pour les administrations publiques : [Lacune de Données] Non trouvés.
+3. **Décret 25-321** (30 décembre 2025) — Stratégie de cybersécurité 2025–2029. En vigueur. Jalons annuels attendus mais non détaillés publiquement.
+4. **Décret 26-07** (7 janvier 2026) — Mandat des unités de cybersécurité. En vigueur. Échéance pour l'établissement des unités : [Lacune de Données] Non spécifiée dans les sources disponibles.
+
+### Attendus / Probables (Pas Encore Publiés)
+
+- [Estimation] Réglementations d'application de l'ANPDP pour la Loi 11-25 (processus de certification DPO, méthodologie DPIA) : Attendues 2026–2027. Définiront la charge de conformité pratique pour les fournisseurs cloud.
+- [Estimation] Mise à jour de l'ARPCE des procédures d'autorisation cloud sous la Loi 22-39 : Attendue pour incorporer les exigences de souveraineté des données de la Loi 11-25 dans les critères d'autorisation. Calendrier inconnu.
+- [Estimation] Circulaire du Ministère de l'Enseignement Supérieur sur l'hébergement des données universitaires : De multiples sources indiquent que les mandats sectoriels de localisation des données sont la prochaine étape réglementaire à travers l'Afrique (modèles Nigeria, Ghana). L'Algérie suivra probablement. Calendrier : [Lacune de Données].
+
+---
+
+## Évaluation des Risques
+
+### Niveau de Risque : MOYEN-ÉLEVÉ (pour le chemin de conformité réglementaire), FAIBLE (pour la position structurelle concurrentielle)
+
+| Risque | Niveau | Détail |
 |---|---|---|
-| Relay on US infrastructure (Render) blocks B2G sales | HIGH | Law 18-07 + ARPCE Decision 48 make this a clear legal barrier. Must resolve before first institutional contract. |
-| ANPDP enforcement remains dormant | MEDIUM | If enforcement stays inactive, institutional urgency evaporates. However, the legal exposure exists regardless — a single public sector data breach could trigger enforcement. |
-| ARPCE authorization process delays | MEDIUM | Authorization required but process timeline is not public. Could delay commercial launch by 3–12 months. |
-| Hyperscaler enters Algeria market | MEDIUM | If OVHcloud or Azure announces Algerian-hosted region before MobiCloud closes institutional contracts, differentiation window closes partially. No evidence this is imminent as of June 2026. |
-| Institutional procurement cycle length | MEDIUM | Algerian public procurement (marchés publics) typically 12–24 months from RFQ to contract. Revenue timeline is long. |
-| Android P2P app regulatory classification | LOW-MEDIUM | The Android app stores user data on third-party devices. ANPDP may require specific consent frameworks. DPIA required before hospital deployment. |
-| Technology risk: Erasure coding on low-end devices | LOW | Computational cost is documented. MobiCloud has presumably addressed this in implementation. |
+| Relay sur infrastructure US (Render) bloque les ventes B2G | ÉLEVÉ | Loi 18-07 + ARPCE Décision 48 en font une barrière légale claire. Doit être résolu avant le premier contrat institutionnel. |
+| L'application par l'ANPDP reste dormante | MOYEN | Si l'application reste inactive, l'urgence institutionnelle s'évapore. Cependant, l'exposition légale existe quoi qu'il arrive — une seule violation de données du secteur public pourrait déclencher l'application. |
+| Délais du processus d'autorisation ARPCE | MOYEN | Autorisation requise mais le calendrier du processus n'est pas public. Pourrait retarder le lancement commercial de 3–12 mois. |
+| Un hyperscaler entre sur le marché algérien | MOYEN | Si OVHcloud ou Azure annonce une région hébergée en Algérie avant que MobiCloud ne ferme des contrats institutionnels, la fenêtre de différenciation se ferme partiellement. Aucune preuve que ce soit imminent en date de juin 2026. |
+| Durée du cycle de marchés publics institutionnels | MOYEN | Les marchés publics algériens typiquement 12–24 mois du RFQ au contrat. Le calendrier de revenu est long. |
+| Classification réglementaire de l'app P2P Android | FAIBLE-MOYEN | L'app Android stocke les données utilisateur sur des appareils tiers. L'ANPDP peut exiger des cadres de consentement spécifiques. DPIA requise avant déploiement hospitalier. |
+| Risque technologique : Erasure coding sur appareils bas de gamme | FAIBLE | Le coût computationnel est documenté. MobiCloud l'a vraisemblablement adressé dans l'implémentation. |
 
 ---
 
-## Data Gaps
+## Lacunes de Données
 
-The following could not be verified through available web search results and should be flagged as open research questions:
+Les éléments suivants n'ont pas pu être vérifiés via les résultats de recherche web disponibles et devraient être signalés comme questions de recherche ouvertes :
 
-1. **[Gap 1] Specific compliance deadlines** for Law 11-25, Decree 25-320, and Decree 26-07 implementation. Official gazette text was not accessible. Recommended action: Obtain Journal Officiel text directly from joradp.dz.
+1. **[Lacune 1] Échéances de conformité spécifiques** pour l'implémentation de la Loi 11-25, du Décret 25-320 et du Décret 26-07. Le texte du Journal Officiel n'était pas accessible. Action recommandée : Obtenir le texte du Journal Officiel directement depuis joradp.dz.
 
-2. **[Gap 2] ARPCE authorization process details** for cloud hosting providers under Law 22-39. The ARPCE website lists authorized providers but the authorization procedure, timeline, and cost are not publicly documented in English. Recommended action: Contact ARPCE directly or use a local legal advisor.
+2. **[Lacune 2] Détails du processus d'autorisation ARPCE** pour les fournisseurs d'hébergement cloud sous la Loi 22-39. Le site web de l'ARPCE liste les fournisseurs autorisés mais la procédure d'autorisation, le calendrier et le coût ne sont pas documentés publiquement en anglais. Action recommandée : Contacter l'ARPCE directement ou utiliser un conseiller juridique local.
 
-3. **[Gap 3] ANPDP enforcement status.** Multiple Tier-1 sources confirm no public enforcement actions have been taken as of their publication dates (2025). Whether any private/administrative sanctions have been issued is unknown. Recommended action: Local legal counsel in Algeria.
+3. **[Lacune 3] Statut de l'application par l'ANPDP.** De multiples sources Tier-1 confirment qu'aucune action d'application publique n'a été prise en date de leurs dates de publication (2025). Si des sanctions privées/administratives ont été émises est inconnu. Action recommandée : Conseil juridique local en Algérie.
 
-4. **[Gap 4] Algeria-specific data center investment pipeline.** No confirmed hyperscaler investment in Algerian territory found. This may reflect a real gap or a research limitation. Recommended action: Check Algerie Telecom annual report and Ministry of Digital Economy press releases.
+4. **[Lacune 4] Pipeline d'investissement data center spécifique à l'Algérie.** Aucun investissement hyperscaler confirmé sur territoire algérien trouvé. Cela peut refléter un véritable gap ou une limitation de recherche. Action recommandée : Vérifier le rapport annuel d'Algerie Telecom et les communiqués de presse du Ministère de l'Économie Numérique.
 
-5. **[Gap 5] Consumer willingness-to-pay and cloud storage adoption rate in Algeria.** DataReportal provides internet penetration data but no subscription data for cloud storage. Recommended action: Survey or use Algeria-specific Statista consumer data (paywalled).
+5. **[Lacune 5] Consentement à payer et taux d'adoption du stockage cloud en Algérie.** DataReportal fournit des données de pénétration internet mais aucune donnée d'abonnement pour le stockage cloud. Action recommandée : Enquête ou utiliser des données consommateurs Statista spécifiques à l'Algérie (payantes).
 
-6. **[Gap 6] ANSSI certification pathway for private vendors.** Decree 26-07 requires institutional cybersecurity units to vet vendors, but the certification standard MobiCloud would need to meet is not defined in available sources. Recommended action: Contact ANSSI directly.
+6. **[Lacune 6] Voie de certification ANSSI pour les fournisseurs privés.** Le Décret 26-07 exige que les unités de cybersécurité institutionnelles évaluent les fournisseurs, mais le standard de certification que MobiCloud devrait satisfaire n'est pas défini dans les sources disponibles. Action recommandée : Contacter l'ANSSI directement.
 
-7. **[Gap 7] "Decree 25-321"** — the search results attributed both the national data governance framework AND the cybersecurity strategy to different decree numbers in the 25-3xx range (25-320 vs. 25-321). There is a possibility of numbering confusion in secondary sources. Recommended action: Verify against Journal Officiel text.
+7. **[Lacune 7] « Décret 25-321 »** — les résultats de recherche ont attribué à la fois le cadre national de gouvernance des données ET la stratégie de cybersécurité à des numéros de décret différents dans la plage 25-3xx (25-320 vs. 25-321). Il y a une possibilité de confusion de numérotation dans les sources secondaires. Action recommandée : Vérifier contre le texte du Journal Officiel.
 
 ---
 
-## Sources Referenced
+## Sources Référencées
 
-**Tier 1 (Primary/authoritative):**
+**Tier 1 (Primaire/faisant autorité) :**
 - [DataReportal Digital 2025: Algeria](https://datareportal.com/reports/digital-2025-algeria)
 - [CMS Expert Guide: Algeria Data Protection and Cybersecurity](https://cms.law/en/int/expert-guides/cms-expert-guide-to-data-protection-and-cyber-security-laws/algeria2)
 - [DLA Piper Data Protection Laws of the World: Algeria](https://www.dlapiperdataprotection.com/?t=law&c=DZ)
 - [IEEE Xplore: Demand-Aware Erasure Coding](https://ieeexplore.ieee.org/document/8576648/)
-- [McKinsey Africa data center projections (cited via TechInAfrica)]
+- [Projections data center Afrique McKinsey (citées via TechInAfrica)]
 
-**Tier 2 (Reputable secondary):**
+**Tier 2 (Secondaire réputé) :**
 - [AlgeriaTech.news: Cybersecurity Strategy 2025–2029](https://algeriatech.news/national-cybersecurity-strategy-2025-2029-analysis/)
 - [AlgeriaTech.news: Algeria Tech AI Startup Ecosystem 2026](https://algeriatech.news/algeria-tech-ai-startup-scene/)
 - [Ecofin Agency: Unicloud Africa sovereign cloud deployment](https://www.ecofinagency.com/news-digital/2910-49922-unicloud-africa-deploys-sovereign-cloud-in-six-african-nations)
@@ -280,7 +280,7 @@ The following could not be verified through available web search results and sho
 - [DataProtectionAfrica: Algeria fact sheet](https://dataprotection.africa/algeria/)
 - [DigitalPolicyAlert: DPA Digital Digest Algeria 2025](https://digitalpolicyalert.org/digest/dpa-digital-digest-algeria)
 
-**Tier 3 (Indicative / market research):**
+**Tier 3 (Indicatif / recherche de marché) :**
 - [Verified Market Reports: Decentralized Cloud Storage 2026–2034](https://www.verifiedmarketreports.com/product/decentralized-cloud-storage-solutions-market/)
 - [GM Insights: Decentralized Storage Market 2025–2034](https://www.gminsights.com/industry-analysis/decentralized-storage-market)
 - [NatLawReview: Decentralized Cloud Storage CAGR through 2030](https://natlawreview.com/press-releases/decentralized-cloud-storage-market-projected-grow-212-cagr-through-2030)

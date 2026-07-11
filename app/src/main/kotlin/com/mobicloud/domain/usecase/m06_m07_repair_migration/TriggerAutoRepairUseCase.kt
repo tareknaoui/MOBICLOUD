@@ -35,7 +35,15 @@ class TriggerAutoRepairUseCase @Inject constructor(
 ) {
 
     companion object {
-        const val UNDER_REPLICATION_THRESHOLD = 1
+        // 2 hôtes actifs requis par fragment. Pertinent surtout pour les uploads à n<=1
+        // (RS(2,1), petits clusters cold-start) : DistributeEncryptedBlocksUseCase y place une
+        // copie secondaire best-effort par fragment (2 hôtes distincts dès l'upload), donc la
+        // branche donneur ci-dessous devient enfin atteignable : un hôte part → l'autre sert de
+        // donneur avant que le fragment ne soit orphelin. Avec seuil=1 (ancien MVP), la réparation
+        // ne se déclenchait qu'à 0 hôte actif restant — donc jamais de donneur disponible.
+        // Pour n>=2 (dynamicN déjà relevé), aucune copie secondaire n'est créée — la tolérance
+        // vient des vrais fragments de parité erasure-coding, moins cher qu'une duplication brute.
+        const val UNDER_REPLICATION_THRESHOLD = 2
         private const val LOGTAG = "MobiCloud:Migrate"
     }
 

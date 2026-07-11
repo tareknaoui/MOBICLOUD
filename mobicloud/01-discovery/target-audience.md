@@ -1,230 +1,230 @@
-# Target Audience
+# Audience Cible
 
-**Phase:** 3 — Market Research (Synthesis)
-**Project:** mobicloud
-**Date:** 2026-06-21
-**Confidence:** Medium (B2G buyer path confirmed from regulatory/procurement research; B2C behavioral data is proxy from South Africa/Nigeria, not Algeria specifically)
-
----
-
-## Primary Persona: B2G Buyer
-
-**Name (fictional):** Karim — DSI (Directeur des Systèmes d'Information)
-**Role:** IT Director / Head of Information Systems
-**Institution:** Public university (2,000–15,000 students) or regional hospital, Algeria
-**Demographics:** 35–50 years old; engineering or computer science background; has worked in public sector 10+ years; based in Algiers, Oran, or Constantine
-
-**Goals:**
-- Keep the institution's IT systems compliant with evolving Algerian law
-- Reduce dependence on foreign cloud services (liability after Law 11-25)
-- Provide staff and students with file storage that works on mobile devices they already own
-- Avoid expensive on-premise server infrastructure projects he doesn't have budget or staff for
-- Not get blamed if an audit finds non-compliant data storage
-
-**Frustrations:**
-- Google Drive and Dropbox are what everyone uses, but they are now legally risky. Removing them creates user revolt without a replacement.
-- CERIST connection exists on paper but is too slow and capacity-constrained for practical mobile use.
-- Nextcloud requires a server he doesn't have and a sysadmin he can't hire.
-- AYRADE is compliant but expensive and centralized — requires infrastructure investment.
-- Procurement for anything new takes 12–18 months unless it's under the gré à gré threshold.
-
-**Current tools:** CERIST fiber access (if connected), Google Workspace (technically non-compliant), some USB drive culture, on-premise NAS in wealthier institutions.
-
-**Representative quote:** *"On a les textes de loi depuis juillet 2025. Mon directeur général m'a demandé ce qu'on fait pour nos données. Je n'ai pas encore de réponse concrète."* [Assumption — no verbatim from real DSI obtained; this reflects the compliance pressure context from Wave 3 research]
-
-**Decision-making path:**
-- **DSI** (Karim) — technical evaluator, identifies the problem, shortlists vendors, runs the pilot
-- **RSSI** (Responsable Sécurité des Systèmes d'Information) — security validator, checks for compliance with Decree 26-07 cybersecurity obligations
-- **DG / Rector / Director** — budget authority, signs the contract
-
-**Decision criteria (ranked):**
-1. Legal compliance — does this satisfy Law 11-25 and ARPCE requirements?
-2. No new server infrastructure required
-3. Works on Android phones staff already own
-4. DZD billing (EUR/USD billing = procurement rejected)
-5. Local support (can reach someone who speaks Darija or French, responds within 24h)
-
-**Budget:** Gré à gré contracts typically under 3M DZD ($22,000 at current rates) to avoid open tender. Initial contract likely 500K–2M DZD/year.
-
-**Sales cycle:** 12–24 months for open tender; 3–6 months for gré à gré under threshold with an existing internal champion.
-
-**Common objections:**
-- "We already use CERIST." → Response: CERIST doesn't provide mobile backup; it's a network, not a storage product.
-- "You have no reference client." → The first deal breaks this. Until then: demo + pilot at zero cost.
-- "Is this ANPT-certified / ANPDP-registered?" → MobiCloud must prepare compliance documentation before B2G outreach.
-- "What happens if your company disappears?" → Open protocol answer: if MobiCloud closes, the relay code is open-source, institutions can run their own.
-
-**Where to reach Karim:**
-- Industry events: Forum Algérie Numérique, Salon DISTREE Africa
-- LinkedIn (Algerian IT professionals are active — search "DSI Algérie" returns real contacts)
-- ANPT conferences and cybersecurity working groups
-- Warm introduction via AYRADE (if partnership secured)
-- University rector networks
+**Phase :** 3 — Recherche de Marché (Synthèse)
+**Projet :** mobicloud
+**Date :** 2026-06-21
+**Confiance :** Moyenne (le parcours d'achat B2G est confirmé par la recherche réglementaire/marchés publics ; les données comportementales B2C sont des proxys d'Afrique du Sud/Nigeria, pas de l'Algérie spécifiquement)
 
 ---
 
-## Secondary Persona: B2C User
+## Persona Primaire : Acheteur B2G
 
-**Name (fictional):** Yasmine — Étudiante en master, Alger
-**Role:** University student / young professional
-**Demographics:** 22–28 years old; Android phone (Samsung or Chinese mid-range); mobile-first internet user; monthly income 30,000–60,000 DZD (student stipend or junior salary); Algiers, Oran, Constantine
-**Device:** Android 11+, 64–128GB storage, often 60–80% full
+**Nom (fictif) :** Karim — DSI (Directeur des Systèmes d'Information)
+**Rôle :** Directeur IT / Responsable des Systèmes d'Information
+**Institution :** Université publique (2 000–15 000 étudiants) ou hôpital régional, Algérie
+**Démographie :** 35–50 ans ; formation ingénierie ou informatique ; a travaillé dans le secteur public 10+ ans ; basé à Alger, Oran ou Constantine
 
-**Goals:**
-- Never lose her thesis drafts, lecture notes, and photos when her phone breaks or gets stolen
-- Not pay €10/month for Google One when her entire disposable income is ~15,000 DZD/month
-- Have something that works when connectivity is spotty (between neighborhoods, in certain buildings)
-- Trust that her files are private — not indexed by Google, not visible to a company
+**Objectifs :**
+- Maintenir les systèmes IT de l'institution conformes à la loi algérienne évolutive
+- Réduire la dépendance aux services cloud étrangers (responsabilité après la Loi 11-25)
+- Fournir au personnel et aux étudiants un stockage de fichiers fonctionnant sur les appareils mobiles qu'ils possèdent déjà
+- Éviter des projets d'infrastructure serveur on-premise coûteux pour lesquels il n'a ni budget ni personnel
+- Ne pas être blâmé si un audit trouve un stockage de données non conforme
 
-**Frustrations:**
-- Google Drive free tier (15GB) fills up fast with photos and lecture recordings. Paid tier is unaffordable and requires an international credit card she doesn't have.
-- WhatsApp "Starred Messages" and "Keep in Chat" as accidental backup — fragile, not searchable, disappears if WhatsApp account is deleted.
-- USB drives break. She's lost files twice already.
-- Nothing works when she's on campus WiFi behind NAT — files she shared won't sync between her laptop and phone.
+**Frustrations :**
+- Google Drive et Dropbox sont ce que tout le monde utilise, mais ils sont désormais légalement risqués. Les retirer crée une révolte des utilisateurs sans remplacement.
+- La connexion CERIST existe sur le papier mais est trop lente et limitée en capacité pour un usage mobile pratique.
+- Nextcloud nécessite un serveur qu'il n'a pas et un sysadmin qu'il ne peut pas embaucher.
+- AYRADE est conforme mais coûteux et centralisé — nécessite un investissement en infrastructure.
+- Les marchés pour quoi que ce soit de nouveau prennent 12–18 mois sauf si c'est sous le seuil gré à gré.
 
-**Current tools:** WhatsApp for informal file sharing, occasionally Google Drive (free tier), USB drives.
+**Outils actuels :** Accès fibre CERIST (si connecté), Google Workspace (techniquement non conforme), une certaine culture de clés USB, NAS on-premise dans les institutions plus aisées.
 
-**Representative quote (composite from Wave 3 review mining):** *"I had 3 years of photos and university work on my phone. When it broke I lost everything. Google Drive is too expensive for me. I wish there was a way to back up to my friends' phones automatically."* [Tier 3, composite]
+**Citation représentative :** *« On a les textes de loi depuis juillet 2025. Mon directeur général m'a demandé ce qu'on fait pour nos données. Je n'ai pas encore de réponse concrète. »* [Hypothèse — pas de verbatim obtenu d'un vrai DSI ; ceci reflète le contexte de pression de conformité de la recherche Wave 3]
 
-**Decision criteria:**
-1. Free or very cheap (200–400 DZD/month maximum, below Spotify's 1,299 DZD)
-2. Works automatically without user intervention
-3. Doesn't need constant internet — at least syncs opportunistically
-4. Friends/flatmates can be in the same group (social buy-in required)
-5. Private (she doesn't want Google reading her files)
+**Parcours de décision :**
+- **DSI** (Karim) — évaluateur technique, identifie le problème, présélectionne les fournisseurs, mène le pilot
+- **RSSI** (Responsable Sécurité des Systèmes d'Information) — validateur sécurité, vérifie la conformité aux obligations de cybersécurité du Décret 26-07
+- **DG / Recteur / Directeur** — autorité budgétaire, signe le contrat
 
-**WTP:** 200–400 DZD/month. Evidence: Spotify Algeria = 1,299 DZD/month; Coursera = 2,499 DZD/month. Storage must price well below these anchors given lower perceived utility of "backup" vs. "entertainment." [Estimate, Wave 3]
+**Critères de décision (classés) :**
+1. Conformité légale — est-ce que cela satisfait la Loi 11-25 et les exigences ARPCE ?
+2. Pas de nouvelle infrastructure serveur requise
+3. Fonctionne sur les téléphones Android que le personnel possède déjà
+4. Facturation DZD (facturation EUR/USD = marché rejeté)
+5. Support local (peut joindre quelqu'un parlant darija ou français, répondant sous 24h)
 
-**Common objections:**
-- "I don't want to use my phone's storage for other people's files." → Reciprocal model: her files are on their phones too.
-- "What if my friend leaves the group?" → Re-replication feature (currently not implemented — honest blocker).
-- "Is it safe? Can my friend see my files?" → Encryption answer: no, they store encrypted fragments they cannot decrypt.
-- "It needs internet to work anyway — what's the difference from cloud?" → Key distinction: files are *stored* on phones, not on any company's server. If MobiCloud disappears, the files don't. [Correct technical framing]
+**Budget :** Contrats gré à gré typiquement sous 3M DZD (22 000 $ aux taux actuels) pour éviter l'appel d'offres ouvert. Contrat initial probablement 500K–2M DZD/an.
 
-**How she discovers apps:**
-- TikTok (21.1M Algerian users): viral demo videos in Darija showing "your files survive on your friends' phones"
-- WhatsApp and Telegram study groups: peer recommendation
-- University Facebook groups: posts about useful apps for students
-- Organic word-of-mouth in dorms and shared apartments
+**Cycle de vente :** 12–24 mois pour l'appel d'offres ouvert ; 3–6 mois pour le gré à gré sous le seuil avec un champion interne existant.
 
-**CAC:** Near zero via organic channels. [Estimate, Wave 3]
+**Objections courantes :**
+- « On utilise déjà CERIST. » → Réponse : CERIST ne fournit pas de sauvegarde mobile ; c'est un réseau, pas un produit de stockage.
+- « Vous n'avez pas de client de référence. » → Le premier contrat brise cela. En attendant : démo + pilot à coût zéro.
+- « Est-ce certifié ANPT / enregistré ANPDP ? » → MobiCloud doit préparer la documentation de conformité avant le démarchage B2G.
+- « Que se passe-t-il si votre entreprise disparaît ? » → Réponse protocole ouvert : si MobiCloud ferme, le code du relay est open-source, les institutions peuvent faire tourner le leur.
 
----
-
-## Anti-Persona (Who NOT to Target)
-
-**Multi-national companies operating in Algeria.** They have compliance teams, existing contracts with certified cloud providers, and procurement processes that require SOC 2 / ISO 27001 certifications MobiCloud doesn't have.
-
-**Individual developers wanting decentralized storage.** They'll use IPFS, Storj, or self-hosted Nextcloud. MobiCloud's consumer UX is not for them; and their bar for "working" is different from an end-user's.
-
-**Users outside Algeria (at launch).** Every additional country requires new relay infrastructure, new compliance documentation, and new relationships. Stay in Algeria until one market is validated.
-
-**Rural users with no 4G coverage.** MobiCloud requires internet for inter-device transfers. A user in a village with no 4G connectivity cannot benefit from the relay-based architecture. [Technical constraint confirmed in intake]
+**Où atteindre Karim :**
+- Événements sectoriels : Forum Algérie Numérique, Salon DISTREE Africa
+- LinkedIn (les professionnels IT algériens sont actifs — rechercher « DSI Algérie » retourne de vrais contacts)
+- Conférences ANPT et groupes de travail cybersécurité
+- Introduction chaleureuse via AYRADE (si partenariat sécurisé)
+- Réseaux de recteurs d'universités
 
 ---
 
-## Customer Pain Hierarchy
+## Persona Secondaire : Utilisateur B2C
 
-Ranked by frequency × intensity across all customer voice research:
+**Nom (fictif) :** Yasmine — Étudiante en master, Alger
+**Rôle :** Étudiante universitaire / jeune professionnelle
+**Démographie :** 22–28 ans ; téléphone Android (Samsung ou milieu de gamme chinois) ; utilisatrice internet mobile-first ; revenu mensuel 30 000–60 000 DZD (bourse étudiante ou salaire junior) ; Alger, Oran, Constantine
+**Appareil :** Android 11+, 64–128 Go de stockage, souvent rempli à 60–80 %
 
-| Rank | Pain | Segment | Intensity | Frequency |
+**Objectifs :**
+- Ne jamais perdre ses brouillons de mémoire, ses notes de cours et ses photos quand son téléphone casse ou se fait voler
+- Ne pas payer 10 €/mois pour Google One quand tout son revenu disponible est ~15 000 DZD/mois
+- Avoir quelque chose qui fonctionne quand la connectivité est instable (entre quartiers, dans certains bâtiments)
+- Faire confiance au fait que ses fichiers soient privés — non indexés par Google, non visibles par une entreprise
+
+**Frustrations :**
+- Le palier gratuit Google Drive (15 Go) se remplit vite avec photos et enregistrements de cours. Le palier payant est inabordable et nécessite une carte de crédit internationale qu'elle n'a pas.
+- WhatsApp « Messages favoris » et « Garder dans la discussion » comme sauvegarde accidentelle — fragile, non recherchable, disparaît si le compte WhatsApp est supprimé.
+- Les clés USB tombent en panne. Elle a déjà perdu des fichiers deux fois.
+- Rien ne fonctionne quand elle est sur le WiFi du campus derrière le NAT — les fichiers qu'elle a partagés ne se synchronisent pas entre son ordinateur portable et son téléphone.
+
+**Outils actuels :** WhatsApp pour le partage de fichiers informel, occasionnellement Google Drive (palier gratuit), clés USB.
+
+**Citation représentative (composite issue du minage d'avis Wave 3) :** *« J'avais 3 ans de photos et de travaux universitaires sur mon téléphone. Quand il a cassé, j'ai tout perdu. Google Drive est trop cher pour moi. J'aimerais qu'il y ait un moyen de sauvegarder automatiquement sur les téléphones de mes amis. »* [Tier 3, composite]
+
+**Critères de décision :**
+1. Gratuit ou très peu cher (200–400 DZD/mois maximum, en dessous des 1 299 DZD de Spotify)
+2. Fonctionne automatiquement sans intervention de l'utilisateur
+3. Pas besoin d'internet constant — synchronise au moins de façon opportuniste
+4. Amis/colocataires peuvent être dans le même groupe (adhésion sociale requise)
+5. Privé (elle ne veut pas que Google lise ses fichiers)
+
+**WTP (consentement à payer) :** 200–400 DZD/mois. Preuve : Spotify Algérie = 1 299 DZD/mois ; Coursera = 2 499 DZD/mois. Le stockage doit se positionner bien en dessous de ces ancres compte tenu de l'utilité perçue plus faible d'une « sauvegarde » vs. « divertissement ». [Estimation, Wave 3]
+
+**Objections courantes :**
+- « Je ne veux pas utiliser le stockage de mon téléphone pour les fichiers des autres. » → Modèle réciproque : ses fichiers sont aussi sur leurs téléphones.
+- « Que se passe-t-il si mon ami quitte le groupe ? » → Fonctionnalité de re-réplication (actuellement non implémentée — blocage honnête).
+- « Est-ce sûr ? Mon ami peut-il voir mes fichiers ? » → Réponse chiffrement : non, ils stockent des fragments chiffrés qu'ils ne peuvent pas déchiffrer.
+- « Ça a besoin d'internet pour fonctionner de toute façon — quelle différence avec le cloud ? » → Distinction clé : les fichiers sont *stockés* sur les téléphones, pas sur le serveur d'une entreprise. Si MobiCloud disparaît, les fichiers non. [Cadrage technique correct]
+
+**Comment elle découvre des apps :**
+- TikTok (21,1M d'utilisateurs algériens) : vidéos de démo virales en darija montrant « tes fichiers survivent sur les téléphones de tes amis »
+- Groupes d'étude WhatsApp et Telegram : recommandation entre pairs
+- Groupes Facebook universitaires : posts sur les apps utiles pour étudiants
+- Bouche-à-oreille organique dans les résidences et appartements partagés
+
+**CAC :** Quasi-nul via les canaux organiques. [Estimation, Wave 3]
+
+---
+
+## Anti-Persona (Qui NE PAS Cibler)
+
+**Entreprises multinationales opérant en Algérie.** Elles ont des équipes de conformité, des contrats existants avec des fournisseurs cloud certifiés, et des processus de marchés qui exigent des certifications SOC 2 / ISO 27001 que MobiCloud n'a pas.
+
+**Développeurs individuels voulant du stockage décentralisé.** Ils utiliseront IPFS, Storj, ou Nextcloud auto-hébergé. L'UX grand public de MobiCloud n'est pas pour eux ; et leur barre pour « ça marche » est différente de celle d'un utilisateur final.
+
+**Utilisateurs hors d'Algérie (au lancement).** Chaque pays supplémentaire nécessite une nouvelle infrastructure relay, une nouvelle documentation de conformité, et de nouvelles relations. Rester en Algérie jusqu'à ce qu'un marché soit validé.
+
+**Utilisateurs ruraux sans couverture 4G.** MobiCloud nécessite internet pour les transferts inter-appareils. Un utilisateur dans un village sans connectivité 4G ne peut pas bénéficier de l'architecture basée relay. [Contrainte technique confirmée à l'intake]
+
+---
+
+## Hiérarchie des Douleurs Client
+
+Classée par fréquence × intensité à travers toute la recherche sur la voix du client :
+
+| Rang | Douleur | Segment | Intensité | Fréquence |
 |---|---|---|---|---|
-| 1 | Compliance exposure: using Google Drive/foreign cloud is now legally risky | B2G | Hair-on-fire | High (regulatory pressure confirmed by 4 laws) |
-| 2 | No mobile-native compliant storage exists without expensive server infrastructure | B2G | High | High (AYRADE/CERIST don't solve this) |
-| 3 | Phone breaks or gets stolen → all files lost | B2C | High | High (documented in Africa data) |
-| 4 | Cloud storage too expensive relative to local income | B2C | Moderate-High | High (pricing data from Africa markets) |
-| 5 | Self-hosted (Nextcloud) requires server and IT skills most institutions lack | B2G | Moderate | Medium (confirmed from Nextcloud reviews) |
-| 6 | Distributed storage products (Hivenet) have reliability failures | B2C | Moderate | Medium (documented in reviews) |
-| 7 | Data privacy: files visible to foreign companies | B2C | Moderate | Medium (emerging, especially post-law) |
+| 1 | Exposition à la conformité : utiliser Google Drive/cloud étranger est désormais légalement risqué | B2G | Cheveux-en-feu | Élevée (pression réglementaire confirmée par 4 lois) |
+| 2 | Aucun stockage conforme mobile-natif n'existe sans infrastructure serveur coûteuse | B2G | Élevée | Élevée (AYRADE/CERIST ne résolvent pas cela) |
+| 3 | Le téléphone casse ou est volé → tous les fichiers perdus | B2C | Élevée | Élevée (documenté dans les données Afrique) |
+| 4 | Stockage cloud trop cher relativement au revenu local | B2C | Modérée-Élevée | Élevée (données de prix des marchés Afrique) |
+| 5 | L'auto-hébergement (Nextcloud) nécessite serveur et compétences IT que la plupart des institutions n'ont pas | B2G | Modérée | Moyenne (confirmé par les avis Nextcloud) |
+| 6 | Les produits de stockage distribué (Hivenet) ont des échecs de fiabilité | B2C | Modérée | Moyenne (documenté dans les avis) |
+| 7 | Confidentialité des données : fichiers visibles par des entreprises étrangères | B2C | Modérée | Moyenne (émergent, surtout post-loi) |
 
 ---
 
 ## Jobs-to-Be-Done
 
-**Functional jobs:**
-- Store files so they survive if one phone breaks (B2C)
-- Keep institution's data in Algerian territory in compliance with Law 11-25 (B2G)
-- Provide mobile file access to staff without provisioning server infrastructure (B2G)
-- Back up files automatically without manual USB transfers (B2C)
+**Jobs fonctionnels :**
+- Stocker des fichiers pour qu'ils survivent si un téléphone casse (B2C)
+- Garder les données de l'institution en territoire algérien en conformité avec la Loi 11-25 (B2G)
+- Fournir un accès mobile aux fichiers au personnel sans provisionner d'infrastructure serveur (B2G)
+- Sauvegarder les fichiers automatiquement sans transferts USB manuels (B2C)
 
-**Social jobs:**
-- As DSI: "I am on top of the compliance situation. My institution is protected." (B2G)
-- As student: "I am the person in my group who set up something smarter than WhatsApp for our files." (B2C)
+**Jobs sociaux :**
+- En tant que DSI : « Je maîtrise la situation de conformité. Mon institution est protégée. » (B2G)
+- En tant qu'étudiante : « Je suis la personne de mon groupe qui a configuré quelque chose de plus intelligent que WhatsApp pour nos fichiers. » (B2C)
 
-**Emotional jobs:**
-- Peace of mind: knowing files will survive a phone breaking (B2C)
-- Relief from compliance anxiety: not being the person responsible when the audit finds non-compliant storage (B2G)
-
----
-
-## Language Map
-
-**Words used to describe the problem:**
-- B2C: "lost everything," "phone broke," "can't afford," "too expensive," "takes too much data"
-- B2G: "non-conforme," "risque juridique," "données qui quittent le territoire," "mise en conformité"
-
-**Words used for desired outcome:**
-- B2C: "survive," "safe," "automatic," "private," "free or cheap"
-- B2G: "souverain," "conforme," "local," "sans serveur," "maîtrise des données"
-
-**Words used in frustration:**
-- B2C: "scam," "lost," "failed," "not found," "too expensive"
-- B2G: "trop technique," "pas de référence," "délai trop long," "budget insuffisant"
-
-**[Opinion]** The B2G pitch should use "conformité" and "souveraineté" — the exact words Algerian government uses ("Face aux GAFAM, l'Algérie choisit la maîtrise"). The B2C pitch should use "tes fichiers restent sur ton téléphone" — simple, visceral, visual.
+**Jobs émotionnels :**
+- Paix d'esprit : savoir que les fichiers survivront à un téléphone qui casse (B2C)
+- Soulagement de l'anxiété de conformité : ne pas être la personne responsable quand l'audit trouve un stockage non conforme (B2G)
 
 ---
 
-## Where to Reach Each Persona
+## Carte du Langage
 
-| Persona | Channel | Density | Cost | Priority |
+**Mots utilisés pour décrire le problème :**
+- B2C : « tout perdu », « téléphone cassé », « pas les moyens », « trop cher », « prend trop de données »
+- B2G : « non-conforme », « risque juridique », « données qui quittent le territoire », « mise en conformité »
+
+**Mots utilisés pour le résultat souhaité :**
+- B2C : « survivre », « en sécurité », « automatique », « privé », « gratuit ou pas cher »
+- B2G : « souverain », « conforme », « local », « sans serveur », « maîtrise des données »
+
+**Mots utilisés dans la frustration :**
+- B2C : « arnaque », « perdu », « échoué », « introuvable », « trop cher »
+- B2G : « trop technique », « pas de référence », « délai trop long », « budget insuffisant »
+
+**[Opinion]** Le pitch B2G devrait utiliser « conformité » et « souveraineté » — les mots exacts que le gouvernement algérien utilise (« Face aux GAFAM, l'Algérie choisit la maîtrise »). Le pitch B2C devrait utiliser « tes fichiers restent sur ton téléphone » — simple, viscéral, visuel.
+
+---
+
+## Où Atteindre Chaque Persona
+
+| Persona | Canal | Densité | Coût | Priorité |
 |---|---|---|---|---|
-| Karim (DSI) | LinkedIn direct outreach | Medium | Free | High |
-| Karim (DSI) | Forum Algérie Numérique / DISTREE Africa | High | Low (event tickets) | High |
-| Karim (DSI) | AYRADE partnership (warm introduction to their 10K clients) | Very High | Partnership terms | Highest if partnership secured |
-| Karim (DSI) | ANPT cybersecurity working groups | High | Free (invitation) | Medium |
-| Yasmine (student) | TikTok — demo video in Darija | 21M users | Free | High |
-| Yasmine (student) | WhatsApp/Telegram university groups | Very High density | Free | High |
-| Yasmine (student) | Facebook university groups | High | Free | Medium |
-| Yasmine (student) | Word-of-mouth in dorms | High (but slow) | Free | Medium (organic flywheel) |
+| Karim (DSI) | Démarchage direct LinkedIn | Moyenne | Gratuit | Élevée |
+| Karim (DSI) | Forum Algérie Numérique / DISTREE Africa | Élevée | Faible (billets d'événement) | Élevée |
+| Karim (DSI) | Partenariat AYRADE (intro chaleureuse à leurs 10K clients) | Très Élevée | Termes de partenariat | La plus haute si partenariat sécurisé |
+| Karim (DSI) | Groupes de travail cybersécurité ANPT | Élevée | Gratuit (invitation) | Moyenne |
+| Yasmine (étudiante) | TikTok — vidéo démo en darija | 21M d'utilisateurs | Gratuit | Élevée |
+| Yasmine (étudiante) | Groupes universitaires WhatsApp/Telegram | Très haute densité | Gratuit | Élevée |
+| Yasmine (étudiante) | Groupes universitaires Facebook | Élevée | Gratuit | Moyenne |
+| Yasmine (étudiante) | Bouche-à-oreille dans les résidences | Élevée (mais lente) | Gratuit | Moyenne (volant organique) |
 
 ---
 
-## Demand Validation
+## Validation de la Demande
 
-- **Search demand:** Rising — decentralized storage growing at 14.68% CAGR globally; Algeria-specific search volume data unavailable. [Medium confidence]
-- **Competitive activity:** Low in Algeria specifically → unproven market, not a proven one. [Yellow flag]
-- **Customer spending:** AYRADE's 117% revenue growth proves institutions are already paying for sovereign storage. The mobile-native gap is unproven. [High confidence on category; Medium on gap]
-- **WTP evidence:** Indirect (Spotify/Coursera anchors for B2C). No direct WTP survey for file storage in Algeria. [Low confidence]
-- **Overall demand signal: Moderate-High for B2G; Low-Medium for B2C.** The institutional pain is real and legally mandated; consumer demand is inferred but not validated.
-
----
-
-## Strategic Connections
-
-- The DSI decision path (DSI → RSSI → DG) aligns with the regulatory requirements in `market-analysis.md` — Decree 26-07 mandates a cybersecurity unit which is the RSSI's role.
-- The B2C language map ("tes fichiers restent sur ton téléphone") is the inverse of the competitive framing in `competitor-landscape.md` — where Hivenet's failures are precisely about files *not* being where users expect them.
-- The AYRADE partnership opportunity in `competitor-landscape.md` directly connects to Karim's need: he already knows AYRADE and trusts them; a MobiCloud-via-AYRADE is a lower-friction sale.
+- **Demande de recherche :** En hausse — le stockage décentralisé croît à 14,68 % de TCAC mondialement ; données de volume de recherche spécifiques à l'Algérie indisponibles. [Confiance moyenne]
+- **Activité concurrentielle :** Faible en Algérie spécifiquement → marché non prouvé, pas un marché prouvé. [Drapeau jaune]
+- **Dépenses client :** La croissance de revenus de 117 % d'AYRADE prouve que les institutions paient déjà pour du stockage souverain. Le gap mobile-natif est non prouvé. [Confiance élevée sur la catégorie ; Moyenne sur le gap]
+- **Preuve WTP :** Indirecte (ancres Spotify/Coursera pour le B2C). Aucune enquête WTP directe pour le stockage de fichiers en Algérie. [Confiance faible]
+- **Signal de demande global : Modéré-Élevé pour le B2G ; Faible-Moyen pour le B2C.** La douleur institutionnelle est réelle et légalement imposée ; la demande grand public est inférée mais non validée.
 
 ---
 
-## Flags
+## Connexions Stratégiques
 
-**Red Flags:**
-- No verbatim quotes from real Algerian users were obtained. All B2C persona data is inferred from South African, Nigerian, and general African market studies. The persona is directionally likely but unvalidated.
-- B2G buyer behavior is modeled from procurement regulations and general emerging-market B2G patterns. No actual DSI interview was conducted.
+- Le parcours de décision DSI (DSI → RSSI → DG) s'aligne avec les exigences réglementaires de `market-analysis.md` — le Décret 26-07 impose une unité de cybersécurité qui est le rôle du RSSI.
+- La carte du langage B2C (« tes fichiers restent sur ton téléphone ») est l'inverse du cadrage concurrentiel dans `competitor-landscape.md` — où les échecs de Hivenet portent précisément sur des fichiers qui ne sont *pas* là où les utilisateurs l'attendent.
+- L'opportunité de partenariat AYRADE dans `competitor-landscape.md` se connecte directement au besoin de Karim : il connaît déjà AYRADE et leur fait confiance ; un MobiCloud-via-AYRADE est une vente à plus faible friction.
 
-**Yellow Flags:**
-- The B2C kill criterion (cluster fragility causing week-1 churn) is entirely untested. Yasmine's "peace of mind" job can only be delivered if the cluster is reliably stable — which has not been tested outside a lab.
+---
 
-## Data Gaps
-- No verbatim Algerian user quotes (research found indirect analogs only)
-- No confirmed institutional IT director interviews
-- No validated B2C WTP data for file storage in Algeria
-- CERIST capacity and waitlist data unavailable
+## Drapeaux
+
+**Drapeaux Rouges :**
+- Aucune citation verbatim de vrais utilisateurs algériens n'a été obtenue. Toutes les données du persona B2C sont inférées d'études de marché sud-africaines, nigérianes et africaines générales. Le persona est directionnellement probable mais non validé.
+- Le comportement d'achat B2G est modélisé à partir des réglementations de marchés publics et des patterns B2G de marchés émergents généraux. Aucun entretien DSI réel n'a été conduit.
+
+**Drapeaux Jaunes :**
+- Le critère d'arrêt B2C (fragilité du cluster causant un churn en semaine 1) est entièrement non testé. Le job « paix d'esprit » de Yasmine ne peut être livré que si le cluster est de façon fiable stable — ce qui n'a pas été testé hors d'un labo.
+
+## Lacunes de Données
+- Pas de citations verbatim d'utilisateurs algériens (la recherche n'a trouvé que des analogues indirects)
+- Pas d'entretiens confirmés de directeurs IT institutionnels
+- Pas de données WTP B2C validées pour le stockage de fichiers en Algérie
+- Données de capacité et de liste d'attente CERIST indisponibles
 
 ## Sources
-- Wave 3 raw research: `01-discovery/raw/customer-voice.md`, `01-discovery/raw/demand-audience.md`
-- Algeria digital statistics: DataReportal 2025 (Tier 2)
-- Hivenet review mining: Trustpilot / Play Store (Tier 3)
-- Algerian regulatory framing: official government sources (Tier 1)
+- Recherche brute Wave 3 : `01-discovery/raw/customer-voice.md`, `01-discovery/raw/demand-audience.md`
+- Statistiques numériques Algérie : DataReportal 2025 (Tier 2)
+- Minage d'avis Hivenet : Trustpilot / Play Store (Tier 3)
+- Cadrage réglementaire algérien : sources gouvernementales officielles (Tier 1)

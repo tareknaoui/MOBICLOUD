@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MobiCloud — Academic Poster</title>
+<style>
+  @page { size: A1 portrait; margin: 0; }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+    background: #eef1f6;
+  }
+  .poster {
+    width: 841mm;
+    height: 1189mm;
+    margin: 20px auto;
+    background: #ffffff;
+    box-shadow: 0 0 30px rgba(0,0,0,0.25);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ---------- HEADER ---------- */
+  .header {
+    background: #14156b;
+    color: #ffffff;
+    padding: 22px 40px;
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+  .logo-circle {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background: #ffffff;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: #14156b;
+    font-weight: 800;
+    font-size: 22px;
+    border: 3px solid #6ea8ff;
+  }
+  .header-text { line-height: 1.35; }
+  .header-text .country { font-weight: 700; font-size: 15px; letter-spacing: 0.3px; }
+  .header-text .ministry { font-size: 13px; opacity: 0.9; }
+  .header-text .school { font-weight: 700; font-size: 15px; margin-top: 2px; }
+  .header-text .cohort { font-size: 12px; opacity: 0.85; margin-top: 4px; letter-spacing: 1px; }
+
+  /* ---------- TITLE BANNER ---------- */
+  .title-banner {
+    background: #dce8fb;
+    padding: 26px 40px;
+  }
+  .title-banner h1 {
+    margin: 0;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 34px;
+    color: #101010;
+    text-align: center;
+  }
+
+  .credits-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 40px 0 40px;
+    font-size: 15px;
+    color: #222;
+  }
+  .credits-row .students { font-weight: 600; }
+  .credits-row .supervisor { font-weight: 600; }
+
+  /* ---------- BODY GRID ---------- */
+  .body-grid {
+    display: grid;
+    grid-template-columns: 1.15fr 1fr;
+    gap: 28px;
+    padding: 26px 40px 10px 40px;
+    flex: 1;
+  }
+
+  .section-title {
+    font-weight: 800;
+    font-size: 21px;
+    color: #14156b;
+    margin: 0 0 10px 0;
+  }
+  .left-col, .right-col { display: flex; flex-direction: column; gap: 26px; }
+
+  .intro-box p {
+    font-size: 15.5px;
+    line-height: 1.55;
+    color: #1a1a1a;
+    margin: 0;
+  }
+
+  .methodology-box .diagram-wrap {
+    background: #f5f8fd;
+    border: 1px solid #dbe4f3;
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .methodology-box p {
+    font-size: 14.5px;
+    line-height: 1.5;
+    color: #222;
+    margin: 12px 0 0 0;
+  }
+  .methodology-box code {
+    background: #eef1fb;
+    padding: 1px 5px;
+    border-radius: 4px;
+    font-size: 13px;
+  }
+
+  .results-box {
+    background: #14156b;
+    color: #ffffff;
+    border-radius: 10px;
+    padding: 24px 26px;
+  }
+  .results-box .section-title { color: #ffffff; }
+  .results-box .item { margin-bottom: 16px; }
+  .results-box .item:last-child { margin-bottom: 0; }
+  .results-box .item h3 {
+    margin: 0 0 4px 0;
+    font-size: 15.5px;
+    font-weight: 700;
+    color: #bcd0ff;
+  }
+  .results-box .item p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #eef1fb;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    flex: 1;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 8px;
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .stat-card .num {
+    font-size: 26px;
+    font-weight: 800;
+    color: #ff9d3d;
+    line-height: 1.1;
+  }
+  .stat-card .label {
+    font-size: 11px;
+    color: #cddaf6;
+    margin-top: 4px;
+    line-height: 1.3;
+  }
+
+  .conclusion-banner {
+    background: #dce8fb;
+    margin: 10px 40px 30px 40px;
+    padding: 22px 30px;
+    border-radius: 10px;
+  }
+  .conclusion-banner .section-title { color: #14156b; }
+  .conclusion-banner p {
+    margin: 0;
+    font-size: 15.5px;
+    line-height: 1.55;
+    color: #1a1a1a;
+  }
+
+  /* ---------- DIAGRAM ---------- */
+  .diagram-caption {
+    text-align: center;
+    font-size: 12px;
+    color: #555;
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+  <div class="poster">
+
+    <div class="header">
+      <div class="logo-circle">ESST</div>
+      <div class="header-text">
+        <div class="country">PEOPLE'S DEMOCRATIC REPUBLIC OF ALGERIA</div>
+        <div class="ministry">MINISTRY OF HIGHER EDUCATION AND SCIENTIFIC RESEARCH</div>
+        <div class="school">HIGHER SCHOOL OF SCIENCE AND TECHNOLOGY</div>
+        <div class="cohort">"2025-2026 COHORT"</div>
+      </div>
+    </div>
+
+    <div class="title-banner">
+      <h1>Design and implementation of a distributed storage system in a mobile environment</h1>
+    </div>
+
+    <div class="credits-row">
+      <div class="students">Students: NEMIRI Yasmine Sara and NAOUI Tarek Anis</div>
+      <div class="supervisor">Supervisor: DJOUAMA Amir</div>
+    </div>
+
+    <div class="body-grid">
+      <div class="left-col">
+
+        <div class="intro-box">
+          <div class="section-title">Introduction &amp; Problem Statement</div>
+          <p>
+            Global data volumes are growing exponentially, yet traditional cloud storage relies
+            on costly, centralized infrastructures that compromise user privacy and data
+            sovereignty. Smartphones collectively hold considerable storage capacity that
+            remains largely unused. MobiCloud turns this idle capacity into a secure,
+            resilient, peer-to-peer distributed storage network.
+          </p>
+        </div>
+
+        <div class="methodology-box">
+          <div class="section-title">Methodology &amp; System Design</div>
+          <div class="diagram-wrap">
+            <!-- Cluster / Super-Peer / Relay diagram -->
+            <svg viewBox="0 0 760 420" xmlns="http://www.w3.org/2000/svg" width="100%">
+              <!-- Relay server (center) -->
+              <g>
+                <ellipse cx="380" cy="210" rx="70" ry="46" fill="#14156b"/>
+                <text x="380" y="205" text-anchor="middle" fill="#fff" font-size="13" font-weight="700">Relay Server</text>
+                <text x="380" y="222" text-anchor="middle" fill="#bcd0ff" font-size="10">(signaling only)</text>
+              </g>
+
+              <!-- Four clusters -->
+              <!-- Cluster A - top left -->
+              <g>
+                <circle cx="140" cy="90" r="88" fill="none" stroke="#7fa8f0" stroke-width="2" stroke-dasharray="4 4"/>
+                <circle cx="140" cy="90" r="16" fill="#ff9d3d"/>
+                <text x="140" y="94" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">SP</text>
+                <circle cx="95" cy="55" r="11" fill="#4a6fd6"/>
+                <circle cx="185" cy="55" r="11" fill="#4a6fd6"/>
+                <circle cx="95" cy="130" r="11" fill="#4a6fd6"/>
+                <circle cx="185" cy="130" r="11" fill="#4a6fd6"/>
+                <line x1="140" y1="90" x2="95" y2="55" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="140" y1="90" x2="185" y2="55" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="140" y1="90" x2="95" y2="130" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="140" y1="90" x2="185" y2="130" stroke="#9fb8ec" stroke-width="1.5"/>
+                <text x="140" y="15" text-anchor="middle" fill="#14156b" font-size="12" font-weight="700">Cluster A</text>
+              </g>
+
+              <!-- Cluster B - top right -->
+              <g>
+                <circle cx="620" cy="90" r="88" fill="none" stroke="#7fa8f0" stroke-width="2" stroke-dasharray="4 4"/>
+                <circle cx="620" cy="90" r="16" fill="#ff9d3d"/>
+                <text x="620" y="94" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">SP</text>
+                <circle cx="575" cy="55" r="11" fill="#4a6fd6"/>
+                <circle cx="665" cy="55" r="11" fill="#4a6fd6"/>
+                <circle cx="575" cy="130" r="11" fill="#4a6fd6"/>
+                <circle cx="665" cy="130" r="11" fill="#4a6fd6"/>
+                <line x1="620" y1="90" x2="575" y2="55" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="620" y1="90" x2="665" y2="55" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="620" y1="90" x2="575" y2="130" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="620" y1="90" x2="665" y2="130" stroke="#9fb8ec" stroke-width="1.5"/>
+                <text x="620" y="15" text-anchor="middle" fill="#14156b" font-size="12" font-weight="700">Cluster B</text>
+              </g>
+
+              <!-- Cluster C - bottom left -->
+              <g>
+                <circle cx="140" cy="330" r="88" fill="none" stroke="#7fa8f0" stroke-width="2" stroke-dasharray="4 4"/>
+                <circle cx="140" cy="330" r="16" fill="#ff9d3d"/>
+                <text x="140" y="334" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">SP</text>
+                <circle cx="95" cy="295" r="11" fill="#4a6fd6"/>
+                <circle cx="185" cy="295" r="11" fill="#4a6fd6"/>
+                <circle cx="95" cy="370" r="11" fill="#4a6fd6"/>
+                <circle cx="185" cy="370" r="11" fill="#4a6fd6"/>
+                <line x1="140" y1="330" x2="95" y2="295" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="140" y1="330" x2="185" y2="295" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="140" y1="330" x2="95" y2="370" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="140" y1="330" x2="185" y2="370" stroke="#9fb8ec" stroke-width="1.5"/>
+                <text x="140" y="410" text-anchor="middle" fill="#14156b" font-size="12" font-weight="700">Cluster C</text>
+              </g>
+
+              <!-- Cluster D - bottom right -->
+              <g>
+                <circle cx="620" cy="330" r="88" fill="none" stroke="#7fa8f0" stroke-width="2" stroke-dasharray="4 4"/>
+                <circle cx="620" cy="330" r="16" fill="#ff9d3d"/>
+                <text x="620" y="334" text-anchor="middle" fill="#fff" font-size="9" font-weight="700">SP</text>
+                <circle cx="575" cy="295" r="11" fill="#4a6fd6"/>
+                <circle cx="665" cy="295" r="11" fill="#4a6fd6"/>
+                <circle cx="575" cy="370" r="11" fill="#4a6fd6"/>
+                <circle cx="665" cy="370" r="11" fill="#4a6fd6"/>
+                <line x1="620" y1="330" x2="575" y2="295" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="620" y1="330" x2="665" y2="295" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="620" y1="330" x2="575" y2="370" stroke="#9fb8ec" stroke-width="1.5"/>
+                <line x1="620" y1="330" x2="665" y2="370" stroke="#9fb8ec" stroke-width="1.5"/>
+                <text x="620" y="410" text-anchor="middle" fill="#14156b" font-size="12" font-weight="700">Cluster D</text>
+              </g>
+
+              <!-- Super-Peer to Relay links -->
+              <line x1="156" y1="120" x2="330" y2="195" stroke="#14156b" stroke-width="2"/>
+              <line x1="604" y1="120" x2="430" y2="195" stroke="#14156b" stroke-width="2"/>
+              <line x1="156" y1="300" x2="330" y2="222" stroke="#14156b" stroke-width="2"/>
+              <line x1="604" y1="300" x2="430" y2="222" stroke="#14156b" stroke-width="2"/>
+            </svg>
+            <div class="diagram-caption">
+              Legend: <b>SP</b> = elected Super-Peer &nbsp;·&nbsp; small nodes = regular peers &nbsp;·&nbsp;
+              dashed circle = cluster boundary &nbsp;·&nbsp; solid lines to center = relay signaling channel
+            </div>
+          </div>
+          <p>
+            Devices self-organize into clusters, each coordinated by a dynamically elected
+            Super-Peer (<code>Bully algorithm</code>, weighted on battery / uptime / signal
+            reliability). Files are erasure-coded (<code>Reed-Solomon k=3, n=2</code>) and
+            encrypted (<code>AES-256-GCM</code>) before fragments are distributed across
+            cluster members. The relay server only handles signaling and NAT traversal — it
+            never accesses unencrypted data.
+          </p>
+        </div>
+
+      </div>
+
+      <div class="right-col">
+        <div class="results-box">
+          <div class="section-title">Results and discussion</div>
+
+          <div class="item">
+            <h3>Storage Efficiency</h3>
+            <p>Reed-Solomon erasure coding (k=3, n=2) reconstructs files using only 1.67&times; the
+              original size — versus 3&times; for full replication — while tolerating the loss of
+              any 2 fragments.</p>
+          </div>
+
+          <div class="item">
+            <h3>Resilience &amp; Failover</h3>
+            <p>Under simulated churn, Bully-based Super-Peer election consistently elected a new
+              coordinator in under 6 seconds. The cluster remained stable with up to 30% of
+              nodes leaving simultaneously.</p>
+          </div>
+
+          <div class="item">
+            <h3>Security Validation</h3>
+            <p>Peer identities are bound to hardware-backed keys (Android Keystore/TEE,
+              secp256r1). Fragments are individually encrypted (AES-256-GCM) and every protocol
+              message is ECDSA-signed with replay protection.</p>
+          </div>
+
+          <div class="item">
+            <h3>Real-Device Testing</h3>
+            <p>The prototype was validated on physical clusters of 3-5 Android devices
+              (Pixel 6/7, Galaxy S21) across 4G and Wi-Fi networks, confirming successful
+              discovery, erasure-coded transfer, and cluster failover.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="conclusion-banner">
+      <div class="section-title">Conclusion</div>
+      <p>
+        This project delivered a working mobile-native distributed storage system that replaces
+        centralized cloud infrastructure with a self-organizing cluster of smartphones. Erasure
+        coding, hardware-backed cryptography, and Bully-elected Super-Peer coordination together
+        provide resilient, storage-efficient, privacy-preserving storage — validated on real
+        Android hardware. Results confirm the approach's viability and open the way toward
+        removing the remaining relay server for full decentralization.
+      </p>
+    </div>
+
+  </div>
+</body>
+</html>

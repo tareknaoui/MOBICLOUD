@@ -93,7 +93,8 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                             else resolvedPeers.shuffled(Random(seed))
 
         // [Priorité #1 — Parallélisation] Tous les fragments envoyés en parallèle.
-        // Chaque coroutine retourne un DeliveryRecord ou null si tous niveaux échouent.
+        // Chaque coroutine retourne 1-2 DeliveryRecord (primaire + secondaire best-effort) ou
+        // liste vide si tous niveaux échouent.
         val deliveries: List<DeliveryRecord> = coroutineScope {
             encryptedBundle.encryptedFragments.mapIndexed { i, frag ->
                 async {
@@ -116,6 +117,7 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                     var result: Result<com.mobicloud.domain.models.BlockAckMessage> =
                         Result.failure(IllegalStateException("not attempted"))
                     var placedInterCluster = false
+                    var primaryIndexForSecondary = -1
 
                     // Niveau 1 — placement local primary (si cluster local non vide).
                     if (shuffledPeers.isNotEmpty()) {
@@ -123,6 +125,7 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                         // tous les pairs sont touchés exactement une fois. Élimine les collisions de
                         // l'ancien `i % size` qui faisait atterrir frag i et frag i+size sur le même pair.
                         val primaryIndex = stride(i, shuffledPeers.size, seed)
+                        primaryIndexForSecondary = primaryIndex
                         val primaryPeer = shuffledPeers[primaryIndex]
                         android.util.Log.i("MobiCloud:Distribute", "[DIAG] sendBlock #${frag.index} parity=${frag.isParity} → ${primaryPeer.identity.nodeId.take(8)}@${primaryPeer.ipAddress}:${primaryPeer.port}")
                         result = blockSender.sendBlock(msg, primaryPeer, BASE_ACK_TIMEOUT_MS)
@@ -230,35 +233,89 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                                 "MobiCloud:Distribute",
                                 "[ACK] fragment #${frag.index} ACK invalide — blockHash match=${ack.blockHash == blockId} receiverNodeId non-blank=${ack.receiverNodeId.isNotBlank()}"
                             )
-                            null
+                            emptyList()
                         } else {
+                            // Capturé en val : évite toute ambiguïté de smart-cast sur le `var`
+                            // confirmedPeer une fois référencé depuis les lambdas ci-dessous.
+                            val confirmedPeerVal: Peer = confirmedPeer
                             android.util.Log.i(
                                 "MobiCloud:Distribute",
-                                "[DIAG] fragment #${frag.index} placé ${if (placedInterCluster) "INTER-CLUSTER" else "LOCAL"} sur ${confirmedPeer.identity.nodeId.take(8)}"
+                                "[DIAG] fragment #${frag.index} placé ${if (placedInterCluster) "INTER-CLUSTER" else "LOCAL"} sur ${confirmedPeerVal.identity.nodeId.take(8)}"
                             )
-                            DeliveryRecord(
+                            val primaryRecord = DeliveryRecord(
                                 frag = frag,
                                 blockId = blockId,
                                 nodeId = ack.receiverNodeId,
-                                peer = confirmedPeer
+                                peer = confirmedPeerVal
                             )
+
+                            // Réplique secondaire best-effort (re-réplication, cf. TriggerAutoRepairUseCase) :
+                            // un 2e hôte distinct pour ce fragment, choisi parmi les pairs locaux déjà
+                            // utilisés comme primaire pour D'AUTRES fragments (pas besoin de 2×(k+n) pairs).
+                            // N'affecte jamais le succès global de l'upload — best-effort uniquement.
+                            // Limité au placement local (pas de secondaire inter-cluster en MVP).
+                            //
+                            // Coût : ne se déclenche QUE si params.n <= 1 (palier de parité le plus faible,
+                            // ex. RS(2,1) sur petit cluster cold-start). Dès que SelectOptimalPeersUseCase
+                            // relève dynamicN à 2+ (cluster assez grand / réseau jugé instable), la tolérance
+                            // aux pertes vient déjà de vrais fragments de parité erasure-coding — moins cher
+                            // en octets ET en bande passante relay qu'une duplication brute, et permanente
+                            // (pas besoin que TriggerAutoRepairUseCase répare à temps). Dupliquer par-dessus
+                            // serait payer deux fois pour la même garantie.
+                            val secondaryRecord = if (!placedInterCluster && shuffledPeers.size > 1 && params.n <= 1) {
+                                val secondaryCandidate = shuffledPeers
+                                    .filterIndexed { idx, p ->
+                                        idx != primaryIndexForSecondary && p.identity.nodeId != confirmedPeerVal.identity.nodeId
+                                    }
+                                    .let { candidates ->
+                                        candidates.firstOrNull { it.ipAddress != confirmedPeerVal.ipAddress }
+                                            ?: candidates.firstOrNull()
+                                    }
+                                secondaryCandidate?.let { secPeer ->
+                                    val secResult = blockSender.sendBlock(msg, secPeer, BASE_ACK_TIMEOUT_MS)
+                                    secResult.getOrNull()?.takeIf {
+                                        it.blockHash == blockId && it.receiverNodeId.isNotBlank()
+                                    }?.let { secAck ->
+                                        android.util.Log.i(
+                                            "MobiCloud:Distribute",
+                                            "[DIAG] fragment #${frag.index} réplique secondaire sur ${secAck.receiverNodeId.take(8)}"
+                                        )
+                                        DeliveryRecord(
+                                            frag = frag,
+                                            blockId = blockId,
+                                            nodeId = secAck.receiverNodeId,
+                                            peer = secPeer
+                                        )
+                                    } ?: run {
+                                        android.util.Log.w(
+                                            "MobiCloud:Distribute",
+                                            "[DIAG] fragment #${frag.index} réplique secondaire échouée (best-effort, ignoré) : ${secResult.exceptionOrNull()?.message}"
+                                        )
+                                        null
+                                    }
+                                }
+                            } else null
+
+                            listOfNotNull(primaryRecord, secondaryRecord)
                         }
                     } else {
                         android.util.Log.e(
                             "MobiCloud:Distribute",
                             "[DROP] fragment #${frag.index} parity=${frag.isParity} ÉCHEC tous niveaux : ${result.exceptionOrNull()?.message}"
                         )
-                        null
+                        emptyList()
                     }
                     }.getOrElse { e ->
                         android.util.Log.e("MobiCloud:Distribute", "[CRASH] fragment #${frag.index} exception inattendue : ${e.message}")
-                        null
+                        emptyList()
                     }
                 }
-            }.awaitAll().filterNotNull()
+            }.awaitAll().flatten()
         }
 
-        val dataBlocksConfirmed = deliveries.count { !it.frag.isParity }
+        // Compte par INDEX de fragment distinct (pas par nombre de livraisons) : une réplique
+        // secondaire best-effort ne doit jamais faire gonfler artificiellement ce quorum.
+        val dataBlocksConfirmed = deliveries.filter { !it.frag.isParity }.map { it.frag.index }.distinct().size
         if (dataBlocksConfirmed < k) {
             return@withContext Result.failure(
                 IllegalStateException(
@@ -272,7 +329,7 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
         // de redondance perdue silencieusement.
         val expectedParity = params.n
         val parityQuorum = (expectedParity + 1) / 2
-        val parityBlocksConfirmed = deliveries.count { it.frag.isParity }
+        val parityBlocksConfirmed = deliveries.filter { it.frag.isParity }.map { it.frag.index }.distinct().size
         if (parityBlocksConfirmed < parityQuorum) {
             return@withContext Result.failure(
                 IllegalStateException(
@@ -287,11 +344,13 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
             // [Fix #3 — HLC] Horloge logique hybride monotone — résiste aux dérives
             // et retours en arrière de l'horloge système Android.
             versionClock = HybridLogicalClock.now(),
-            fragmentLocations = deliveries.map { delivery ->
+            // Groupé par index de fragment : primaire + réplique secondaire (le cas échéant)
+            // partagent le même blockId (même ciphertext) mais 2 nodeIds distincts.
+            fragmentLocations = deliveries.groupBy { it.frag.index }.map { (index, records) ->
                 FragmentLocation(
-                    fragmentIndex = delivery.frag.index,
-                    fragmentHash = delivery.blockId,
-                    nodeIds = listOf(delivery.nodeId)
+                    fragmentIndex = index,
+                    fragmentHash = records.first().blockId,
+                    nodeIds = records.map { it.nodeId }.distinct()
                 )
             },
             wrappedMasterKey = encryptedBundle.wrappedFileMasterKey,

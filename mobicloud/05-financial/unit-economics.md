@@ -53,17 +53,18 @@ Le CAC B2G est principalement du temps fondateur, pas de la dépense monétaire 
 
 | Coût fixe Year 1 à couvrir | Montant DZD |
 |---|---|
-| Relay hébergement annuel | 960 000 |
+| Relay hébergement annuel (palier Pilot) | 150 000 |
 | Conformité légale (one-time) | 350 000 |
-| Total à couvrir | **1 310 000** |
+| Outillage IA Claude Max (12 mois × 25 300) | 304 000 |
+| Total à couvrir | **804 000** |
 
 | Prix contrat | Contrats nécessaires pour couvrir les coûts |
 |---|---|
-| 500 000 DZD/an (petit) | 3 contrats |
-| 800 000 DZD/an (moyen) | 2 contrats |
-| 1 500 000 DZD/an (grand) | 1 contrat |
+| 500 000 DZD/an (petit) | 2 contrats |
+| 800 000 DZD/an (moyen) | 1 contrat (couvre quasi exactement — 800K ≈ 804K) |
+| 1 500 000 DZD/an (grand) | 1 contrat (marge de +696K) |
 
-**Conclusion :** 1 à 2 contrats B2G couvrent l'intégralité des coûts d'infrastructure. Le modèle est structurellement viable à très petite échelle.
+**Conclusion :** 1 seul contrat B2G moyen (800K DZD) couvre la quasi-totalité des coûts Year 1. Le modèle est viable à très petite échelle — même avec le coût Claude Max recalculé au taux réel (1 USD ≈ 253 DZD).
 
 ---
 
@@ -110,15 +111,35 @@ Le CAC B2G est principalement du temps fondateur, pas de la dépense monétaire 
 
 *L'économie unitaire du bundle opérateur est fondamentalement différente : MobiCloud ne contrôle pas le CAC (c'est l'opérateur qui acquiert) ni le churn (c'est l'opérateur qui rétient).*
 
-| Métrique | Valeur | Base |
-|---|---|---|
-| Revenue share MobiCloud | 30–50% du prix bundle | Benchmark opérateurs africains |
-| Prix bundle opérateur (exemple) | 200–300 DZD/mois | Estimation |
-| Revenu MobiCloud par abonné actif | 60–150 DZD/mois | 30–50% × 200–300 DZD |
-| Volume potentiel Mobilis (1% activation sur 20M abonnés) | 200 000 abonnés | Très hypothétique |
-| **Revenu mensuel si 200K abonnés actifs** | **12M–30M DZD/mois** | Scénario de maturité — 5+ ans |
+### Principe clé : partage à 2 parties, pas 3
 
-*Ce chiffre est présenté pour montrer le potentiel du canal, pas comme une projection à court terme. Le pilot Mobilis (1 wilaya) représenterait ~1 000–10 000 abonnés, soit 60K–1,5M DZD/mois.*
+Le contributeur de stockage **est** l'abonné (mutualisation : prêter du stockage = recevoir du backup). Il est rétribué **en nature**, jamais en cash. Le revenu se partage donc entre **2 parties seulement** : Opérateur ↔ MobiCloud. Cela préserve la marge et évite de rouvrir le système d'incitation retiré du scope technique. (Détail du modèle : `02-strategy/business-model.md`, Stream 2.)
+
+### Décomposition par abonné actif (bundle à 300 DZD/mois)
+
+| Ligne | Part | Montant DZD | Note |
+|---|---|---|---|
+| Prix bundle facturé par l'opérateur | 100% | 300 | Mode A revenue-share |
+| − Part opérateur | 60% | 180 | Distribution, facturation, marque, réseau, nœuds-ancre |
+| = Part MobiCloud | 40% | 120 | |
+| − Coût relay (routage, bande passante) | | 5–10 | Quasi nul : le relay ne stocke pas |
+| **= Net MobiCloud par abonné actif** | | **~110** | Marge ~92% sur la part reçue |
+| Rétribution contributeur | en nature | 0 cash | Son propre backup |
+| Crédit de facture (déséquilibre/super-peer) | | 0 pour MobiCloud | Financé par la part opérateur |
+
+### Effet de volume (le levier d'échelle)
+
+| Abonnés actifs | Net MobiCloud/mois | Net MobiCloud/an | Stade |
+|---|---|---|---|
+| 10 000 (pilot 1 wilaya) | ~1,1M DZD | ~13M DZD | Year 2–3 |
+| 100 000 (croissance) | ~11M DZD | ~132M DZD | Year 3–4 |
+| 500 000 (maturité) | ~55M DZD | ~660M DZD | Year 5+ |
+
+*Mobilis ~20M abonnés → 1% d'activation = 200 000. Un seul deal opérateur à maturité dépasse tous les contrats B2G cumulés — d'où le statut de levier d'échelle. Mais conditionné à : référence B2G + SLA démontré + relay scalé. Ne pas inclure en scénario conservateur.*
+
+### Mode B — Licence/ARPU (alternative)
+
+Si l'opérateur bundle « gratuit » dans un forfait premium (anti-churn) plutôt que de facturer au détail : MobiCloud reçoit un **fee fixe ~50 DZD/abonné actif/mois**, prévisible, sans risque de volume payant. Souvent préféré par l'opérateur. À 100K abonnés → ~5M DZD/mois garantis.
 
 ---
 

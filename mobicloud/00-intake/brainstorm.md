@@ -1,65 +1,65 @@
-# Brainstorm — MobiCloud Idea Variations
+# Brainstorm — Variations d'Idées MobiCloud
 
-**Phase:** 2 — Brainstorm
-**Project:** mobicloud
-**Date:** 2026-06-21
-**Confidence:** High (founder-validated direction)
+**Phase :** 2 — Brainstorm
+**Projet :** mobicloud
+**Date :** 2026-06-21
+**Confiance :** Élevée (direction validée par le fondateur)
 
 ---
 
-## Variations Explored
+## Variations Explorées
 
-Seven variations were presented across a spectrum from simplest to most ambitious:
+Sept variations ont été présentées sur un spectre allant du plus simple au plus ambitieux :
 
-| Variation | Core Direction | Verdict |
+| Variation | Direction Centrale | Verdict |
 |---|---|---|
-| 1 — Trusted Group Consumer | Original: closed group backup app | Keep as long-term consumer play |
-| 2 — B2G First | Skip consumer, sell to institutions | **Selected beachhead** |
-| 3 — Relay-as-a-Service | Monetize relay infrastructure, open-source client | **Core asset identified** |
-| 4 — Student Document Vault | Vertical narrow for university segment | Useful for early pilots, not standalone |
-| 5 — 1:1 Backup Buddy | Strip to minimum 2-person backup | Set aside — prototype already exceeds this |
-| 6 — Offline Mesh | Remove relay, use WiFi Direct/Bluetooth | Rejected — WiFi Direct on Android is unreliable by design |
-| 7 — African Sovereign Cloud | 10x vision: sovereign cloud continent | North star for narrative, not roadmap |
+| 1 — Grand Public Groupe de Confiance | Original : app de sauvegarde en groupe fermé | À garder comme levier grand public long terme |
+| 2 — B2G d'Abord | Sauter le grand public, vendre aux institutions | **Beachhead sélectionné** |
+| 3 — Relay-as-a-Service | Monétiser l'infrastructure relay, client open-source | **Actif central identifié** |
+| 4 — Coffre-fort Documents Étudiants | Vertical étroit pour le segment universitaire | Utile pour les premiers pilots, pas autonome |
+| 5 — Backup Buddy 1:1 | Réduire au minimum : sauvegarde à 2 personnes | Mis de côté — le prototype dépasse déjà ceci |
+| 6 — Mesh Hors Ligne | Retirer le relay, utiliser WiFi Direct/Bluetooth | Rejeté — WiFi Direct sur Android est non fiable par conception |
+| 7 — Cloud Souverain Africain | Vision 10x : continent du cloud souverain | Étoile polaire pour la narrative, pas la roadmap |
 
-## Founder's Direction (verbatim synthesis)
+## Direction du Fondateur (synthèse verbatim)
 
-**"Tu n'es pas une app company, tu es une infrastructure company."**
+**« Tu n'es pas une app company, tu es une infrastructure company. »**
 
-The relay is already built, deployed, and operational. It is the only centralized component controlled by MobiCloud that no competitor can replicate without permission. The Android app can be open-source — the relay running on Algerian servers, under Algerian jurisdiction, is the asset.
+Le relay est déjà construit, déployé et opérationnel. C'est le seul composant centralisé contrôlé par MobiCloud qu'aucun concurrent ne peut répliquer sans permission. L'app Android peut être open-source — le relay tournant sur des serveurs algériens, sous juridiction algérienne, est l'actif.
 
-The institutional B2G path (Variation 2) is the right first customer because:
-- No consumer marketing or distribution required
-- One pilot contract proves the model
-- Data sovereignty is not a selling point — it is a legal obligation for institutions, and the pressure is increasing
-- The urgency is on the buyer's side, not the seller's
+La voie institutionnelle B2G (Variation 2) est le bon premier client parce que :
+- Aucun marketing ou distribution grand public requis
+- Un seul contrat de pilot prouve le modèle
+- La souveraineté des données n'est pas un argument de vente — c'est une obligation légale pour les institutions, et la pression augmente
+- L'urgence est du côté de l'acheteur, pas du vendeur
 
-## Selected Direction — Refined Idea
+## Direction Sélectionnée — Idée Affinée
 
-**Sovereign Relay Infrastructure + Android App, sold to Algerian institutions (B2G first)**
+**Infrastructure Relay Souveraine + App Android, vendue aux institutions algériennes (B2G d'abord)**
 
-**What MobiCloud sells:**
-A relay server hosted in Algeria on Algerian infrastructure (not Render/US) + the Android distributed storage client + support contract + optional subscription tiers for consumers. Patient data / student records / government documents never leave Algerian territory. Foreign cloud providers cannot legally replicate this proposition.
+**Ce que MobiCloud vend :**
+Un serveur relay hébergé en Algérie sur infrastructure algérienne (pas Render/US) + le client de stockage distribué Android + contrat de support + paliers d'abonnement optionnels pour le grand public. Données patients / dossiers étudiants / documents gouvernementaux ne quittent jamais le territoire algérien. Les fournisseurs cloud étrangers ne peuvent pas répliquer légalement cette proposition.
 
-**Technical clarification (corrected from initial brainstorm):**
-MobiCloud is NOT an offline/mesh solution. Internet (4G or WiFi) is required for inter-device transfers because the relay handles NAT traversal between devices on different networks. The key distinction is: *data is stored on users' own phones, not on any server* — but transfer requires connectivity. Framing it as "local" or "offline" is inaccurate and would mislead institutional buyers.
+**Clarification technique (corrigée par rapport au brainstorm initial) :**
+MobiCloud N'EST PAS une solution hors ligne / mesh. Internet (4G ou WiFi) est requis pour les transferts inter-appareils car le relay gère la traversée NAT entre appareils sur des réseaux différents. La distinction clé est : *les données sont stockées sur les propres téléphones des utilisateurs, pas sur un serveur* — mais le transfert nécessite la connectivité. La présenter comme « locale » ou « hors ligne » est inexact et tromperait les acheteurs institutionnels.
 
-**First target customer:** One university or one ministry. A single signed pilot contract (even unpaid) validates the model and finances consumer development next.
+**Premier client cible :** Une université ou un ministère. Un seul contrat de pilot signé (même non payé) valide le modèle et finance ensuite le développement grand public.
 
-**Consumer market:** Secondary. B2G revenue funds the consumer product — attempting the reverse (build consumer base to impress institutions) adds 3 years to the timeline.
+**Marché grand public :** Secondaire. Le revenu B2G finance le produit grand public — tenter l'inverse (construire une base grand public pour impressionner les institutions) ajoute 3 ans au calendrier.
 
-**What is set aside:**
-- Offline Mesh (WiFi Direct unreliable on Android, removed from project for good reasons)
-- Backup Buddy (prototype already exceeds this; starting over costs 6 months for no gain)
-- 10x African vision (pitch narrative only, not roadmap)
+**Ce qui est mis de côté :**
+- Mesh Hors Ligne (WiFi Direct non fiable sur Android, retiré du projet pour de bonnes raisons)
+- Backup Buddy (le prototype dépasse déjà ceci ; tout recommencer coûte 6 mois pour aucun gain)
+- Vision africaine 10x (narrative de pitch uniquement, pas roadmap)
 
-## Key Tensions Resolved
+## Tensions Clés Résolues
 
-| Tension | Resolution |
+| Tension | Résolution |
 |---|---|
-| App company vs. infrastructure company | Infrastructure company. Relay is the moat. |
-| Consumer vs. B2G first | B2G first. Consumer funded by first institutional contract. |
-| Relay as cost center vs. monetization point | Relay-as-a-Service is the natural revenue model. |
-| Algerian jurisdiction (required for B2G) | Relay must move off Render (US) to Algerian hosting immediately. |
+| App company vs. infrastructure company | Infrastructure company. Le relay est le moat. |
+| Grand public vs. B2G d'abord | B2G d'abord. Grand public financé par le premier contrat institutionnel. |
+| Relay comme centre de coût vs. point de monétisation | Le Relay-as-a-Service est le modèle de revenus naturel. |
+| Juridiction algérienne (requise pour B2G) | Le relay doit quitter Render (US) pour un hébergement algérien immédiatement. |
 
 ## Variation 8 — Bundle Opérateur Téléphonique (B2B2C) *(ajoutée post-gate)*
 
@@ -96,14 +96,14 @@ Le brief d'intake (`00-intake/brief.md`) décrit trois voies de monétisation. A
 
 ---
 
-## Flags
+## Drapeaux
 
-**Red Flags:**
-- None introduced by this direction that were not already in the intake.
+**Drapeaux Rouges :**
+- Aucun introduit par cette direction qui n'était pas déjà dans l'intake.
 
-**Yellow Flags:**
-- The relay must move off US infrastructure before any institutional B2G conversation — this is a prerequisite, not a future task.
-- "Infrastructure company" positioning requires a different sales motion (longer cycles, relationships, procurement) than the current solo technical founder skill set.
+**Drapeaux Jaunes :**
+- Le relay doit quitter l'infrastructure US avant toute conversation institutionnelle B2G — c'est un prérequis, pas une tâche future.
+- Le positionnement « infrastructure company » nécessite une dynamique commerciale différente (cycles plus longs, relations, marchés publics) du profil de compétences actuel du fondateur technique solo.
 
 ## Sources
-- Founder direction (June 2026) — direct
+- Direction du fondateur (juin 2026) — direct
