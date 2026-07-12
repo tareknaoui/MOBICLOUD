@@ -25,6 +25,10 @@ import com.mobicloud.presentation.dashboard.DashboardRoute
 import com.mobicloud.presentation.dashboard.DashboardScreen
 import com.mobicloud.presentation.explorer.ExplorerRoute
 import com.mobicloud.presentation.explorer.ExplorerScreen
+import com.mobicloud.presentation.invite.InviteRoute
+import com.mobicloud.presentation.invite.InviteScreen
+import com.mobicloud.presentation.invite.JoinInviteRoute
+import com.mobicloud.presentation.invite.JoinInviteScreen
 import com.mobicloud.presentation.network.NetworkRoute
 import com.mobicloud.presentation.network.NetworkScreen
 import com.mobicloud.presentation.onboarding.InitRoute
@@ -171,7 +175,20 @@ fun JetpackNavHost(
             )
         }
         composable<NetworkRoute> {
-            NetworkScreen()
+            NetworkScreen(
+                onNavigateToInvite = { navController.navigate(InviteRoute) }
+            )
+        }
+        composable<InviteRoute> {
+            InviteScreen()
+        }
+        composable<JoinInviteRoute> { backStackEntry ->
+            val route = backStackEntry.toRoute<JoinInviteRoute>()
+            JoinInviteScreen(
+                clusterId = route.cid,
+                hintedSpNodeId = route.sp,
+                onDone = { navController.popBackStack() }
+            )
         }
     }
 }

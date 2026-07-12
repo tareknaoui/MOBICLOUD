@@ -185,6 +185,10 @@ dependencies {
     // ... Security
     implementation(libs.androidx.security.crypto)
 
+    // ... Invitation (QR) — génération uniquement, pas de scan interne (cf. AndroidManifest
+    // intent-filter BROWSABLE : l'appareil photo natif route directement vers l'app)
+    implementation(libs.zxing.core)
+
     // ... Sync
     implementation(project(":sync"))
 

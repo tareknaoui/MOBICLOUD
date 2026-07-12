@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,6 +30,7 @@ object NetworkRoute  // NE PAS RENOMMER — label utilisateur "Communauté" gér
 @Composable
 fun NetworkScreen(
     modifier: Modifier = Modifier,
+    onNavigateToInvite: () -> Unit = {},
     viewModel: NetworkViewModel = hiltViewModel()
 ) {
     val topology by viewModel.clusterTopology.collectAsStateWithLifecycle()
@@ -54,6 +56,13 @@ fun NetworkScreen(
                 coordinatorAlias = coordinatorAlias,
                 modifier = Modifier.fillMaxWidth()
             )
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = onNavigateToInvite,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Invite a friend")
+            }
             Spacer(Modifier.height(8.dp))
             Text(
                 text = "GROUP MEMBERS",

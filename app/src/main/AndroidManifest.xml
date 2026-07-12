@@ -48,10 +48,20 @@
 
         <activity
             android:name="com.mobicloud.MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTask">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Lien/QR d'invitation à un cluster (mobicloud://join?cid=...&sp=...).
+                 BROWSABLE : l'appareil photo natif ou un navigateur peuvent router directement
+                 vers l'app si elle est déjà installée (pas de scanner QR interne nécessaire). -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="mobicloud" android:host="join" />
             </intent-filter>
         </activity>
 

@@ -31,9 +31,12 @@ import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.windowsizeclass.ExperimentalMaterial3WindowSizeClassApi
 import androidx.compose.material3.windowsizeclass.calculateWindowSizeClass
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.mobicloud.domain.models.m11_join.ClusterInvite
+import com.mobicloud.presentation.invite.JoinInviteRoute
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -90,10 +93,21 @@ class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainActivityViewModel by viewModels()
 
+    // Lien/QR d'invitation à un cluster (mobicloud://join?cid=...) — singleTask + onNewIntent
+    // garantit qu'on capture le lien même si l'app tourne déjà (pas de nouvelle instance).
+    private var pendingInviteUri by mutableStateOf<String?>(null)
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        intent.data?.let { pendingInviteUri = it.toString() }
+    }
+
     @OptIn(ExperimentalMaterial3WindowSizeClassApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        pendingInviteUri = intent?.data?.toString()
 
         // We keep this as a mutable state, so that we can track changes inside the composition.
         // This allows us to react to dark/light mode changes.
@@ -151,6 +165,19 @@ class MainActivity : AppCompatActivity() {
                 windowSizeClass = calculateWindowSizeClass(this),
                 networkUtils = networkUtils,
             )
+            // Ne traite le lien d'invitation qu'une fois l'onboarding terminé — éviter de
+            // court-circuiter la création d'identité/permissions avec une navigation surprise.
+            // Limite connue : un lien tapé avant la fin de l'onboarding est silencieusement
+            // perdu plutôt que différé — acceptable pour ce scope (app déjà installée en groupe).
+            LaunchedEffect(pendingInviteUri, hasCompletedOnboarding) {
+                val uri = pendingInviteUri ?: return@LaunchedEffect
+                if (!hasCompletedOnboarding) return@LaunchedEffect
+                ClusterInvite.fromUri(uri)?.let { invite ->
+                    appState.navController.navigate(JoinInviteRoute(invite.clusterId, invite.hintedSpNodeId))
+                }
+                pendingInviteUri = null
+            }
+
             JetpackTheme {
                 JetpackApp(appState, hasCompletedOnboarding = hasCompletedOnboarding, hasPinSet = hasPinSet)
             }
