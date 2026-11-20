@@ -67,7 +67,13 @@ class RunBullyElectionUseCase @Inject constructor(
         // Race entre deux conditions de déclenchement :
         // 1. Bully classique : noSuperPeer + hasOtherKnownPeer stables pendant MONITORING_WINDOW_MS
         // 2. Solo bootstrap : aucun peer ni SP après SOLO_BOOTSTRAP_TIMEOUT_MS — fallback isolation totale
-        val triggerReason = withTimeoutOrNull(SOLO_BOOTSTRAP_TIMEOUT_MS) {
+        // Rotation : un Super-Pair sortant retarde sa candidature pour laisser un autre membre
+        // gagner ; seul, il reprend le rôle après ce délai. Le timeout de bootstrap solo est
+        // rallongé d'autant, sinon il déclencherait la candidature avant la fin du retrait.
+        val yieldDelay = if (electionStateManager.isInRotationYield()) {
+            MandateRotationPolicy.ROTATION_CANDIDACY_DELAY_MS
+        } else 0L
+        val triggerReason = withTimeoutOrNull(SOLO_BOOTSTRAP_TIMEOUT_MS + yieldDelay) {
             peerRepository.peers
                 .map { peers ->
                     val noSuperPeer = peers.none { it.isActive && it.isSuperPair }
@@ -77,7 +83,7 @@ class RunBullyElectionUseCase @Inject constructor(
                 .distinctUntilChanged()
                 .transformLatest { shouldElect ->
                     if (shouldElect) {
-                        delay(MONITORING_WINDOW_MS)
+                        delay(MONITORING_WINDOW_MS + yieldDelay)
                         emit(Unit)
                     }
                 }

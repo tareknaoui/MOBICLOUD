@@ -54,6 +54,7 @@ import com.mobicloud.domain.usecase.m10_election.ProcessIncomingElectionEventUse
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
+import com.mobicloud.domain.usecase.m10_election.MandateRotationPolicy
 import com.mobicloud.domain.usecase.m11_join.JoinStateMachine
 import com.mobicloud.domain.usecase.m11_join.MemberHeartbeatUseCase
 import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
@@ -155,8 +156,8 @@ class MobicloudP2PService : Service() {
         private const val EVICTION_CHECK_INTERVAL_MS = 15_000L
         private const val RELIABILITY_SCORE_INTERVAL_MS = 30_000L
         private const val LOGTAG = "MobicloudP2PService"
-        /** Durée du mandat Super-Pair avant abdication automatique (testable via overrideAbdicationDelayMs). */
-        const val ABDICATION_DELAY_MS = 30 * 60 * 1000L
+        /** Durée du mandat Super-Pair (voir MandateRotationPolicy, source de vérité). */
+        const val ABDICATION_DELAY_MS = MandateRotationPolicy.MANDATE_DURATION_MS
         /** Délai inter-cycle du monitoring d'élection — évite le hot-loop en période de cooldown. */
         private const val ELECTION_RETRY_DELAY_MS = 5_000L
         /** Story 7.3 — intervalle du scan auto-réparation (compromis détection vs thrash). */
@@ -718,24 +719,10 @@ class MobicloudP2PService : Service() {
                                         delay(30_000L)
                                     }
                                 }
-                                // S10 (stabilité) : auto-abdication 30 min DÉSACTIVÉE. Causait le bug
-                                // "SP affiche Searching après ~30 min" : forçait rotation du rôle SP
-                                // même quand le cluster était sain → churn inutile, perte temporaire
-                                // de cohérence (members → Rejoining → re-Bully → reconvergence).
-                                // Promotabilité préservée via : SP conflict resolution (cross-network),
-                                // Bully forcé si SP meurt, abdication manuelle utilisateur.
-                                // Pour ré-activer rotation équitable : décommenter le bloc ci-dessous.
-                                /*
-                                launch {
-                                    Log.i(LOGTAG, "Timer d'abdication BullySolo démarré (${ABDICATION_DELAY_MS / 60_000}min)")
-                                    delay(ABDICATION_DELAY_MS)
-                                    Log.i(LOGTAG, "Timer d'abdication BullySolo expiré — abdication")
-                                    abdicateSuperPeerUseCase()
-                                        .onFailure { Log.w(LOGTAG, "Broadcast ABDICATION échoué — abdication tout de même", it) }
-                                    networkEventRepository.pushEvent("[ELECTION] Abdication automatique après ${ABDICATION_DELAY_MS / 60_000}min")
-                                    abdicate()
-                                }
-                                */
+                                // Mandat tournant borné (réactivé, voir MandateRotationPolicy) :
+                                // rotation seulement s'il existe un successeur actif, retrait souple
+                                // au lieu du cooldown strict (corrige "SP affiche Searching après 30 min").
+                                launchMandateRotation("BullySolo")
                             }
                         }
                         // Polling 2s × 8 = 16s pour laisser le GET_PEERS (intervalle 10s) retourner
@@ -911,20 +898,8 @@ class MobicloudP2PService : Service() {
                                             delay(30_000L)
                                         }
                                     }
-                                    // S10 (stabilité) : auto-abdication 30 min DÉSACTIVÉE — voir
-                                    // commentaire dans le bloc BullySolo path ci-dessus.
-                                    /*
-                                    launch {
-                                        Log.i(LOGTAG, "Timer d'abdication démarré (${ABDICATION_DELAY_MS / 60_000}min)")
-                                        delay(ABDICATION_DELAY_MS)
-                                        Log.i(LOGTAG, "Timer d'abdication expiré — exécution de l'abdication")
-                                        // F-05 : log l'échec broadcast mais procède toujours à l'abdication
-                                        abdicateSuperPeerUseCase()
-                                            .onFailure { Log.w(LOGTAG, "Broadcast ABDICATION échoué — abdication tout de même exécutée", it) }
-                                        networkEventRepository.pushEvent("[ELECTION] Abdication automatique après ${ABDICATION_DELAY_MS / 60_000}min")
-                                        abdicate() // Annule superPeerJob (keepalive Relais HA)
-                                    }
-                                    */
+                                    // Mandat tournant borné (réactivé, voir MandateRotationPolicy).
+                                    launchMandateRotation("Bully")
                                 }
                             }
                             .onFailure { Log.d(LOGTAG, "Cycle d'élection terminé : ${it.message}") }
@@ -933,6 +908,40 @@ class MobicloudP2PService : Service() {
                     delay(ELECTION_RETRY_DELAY_MS)
                 }
             }
+        }
+    }
+
+    /**
+     * Mandat tournant borné (R2-3). Lancé dans le superPeerJob : annulé avec lui si le nœud
+     * cesse d'être Super-Pair pour une autre raison.
+     *
+     * À chaque échéance : rotation s'il existe un membre actif pouvant succéder, sinon
+     * renouvellement du mandat. En rotation, l'abdication diffuse ABDICATION (les membres
+     * lancent Bully immédiatement) et place ce nœud en retrait souple.
+     */
+    private fun CoroutineScope.launchMandateRotation(path: String) = launch {
+        val mandateMinutes = MandateRotationPolicy.MANDATE_DURATION_MS / 60_000
+        Log.i(LOGTAG, "[$path] Mandat Super-Pair démarré (${mandateMinutes} min)")
+        while (isActive) {
+            delay(MandateRotationPolicy.MANDATE_DURATION_MS)
+            val activePeerIds = peerRepository.peers.value
+                .filter { it.isActive }
+                .mapTo(HashSet()) { it.identity.nodeId }
+            val hasSuccessor = MandateRotationPolicy.hasEligibleSuccessor(
+                memberSnapshotCacheUseCase.inMemory.value,
+                activePeerIds
+            )
+            if (!hasSuccessor) {
+                Log.i(LOGTAG, "[$path] Fin de mandat — aucun successeur actif, mandat renouvelé")
+                networkEventRepository.pushEvent("[ELECTION] Fin de mandat : aucun successeur actif — mandat renouvelé")
+                continue
+            }
+            Log.i(LOGTAG, "[$path] Fin de mandat — rotation")
+            networkEventRepository.pushEvent("[ELECTION] Fin de mandat (${mandateMinutes} min) — rotation du Super-Pair")
+            abdicateSuperPeerUseCase(rotation = true)
+                .onFailure { Log.w(LOGTAG, "Broadcast ABDICATION échoué — rotation tout de même", it) }
+            abdicate() // annule superPeerJob, donc cette boucle
+            break
         }
     }
 

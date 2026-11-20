@@ -34,7 +34,9 @@ data class TermState(
     /** Plus haut term de mandat observé (COORDINATOR) pour [clusterId]. */
     val highestTerm: Long = 0L,
     /** Term du mandat local en cours, 0 si le nœud n'est pas Super-Pair. */
-    val ownTerm: Long = 0L
+    val ownTerm: Long = 0L,
+    /** Fin (ms) du retrait après rotation du mandat, 0 si aucun retrait. */
+    val rotationYieldUntilMs: Long = 0L
 )
 
 interface TermStore {
@@ -125,7 +127,7 @@ class ElectionStateManager @Inject constructor(
     fun observeTerm(clusterId: String, term: Long) {
         if (clusterId.isBlank() || term <= 0L) return
         terms = when {
-            clusterId != terms.clusterId -> TermState(clusterId = clusterId, highestTerm = term, ownTerm = 0L)
+            clusterId != terms.clusterId -> terms.copy(clusterId = clusterId, highestTerm = term, ownTerm = 0L)
             term > terms.highestTerm -> terms.copy(highestTerm = term)
             else -> return
         }
@@ -137,7 +139,7 @@ class ElectionStateManager @Inject constructor(
     fun beginMandate(clusterId: String, term: Long) {
         if (clusterId.isBlank() || term <= 0L) return
         val highest = if (clusterId == terms.clusterId) maxOf(terms.highestTerm, term) else term
-        terms = TermState(clusterId = clusterId, highestTerm = highest, ownTerm = term)
+        terms = terms.copy(clusterId = clusterId, highestTerm = highest, ownTerm = term)
         termStore.write(terms)
     }
 
@@ -145,6 +147,18 @@ class ElectionStateManager @Inject constructor(
     @Synchronized
     fun ownTerm(clusterId: String): Long =
         if (clusterId.isNotBlank() && clusterId == terms.clusterId) terms.ownTerm else 0L
+
+    // ── Rotation du mandat (voir MandateRotationPolicy) ─────────────────────
+
+    /** Début du retrait après rotation : pas d'ALIVE, candidature retardée. */
+    @Synchronized
+    fun startRotationYield(durationMs: Long) {
+        terms = terms.copy(rotationYieldUntilMs = clockMs() + durationMs)
+        termStore.write(terms)
+    }
+
+    @Synchronized
+    fun isInRotationYield(): Boolean = clockMs() < terms.rotationYieldUntilMs
 
     /** Fin du mandat local (abdication ou retrait au profit d'un autre Super-Pair). */
     @Synchronized

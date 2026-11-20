@@ -22,7 +22,8 @@ class SharedPrefsTermStore @Inject constructor(
     override fun read(): TermState = TermState(
         clusterId = prefs.getString(KEY_CLUSTER_ID, "") ?: "",
         highestTerm = prefs.getLong(KEY_HIGHEST_TERM, 0L),
-        ownTerm = prefs.getLong(KEY_OWN_TERM, 0L)
+        ownTerm = prefs.getLong(KEY_OWN_TERM, 0L),
+        rotationYieldUntilMs = prefs.getLong(KEY_ROTATION_YIELD_UNTIL_MS, 0L)
     )
 
     override fun write(state: TermState) {
@@ -30,6 +31,7 @@ class SharedPrefsTermStore @Inject constructor(
             .putString(KEY_CLUSTER_ID, state.clusterId)
             .putLong(KEY_HIGHEST_TERM, state.highestTerm)
             .putLong(KEY_OWN_TERM, state.ownTerm)
+            .putLong(KEY_ROTATION_YIELD_UNTIL_MS, state.rotationYieldUntilMs)
             .apply()
     }
 
@@ -38,5 +40,6 @@ class SharedPrefsTermStore @Inject constructor(
         private const val KEY_CLUSTER_ID = "term_cluster_id"
         private const val KEY_HIGHEST_TERM = "term_highest"
         private const val KEY_OWN_TERM = "term_own"
+        private const val KEY_ROTATION_YIELD_UNTIL_MS = "rotation_yield_until_ms"
     }
 }

@@ -277,6 +277,52 @@ class ElectionTermTest {
         }
     }
 
+    // ── Retrait après rotation du mandat (R2-3) ─────────────────────────────
+
+    @Test
+    fun `node in rotation yield does not bully a lower-scoring candidate`() = runTest {
+        val state = ElectionStateManager().apply { startRotationYield(MandateRotationPolicy.ROTATION_YIELD_MS) }
+        // score distant 0.5 < score local 1.0 : sans retrait, on répondrait ALIVE
+        val event = process(
+            processUseCase(state, localIsSuperPair = false),
+            coordinator(term = 0, score = 0.5f, type = ElectionMessageType.ELECTION)
+        ).getOrThrow()
+
+        assertEquals(ElectionEvent.Ignored, event)
+        coVerify(exactly = 0) { networkClient.broadcastElectionMessage(any()) }
+    }
+
+    @Test
+    fun `without yield a higher-scoring node answers ALIVE`() = runTest {
+        val event = process(
+            processUseCase(ElectionStateManager(), localIsSuperPair = false),
+            coordinator(term = 0, score = 0.5f, type = ElectionMessageType.ELECTION)
+        ).getOrThrow()
+
+        assertEquals(ElectionEvent.ShouldStartOwnElection, event)
+        coVerify(exactly = 1) {
+            networkClient.broadcastElectionMessage(match { it.type == ElectionMessageType.ALIVE })
+        }
+    }
+
+    @Test
+    fun `candidate in rotation yield delays its candidacy`() = runTest {
+        val dispatcher = UnconfinedTestDispatcher(testScheduler)
+        val state = ElectionStateManager().apply { startRotationYield(MandateRotationPolicy.ROTATION_YIELD_MS) }
+        val job = launch(dispatcher) { runBully(state, dispatcher)().first() }
+
+        advanceTimeBy(RunBullyElectionUseCase.MONITORING_WINDOW_MS + 1L)
+        coVerify(exactly = 0) {
+            networkClient.broadcastElectionMessage(match { it.type == ElectionMessageType.ELECTION })
+        }
+
+        advanceTimeBy(MandateRotationPolicy.ROTATION_CANDIDACY_DELAY_MS)
+        coVerify(exactly = 1) {
+            networkClient.broadcastElectionMessage(match { it.type == ElectionMessageType.ELECTION })
+        }
+        job.join()
+    }
+
     // ── RunBullyElectionUseCase ─────────────────────────────────────────────
 
     private fun runBully(state: ElectionStateManager, dispatcher: kotlinx.coroutines.CoroutineDispatcher): RunBullyElectionUseCase {

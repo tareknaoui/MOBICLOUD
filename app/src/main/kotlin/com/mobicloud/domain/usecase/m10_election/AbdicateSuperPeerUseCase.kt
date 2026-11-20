@@ -14,7 +14,12 @@ class AbdicateSuperPeerUseCase @Inject constructor(
     private val networkClient: IElectionNetworkClient,
     private val electionStateManager: ElectionStateManager
 ) {
-    suspend operator fun invoke(): Result<Unit> {
+    /**
+     * @param rotation true pour une fin de mandat planifiée : retrait souple
+     * ([MandateRotationPolicy]) au lieu du cooldown strict de 5 min, qui empêchait
+     * l'ancien Super-Pair de reprendre le rôle même s'il restait seul.
+     */
+    suspend operator fun invoke(rotation: Boolean = false): Result<Unit> {
         val identity = securityRepository.getIdentity().getOrElse {
             return Result.failure(it)
         }
@@ -49,7 +54,11 @@ class AbdicateSuperPeerUseCase @Inject constructor(
 
         // 2. Appliquer le cooldown seulement si le broadcast a réussi
         //    Évite de paralyser le nœud si la diffusion échoue
-        if (broadcastResult.isSuccess) {
+        if (rotation) {
+            // Retrait appliqué même si la diffusion échoue : les membres détecteront
+            // l'absence de Super-Pair par timeout et éliront un successeur.
+            electionStateManager.startRotationYield(MandateRotationPolicy.ROTATION_YIELD_MS)
+        } else if (broadcastResult.isSuccess) {
             electionStateManager.setCooldown(5 * 60 * 1000L)
         }
 

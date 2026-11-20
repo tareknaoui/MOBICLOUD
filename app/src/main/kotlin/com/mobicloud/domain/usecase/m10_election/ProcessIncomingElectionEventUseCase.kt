@@ -92,7 +92,7 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                     networkClient.broadcastElectionMessage(coordinatorPayload)
                         .getOrElse { error -> throw Exception("Failed to broadcast COORDINATOR", error) }
                     Result.success(ElectionEvent.Ignored)
-                } else if (electionStateManager.isInCooldown()) {
+                } else if (electionStateManager.isInCooldown() || electionStateManager.isInRotationYield()) {
                     Result.success(ElectionEvent.Ignored)
                 } else if (isHigherPriority(localScore, localIdentity.nodeId, payload.reliabilityScore, payload.senderNodeId)) {
                     val alivePayload = createPayload(localIdentity, localScore, ElectionMessageType.ALIVE)
