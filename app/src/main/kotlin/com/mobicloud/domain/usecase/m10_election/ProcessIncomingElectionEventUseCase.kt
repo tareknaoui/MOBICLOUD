@@ -84,7 +84,10 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                     // l'élection du demandeur et l'orienter vers notre cluster existant.
                     // Sans ça, un challenger sans réponse se déclare COORDINATOR → double SP.
                     val localClusterId = runCatching { nodeSettingsRepository.getSettings().clusterId }.getOrDefault("")
-                    val coordinatorPayload = createPayload(localIdentity, localScore, ElectionMessageType.COORDINATOR, localClusterId)
+                    val coordinatorPayload = createPayload(
+                        localIdentity, localScore, ElectionMessageType.COORDINATOR, localClusterId,
+                        term = electionStateManager.ownTerm(localClusterId)
+                    )
                         .getOrElse { error -> throw Exception("Failed to sign COORDINATOR payload", error) }
                     networkClient.broadcastElectionMessage(coordinatorPayload)
                         .getOrElse { error -> throw Exception("Failed to broadcast COORDINATOR", error) }
@@ -130,6 +133,10 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                         Exception("Received COORDINATOR from unknown peer '${payload.senderNodeId}' -- ignoring.")
                     )
 
+                // ── Terms (fencing et départage des Super-Pairs concurrents) ──
+                resolveCoordinatorTerm(payload, localIdentity, localScore, senderPeer.identity)
+                    ?.let { return Result.success(it) }
+
                 peerRepository.registerOrUpdatePeer(
                     identity = senderPeer.identity,
                     timestampMs = System.currentTimeMillis(),
@@ -142,6 +149,7 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                 val canAdoptClusterId = joinStateMachine == null || localState is NodeJoinState.Undiscovered || localState is NodeJoinState.Isolated
                 if (payload.clusterId.isNotBlank() && payload.senderNodeId != localIdentity.nodeId && canAdoptClusterId) {
                     nodeSettingsRepository.updateClusterId(payload.clusterId)
+                    electionStateManager.observeTerm(payload.clusterId, payload.term)
                 }
 
                 val pendingRequests = localRepairBuffer.drain()
@@ -173,6 +181,73 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
         }
     }
 
+    /**
+     * Applique les règles de term à un COORDINATOR d'un autre nœud du même cluster.
+     *
+     * - term < plus haut term connu → périmé, rejeté (fencing) ;
+     * - nœud local Super-Pair avec un mandat de term connu :
+     *     · notre mandat l'emporte (term plus récent, ou même term et priorité supérieure)
+     *       → on réaffirme notre COORDINATOR pour que l'autre se retire ;
+     *     · sinon → on se retire ([ElectionEvent.StepDownRequired]) ;
+     * - sinon → on enregistre le term et le traitement habituel continue.
+     *
+     * Retourne l'événement final, ou null pour poursuivre le traitement habituel.
+     * Les messages sans term (term = 0, ancienne version) suivent le traitement habituel.
+     */
+    private suspend fun resolveCoordinatorTerm(
+        payload: ElectionPayload,
+        localIdentity: NodeIdentity,
+        localScore: Float,
+        senderIdentity: NodeIdentity
+    ): ElectionEvent? {
+        if (payload.senderNodeId == localIdentity.nodeId || payload.term <= 0L) return null
+        val localClusterId = runCatching { nodeSettingsRepository.getSettings().clusterId }.getOrDefault("")
+        if (payload.clusterId.isBlank() || payload.clusterId != localClusterId) return null
+
+        if (electionStateManager.isStale(payload.clusterId, payload.term)) {
+            networkEventRepository.pushEvent(
+                "[ELECTION] COORDINATOR périmé de ${payload.senderNodeId.take(8)} " +
+                    "(term ${payload.term} < ${electionStateManager.highestTerm(payload.clusterId)}) — rejeté"
+            )
+            return ElectionEvent.StaleCoordinatorRejected(payload.senderNodeId, payload.term)
+        }
+
+        val myTerm = electionStateManager.ownTerm(payload.clusterId)
+        val localIsSuperPair = joinStateMachine?.currentState?.value is NodeJoinState.SuperPair
+        if (localIsSuperPair && myTerm > 0L) {
+            val localWins = myTerm > payload.term ||
+                (myTerm == payload.term &&
+                    isHigherPriority(localScore, localIdentity.nodeId, payload.reliabilityScore, payload.senderNodeId))
+            if (localWins) {
+                val reassert = createPayload(
+                    localIdentity, localScore, ElectionMessageType.COORDINATOR, localClusterId, term = myTerm
+                ).getOrElse { error -> throw Exception("Failed to sign COORDINATOR payload", error) }
+                networkClient.broadcastElectionMessage(reassert)
+                    .getOrElse { error -> throw Exception("Failed to broadcast COORDINATOR", error) }
+                networkEventRepository.pushEvent(
+                    "[ELECTION] SP concurrent ${payload.senderNodeId.take(8)} (term ${payload.term}) — " +
+                        "notre mandat (term $myTerm) l'emporte, réaffirmé"
+                )
+                return ElectionEvent.Ignored
+            }
+            electionStateManager.observeTerm(payload.clusterId, payload.term)
+            electionStateManager.endMandate()
+            peerRepository.registerOrUpdatePeer(
+                identity = senderIdentity,
+                timestampMs = System.currentTimeMillis(),
+                isSuperPair = true
+            )
+            networkEventRepository.pushEvent(
+                "[ELECTION] SP concurrent ${payload.senderNodeId.take(8)} (term ${payload.term}) l'emporte " +
+                    "sur notre mandat (term $myTerm) — retrait"
+            )
+            return ElectionEvent.StepDownRequired(payload.senderNodeId, payload.term)
+        }
+
+        electionStateManager.observeTerm(payload.clusterId, payload.term)
+        return null
+    }
+
     private fun isHigherPriority(
         localScore: Float,
         localId: String,
@@ -188,10 +263,11 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
         identity: NodeIdentity,
         score: Float,
         type: ElectionMessageType,
-        clusterId: String = ""
+        clusterId: String = "",
+        term: Long = 0L
     ): Result<ElectionPayload> {
         val timestampMs = System.currentTimeMillis()
-        val dataToSign = electionSignedBytes(type, identity.nodeId, score, clusterId, timestampMs)
+        val dataToSign = electionSignedBytes(type, identity.nodeId, score, clusterId, timestampMs, term)
         val signature = securityRepository.signData(dataToSign).getOrElse { error ->
             return Result.failure(Exception("Failed to sign ${type.name} payload", error))
         }
@@ -202,7 +278,8 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
                 reliabilityScore = score,
                 signatureBytes = signature,
                 clusterId = clusterId,
-                timestampMs = timestampMs
+                timestampMs = timestampMs,
+                term = term
             )
         )
     }
@@ -241,7 +318,8 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
             senderNodeId = payload.senderNodeId,
             reliabilityScore = payload.reliabilityScore,
             clusterId = payload.clusterId,
-            timestampMs = payload.timestampMs
+            timestampMs = payload.timestampMs,
+            term = payload.term
         )
 
         val isValid = securityRepository.verifySignature(

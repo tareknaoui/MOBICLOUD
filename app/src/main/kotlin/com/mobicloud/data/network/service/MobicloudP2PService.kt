@@ -319,6 +319,16 @@ class MobicloudP2PService : Service() {
                     runCatching {
                         processIncomingElectionEventUseCase().collect { result ->
                             result.onSuccess { event ->
+                                // Terms : un COORDINATOR concurrent du même cluster l'emporte sur notre
+                                // mandat (term plus récent, ou même term et priorité supérieure).
+                                // Même séquence de retrait que la résolution split-brain via le relais.
+                                if (event is com.mobicloud.domain.models.ElectionEvent.StepDownRequired
+                                    && joinStateMachine.currentState.value is NodeJoinState.SuperPair
+                                ) {
+                                    Log.i(LOGTAG, "[ELECTION-IN] Retrait au profit de ${event.winnerNodeId.take(8)} (term ${event.term})")
+                                    abdicate()
+                                    launch { abdicateSuperPeerUseCase() }
+                                }
                                 // D1 : AbdicationReceived était silencieusement ignoré ici —
                                 // les membres attendaient SP_TIMEOUT_MS (90s) pour détecter l'absence
                                 // de leur SP au lieu de réagir immédiatement. Fix : si le SP qui abdique

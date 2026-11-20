@@ -43,4 +43,16 @@ sealed class ElectionEvent {
      * Aucune action requise de la part de l'appelant.
      */
     object Ignored : ElectionEvent()
+
+    /**
+     * COORDINATOR rejeté car son term est inférieur au plus haut term connu pour ce cluster :
+     * il provient d'un Super-Pair dont le mandat a été remplacé (fencing). Aucune action requise.
+     */
+    data class StaleCoordinatorRejected(val senderNodeId: String, val term: Long) : ElectionEvent()
+
+    /**
+     * Le nœud local est Super-Pair mais un COORDINATOR du même cluster l'emporte (term plus
+     * récent, ou même term et priorité supérieure). L'appelant doit abdiquer.
+     */
+    data class StepDownRequired(val winnerNodeId: String, val term: Long) : ElectionEvent()
 }

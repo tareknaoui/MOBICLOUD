@@ -103,7 +103,13 @@ class RunBullyElectionUseCase @Inject constructor(
         val localClusterId = nodeSettingsRepository.getClusterIdOnce()
             .ifBlank { java.util.UUID.randomUUID().toString() }
 
-        val electionPayload = createPayload(localIdentity, localScore, ElectionMessageType.ELECTION)
+        // Term proposé : plus haut term de mandat connu pour ce cluster + 1 (Raft).
+        // Il n'est enregistré comme mandat qu'en cas de victoire (beginMandate) : un
+        // candidat battu garde le plus haut term réellement observé, sinon il rejetterait
+        // ensuite le COORDINATOR légitime du Super-Pair en place.
+        val candidateTerm = electionStateManager.nextCandidateTerm(localClusterId)
+
+        val electionPayload = createPayload(localIdentity, localScore, ElectionMessageType.ELECTION, term = candidateTerm)
             .getOrElse { error ->
                 emit(Result.failure(error))
                 return@flow
@@ -132,7 +138,10 @@ class RunBullyElectionUseCase @Inject constructor(
                     // l.80-87) : il s'affirme déjà leader → on cède sans attendre la fin du timeout.
                     // Sans ça : 7a0cd8ff ignore le COORDINATOR de a487f978, attend 3s, se déclare vainqueur
                     // → split-brain oscillant toutes les ~7s.
-                    ElectionMessageType.COORDINATOR -> msg.senderNodeId != localIdentity.nodeId
+                    // Fencing : un COORDINATOR périmé (term < plus haut term connu du cluster)
+                    // vient d'un Super-Pair remplacé → on ne lui cède pas.
+                    ElectionMessageType.COORDINATOR -> msg.senderNodeId != localIdentity.nodeId &&
+                        !electionStateManager.isStale(msg.clusterId, msg.term)
                     else -> false
                 }
             }
@@ -141,13 +150,20 @@ class RunBullyElectionUseCase @Inject constructor(
         if (higherAliveReceived != null) {
             emit(Result.failure(Exception("Election lost to a higher scoring node: ${higherAliveReceived.senderNodeId}")))
         } else {
-            val coordinatorPayload = createPayload(localIdentity, localScore, ElectionMessageType.COORDINATOR, localClusterId)
+            // Mandat enregistré AVANT la diffusion : un COORDINATOR concurrent reçu juste après
+            // doit être comparé à notre term (voir ProcessIncomingElectionEventUseCase).
+            electionStateManager.beginMandate(localClusterId, candidateTerm)
+            val coordinatorPayload = createPayload(
+                localIdentity, localScore, ElectionMessageType.COORDINATOR, localClusterId, candidateTerm
+            )
                 .getOrElse { error ->
+                    electionStateManager.endMandate()
                     emit(Result.failure(error))
                     return@flow
                 }
 
             networkClient.broadcastElectionMessage(coordinatorPayload).getOrElse { error ->
+                electionStateManager.endMandate()
                 emit(Result.failure(Exception("Failed to broadcast COORDINATOR message", error)))
                 return@flow
             }
@@ -180,10 +196,11 @@ class RunBullyElectionUseCase @Inject constructor(
         identity: NodeIdentity,
         score: Float,
         type: ElectionMessageType,
-        clusterId: String = ""
+        clusterId: String = "",
+        term: Long = 0L
     ): Result<ElectionPayload> {
         val timestampMs = System.currentTimeMillis()
-        val dataToSign = electionSignedBytes(type, identity.nodeId, score, clusterId, timestampMs)
+        val dataToSign = electionSignedBytes(type, identity.nodeId, score, clusterId, timestampMs, term)
         val signature = securityRepository.signData(dataToSign).getOrElse { error ->
             return Result.failure(Exception("Failed to sign election payload of type ${type.name}", error))
         }
@@ -194,7 +211,8 @@ class RunBullyElectionUseCase @Inject constructor(
                 reliabilityScore = score,
                 signatureBytes = signature,
                 clusterId = clusterId,
-                timestampMs = timestampMs
+                timestampMs = timestampMs,
+                term = term
             )
         )
     }

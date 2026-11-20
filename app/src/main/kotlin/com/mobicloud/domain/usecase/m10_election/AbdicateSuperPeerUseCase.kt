@@ -40,6 +40,10 @@ class AbdicateSuperPeerUseCase @Inject constructor(
             timestampMs = timestampMs
         )
 
+        // Fin du mandat local, que la diffusion réussisse ou non : le nœud ne doit plus
+        // réaffirmer un term de Super-Pair qu'il n'exerce plus.
+        electionStateManager.endMandate()
+
         // 1. Diffuser l'abdication en premier
         val broadcastResult = networkClient.broadcastElectionMessage(payload)
 
