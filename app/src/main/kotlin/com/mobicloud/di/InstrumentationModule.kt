@@ -3,9 +3,11 @@ package com.mobicloud.di
 import com.mobicloud.data.instrumentation.AndroidExperimentEnvironment
 import com.mobicloud.data.instrumentation.BatteryEnergyMeter
 import com.mobicloud.data.instrumentation.CsvMeasurementSink
+import com.mobicloud.data.instrumentation.CsvProtocolEventRecorder
 import com.mobicloud.domain.usecase.experiments.EnergyMeter
 import com.mobicloud.domain.usecase.experiments.ExperimentEnvironment
 import com.mobicloud.domain.usecase.experiments.MeasurementSink
+import com.mobicloud.domain.usecase.experiments.ProtocolEventRecorder
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -18,4 +20,5 @@ abstract class InstrumentationModule {
     @Binds abstract fun bindEnergyMeter(impl: BatteryEnergyMeter): EnergyMeter
     @Binds abstract fun bindMeasurementSink(impl: CsvMeasurementSink): MeasurementSink
     @Binds abstract fun bindExperimentEnvironment(impl: AndroidExperimentEnvironment): ExperimentEnvironment
+    @Binds abstract fun bindProtocolEventRecorder(impl: CsvProtocolEventRecorder): ProtocolEventRecorder
 }
