@@ -2,12 +2,25 @@ package com.mobicloud.data.local.m11_join
 
 import android.util.Log
 import com.mobicloud.data.local.entity.MemberEntity
+import com.mobicloud.domain.models.EncryptionKeyBinding
 import com.mobicloud.domain.models.m11_join.MemberInfo
 import com.mobicloud.domain.models.m11_join.MemberRole
 import com.mobicloud.domain.models.m11_join.hexToByteArray
 import com.mobicloud.domain.models.m11_join.toHexString
 
 private const val LOGTAG = "MemberMapper"
+
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+internal fun EncryptionKeyBinding.encodeForStorage(): ByteArray =
+    kotlinx.serialization.protobuf.ProtoBuf.encodeToByteArray(EncryptionKeyBinding.serializer(), this)
+
+/** Décodage tolérant : une colonne illisible ne doit jamais faire perdre le membre. */
+@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+internal fun ByteArray?.decodeEncryptionKeyBinding(): EncryptionKeyBinding? = this?.let { bytes ->
+    runCatching {
+        kotlinx.serialization.protobuf.ProtoBuf.decodeFromByteArray(EncryptionKeyBinding.serializer(), bytes)
+    }.getOrNull()
+}
 
 fun MemberInfo.toEntityOrNull(
     clusterId: String,
@@ -34,7 +47,8 @@ fun MemberInfo.toEntity(
         freeBytes = freeBytes,
         lastSeen = lastSeen,
         role = role.name,
-        status = status.name
+        status = status.name,
+        encryptionKeyBinding = encryptionKeyBinding?.encodeForStorage()
     )
 }
 
@@ -50,7 +64,8 @@ fun MemberEntity.toMemberInfoOrNull(): MemberInfo? {
         ipAddress = ipAddress,
         port = port,
         freeBytes = freeBytes,
-        role = parsedRole
+        role = parsedRole,
+        encryptionKeyBinding = encryptionKeyBinding.decodeEncryptionKeyBinding()
     )
 }
 
@@ -64,7 +79,8 @@ fun MemberEntity.toMemberInfo(): MemberInfo = toMemberInfoOrNull() ?: MemberInfo
     ipAddress = ipAddress,
     port = port,
     freeBytes = freeBytes,
-    role = MemberRole.MEMBER
+    role = MemberRole.MEMBER,
+    encryptionKeyBinding = encryptionKeyBinding.decodeEncryptionKeyBinding()
 )
 
 fun List<MemberEntity>.toMemberInfoList(): List<MemberInfo> = mapNotNull { it.toMemberInfoOrNull() }

@@ -29,7 +29,9 @@ class SendJoinRequestUseCase @Inject constructor(
     private val securityRepository: SecurityRepository,
     private val nodeSettingsRepository: NodeSettingsRepository,
     private val networkEventRepository: NetworkEventRepository,
-    private val joinStateMachine: JoinStateMachine
+    private val joinStateMachine: JoinStateMachine,
+    private val issueEncryptionKeyBinding: IssueEncryptionKeyBindingUseCase =
+        IssueEncryptionKeyBindingUseCase(securityRepository)
 ) {
     /** Tri sticky+charge et tentatives séquentielles (max 3). */
     operator fun invoke(candidates: List<SuperPeerHint>): Flow<Result<JoinMetrics>> = flow {
@@ -81,13 +83,19 @@ class SendJoinRequestUseCase @Inject constructor(
                 continue
             }
 
+            // R2-10 : la clé de chiffrement voyage signée par l'identité Keystore. Best-effort :
+            // sans clé de chiffrement disponible, le JOIN part quand même (le membre n'aura
+            // simplement pas de clé publiée dans le cluster).
+            val binding = issueEncryptionKeyBinding(senderNodeIdBytes).getOrNull()
+
             val request = JoinRequest(
                 senderNodeId = senderNodeIdBytes,
                 candidatePublicKey = pubKeyBytes,
                 freeBytes = freeBytesNow,
                 reliabilityScore = reliabilityScore,
                 timestampMs = timestampMs,
-                signatureBytes = signature
+                signatureBytes = signature,
+                encryptionKeyBinding = binding
             )
 
             val startMs = System.currentTimeMillis()

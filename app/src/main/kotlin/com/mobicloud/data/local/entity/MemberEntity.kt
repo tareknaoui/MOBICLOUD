@@ -21,7 +21,9 @@ data class MemberEntity(
     @ColumnInfo(name = "free_bytes") val freeBytes: Long,
     @ColumnInfo(name = "last_seen") val lastSeen: Long,
     @ColumnInfo(name = "role") val role: String,
-    @ColumnInfo(name = "status") val status: String = "ACTIVE"
+    @ColumnInfo(name = "status") val status: String = "ACTIVE",
+    /** EncryptionKeyBinding encodé en ProtoBuf (R2-10) ; NULL si le membre n'en a pas publié. */
+    @ColumnInfo(name = "encryption_key_binding") val encryptionKeyBinding: ByteArray? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -35,6 +37,7 @@ data class MemberEntity(
             && lastSeen == other.lastSeen
             && role == other.role
             && status == other.status
+            && encryptionKeyBinding.contentEquals(other.encryptionKeyBinding)
     }
 
     override fun hashCode(): Int {
@@ -47,6 +50,7 @@ data class MemberEntity(
         result = 31 * result + lastSeen.hashCode()
         result = 31 * result + role.hashCode()
         result = 31 * result + status.hashCode()
+        result = 31 * result + (encryptionKeyBinding?.contentHashCode() ?: 0)
         return result
     }
 }

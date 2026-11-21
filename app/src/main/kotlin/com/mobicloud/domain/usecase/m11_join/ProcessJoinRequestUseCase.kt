@@ -1,6 +1,7 @@
 package com.mobicloud.domain.usecase.m11_join
 
 import com.mobicloud.domain.models.BULLY_TIMESTAMP_WINDOW_MS
+import com.mobicloud.domain.models.verifyEncryptionKeyBinding
 import com.mobicloud.domain.models.m11_join.JoinRedirectReason
 import com.mobicloud.domain.models.m11_join.JoinRequest
 import com.mobicloud.domain.models.m11_join.JoinResponse
@@ -76,6 +77,23 @@ class ProcessJoinRequestUseCase @Inject constructor(
             return signedRedirect(JoinRedirectReason.INVALID_SIGNATURE, emptyList(), selfNodeIdBytes)
         }
 
+        // Branche 2b (R2-10) : un lien de clé de chiffrement présent doit être valide, sinon
+        // le candidat tente de publier une clé qui n'est pas la sienne → rejet. Absent = ancien
+        // client ou clé indisponible → admis, sans clé publiée.
+        val binding = request.encryptionKeyBinding
+        if (binding != null && !verifyEncryptionKeyBinding(
+                binding = binding,
+                expectedNodeId = request.senderNodeId,
+                signingPublicKey = request.candidatePublicKey,
+                securityRepository = securityRepository
+            )
+        ) {
+            val msg = "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} REJECTED: INVALID_ENCRYPTION_KEY_BINDING"
+            networkEventRepository.pushEvent(msg)
+            android.util.Log.d("JOIN_DEBUG", msg)
+            return signedRedirect(JoinRedirectReason.INVALID_SIGNATURE, emptyList(), selfNodeIdBytes)
+        }
+
         // Branche 3+4 : check-and-add atomique (P7 review) — sans ça, 2 JOIN concurrents passent
         // tous deux le check `size() < MAX` puis appellent add() → cluster à MAX+1.
         val clusterId = currentState.clusterId
@@ -85,7 +103,8 @@ class ProcessJoinRequestUseCase @Inject constructor(
             ipAddress = "",
             port = 0,
             freeBytes = request.freeBytes,
-            role = MemberRole.MEMBER
+            role = MemberRole.MEMBER,
+            encryptionKeyBinding = binding
         )
         val admitted = memberRegistry.addIfBelowCapacity(newMember, MAX_CLUSTER_SIZE)
         if (!admitted) {
@@ -121,7 +140,7 @@ class ProcessJoinRequestUseCase @Inject constructor(
             return signedRedirect(JoinRedirectReason.INVALID_SIGNATURE, emptyList(), selfNodeIdBytes)
         }
 
-        val acceptMsg = "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} (free=${request.freeBytes}) → ACCEPT (cluster=${memberRegistry.size()}/$MAX_CLUSTER_SIZE)"
+        val acceptMsg = "[JOIN-SP] JOIN_REQUEST from ${request.senderNodeId.toHexShort()} (free=${request.freeBytes}) → ACCEPT (cluster=${memberRegistry.size()}/$MAX_CLUSTER_SIZE, encKey=${if (binding != null) "verified" else "absent"})"
         networkEventRepository.pushEvent(acceptMsg)
         android.util.Log.d("JOIN_DEBUG", acceptMsg)
 
