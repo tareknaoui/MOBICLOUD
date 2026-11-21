@@ -261,13 +261,15 @@ class DistributeEncryptedBlocksUseCaseTest {
         val peers = (1..6).map { fakePeer("node_$it", it) }
         every { peerRepository.peers } returns MutableStateFlow(peers)
 
-        var callCount = 0
+        // Les fragments partent en parallèle : un compteur d'appels global (1 succès sur 2)
+        // faisait parfois échouer un envoi PRIMAIRE selon l'ordonnancement → test instable.
+        // Ici, le premier envoi de chaque bloc (le primaire) réussit et tout envoi suivant du
+        // même bloc (la réplique secondaire) échoue, quel que soit l'ordre des coroutines.
+        val alreadySent = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
         val bundle = fakeBundle(k = 2, n = 1)
         coEvery { blockSender.sendBlock(any(), any(), any()) } answers {
-            callCount++
             val msg = firstArg<com.mobicloud.domain.models.BlockTransferMessage>()
-            // 1 succès sur 2 : simule un donneur secondaire indisponible pour la moitié des blocs.
-            if (callCount % 2 == 1) {
+            if (alreadySent.add(msg.blockId)) {
                 Result.success(fakeAck(msg.blockId, "node_receiver"))
             } else {
                 Result.failure(SocketTimeoutException("secondary unreachable"))
