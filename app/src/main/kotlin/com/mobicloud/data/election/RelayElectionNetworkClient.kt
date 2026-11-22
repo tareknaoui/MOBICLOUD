@@ -60,6 +60,9 @@ internal fun electionPayloadToJson(payload: ElectionPayload): ByteArray =
         put("signatureBytes",  java.util.Base64.getEncoder().encodeToString(payload.signatureBytes))
         put("clusterId",       payload.clusterId)
         put("timestampMs",     payload.timestampMs)
+        // Le term fait partie des octets signés (format v3) : sans lui, le récepteur
+        // reconstruit le format v2 et rejette la signature de tout message avec term > 0.
+        if (payload.term > 0L) put("term", payload.term)
     }.toString().toByteArray(Charsets.UTF_8)
 
 internal fun electionPayloadFromJson(raw: ByteArray): ElectionPayload? = runCatching {
@@ -70,7 +73,8 @@ internal fun electionPayloadFromJson(raw: ByteArray): ElectionPayload? = runCatc
         reliabilityScore = obj.getDouble("reliabilityScore").toFloat(),
         signatureBytes   = java.util.Base64.getDecoder().decode(obj.getString("signatureBytes")),
         clusterId        = obj.optString("clusterId", ""),
-        timestampMs      = obj.getLong("timestampMs")
+        timestampMs      = obj.getLong("timestampMs"),
+        term             = obj.optLong("term", 0L)
     )
 }.onFailure { e ->
     Log.w(TAG, "electionPayloadFromJson failed : ${e.message}")
