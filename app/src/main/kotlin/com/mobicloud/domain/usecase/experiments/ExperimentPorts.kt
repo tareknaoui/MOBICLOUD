@@ -1,5 +1,6 @@
 package com.mobicloud.domain.usecase.experiments
 
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.ParityPolicy
 import java.io.File
 
 /** Mesure l'énergie consommée pendant l'exécution de [block]. */
@@ -31,7 +32,7 @@ data class ExperimentConfig(
     val repetitions: Int,
     /** Vrai : chaque upload est suivi du download du même fichier. */
     val roundTrip: Boolean,
-    val baseK: Int = 2,
+    val baseK: Int = ParityPolicy.DEFAULT_K,
     /** Pause entre deux répétitions, pour laisser le courant de la batterie revenir au repos. */
     val cooldownMs: Long = 5_000L
 ) {

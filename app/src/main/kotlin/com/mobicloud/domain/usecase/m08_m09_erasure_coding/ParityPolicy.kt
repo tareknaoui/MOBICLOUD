@@ -23,6 +23,13 @@ package com.mobicloud.domain.usecase.m08_m09_erasure_coding
  */
 object ParityPolicy {
 
+    /**
+     * Nombre de fragments de données k de référence (mémoire et article : RS(4, m)).
+     * Le testbed de soutenance utilisait k = 2 faute de téléphones ; valeur unique à
+     * partager entre l'application, les campagnes de mesure et la simulation.
+     */
+    const val DEFAULT_K = 4
+
     /** Disponibilité cible par défaut : « trois neuf ». */
     const val DEFAULT_TARGET_AVAILABILITY = 0.999
 

@@ -56,16 +56,14 @@ class SelectOptimalPeersUseCase @Inject constructor(
 
     suspend operator fun invoke(
         fileSizeBytes: Long,
-        baseK: Int = 2,
+        baseK: Int = ParityPolicy.DEFAULT_K,
         // MODE TEST UNIQUEMENT : autorise un meme pair a recevoir plusieurs fragments
         // (round-robin) si le nombre de pairs est insuffisant pour une distribution 1:1.
         // CASSE la garantie de redondance Reed-Solomon -- si un pair a 2 fragments et meurt,
         // 2 fragments perdus, reconstruction impossible. Default false = production stricte.
         allowDuplicatePeers: Boolean = false
     ): Result<OptimalPeersResult> = runCatching {
-        // baseK = 2 (au lieu de 4) pour permettre des tests avec un petit nombre de pairs
-        // (3 phones suffisent : K=2 data + N=1 parite). Reed-Solomon RS(2,1) tolere la perte
-        // de 1 nœud sur 3. A reaugmenter (K=4) pour des deploiements en production avec >=5 nœuds.
+        // k = ParityPolicy.DEFAULT_K (4, valeur du mémoire) ; il faut au moins k + 1 hôtes.
         // Déféré 3 : guard baseK <= 0 → division par zéro évitée
         if (baseK <= 0) throw PeerSelectionException.InvalidBaseK(baseK)
         if (fileSizeBytes < 0L) throw IllegalArgumentException("fileSizeBytes ne peut pas être négatif, reçu : $fileSizeBytes")

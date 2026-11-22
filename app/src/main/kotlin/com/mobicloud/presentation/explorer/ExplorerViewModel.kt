@@ -20,6 +20,7 @@ import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBl
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.ParityPolicy
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.PeerSelectionException
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -335,7 +336,7 @@ class ExplorerViewModel @Inject constructor(
 
                 val optimalResult = selectOptimalPeersUseCase(
                     fileSizeBytes = fileSizeBytes ?: 0L,
-                    baseK = 2,  // RS(2,1) : 2 data + 1 parité = 3 fragments sur 3 peers (4 phones : uploadeur encode, SP + 2 membres stockent)
+                    baseK = ParityPolicy.DEFAULT_K,  // RS(4, m) : m dérivé de la disponibilité cible, au moins 5 hôtes
                     allowDuplicatePeers = false
                 ).getOrElse { e ->
                     val userMessage = when (e) {

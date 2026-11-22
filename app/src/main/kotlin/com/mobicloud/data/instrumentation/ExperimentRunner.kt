@@ -7,6 +7,7 @@ import android.util.Log
 import com.mobicloud.domain.usecase.experiments.ExperimentConfig
 import com.mobicloud.domain.usecase.experiments.MeasurementSink
 import com.mobicloud.domain.usecase.experiments.RunExperimentUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.ParityPolicy
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -84,7 +85,7 @@ class ExperimentCommandReceiver : BroadcastReceiver() {
                         fileSizeBytes = intent.getIntExtra(EXTRA_SIZE_KB, 1024).toLong() * 1024L,
                         repetitions = intent.getIntExtra(EXTRA_REPS, 10),
                         roundTrip = intent.getBooleanExtra(EXTRA_ROUND_TRIP, true),
-                        baseK = intent.getIntExtra(EXTRA_K, 2),
+                        baseK = intent.getIntExtra(EXTRA_K, ParityPolicy.DEFAULT_K),
                         cooldownMs = intent.getIntExtra(EXTRA_COOLDOWN_S, 5).toLong() * 1000L
                     )
                 }.getOrElse { e ->

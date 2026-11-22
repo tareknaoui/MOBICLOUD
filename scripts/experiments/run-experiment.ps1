@@ -30,7 +30,7 @@ param(
     [int]$SizeMb = 0,
     [int]$SizeKb = 0,
     [int]$Reps = 30,
-    [int]$K = 2,
+    [int]$K = 4,
     [int]$CooldownS = 5,
     [switch]$UploadOnly,
     [switch]$AllowCharging,
