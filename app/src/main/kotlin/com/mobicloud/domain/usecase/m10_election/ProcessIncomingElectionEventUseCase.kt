@@ -243,6 +243,22 @@ class ProcessIncomingElectionEventUseCase @Inject constructor(
             )
             return ElectionEvent.StepDownRequired(payload.senderNodeId, payload.term)
         }
+        if (localIsSuperPair) {
+            // Super-Pair sans mandat numéroté (myTerm = 0) face à un mandat numéroté : le mandat
+            // numéroté l'emporte. Sans cette règle, un tel Super-Pair ne se retirait jamais et le
+            // conflit signalé par le relais restait irrésolu (ResolveRelaySuperPeerConflictUseCase).
+            electionStateManager.observeTerm(payload.clusterId, payload.term)
+            peerRepository.registerOrUpdatePeer(
+                identity = senderIdentity,
+                timestampMs = System.currentTimeMillis(),
+                isSuperPair = true
+            )
+            networkEventRepository.pushEvent(
+                "[ELECTION] SP concurrent ${payload.senderNodeId.take(8)} (term ${payload.term}) — " +
+                    "notre rôle n'a pas de mandat numéroté, retrait"
+            )
+            return ElectionEvent.StepDownRequired(payload.senderNodeId, payload.term)
+        }
 
         electionStateManager.observeTerm(payload.clusterId, payload.term)
         return null

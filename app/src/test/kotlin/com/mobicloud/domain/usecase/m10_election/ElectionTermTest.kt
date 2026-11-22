@@ -392,4 +392,15 @@ class ElectionTermTest {
         assertEquals(0L, state.ownTerm(cluster))
         assertEquals("un candidat battu ne garde pas le term proposé", 4L, state.highestTerm(cluster))
     }
+
+    @Test
+    fun `super-pair without numbered mandate steps down to a numbered coordinator`() = runTest {
+        // Rôle de Super-Pair sans term (ownTerm = 0) : le mandat numéroté du rival l'emporte,
+        // sinon le conflit signalé par le relais ne se résout jamais.
+        val state = ElectionStateManager()
+        val event = process(processUseCase(state, localIsSuperPair = true), coordinator(term = 2)).getOrThrow()
+
+        assertTrue(event is ElectionEvent.StepDownRequired)
+        assertEquals(2L, state.highestTerm(cluster))
+    }
 }

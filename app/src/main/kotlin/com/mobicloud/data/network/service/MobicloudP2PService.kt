@@ -104,6 +104,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var tcpConnectionManager: TcpConnectionManager
     @Inject lateinit var networkEventRepository: NetworkEventRepository
     @Inject lateinit var runBullyElectionUseCase: RunBullyElectionUseCase
+    @Inject lateinit var resolveRelaySuperPeerConflictUseCase: com.mobicloud.domain.usecase.m10_election.ResolveRelaySuperPeerConflictUseCase
     @Inject lateinit var registerSuperPeerUseCase: RegisterSuperPeerUseCase
     @Inject lateinit var abdicateSuperPeerUseCase: AbdicateSuperPeerUseCase
     @Inject lateinit var processIncomingElectionEventUseCase: ProcessIncomingElectionEventUseCase
@@ -558,12 +559,14 @@ class MobicloudP2PService : Service() {
                                     val myClusterId = nodeSettingsRepository.getClusterIdOnce()
                                     val peers = signalingRepository.latestPeers.value
                                     val sameClusterRival = peers.firstOrNull { p ->
-                                        p.isSuperPair
-                                            && p.clusterId == myClusterId
-                                            && p.nodeId > identity.nodeId
+                                        p.isSuperPair && myClusterId.isNotBlank() && p.clusterId == myClusterId
                                     }
-                                    if (sameClusterRival != null) {
-                                        Log.i(LOGTAG, "[RECONNECT] Split-brain post-reconnexion: yield to ${sameClusterRival.nodeId.take(8)}")
+                                    // Le relais détecte, le term décide (ResolveRelaySuperPeerConflictUseCase).
+                                    if (sameClusterRival != null &&
+                                        resolveRelaySuperPeerConflictUseCase(myClusterId, sameClusterRival.nodeId, identity.nodeId) ==
+                                        com.mobicloud.domain.usecase.m10_election.ResolveRelaySuperPeerConflictUseCase.Decision.YIELD
+                                    ) {
+                                        Log.i(LOGTAG, "[RECONNECT] Split-brain post-reconnexion (sans mandat): yield to ${sameClusterRival.nodeId.take(8)}")
                                         abdicate()
                                         launch { abdicateSuperPeerUseCase() }
                                     }
@@ -638,10 +641,18 @@ class MobicloudP2PService : Service() {
                                 // Split-brain intra-cluster : même clusterId → abdication obligatoire
                                 // même si on a des membres. Deux SPs du même cluster avec chacun des
                                 // membres = deadlock permanent sans ce cas prioritaire.
-                                if (peer.clusterId.isNotBlank() && peer.clusterId == fsmState.clusterId && peer.nodeId > identity.nodeId) {
-                                    Log.i(LOGTAG, "[JOIN] SP split-brain (latestPeers, same cluster ${peer.clusterId.take(8)}): yield to ${peer.nodeId.take(8)}")
-                                    abdicate()
-                                    launch { abdicateSuperPeerUseCase() }
+                                // Le relais détecte, le term décide : le rival n'est pas ajouté à
+                                // seenSuperPairIds, donc le mandat est réaffirmé à chaque GET_PEERS
+                                // jusqu'au retrait de l'un des deux (ResolveRelaySuperPeerConflictUseCase).
+                                if (peer.clusterId.isNotBlank() && peer.clusterId == fsmState.clusterId) {
+                                    val decision = resolveRelaySuperPeerConflictUseCase(peer.clusterId, peer.nodeId, identity.nodeId)
+                                    if (decision == com.mobicloud.domain.usecase.m10_election.ResolveRelaySuperPeerConflictUseCase.Decision.YIELD) {
+                                        Log.i(LOGTAG, "[JOIN] SP split-brain (latestPeers, same cluster ${peer.clusterId.take(8)}, sans mandat): yield to ${peer.nodeId.take(8)}")
+                                        abdicate()
+                                        launch { abdicateSuperPeerUseCase() }
+                                    } else {
+                                        Log.i(LOGTAG, "[JOIN] SP split-brain (latestPeers, same cluster ${peer.clusterId.take(8)}) avec ${peer.nodeId.take(8)} : $decision")
+                                    }
                                 // Guards anti-ghost-cluster (incident 2026-05-17) :
                                 // 1. Si le SP local a des membres réels et rival dans un autre cluster,
                                 //    ne PAS abdiquer — on les abandonnerait à un cluster potentiellement fantôme.
@@ -742,16 +753,21 @@ class MobicloudP2PService : Service() {
                                 // obligatoire même si on a des membres (règle Bully : nodeId le plus
                                 // bas cède, peu importe l'état). Sans ça, deux SPs gardent chacun
                                 // leurs membres et le deadlock est permanent.
+                                // Le relais détecte, le term décide (ResolveRelaySuperPeerConflictUseCase) :
+                                // mandat réaffirmé par COORDINATOR signé, le perdant se retire via
+                                // StepDownRequired. Repli par nodeId seulement sans mandat numéroté.
                                 val sameClusterRival = peers.firstOrNull { p ->
-                                    p.isSuperPair
-                                        && p.clusterId == myClusterId
-                                        && p.nodeId > identity.nodeId
+                                    p.isSuperPair && myClusterId.isNotBlank() && p.clusterId == myClusterId
                                 }
                                 if (sameClusterRival != null) {
-                                    Log.i(LOGTAG, "[JOIN] SP split-brain (same cluster): yield to ${sameClusterRival.nodeId.take(8)}")
-                                    abdicate()
-                                    launch { abdicateSuperPeerUseCase() }
-                                    return@launch
+                                    val decision = resolveRelaySuperPeerConflictUseCase(myClusterId, sameClusterRival.nodeId, identity.nodeId)
+                                    if (decision == com.mobicloud.domain.usecase.m10_election.ResolveRelaySuperPeerConflictUseCase.Decision.YIELD) {
+                                        Log.i(LOGTAG, "[JOIN] SP split-brain (same cluster, sans mandat): yield to ${sameClusterRival.nodeId.take(8)}")
+                                        abdicate()
+                                        launch { abdicateSuperPeerUseCase() }
+                                        return@launch
+                                    }
+                                    return@repeat
                                 }
                                 // Guard anti-ghost (incident 2026-05-17) : ne pas abdiquer si on a déjà
                                 // des membres réels et que le rival est dans un cluster différent.

@@ -62,8 +62,12 @@ class InMemoryTermStore : TermStore {
  *    - un COORDINATOR dont le term est inférieur au plus haut term connu est périmé et
  *      rejeté (fencing) : les membres ne suivent jamais un Super-Pair remplacé ;
  *    - deux Super-Pairs concurrents se départagent par (term, score, nodeId).
- *    Deux Super-Pairs peuvent donc coexister brièvement avant stabilisation (GST),
- *    mais au plus un seul est suivi pour un term donné, et le plus récent l'emporte.
+ *    Garantie : entre deux terms différents, le plus récent l'emporte toujours et un
+ *    Super-Pair de term inférieur est rejeté par tout nœud ayant vu le term supérieur.
+ *    Deux candidats isolés l'un de l'autre peuvent en revanche gagner avec le MÊME term :
+ *    deux Super-Pairs coexistent alors brièvement (un membre suit le dernier COORDINATOR
+ *    reçu) jusqu'à ce que leurs messages se croisent (GST) et que (score, nodeId) n'en
+ *    laisse qu'un. Garantie de convergence, pas d'exclusion mutuelle stricte.
  *
  * [clockMs] est injectable pour les tests unitaires.
  */
