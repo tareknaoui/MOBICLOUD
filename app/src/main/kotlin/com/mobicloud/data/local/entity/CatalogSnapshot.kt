@@ -19,6 +19,7 @@ data class CatalogEntrySnapshot(
     val originalFileName: String = "",
     val k: Int = 4,
     val n: Int = 2,
+    val cipherScheme: Int = 0,
     val isInTrash: Boolean = false,
     val deletedAt: Long? = null,
     val folderPath: String? = null,

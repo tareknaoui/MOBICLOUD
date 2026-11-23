@@ -8,7 +8,9 @@ import android.os.Environment
 import android.provider.MediaStore
 import android.util.Log
 import android.webkit.MimeTypeMap
+import com.mobicloud.core.security.FileEnvelopeCipher
 import com.mobicloud.core.security.unwrapFileMasterKey
+import com.mobicloud.domain.models.CipherScheme
 import com.mobicloud.core.security.hkdfSha256
 import com.mobicloud.domain.models.DownloadException
 import com.mobicloud.domain.models.DownloadedBlock
@@ -55,7 +57,8 @@ class AssembleDownloadedFileUseCase @Inject constructor(
     @ApplicationContext private val context: Context,
     private val catalogRepository: CatalogRepository,
     private val securityRepository: SecurityRepository,
-    private val decodeErasureFragmentsUseCase: DecodeErasureFragmentsUseCase
+    private val decodeErasureFragmentsUseCase: DecodeErasureFragmentsUseCase,
+    private val envelopeCipher: FileEnvelopeCipher = FileEnvelopeCipher()
 ) {
 
     sealed class AssembleResult {
@@ -132,90 +135,102 @@ class AssembleDownloadedFileUseCase @Inject constructor(
         runCatching { tempFile.delete() }
 
         try {
-            val hasParity = blocks.values.any { it.isParity }
             val processedCounter = AtomicInteger(0)
-
-            // 3. Déchiffrement parallèle (CPU-bound) sur Dispatchers.Default.
-            //    Chaque bloc dérive sa propre `blockKey` via HKDF + index ; clé zéroïsée
-            //    immédiatement après `Cipher.doFinal` (pattern strictement identique à
-            //    FragmentCipherUseCase.decrypt).
-            val decryptedFragments: List<ErasureFragment> = coroutineScope {
-                blocks.values.map { block ->
-                    async {
-                        val blockKey = hkdfSha256(
-                            ikm = fileMasterKey,
-                            info = "block_key_${block.fragmentIndex}".toByteArray()
-                        )
-                        try {
-                            val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
-                                init(
-                                    Cipher.DECRYPT_MODE,
-                                    SecretKeySpec(blockKey, "AES"),
-                                    GCMParameterSpec(128, block.iv)
-                                )
-                            }
-                            val plaintext: ByteArray = try {
-                                cipher.doFinal(block.ciphertext)
-                            } catch (e: GeneralSecurityException) {
-                                throw DownloadException.CorruptBlock(
-                                    "fragmentIndex=${block.fragmentIndex}: ${e.message}"
-                                )
-                            }
-                            processedCounter.incrementAndGet()
-                            ErasureFragment(
-                                index = block.fragmentIndex,
-                                isParity = block.isParity,
-                                data = plaintext,
-                                originalFileSize = catalog.originalFileSize
-                            )
-                        } finally {
-                            blockKey.fill(0)
-                        }
-                    }
-                }.awaitAll()
-            }
-
-            // 4. Branche streaming (chemin AC#6, sans parité) vs décodage EC (avec parité)
             val digest = MessageDigest.getInstance("SHA-256")
             val originalFileSize = catalog.originalFileSize
-
             val totalWritten: Long
-            if (!hasParity) {
-                // Chemin streaming : écrire chaque bloc data dans l'ordre d'index croissant.
-                // SHA-256 incrémental (O(1) mémoire) — pas de relecture du fichier final.
-                val ordered = decryptedFragments.sortedBy { it.index }
-                var written = 0L
-                FileOutputStream(tempFile).use { fos ->
-                    for (frag in ordered) {
-                        val remaining = originalFileSize - written
-                        if (remaining <= 0L) break
-                        val take = minOf(frag.data.size.toLong(), remaining).toInt()
-                        if (take == frag.data.size) {
-                            fos.write(frag.data)
-                            digest.update(frag.data)
-                        } else {
-                            // Dernier bloc data partiel — trim au padding pour respecter
-                            // originalFileSize. Évite d'écrire les zéros de padding Erasure.
-                            fos.write(frag.data, 0, take)
-                            digest.update(frag.data, 0, take)
-                        }
-                        written += take
-                    }
-                }
-                totalWritten = written
+            if (catalog.cipherScheme == CipherScheme.ENCRYPT_THEN_ENCODE) {
+                // Chiffrer-puis-encoder : les blocs sont des fragments Reed-Solomon du chiffré.
+                // Intégrité par fragment (SHA-256 = blockId), décodage RS sans clé, puis un seul
+                // déchiffrement AES-GCM du fichier entier (tag = intégrité globale).
+                val plaintext = openEncryptThenEncode(blocks, params, catalog.originalFileSize, fileMasterKey)
+                processedCounter.set(k)
+                withContext(Dispatchers.IO) { tempFile.writeBytes(plaintext) }
+                digest.update(plaintext)
+                totalWritten = plaintext.size.toLong()
             } else {
-                // Chemin décodage EC : reconstruction complète en RAM, puis écriture
-                // d'un seul `writeBytes` (le décodeur trime déjà à originalFileSize).
-                val original = decodeErasureFragmentsUseCase
-                    .invoke(decryptedFragments, params)
-                    .getOrElse { e ->
-                        throw DownloadException.CorruptBlock(
-                            "erasure decode échoué: ${e.message}"
-                        )
+                // Ancien format (encoder-puis-chiffrer) : fichiers déjà stockés.
+                val hasParity = blocks.values.any { it.isParity }
+
+                // 3. Déchiffrement parallèle (CPU-bound) sur Dispatchers.Default.
+                //    Chaque bloc dérive sa propre `blockKey` via HKDF + index ; clé zéroïsée
+                //    immédiatement après `Cipher.doFinal` (pattern strictement identique à
+                //    FragmentCipherUseCase.decrypt).
+                val decryptedFragments: List<ErasureFragment> = coroutineScope {
+                    blocks.values.map { block ->
+                        async {
+                            val blockKey = hkdfSha256(
+                                ikm = fileMasterKey,
+                                info = "block_key_${block.fragmentIndex}".toByteArray()
+                            )
+                            try {
+                                val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
+                                    init(
+                                        Cipher.DECRYPT_MODE,
+                                        SecretKeySpec(blockKey, "AES"),
+                                        GCMParameterSpec(128, block.iv)
+                                    )
+                                }
+                                val plaintext: ByteArray = try {
+                                    cipher.doFinal(block.ciphertext)
+                                } catch (e: GeneralSecurityException) {
+                                    throw DownloadException.CorruptBlock(
+                                        "fragmentIndex=${block.fragmentIndex}: ${e.message}"
+                                    )
+                                }
+                                processedCounter.incrementAndGet()
+                                ErasureFragment(
+                                    index = block.fragmentIndex,
+                                    isParity = block.isParity,
+                                    data = plaintext,
+                                    originalFileSize = catalog.originalFileSize
+                                )
+                            } finally {
+                                blockKey.fill(0)
+                            }
+                        }
+                    }.awaitAll()
+                }
+
+                // 4. Branche streaming (chemin AC#6, sans parité) vs décodage EC (avec parité)
+
+                if (!hasParity) {
+                    // Chemin streaming : écrire chaque bloc data dans l'ordre d'index croissant.
+                    // SHA-256 incrémental (O(1) mémoire) — pas de relecture du fichier final.
+                    val ordered = decryptedFragments.sortedBy { it.index }
+                    var written = 0L
+                    FileOutputStream(tempFile).use { fos ->
+                        for (frag in ordered) {
+                            val remaining = originalFileSize - written
+                            if (remaining <= 0L) break
+                            val take = minOf(frag.data.size.toLong(), remaining).toInt()
+                            if (take == frag.data.size) {
+                                fos.write(frag.data)
+                                digest.update(frag.data)
+                            } else {
+                                // Dernier bloc data partiel — trim au padding pour respecter
+                                // originalFileSize. Évite d'écrire les zéros de padding Erasure.
+                                fos.write(frag.data, 0, take)
+                                digest.update(frag.data, 0, take)
+                            }
+                            written += take
+                        }
                     }
-                withContext(Dispatchers.IO) { tempFile.writeBytes(original) }
-                digest.update(original)
-                totalWritten = original.size.toLong()
+                    totalWritten = written
+                } else {
+                    // Chemin décodage EC : reconstruction complète en RAM, puis écriture
+                    // d'un seul `writeBytes` (le décodeur trime déjà à originalFileSize).
+                    val original = decodeErasureFragmentsUseCase
+                        .invoke(decryptedFragments, params)
+                        .getOrElse { e ->
+                            throw DownloadException.CorruptBlock(
+                                "erasure decode échoué: ${e.message}"
+                            )
+                        }
+                    withContext(Dispatchers.IO) { tempFile.writeBytes(original) }
+                    digest.update(original)
+                    totalWritten = original.size.toLong()
+                }
             }
 
             // 5. Vérification finale — SHA-256 du fichier reconstitué doit matcher
@@ -293,6 +308,45 @@ class AssembleDownloadedFileUseCase @Inject constructor(
     }.flowOn(Dispatchers.Default)
 
     /** Déduit le type MIME depuis l'extension du nom de fichier ; octet-stream si inconnu. */
+    /**
+     * Chiffrer-puis-encoder : vérifie chaque fragment (SHA-256 = blockId), reconstitue le chiffré
+     * par Reed-Solomon (sans clé), puis le déchiffre en une fois (le tag GCM couvre tout le fichier).
+     */
+    private suspend fun openEncryptThenEncode(
+        blocks: Map<Int, DownloadedBlock>,
+        params: ErasureParameters,
+        plaintextSize: Long,
+        fileMasterKey: ByteArray
+    ): ByteArray {
+        val valid = blocks.values.filter { sha256Hex(it.ciphertext).equals(it.blockId, ignoreCase = true) }
+        if (valid.size < params.k) {
+            throw DownloadException.CorruptBlock(
+                "${blocks.size - valid.size} fragment(s) altéré(s) : ${valid.size} valides pour k=${params.k}"
+            )
+        }
+        val nonce = valid.first().iv
+        if (valid.any { !it.iv.contentEquals(nonce) }) {
+            throw DownloadException.CorruptBlock("nonces divergents entre fragments")
+        }
+        val cipherSize = FileEnvelopeCipher.ciphertextSize(plaintextSize)
+        val shards = valid.sortedBy { it.fragmentIndex }.map {
+            ErasureFragment(index = it.fragmentIndex, isParity = it.isParity, data = it.ciphertext, originalFileSize = cipherSize)
+        }
+        val ciphertext = decodeErasureFragmentsUseCase(shards, params).getOrElse { e ->
+            throw DownloadException.CorruptBlock("erasure decode échoué: ${e.message}")
+        }
+        return withContext(Dispatchers.Default) {
+            try {
+                envelopeCipher.open(ciphertext, nonce, fileMasterKey)
+            } catch (e: GeneralSecurityException) {
+                throw DownloadException.CorruptBlock("tag AES-GCM invalide : ${e.message}")
+            }
+        }
+    }
+
+    private fun sha256Hex(bytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
     private fun inferMimeType(fileName: String): String {
         val ext = fileName.substringAfterLast('.', "").lowercase()
         return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)

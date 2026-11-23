@@ -61,7 +61,7 @@ class FragmentCipherUseCase @Inject constructor() {
                     }
                 }
 
-                val wrappedKey = wrapFileMasterKey(fileMasterKey, recipientPublicKeyBytes)
+                val wrappedKey = wrapFileMasterKey(fileMasterKey, recipientPublicKeyBytes, secureRandom)
                 Result.success(EncryptedBundle(encryptedFragments, wrappedKey))
             } finally {
                 fileMasterKey.fill(0)
@@ -110,40 +110,6 @@ class FragmentCipherUseCase @Inject constructor() {
             }
         } catch (e: GeneralSecurityException) {
             Result.failure(e)
-        }
-    }
-
-    private fun wrapFileMasterKey(
-        fileMasterKey: ByteArray,
-        recipientPublicKeyBytes: ByteArray
-    ): WrappedFileMasterKey {
-        val ephemeralKeyPair = KeyPairGenerator.getInstance("EC").apply {
-            initialize(ECGenParameterSpec("secp256r1"), secureRandom)
-        }.generateKeyPair()
-
-        val recipientPublicKey = KeyFactory.getInstance("EC")
-            .generatePublic(X509EncodedKeySpec(recipientPublicKeyBytes))
-
-        val sharedSecret = KeyAgreement.getInstance("ECDH").apply {
-            init(ephemeralKeyPair.private)
-            doPhase(recipientPublicKey, true)
-        }.generateSecret()
-
-        val wrappingKey = hkdfSha256(ikm = sharedSecret, info = "ecies_key".toByteArray())
-        try {
-            val iv = ByteArray(12).also { secureRandom.nextBytes(it) }
-            val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
-                init(Cipher.ENCRYPT_MODE, SecretKeySpec(wrappingKey, "AES"), GCMParameterSpec(128, iv))
-            }
-            val encryptedKey = cipher.doFinal(fileMasterKey)
-            return WrappedFileMasterKey(
-                ephemeralPublicKeyBytes = ephemeralKeyPair.public.encoded,
-                iv = iv,
-                encryptedKey = encryptedKey
-            )
-        } finally {
-            sharedSecret.fill(0)
-            wrappingKey.fill(0)
         }
     }
 

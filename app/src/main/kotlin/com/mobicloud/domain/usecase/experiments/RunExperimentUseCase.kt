@@ -1,6 +1,5 @@
 package com.mobicloud.domain.usecase.experiments
 
-import com.mobicloud.core.security.FragmentCipherUseCase
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.EncryptedBundle
 import com.mobicloud.domain.repository.CatalogRepository
@@ -8,9 +7,9 @@ import com.mobicloud.domain.repository.SecurityRepository
 import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncryptThenEncodeUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
-import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
@@ -23,8 +22,8 @@ import javax.inject.Inject
 /**
  * Répète une opération de stockage (upload, ou upload puis download) et enregistre une
  * ligne de mesure par opération. Enchaîne exactement les mêmes use cases que l'explorateur
- * (sélection, encodage RS, chiffrement, distribution ; localisation, téléchargement,
- * déchiffrement et décodage), sur des fichiers aléatoires générés pour chaque répétition.
+ * (sélection, chiffrement du fichier, encodage RS du chiffré, distribution ; localisation,
+ * téléchargement, décodage et déchiffrement), sur des fichiers aléatoires générés pour chaque répétition.
  *
  * Chronométrage : l'upload se termine quand le dernier destinataire a renvoyé son ACK
  * (retour de distribute) et non quand le relais a accepté les octets. Le download se termine
@@ -32,8 +31,7 @@ import javax.inject.Inject
  */
 class RunExperimentUseCase @Inject constructor(
     private val selectOptimalPeers: SelectOptimalPeersUseCase,
-    private val encodeErasureFragments: EncodeErasureFragmentsUseCase,
-    private val fragmentCipher: FragmentCipherUseCase,
+    private val encryptThenEncode: EncryptThenEncodeUseCase,
     private val distributeEncryptedBlocks: DistributeEncryptedBlocksUseCase,
     private val securityRepository: SecurityRepository,
     private val localizeFileBlocks: LocalizeFileBlocksUseCase,
@@ -104,10 +102,11 @@ class RunExperimentUseCase @Inject constructor(
                     val t0 = clockMs()
                     val selection = selectOptimalPeers(config.fileSizeBytes, config.baseK).getOrThrow()
                     val t1 = clockMs()
-                    val fragments = encodeErasureFragments(file, selection.params).getOrThrow()
-                    val t2 = clockMs()
+                    // Chiffrer-puis-encoder : chiffrement du fichier entier, puis RS sur le chiffré.
                     val recipient = securityRepository.getEncryptionIdentity().getOrThrow().publicKeyBytes
-                    val bundle = fragmentCipher.encrypt(fragments, recipient).getOrThrow()
+                    val sealed = encryptThenEncode.seal(bytes, recipient)
+                    val t2 = clockMs()
+                    val bundle = encryptThenEncode.encode(sealed, bytes.size.toLong(), selection.params)
                     val t3 = clockMs()
                     val entry = distributeEncryptedBlocks.distribute(
                         encryptedBundle = bundle,
@@ -120,7 +119,7 @@ class RunExperimentUseCase @Inject constructor(
                     record.copy(
                         k = selection.params.k, n = selection.params.n,
                         wireBytes = wireBytes(bundle, entry), hostCount = entry.fragmentLocations.flatMap { it.nodeIds }.toSet().size,
-                        selectMs = t1 - t0, encodeMs = t2 - t1, encryptMs = t3 - t2, transferMs = t4 - t3, totalMs = t4 - t0,
+                        selectMs = t1 - t0, encryptMs = t2 - t1, encodeMs = t3 - t2, transferMs = t4 - t3, totalMs = t4 - t0,
                         success = true
                     )
                 }

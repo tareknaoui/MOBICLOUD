@@ -122,6 +122,7 @@ class CloudIdentityRepositoryImpl @Inject constructor(
                 originalFileName = entry.catalogEntry.originalFileName,
                 k = entry.catalogEntry.k,
                 n = entry.catalogEntry.n,
+                cipherScheme = entry.catalogEntry.cipherScheme,
                 isInTrash = entry.catalogEntry.isInTrash,
                 deletedAt = entry.catalogEntry.deletedAt,
                 folderPath = entry.catalogEntry.folderPath,
@@ -155,6 +156,7 @@ class CloudIdentityRepositoryImpl @Inject constructor(
                 originalFileName = entry.originalFileName,
                 k = entry.k,
                 n = entry.n,
+                cipherScheme = entry.cipherScheme,
                 isInTrash = entry.isInTrash,
                 deletedAt = entry.deletedAt,
                 folderPath = entry.folderPath

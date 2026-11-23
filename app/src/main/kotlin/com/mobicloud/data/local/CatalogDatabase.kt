@@ -56,7 +56,7 @@ abstract class CatalogDatabase : RoomDatabase() {
     companion object {
         // Room `@Database` est en `RetentionPolicy.CLASS` → invisible à la réflexion runtime.
         // Cette constante sert de source unique consommée par l'annotation ET par les tests.
-        const val CURRENT_VERSION = 21
+        const val CURRENT_VERSION = 22
 
         // Story 1-3 — premier ajout de NodeIdentityEntity + PeerNodeEntity (sans is_super_pair).
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -306,6 +306,14 @@ abstract class CatalogDatabase : RoomDatabase() {
         val MIGRATION_20_21 = object : Migration(20, 21) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE cluster_members ADD COLUMN encryption_key_binding BLOB DEFAULT NULL")
+            }
+        }
+
+        // Chiffrer-puis-encoder : ordre chiffrement / encodage par fichier (CipherScheme).
+        // 0 = encoder-puis-chiffrer : les fichiers existants restent lisibles par l'ancien chemin.
+        val MIGRATION_21_22 = object : Migration(21, 22) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE catalog_entry ADD COLUMN cipher_scheme INTEGER NOT NULL DEFAULT 0")
             }
         }
     }

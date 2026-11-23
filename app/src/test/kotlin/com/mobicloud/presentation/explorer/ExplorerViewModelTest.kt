@@ -2,7 +2,6 @@ package com.mobicloud.presentation.explorer
 
 import android.content.Context
 import android.util.Log
-import com.mobicloud.core.security.FragmentCipherUseCase
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.FragmentLocation
 import com.mobicloud.domain.models.ResolvedBlockLocation
@@ -14,7 +13,7 @@ import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFil
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
-import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncryptThenEncodeUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.OptimalPeersResult
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
 import com.mobicloud.domain.models.ErasureParameters
@@ -52,8 +51,7 @@ class ExplorerViewModelTest {
 
     private lateinit var catalogRepository: CatalogRepository
     private lateinit var gossipSyncUseCase: GossipSyncUseCase
-    private lateinit var encodeErasureFragmentsUseCase: EncodeErasureFragmentsUseCase
-    private lateinit var fragmentCipherUseCase: FragmentCipherUseCase
+    private lateinit var encryptThenEncodeUseCase: EncryptThenEncodeUseCase
     private lateinit var distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase
     private lateinit var securityRepository: SecurityRepository
     private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
@@ -73,8 +71,7 @@ class ExplorerViewModelTest {
         every { Log.w(any(), any<String>()) } returns 0
         catalogRepository = mockk()
         gossipSyncUseCase = mockk(relaxed = true)
-        encodeErasureFragmentsUseCase = mockk(relaxed = true)
-        fragmentCipherUseCase = mockk(relaxed = true)
+        encryptThenEncodeUseCase = mockk(relaxed = true)
         distributeEncryptedBlocksUseCase = mockk(relaxed = true)
         securityRepository = mockk(relaxed = true)
         localizeFileBlocksUseCase = mockk(relaxed = true)
@@ -100,8 +97,7 @@ class ExplorerViewModelTest {
     private fun createViewModel() = ExplorerViewModel(
         catalogRepository = catalogRepository,
         gossipSyncUseCase = gossipSyncUseCase,
-        encodeErasureFragmentsUseCase = encodeErasureFragmentsUseCase,
-        fragmentCipherUseCase = fragmentCipherUseCase,
+        encryptThenEncodeUseCase = encryptThenEncodeUseCase,
         distributeEncryptedBlocksUseCase = distributeEncryptedBlocksUseCase,
         securityRepository = securityRepository,
         localizeFileBlocksUseCase = localizeFileBlocksUseCase,

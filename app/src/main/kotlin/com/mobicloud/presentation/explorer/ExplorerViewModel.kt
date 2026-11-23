@@ -5,7 +5,6 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mobicloud.core.security.FragmentCipherUseCase
 import android.util.Log
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.ErasureParameters
@@ -19,7 +18,7 @@ import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFil
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
-import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncryptThenEncodeUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.ParityPolicy
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.PeerSelectionException
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
@@ -50,8 +49,7 @@ import javax.inject.Inject
 class ExplorerViewModel @Inject constructor(
     private val catalogRepository: CatalogRepository,
     private val gossipSyncUseCase: GossipSyncUseCase,
-    private val encodeErasureFragmentsUseCase: EncodeErasureFragmentsUseCase,
-    private val fragmentCipherUseCase: FragmentCipherUseCase,
+    private val encryptThenEncodeUseCase: EncryptThenEncodeUseCase,
     private val distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase,
     private val securityRepository: SecurityRepository,
     private val localizeFileBlocksUseCase: LocalizeFileBlocksUseCase,
@@ -330,10 +328,7 @@ class ExplorerViewModel @Inject constructor(
 
             val fileHash = sha256Hex(fileBytes)
 
-            val tempFile = File(context.cacheDir, "mobicloud_store_${System.currentTimeMillis()}.tmp")
             try {
-                withContext(ioDispatcher) { tempFile.writeBytes(fileBytes) }
-
                 val optimalResult = selectOptimalPeersUseCase(
                     fileSizeBytes = fileSizeBytes ?: 0L,
                     baseK = ParityPolicy.DEFAULT_K,  // RS(4, m) : m dérivé de la disponibilité cible, au moins 5 hôtes
@@ -358,13 +353,6 @@ class ExplorerViewModel @Inject constructor(
                 val params = optimalResult.params
                 val selectedPeers = optimalResult.selectedPeers
 
-                val fragments = encodeErasureFragmentsUseCase(tempFile, params)
-                    .getOrElse { e ->
-                        _storeState.value = StoreState.Error("Encoding failed: ${e.message ?: "unknown error"}")
-                        scheduleReset()
-                        return@launch
-                    }
-
                 _storeState.value = StoreState.InProgress.Encrypting
 
                 // Story 6.3 — `getIdentity()` retourne la clé Keystore SIGN/VERIFY (incompatible
@@ -378,7 +366,10 @@ class ExplorerViewModel @Inject constructor(
                         return@launch
                     }
 
-                val bundle = fragmentCipherUseCase.encrypt(fragments, encryptionIdentity.publicKeyBytes)
+                // Chiffrer-puis-encoder : le fichier entier est chiffré (AES-256-GCM) puis le chiffré
+                // est découpé par Reed-Solomon ; les hôtes ne reçoivent que des morceaux de chiffré
+                // et un fragment perdu peut être régénéré sans la clé (RegenerateFragmentsUseCase).
+                val bundle = encryptThenEncodeUseCase(fileBytes, encryptionIdentity.publicKeyBytes, params)
                     .getOrElse { e ->
                         _storeState.value = StoreState.Error("Encryption failed: ${e.message ?: "unknown error"}")
                         scheduleReset()
@@ -430,8 +421,6 @@ class ExplorerViewModel @Inject constructor(
                     _storeState.value = StoreState.Error("Unexpected error: ${e.message ?: "unknown error"}")
                     scheduleReset()
                 }
-            } finally {
-                tempFile.delete()
             }
         }
     }

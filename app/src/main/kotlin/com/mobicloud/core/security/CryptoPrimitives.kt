@@ -2,6 +2,9 @@ package com.mobicloud.core.security
 
 import com.mobicloud.domain.models.WrappedFileMasterKey
 import java.security.KeyFactory
+import java.security.spec.ECGenParameterSpec
+import java.security.SecureRandom
+import java.security.KeyPairGenerator
 import java.security.PrivateKey
 import java.security.spec.X509EncodedKeySpec
 import javax.crypto.Cipher
@@ -51,6 +54,44 @@ internal fun unwrapFileMasterKey(
             )
         }
         return cipher.doFinal(wrapped.encryptedKey)
+    } finally {
+        sharedSecret.fill(0)
+        wrappingKey.fill(0)
+    }
+}
+
+/**
+ * Chiffre la `fileMasterKey` pour [recipientPublicKeyBytes] (ECIES : ECDH éphémère P-256,
+ * HKDF-SHA256 "ecies_key", AES-256-GCM). Partagé par les deux schémas de chiffrement.
+ */
+internal fun wrapFileMasterKey(
+    fileMasterKey: ByteArray,
+    recipientPublicKeyBytes: ByteArray,
+    secureRandom: SecureRandom
+): WrappedFileMasterKey {
+    val ephemeralKeyPair = KeyPairGenerator.getInstance("EC").apply {
+        initialize(ECGenParameterSpec("secp256r1"), secureRandom)
+    }.generateKeyPair()
+
+    val recipientPublicKey = KeyFactory.getInstance("EC")
+        .generatePublic(X509EncodedKeySpec(recipientPublicKeyBytes))
+
+    val sharedSecret = KeyAgreement.getInstance("ECDH").apply {
+        init(ephemeralKeyPair.private)
+        doPhase(recipientPublicKey, true)
+    }.generateSecret()
+
+    val wrappingKey = hkdfSha256(ikm = sharedSecret, info = "ecies_key".toByteArray())
+    try {
+        val iv = ByteArray(12).also { secureRandom.nextBytes(it) }
+        val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
+            init(Cipher.ENCRYPT_MODE, SecretKeySpec(wrappingKey, "AES"), GCMParameterSpec(128, iv))
+        }
+        return WrappedFileMasterKey(
+            ephemeralPublicKeyBytes = ephemeralKeyPair.public.encoded,
+            iv = iv,
+            encryptedKey = cipher.doFinal(fileMasterKey)
+        )
     } finally {
         sharedSecret.fill(0)
         wrappingKey.fill(0)

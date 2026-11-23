@@ -1,6 +1,6 @@
 package com.mobicloud.domain.usecase.experiments
 
-import com.mobicloud.core.security.FragmentCipherUseCase
+import com.mobicloud.core.security.SealedFile
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.DownloadedBlock
 import com.mobicloud.domain.models.EncryptedBundle
@@ -18,7 +18,7 @@ import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFil
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadFileBlocksUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DownloadProgressState
-import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncryptThenEncodeUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.OptimalPeersResult
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.PeerSelectionException
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
@@ -42,8 +42,7 @@ class RunExperimentUseCaseTest {
     @get:Rule val tmp = TemporaryFolder()
 
     private val select = mockk<SelectOptimalPeersUseCase>()
-    private val encode = mockk<EncodeErasureFragmentsUseCase>()
-    private val cipher = mockk<FragmentCipherUseCase>()
+    private val encryptThenEncode = mockk<EncryptThenEncodeUseCase>()
     private val distribute = mockk<DistributeEncryptedBlocksUseCase>()
     private val security = mockk<SecurityRepository>()
     private val localize = mockk<LocalizeFileBlocksUseCase>()
@@ -82,22 +81,19 @@ class RunExperimentUseCaseTest {
     )
 
     private fun useCase() = RunExperimentUseCase(
-        select, encode, cipher, distribute, security, localize, download, assemble, catalog, meter, sink, environment
+        select, encryptThenEncode, distribute, security, localize, download, assemble, catalog, meter, sink, environment
     )
 
     @Before
     fun setUp() {
         scratch = tmp.newFolder("scratch")
         coEvery { select(any(), any(), any()) } returns Result.success(OptimalPeersResult(ErasureParameters(2, 1), emptyList()))
-        coEvery { encode(any(), any()) } returns Result.success(
-            listOf(ErasureFragment(0, false, ByteArray(10), 20), ErasureFragment(1, false, ByteArray(10), 20), ErasureFragment(2, true, ByteArray(10), 20))
-        )
         coEvery { security.getEncryptionIdentity() } returns Result.success(EncryptionIdentity(ByteArray(65) { 1 }, mockk()))
-        coEvery { cipher.encrypt(any(), any()) } returns Result.success(
-            EncryptedBundle(
-                (0..2).map { EncryptedFragment(it, it == 2, ByteArray(100), ByteArray(12), 20) },
-                WrappedFileMasterKey(ByteArray(65) { 1 }, ByteArray(12), ByteArray(48))
-            )
+        val wrapped = WrappedFileMasterKey(ByteArray(65) { 1 }, ByteArray(12), ByteArray(48))
+        coEvery { encryptThenEncode.seal(any(), any()) } returns SealedFile(ByteArray(4_112), ByteArray(12) { 1 }, wrapped)
+        coEvery { encryptThenEncode.encode(any(), any(), any()) } returns EncryptedBundle(
+            (0..2).map { EncryptedFragment(it, it == 2, ByteArray(100), ByteArray(12), 20) },
+            wrapped
         )
         coEvery { distribute.distribute(any(), any(), any(), any(), any(), any()) } returns Result.success(entry)
         coEvery { catalog.moveToTrash(any()) } returns Result.success(Unit)
