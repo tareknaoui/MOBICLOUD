@@ -28,7 +28,9 @@ import javax.inject.Singleton
 @Singleton
 class LocalRepairBuffer @Inject constructor(
     private val circuitBreakerUseCase: CircuitBreakerUseCase,
-    @ApplicationScope private val applicationScope: CoroutineScope
+    @ApplicationScope private val applicationScope: CoroutineScope,
+    private val eventRecorder: com.mobicloud.domain.usecase.experiments.ProtocolEventRecorder =
+        com.mobicloud.domain.usecase.experiments.NoOpProtocolEventRecorder
 ) {
 
     private val buffer = LinkedList<RepairRequest>()
@@ -56,6 +58,7 @@ class LocalRepairBuffer @Inject constructor(
                         items
                     }
                     if (pending.isNotEmpty()) {
+                        eventRecorder.record(com.mobicloud.domain.usecase.experiments.ProtocolEventType.REPAIR_DRAINED, pending.size.toDouble())
                         pendingAfterCircuitClose.emit(pending)
                     }
                 }

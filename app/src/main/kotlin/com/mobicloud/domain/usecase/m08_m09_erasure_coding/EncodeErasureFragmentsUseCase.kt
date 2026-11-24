@@ -28,35 +28,45 @@ class EncodeErasureFragmentsUseCase @Inject constructor(
                 "GF(256) constraint: k >= 1, n >= 1, k + n <= 255 (got k=${params.k}, n=${params.n})"
             }
             require(file.exists() && file.isFile) { "File not found or not a regular file: $file" }
-
             val bytes = withContext(Dispatchers.IO) { file.readBytes() }
-            val originalSize = bytes.size.toLong()
-            require(originalSize > 0) { "File is empty, cannot encode" }
-
-            val fragmentSize = (bytes.size + params.k - 1) / params.k
-            require(fragmentSize.toLong() * params.k <= Int.MAX_VALUE) {
-                "Padded size overflows Int (fragmentSize=$fragmentSize, k=${params.k})"
-            }
-            val paddedSize = fragmentSize * params.k
-            val padded = bytes.copyOf(paddedSize)
-
-            val dataBlocks = List(params.k) { i ->
-                padded.copyOfRange(i * fragmentSize, (i + 1) * fragmentSize)
-            }
-            val parityBlocks = codec.encode(dataBlocks, params.k, params.n)
-
-            val dataFragments = dataBlocks.mapIndexed { i, data ->
-                ErasureFragment(index = i, isParity = false, data = data, originalFileSize = originalSize)
-            }
-            val parityFragments = parityBlocks.mapIndexed { i, data ->
-                ErasureFragment(
-                    index = params.k + i,
-                    isParity = true,
-                    data = data,
-                    originalFileSize = originalSize,
-                )
-            }
-            dataFragments + parityFragments
+            encodeBytes(bytes, params)
         }
+    }
+
+    /** Encode [bytes] (clair ou chiffré) en k fragments de données + n de parité. */
+    suspend fun encodeBytes(
+        bytes: ByteArray,
+        params: ErasureParameters = ErasureParameters(),
+    ): List<ErasureFragment> = withContext(Dispatchers.Default) {
+        require(params.k >= 1 && params.n >= 1 && params.k + params.n <= 255) {
+            "GF(256) constraint: k >= 1, n >= 1, k + n <= 255 (got k=${params.k}, n=${params.n})"
+        }
+        val originalSize = bytes.size.toLong()
+        require(originalSize > 0) { "File is empty, cannot encode" }
+
+        val fragmentSize = (bytes.size + params.k - 1) / params.k
+        require(fragmentSize.toLong() * params.k <= Int.MAX_VALUE) {
+            "Padded size overflows Int (fragmentSize=$fragmentSize, k=${params.k})"
+        }
+        val paddedSize = fragmentSize * params.k
+        val padded = bytes.copyOf(paddedSize)
+
+        val dataBlocks = List(params.k) { i ->
+            padded.copyOfRange(i * fragmentSize, (i + 1) * fragmentSize)
+        }
+        val parityBlocks = codec.encode(dataBlocks, params.k, params.n)
+
+        val dataFragments = dataBlocks.mapIndexed { i, data ->
+            ErasureFragment(index = i, isParity = false, data = data, originalFileSize = originalSize)
+        }
+        val parityFragments = parityBlocks.mapIndexed { i, data ->
+            ErasureFragment(
+                index = params.k + i,
+                isParity = true,
+                data = data,
+                originalFileSize = originalSize,
+            )
+        }
+        dataFragments + parityFragments
     }
 }

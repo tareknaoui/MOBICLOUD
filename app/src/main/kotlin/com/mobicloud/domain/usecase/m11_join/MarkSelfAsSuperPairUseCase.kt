@@ -30,7 +30,9 @@ class MarkSelfAsSuperPairUseCase @Inject constructor(
     private val memberRegistry: MemberRegistry,
     private val joinStateMachine: JoinStateMachine,
     private val monitorMemberLivenessUseCaseLazy: Lazy<MonitorMemberLivenessUseCase>,
-    private val memberSnapshotCacheUseCaseLazy: Lazy<MemberSnapshotCacheUseCase>
+    private val memberSnapshotCacheUseCaseLazy: Lazy<MemberSnapshotCacheUseCase>,
+    private val issueEncryptionKeyBinding: IssueEncryptionKeyBindingUseCase =
+        IssueEncryptionKeyBindingUseCase(securityRepository)
 ) {
     suspend operator fun invoke(clusterIdArg: String) {
         // P2 (review R2) : fallback sur NodeSettings.clusterId si l'argument est vide. Couvre
@@ -56,7 +58,9 @@ class MarkSelfAsSuperPairUseCase @Inject constructor(
             ipAddress = "",
             port = 0,
             freeBytes = freeBytes,
-            role = MemberRole.SUPER_PAIR
+            role = MemberRole.SUPER_PAIR,
+            // R2-10 : le Super-Pair publie aussi sa clé de chiffrement signée.
+            encryptionKeyBinding = issueEncryptionKeyBinding(selfNodeId).getOrNull()
         )
 
         // P18 (fix 2026-05-19) : persister clusterId AVANT memberRegistry.add(selfMember).

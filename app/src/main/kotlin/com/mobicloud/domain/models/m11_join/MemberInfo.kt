@@ -1,5 +1,6 @@
 package com.mobicloud.domain.models.m11_join
 
+import com.mobicloud.domain.models.EncryptionKeyBinding
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -9,7 +10,9 @@ data class MemberInfo(
     val ipAddress: String,
     val port: Int,
     val freeBytes: Long,
-    val role: MemberRole
+    val role: MemberRole,
+    /** Clé de chiffrement signée par l'identité (R2-10) ; à lire via verifiedEncryptionPublicKey(). */
+    val encryptionKeyBinding: EncryptionKeyBinding? = null
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -21,6 +24,7 @@ data class MemberInfo(
         if (port != other.port) return false
         if (freeBytes != other.freeBytes) return false
         if (role != other.role) return false
+        if (encryptionKeyBinding != other.encryptionKeyBinding) return false
         return true
     }
 
@@ -31,6 +35,7 @@ data class MemberInfo(
         result = 31 * result + port
         result = 31 * result + freeBytes.hashCode()
         result = 31 * result + role.hashCode()
+        result = 31 * result + (encryptionKeyBinding?.hashCode() ?: 0)
         return result
     }
 }

@@ -354,10 +354,12 @@ class DistributeEncryptedBlocksUseCase @Inject constructor(
                 )
             },
             wrappedMasterKey = encryptedBundle.wrappedFileMasterKey,
-            originalFileSize = encryptedBundle.encryptedFragments.firstOrNull()?.originalFileSize ?: 0L,
+            originalFileSize = encryptedBundle.plaintextSize
+                ?: encryptedBundle.encryptedFragments.firstOrNull()?.originalFileSize ?: 0L,
             originalFileName = originalFileName,
             k = params.k,
-            n = params.n
+            n = params.n,
+            cipherScheme = encryptedBundle.cipherScheme
         )
 
         // [Atomicité DHT/catalog] Le catalog est la source de vérité — on l'écrit AVANT la DHT.

@@ -31,7 +31,9 @@ class TriggerAutoRepairUseCase @Inject constructor(
     private val gossipSyncUseCase: GossipSyncUseCase,
     private val circuitBreakerUseCase: CircuitBreakerUseCase,
     private val localRepairBuffer: LocalRepairBuffer,
-    private val networkEventRepository: NetworkEventRepository
+    private val networkEventRepository: NetworkEventRepository,
+    private val eventRecorder: com.mobicloud.domain.usecase.experiments.ProtocolEventRecorder =
+        com.mobicloud.domain.usecase.experiments.NoOpProtocolEventRecorder
 ) {
 
     companion object {
@@ -152,7 +154,9 @@ class TriggerAutoRepairUseCase @Inject constructor(
                             port = directive.destinationPort
                         )
                     )
+                    eventRecorder.record(com.mobicloud.domain.usecase.experiments.ProtocolEventType.REPAIR_BUFFERED, detail = directive.blockId.take(16))
                     if (dropped != null) {
+                        eventRecorder.record(com.mobicloud.domain.usecase.experiments.ProtocolEventType.REPAIR_DROPPED, detail = dropped.blockId.take(16))
                         networkEventRepository.pushEvent(
                             "[REPAIR] Buffer plein — ${dropped.blockId.take(16)} droppée (FIFO)"
                         )
@@ -202,6 +206,7 @@ class TriggerAutoRepairUseCase @Inject constructor(
                 Log.i(LOGTAG, "[REPAIR] Plan → donneur=${donorNodeId.take(8)} dest=${destination.identity.nodeId.take(8)} bloc=${entry.blockId.take(16)}")
                 gossipRelayChannel.sendReplicationPlan(donorNodeId, plan)
                     .onSuccess {
+                        eventRecorder.record(com.mobicloud.domain.usecase.experiments.ProtocolEventType.REPAIR_EMITTED, detail = entry.blockId.take(16))
                         val repairMsg = "[REPAIR] ${entry.blockId.take(16)} donneur=${donorNodeId.take(8)} → dest=${destination.identity.nodeId.take(8)}"
                         networkEventRepository.pushEvent(repairMsg)
                         Log.i(LOGTAG, repairMsg)

@@ -47,6 +47,7 @@ class CatalogRepositoryImpl(
             originalFileName = originalFileName,
             k = k,
             n = n,
+            cipherScheme = cipherScheme,
             isInTrash = isInTrash,
             deletedAt = deletedAt,
             folderPath = folderPath
@@ -89,6 +90,7 @@ class CatalogRepositoryImpl(
             originalFileName = catalogEntry.originalFileName,
             k = catalogEntry.k,
             n = catalogEntry.n,
+            cipherScheme = catalogEntry.cipherScheme,
             isInTrash = catalogEntry.isInTrash,
             deletedAt = catalogEntry.deletedAt,
             folderPath = catalogEntry.folderPath

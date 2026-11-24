@@ -47,7 +47,14 @@ class MergeCatalogEntriesUseCase {
                     versionClock = local.versionClock,
                     fragmentLocations = mergedFragments,
                     wrappedMasterKey = mergedWrappedKey,
-                    originalFileSize = mergedSize
+                    originalFileSize = mergedSize,
+                    // Paramètres de reconstruction : propres au fichier, identiques des deux côtés.
+                    // Avant, ils étaient perdus au merge (retour aux défauts k=4, n=2, format 0),
+                    // ce qui rendait le fichier indécodable s'il avait été encodé autrement.
+                    originalFileName = local.originalFileName.ifEmpty { remote.originalFileName },
+                    k = local.k,
+                    n = local.n,
+                    cipherScheme = maxOf(local.cipherScheme, remote.cipherScheme)
                 )
             }
         }

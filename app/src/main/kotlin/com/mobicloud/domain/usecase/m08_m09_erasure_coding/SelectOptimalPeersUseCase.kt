@@ -37,7 +37,11 @@ sealed class PeerSelectionException(message: String) : Exception(message) {
 
 data class OptimalPeersResult(
     val params: ErasureParameters,
-    val selectedPeers: List<Peer>
+    val selectedPeers: List<Peer>,
+    /** Disponibilité estimée du fichier (voir [ParityPolicy]) ; null si inconnue. */
+    val estimatedAvailability: Double? = null,
+    /** Faux si la cible n'a pas pu être atteinte (trop peu d'hôtes ou plafond de surcoût). */
+    val availabilityTargetMet: Boolean = true
 )
 
 class SelectOptimalPeersUseCase @Inject constructor(
@@ -47,18 +51,19 @@ class SelectOptimalPeersUseCase @Inject constructor(
         private const val PEER_FLOW_TIMEOUT_MS = 5_000L
     }
 
+    /** Disponibilité visée par fichier (voir [ParityPolicy]). */
+    internal var targetAvailability: Double = ParityPolicy.DEFAULT_TARGET_AVAILABILITY
+
     suspend operator fun invoke(
         fileSizeBytes: Long,
-        baseK: Int = 2,
+        baseK: Int = ParityPolicy.DEFAULT_K,
         // MODE TEST UNIQUEMENT : autorise un meme pair a recevoir plusieurs fragments
         // (round-robin) si le nombre de pairs est insuffisant pour une distribution 1:1.
         // CASSE la garantie de redondance Reed-Solomon -- si un pair a 2 fragments et meurt,
         // 2 fragments perdus, reconstruction impossible. Default false = production stricte.
         allowDuplicatePeers: Boolean = false
     ): Result<OptimalPeersResult> = runCatching {
-        // baseK = 2 (au lieu de 4) pour permettre des tests avec un petit nombre de pairs
-        // (3 phones suffisent : K=2 data + N=1 parite). Reed-Solomon RS(2,1) tolere la perte
-        // de 1 nœud sur 3. A reaugmenter (K=4) pour des deploiements en production avec >=5 nœuds.
+        // k = ParityPolicy.DEFAULT_K (4, valeur du mémoire) ; il faut au moins k + 1 hôtes.
         // Déféré 3 : guard baseK <= 0 → division par zéro évitée
         if (baseK <= 0) throw PeerSelectionException.InvalidBaseK(baseK)
         if (fileSizeBytes < 0L) throw IllegalArgumentException("fileSizeBytes ne peut pas être négatif, reçu : $fileSizeBytes")
@@ -120,32 +125,32 @@ class SelectOptimalPeersUseCase @Inject constructor(
         // Trier par score de fiabilité décroissant
         val sortedPeers = capablePeers.sortedByDescending { it.identity.reliabilityScore }
 
-        // Évaluer le Maillon Faible sur le Pool de Sélection de base (les K meilleurs nœuds)
-        val coreSelection = sortedPeers.take(baseK)
-        // [P11-Fix] Borner le score dans [0f, 1f] — un score non initialisé ou négatif ferait
-        // tomber dynamicN=4 silencieusement et pourrait épuiser le pool disponible.
-        val weakestLinkScore = coreSelection.minOf { it.identity.reliabilityScore }.coerceIn(0f, 1f)
-        
-        // Déterminer la redondance dynamique M (n)
-        val dynamicN = when {
-            weakestLinkScore >= 0.8f -> 1 // Réseau très stable
-            weakestLinkScore >= 0.5f -> 2 // Réseau normal
-            else -> 4 // Réseau instable, on maximise la redondance
-        }
-        
-        // Ajuster dynamiquement N s'il n'y a pas assez de téléphones disponibles dans tout le réseau
-        val totalRequiredNodes = baseK + dynamicN
+        // Parité dérivée d'une disponibilité cible (voir ParityPolicy) au lieu des anciens
+        // seuils 0.5 / 0.8 sur le maillon faible : plus petit m tel que
+        // P(au moins K des K+m hôtes joignables) ≥ targetAvailability, avec les scores
+        // réels des hôtes qui seront choisis, et un surcoût borné à ×3 (m ≤ 2K).
+        // [P11-Fix] conservé : chaque score est borné dans [0, 1] par ParityPolicy.
         val availableNodes = sortedPeers.size
-        
-        val finalN = when {
-            availableNodes >= totalRequiredNodes -> dynamicN
-            availableNodes > baseK -> availableNodes - baseK // Réduire la redondance au maximum physiquement possible
-            allowDuplicatePeers -> dynamicN // Mode test : on garde dynamicN, le round-robin compense
+        val maxParity = ParityPolicy.defaultMaxParity(baseK)
+        val rankedScores = when {
+            availableNodes > baseK -> sortedPeers.map { it.identity.reliabilityScore.toDouble() }
+            // Mode test : les fragments sont répartis en round-robin ; on évalue la même
+            // répartition (estimation optimiste, deux fragments sur un pair ne sont pas indépendants).
+            allowDuplicatePeers -> List(baseK + maxParity) { i ->
+                sortedPeers[i % availableNodes].identity.reliabilityScore.toDouble()
+            }
             else -> throw PeerSelectionException.InsufficientRedundancyNodes(
                 available = availableNodes,
                 baseK = baseK
             )
         }
+        val decision = ParityPolicy.minimalParity(
+            rankedScores = rankedScores,
+            k = baseK,
+            target = targetAvailability,
+            maxParity = maxParity
+        )
+        val finalN = decision.parity
 
         // Sélection finale
         val totalFragments = baseK + finalN
@@ -159,6 +164,11 @@ class SelectOptimalPeersUseCase @Inject constructor(
         }
         val finalParams = ErasureParameters(k = baseK, n = finalN)
 
-        OptimalPeersResult(params = finalParams, selectedPeers = finalSelectedPeers)
+        OptimalPeersResult(
+            params = finalParams,
+            selectedPeers = finalSelectedPeers,
+            estimatedAvailability = decision.estimatedAvailability,
+            availabilityTargetMet = decision.targetMet
+        )
     }
 }

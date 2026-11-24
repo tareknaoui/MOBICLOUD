@@ -237,7 +237,7 @@ BlockTransferChannel    → migrates fragments to new host
 | 4 | Why BloomFilter for gossip, not full DHT? | Full catalog = O(entries). BloomFilter = 128 bytes fixed. Delta-sync sends only missing entries. |
 | 5 | What if the super-peer crashes without notice? | Heartbeat timeout → peers detect liveness loss → re-election → new super-peer inherits relay session. |
 | 6 | Your relay is centralized — isn't that a contradiction? | It's a transport relay, not a data store. Data stays on peers. Relay is replaceable. It's the minimum viable centralization for NAT traversal. |
-| 7 | How is node identity generated? | Android Keystore → RSA key pair → public key hashed → nodeId. Device-bound, cannot be cloned. |
+| 7 | How is node identity generated? | Software EC P-256 key pair → stored in EncryptedSharedPreferences (encrypted with Master Key from Keystore TEE) → public key hashed → nodeId. Not device-bound (exportable via recovery code). |
 | 8 | What does difficulty 18 bits mean in practice? | Expected 2^18 = 262,144 SHA-256 iterations ≈ 1 second on ARM. Fake identity = 1s CPU cost per attempt. |
 | 9 | Why tombstones in the DHT? | Without tombstones, a re-joining peer would re-insert deleted entries during gossip sync. Tombstones enforce logical deletes. |
 | 10 | What is your real-world performance result? | 4G↔WiFi transfer tested IRL — works end-to-end. Throughput bounded by 4G upload speed (~10 Mbps), not a logic bottleneck. |

@@ -5,7 +5,6 @@ import android.content.Context
 import android.database.Cursor
 import android.net.Uri
 import android.provider.OpenableColumns
-import com.mobicloud.core.security.FragmentCipherUseCase
 import com.mobicloud.domain.models.CatalogEntry
 import com.mobicloud.domain.models.EncryptedBundle
 import com.mobicloud.domain.models.EncryptedFragment
@@ -20,7 +19,7 @@ import com.mobicloud.domain.usecase.m05_dht_catalog.LocalizeFileBlocksUseCase
 import com.mobicloud.domain.models.EncryptionIdentity
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.AssembleDownloadedFileUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.DistributeEncryptedBlocksUseCase
-import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncodeErasureFragmentsUseCase
+import com.mobicloud.domain.usecase.m08_m09_erasure_coding.EncryptThenEncodeUseCase
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.OptimalPeersResult
 import com.mobicloud.domain.usecase.m08_m09_erasure_coding.SelectOptimalPeersUseCase
 import com.mobicloud.domain.models.ErasureParameters
@@ -63,8 +62,7 @@ class ErasureProgressViewModelTest {
 
     private lateinit var catalogRepository: CatalogRepository
     private lateinit var gossipSyncUseCase: GossipSyncUseCase
-    private lateinit var encodeErasureFragmentsUseCase: EncodeErasureFragmentsUseCase
-    private lateinit var fragmentCipherUseCase: FragmentCipherUseCase
+    private lateinit var encryptThenEncodeUseCase: EncryptThenEncodeUseCase
     private lateinit var distributeEncryptedBlocksUseCase: DistributeEncryptedBlocksUseCase
     private lateinit var securityRepository: SecurityRepository
     private lateinit var localizeFileBlocksUseCase: LocalizeFileBlocksUseCase
@@ -82,8 +80,7 @@ class ErasureProgressViewModelTest {
         Dispatchers.setMain(testDispatcher)
         catalogRepository = mockk()
         gossipSyncUseCase = mockk(relaxed = true)
-        encodeErasureFragmentsUseCase = mockk()
-        fragmentCipherUseCase = mockk()
+        encryptThenEncodeUseCase = mockk()
         distributeEncryptedBlocksUseCase = mockk(relaxed = true)
         securityRepository = mockk()
         localizeFileBlocksUseCase = mockk(relaxed = true)
@@ -127,8 +124,7 @@ class ErasureProgressViewModelTest {
     private fun createViewModel() = ExplorerViewModel(
         catalogRepository = catalogRepository,
         gossipSyncUseCase = gossipSyncUseCase,
-        encodeErasureFragmentsUseCase = encodeErasureFragmentsUseCase,
-        fragmentCipherUseCase = fragmentCipherUseCase,
+        encryptThenEncodeUseCase = encryptThenEncodeUseCase,
         distributeEncryptedBlocksUseCase = distributeEncryptedBlocksUseCase,
         securityRepository = securityRepository,
         localizeFileBlocksUseCase = localizeFileBlocksUseCase,
@@ -179,12 +175,13 @@ class ErasureProgressViewModelTest {
         // yield() après chaque étape suspend ée : le StandardTestDispatcher ne peut exécuter
         // qu'une coroutine à la fois. Sans point de suspension entre les transitions d'état,
         // le collector StateFlow ne peut jamais s'intercaler et observe seulement la dernière valeur.
-        coEvery { encodeErasureFragmentsUseCase(any(), any()) } coAnswers {
-            yield()  // laisse le collecteur voir Encoding avant que encode termine
-            Result.success(fakeErasureFragments())
+        // Encoding = préparation (sélection des hôtes), Encrypting = chiffrer-puis-encoder.
+        coEvery { selectOptimalPeersUseCase(any(), any(), any()) } coAnswers {
+            yield()  // laisse le collecteur voir Encoding (préparation)
+            Result.success(OptimalPeersResult(params = ErasureParameters(), selectedPeers = emptyList()))
         }
-        coEvery { fragmentCipherUseCase.encrypt(any(), any()) } coAnswers {
-            yield()  // laisse le collecteur voir Encrypting avant que encrypt termine
+        coEvery { encryptThenEncodeUseCase(any(), any(), any()) } coAnswers {
+            yield()  // laisse le collecteur voir Encrypting avant la fin du chiffrement/encodage
             Result.success(bundle)
         }
         coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any(), any()) } coAnswers {
@@ -238,10 +235,9 @@ class ErasureProgressViewModelTest {
         val entry = fakeEntry()
         val states = mutableListOf<StoreState>()
 
-        coEvery { encodeErasureFragmentsUseCase(any(), any()) } returns Result.success(fakeErasureFragments())
         coEvery { securityRepository.getIdentity() } returns
             Result.success(NodeIdentity("nodeId", Random.nextBytes(65)))
-        coEvery { fragmentCipherUseCase.encrypt(any(), any()) } returns Result.success(bundle)
+        coEvery { encryptThenEncodeUseCase(any(), any(), any()) } returns Result.success(bundle)
 
         // yield() après chaque callback pour capturer l'état intermédiaire post-échec
         coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any(), any()) } coAnswers {
@@ -286,15 +282,14 @@ class ErasureProgressViewModelTest {
 
         coEvery { securityRepository.getIdentity() } returns
             Result.success(NodeIdentity("nodeId", Random.nextBytes(65)))
-        coEvery { fragmentCipherUseCase.encrypt(any(), any()) } returns Result.success(bundle)
         coEvery { distributeEncryptedBlocksUseCase.distribute(any(), any(), any(), any(), any(), any()) } returns
             Result.success(entry)
 
         // Utilise CompletableDeferred pour maintenir la coroutine en état InProgress.Encoding
         val proceed = CompletableDeferred<Unit>()
-        coEvery { encodeErasureFragmentsUseCase(any(), any()) } coAnswers {
+        coEvery { encryptThenEncodeUseCase(any(), any(), any()) } coAnswers {
             proceed.await()  // suspend jusqu'à déblocage explicite
-            Result.success(fakeErasureFragments())
+            Result.success(bundle)
         }
 
         val viewModel = createViewModel()
@@ -313,7 +308,7 @@ class ErasureProgressViewModelTest {
         viewModel.storeFile(fakeUri)
 
         // encode ne doit avoir été appelé qu'une seule fois (le 2ème appel a été ignoré)
-        coVerify(exactly = 1) { encodeErasureFragmentsUseCase(any(), any()) }
+        coVerify(exactly = 1) { encryptThenEncodeUseCase(any(), any(), any()) }
 
         // Déblocage pour que la coroutine se termine proprement
         proceed.complete(Unit)

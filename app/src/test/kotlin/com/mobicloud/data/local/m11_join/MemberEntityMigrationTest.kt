@@ -50,10 +50,22 @@ class MemberEntityMigrationTest {
     }
 
     @Test
-    fun `CatalogDatabase version est 20`() {
+    fun `MIGRATION_20_21 ajoute encryption_key_binding`() {
+        assertEquals(20, CatalogDatabase.MIGRATION_20_21.startVersion)
+        assertEquals(21, CatalogDatabase.MIGRATION_20_21.endVersion)
+    }
+
+    @Test
+    fun `MIGRATION_21_22 ajoute cipher_scheme`() {
+        assertEquals(21, CatalogDatabase.MIGRATION_21_22.startVersion)
+        assertEquals(22, CatalogDatabase.MIGRATION_21_22.endVersion)
+    }
+
+    @Test
+    fun `CatalogDatabase version est 22`() {
         // Note : `@Database` est en `RetentionPolicy.CLASS`, donc non lisible via réflexion.
         // On consomme la même constante que l'annotation pour garder le test couplé à la source.
-        assertEquals(20, CatalogDatabase.CURRENT_VERSION)
+        assertEquals(22, CatalogDatabase.CURRENT_VERSION)
     }
 
     @Test

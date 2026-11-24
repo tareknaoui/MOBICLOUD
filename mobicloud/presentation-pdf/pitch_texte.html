@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>MobiCloud - Script de Pitch Oral</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: #0f172a;
+            background-color: #ffffff;
+            margin: 0;
+            padding: 40px;
+            line-height: 1.6;
+        }
+        
+        header {
+            border-bottom: 2px solid #4f46e5;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo-title h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 32px;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+        }
+        
+        .logo-title p {
+            font-size: 14px;
+            color: #64748b;
+            margin: 5px 0 0 0;
+        }
+        
+        .badge-soutenance {
+            background-color: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #4f46e5;
+        }
+        
+        .section-pitch {
+            margin-bottom: 25px;
+            page-break-inside: avoid;
+        }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 4px solid #4f46e5;
+            padding-left: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .section-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 18px;
+            font-weight: 700;
+            color: #0f172a;
+            margin: 0;
+        }
+        
+        .section-time {
+            background-color: #e0f2fe;
+            color: #0369a1;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 4px;
+        }
+        
+        .section-body {
+            font-size: 14px;
+            color: #334155;
+            margin: 0;
+            text-align: justify;
+        }
+        
+        .highlight-card {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 15px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 13px;
+        }
+        
+        th {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-family: 'Outfit', sans-serif;
+            font-weight: 600;
+            text-align: left;
+            padding: 12px;
+            border: 1px solid #334155;
+        }
+        
+        td {
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+        }
+        
+        tr:nth-child(even) td {
+            background-color: #f8fafc;
+        }
+        
+        .text-indigo {
+            color: #4f46e5;
+            font-weight: 600;
+        }
+        
+        .text-green {
+            color: #10b981;
+            font-weight: 600;
+        }
+        
+        .footer-note {
+            text-align: center;
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 40px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-title">
+            <h1>MobiCloud</h1>
+            <p>Soutenance de Projet Innovant (Option Startup) · ESST 2026</p>
+        </div>
+        <div class="badge-soutenance">
+            Script de Pitch Oral
+        </div>
+    </header>
+
+    <!-- 1. Accroche -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[Accroche]</h2>
+            <span class="section-time">20 secondes</span>
+        </div>
+        <p class="section-body">
+            Combien d'entre vous ont déjà renoncé à un abonnement Google Drive ou iCloud faute de carte bancaire internationale ? Une grande partie des utilisateurs algériens est confrontée à ce problème. Nous, on a trouvé une autre approche. Je m'appelle Yasmine, et voici mon binôme Tarek. Nous vous présentons MobiCloud.
+        </p>
+    </div>
+
+    <!-- 2. Le Problème -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[Le Problème]</h2>
+            <span class="section-time">40 secondes</span>
+        </div>
+        <p class="section-body">
+            Aujourd'hui, sauvegarder ses photos, ses documents ou ses cours sur le cloud est devenu indispensable. Pourtant, des millions d'Algériens ne peuvent pas accéder simplement à ces services, parce qu'ils nécessitent un paiement international et que la mémoire de leur téléphone reste saturée.<br>
+            Et ce n'est pas qu'un problème pour les particuliers. Pour les administrations et les entreprises, héberger leurs données à l'étranger les expose légalement, et crée une dépendance totale à des acteurs qu'elles ne contrôlent pas.
+        </p>
+    </div>
+
+    <!-- 3. L'Opportunité -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[L'Opportunité]</h2>
+            <span class="section-time">25 secondes</span>
+        </div>
+        <p class="section-body">
+            Pourquoi maintenant ? Parce qu'il y a 45 millions de téléphones en Algérie. La plupart des gens manquent de place sur leur mobile, tandis que d'autres ont de grands téléphones à moitié vides. MobiCloud permet de stocker les fichiers des téléphones pleins sur l'espace vide des autres téléphones. C'est du stockage collaboratif, sans aucun serveur physique à acheter.
+        </p>
+    </div>
+
+    <!-- 4. La Solution -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[La Solution]</h2>
+            <span class="section-time">45 secondes</span>
+        </div>
+        <p class="section-body">
+            MobiCloud transforme cet espace inutilisé en un vrai service de stockage. Voici comment ça marche : vos fichiers sont découpés en fragments grâce à l'algorithme Reed-Solomon, puis chaque morceau est chiffré en AES-256 directement sur votre téléphone. Ces morceaux sont ensuite sauvegardés, de manière totalement anonyme et sécurisée, sur les téléphones des autres abonnés de l'opérateur téléphonique. Vous pouvez alors libérer la mémoire de votre téléphone d'un simple geste. Et si votre téléphone casse ou se perd, pas de panique : vos fichiers se reconstruisent automatiquement grâce aux autres téléphones du réseau.<br>
+            Tout ça, en dinars, sans carte internationale, et sans construire le moindre datacenter — on utilise simplement l'espace qui existe déjà dans vos poches.
+        </p>
+    </div>
+
+    <!-- 5. Le vrai bénéfice pour le client -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[Le vrai bénéfice pour le client]</h2>
+            <span class="section-time">45 secondes</span>
+        </div>
+        <p class="section-body">
+            Soyons précis : ce n'est pas un service gratuit. L'abonné paie, ou la fonctionnalité est intégrée dans son forfait mobile.<br>
+            Mais voici ce qui rend MobiCloud différent : plus vous participez, plus vous y gagnez. Concrètement, chaque fichier est découpé en 5 fragments chiffrés répartis sur le réseau global — vous n'avez donc besoin de partager qu'une petite fraction de votre espace, pas des gigaoctets entiers. Et en échange de ce partage, vous recevez de la data mobile offerte par l'opérateur : ça coûte environ 40 dinars à l'opérateur, mais ça vaut 250 dinars pour vous — soit plus de 6 fois la valeur perçue. Ce n'est pas une récompense symbolique : c'est une économie réelle pour l'utilisateur.
+        </p>
+        
+        <div class="highlight-card">
+            <h3 style="margin-top: 0; font-family: 'Outfit', sans-serif; font-size: 15px; color: #4f46e5;">Équilibre Économique (Abonnement à 100 DZD)</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Participant</th>
+                        <th>Ce qu'il DONNE</th>
+                        <th>Ce qu'il REÇOIT</th>
+                        <th>Bénéfice Clé (ROI)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>1. L'Abonné (B2C)</strong></td>
+                        <td>100 DZD / mois</td>
+                        <td>10 Go stockage sécurisé</td>
+                        <td>Mémoire du téléphone libérée sans carte internationale.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>2. Le Prêteur</strong></td>
+                        <td>20 Go espace vide</td>
+                        <td class="text-indigo">2 Go Data Internet mobile</td>
+                        <td>Espace vide transformé en forfait internet gratuit.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>3. L'Opérateur (Mobilis/Djezzy/Ooredoo)</strong></td>
+                        <td>2 Go internet (~20 DA coût réseau)</td>
+                        <td class="text-green">70 DZD / mois (70%)</td>
+                        <td>Gain net de 50 DA par client et rétention accrue.</td>
+                    </tr>
+                    <tr>
+                        <td><strong>4. MobiCloud (Nous)</strong></td>
+                        <td>Logiciel + Serveur relais</td>
+                        <td class="text-green">30 DZD / mois (30%)</td>
+                        <td>Marge pure de 30 DA (0 DA de serveurs physiques de stockage).</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 6. Avantage Concurrentiel -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[Avantage Concurrentiel]</h2>
+            <span class="section-time">30 secondes</span>
+        </div>
+        <p class="section-body">
+            Notre avantage est local. Pour proposer le même modèle économique et répondre aux contraintes réglementaires algériennes, un acteur international devrait investir dans une infrastructure locale et établir des partenariats avec les opérateurs. Nous, nous avons déjà commencé ce travail : un prototype fonctionnel, testé sur de vrais téléphones.
+        </p>
+    </div>
+
+    <!-- 7. Business Model -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[Business Model]</h2>
+            <span class="section-time">40 secondes</span>
+        </div>
+        <p class="section-body">
+            Notre canal commercial : un partenariat avec un opérateur télécom, Mobilis en priorité. MobiCloud devient une fonctionnalité intégrée à leurs forfaits. L'opérateur et MobiCloud se partagent la valeur générée par chaque abonné (70 DZD pour l'opérateur et 30 DZD pour MobiCloud), et l'abonné qui contribue en espace reçoit en plus de la data, financée par l'opérateur. Un modèle où tout le monde gagne, et où la valeur reste dans l'écosystème algérien.
+        </p>
+    </div>
+
+    <!-- 8. Marché -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[Marché & Segmentation]</h2>
+            <span class="section-time">25 secondes</span>
+        </div>
+        <p class="section-body">
+            Notre marché se divise en deux cibles claires :<br>
+            D'abord, le <strong>B2B2C</strong> : les abonnés d'un <strong>opérateur mobile</strong>, âgés de <strong>18 à 35 ans</strong>, qui manquent d'espace sur leur téléphone et payent en Dinars via l'opérateur.<br>
+            Ensuite, le <strong>B2B</strong> : les entreprises soumises à la loi 18-07. Pour leur éviter les coûts élevés d'un datacenter physique, MobiCloud stocke leurs données de manière chiffrée directement sur la flotte de smartphones professionnels de leurs propres employés.<br>
+            Avec seulement 1% de pénétration de la cible Mobilis la première année, cela représente 200 000 abonnés et <strong>55 à 70 millions de dinars par an</strong>.
+        </p>
+    </div>
+
+    <!-- 9. État d'avancement -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[État d'avancement]</h2>
+            <span class="section-time">20 secondes</span>
+        </div>
+        <p class="section-body">
+            Le prototype est déjà validé : des clusters multi-téléphones testés sur de vrais appareils, avec basculement automatique en cas de panne.
+        </p>
+    </div>
+
+    <!-- 10. Conclusion & Demande -->
+    <div class="section-pitch">
+        <div class="section-header">
+            <h2 class="section-title">[Conclusion & Demande]</h2>
+            <span class="section-time">35 secondes</span>
+        </div>
+        <p class="section-body">
+            Nous ne construisons pas un nouveau cloud. Nous transformons les millions de smartphones déjà présents en Algérie en une infrastructure cloud distribuée, locale et accessible à tous.<br>
+            Pour avancer, nous avons besoin de trois choses : premièrement, l'obtention du label Projet Innovant ; deuxièmement, une mise en relation avec Mobilis pour lancer notre pilote ; et troisièmement, un accompagnement pour financer notre mise en conformité légale auprès de l'ANPDP.<br>
+            Merci pour votre attention. Nous sommes prêts à répondre à vos questions.
+        </p>
+    </div>
+
+    <div class="footer-note">
+        MobiCloud Project · Pitch de Soutenance Oral · NEMIRI Yasmine Sara & NAOUI Tarek Anis
+    </div>
+
+</body>
+</html>

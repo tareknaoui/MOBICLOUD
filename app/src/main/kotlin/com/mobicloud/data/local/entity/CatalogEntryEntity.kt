@@ -34,6 +34,10 @@ data class CatalogEntryEntity(
     @ColumnInfo(name = "n", defaultValue = "2")
     val n: Int = 2,
 
+    // Ordre chiffrement / encodage (CipherScheme) ; 0 = encoder-puis-chiffrer (lignes existantes).
+    @ColumnInfo(name = "cipher_scheme", defaultValue = "0")
+    val cipherScheme: Int = 0,
+
     // Story 13.2 — corbeille locale (non distribuée dans le DHT)
     @ColumnInfo(name = "is_in_trash", defaultValue = "0")
     val isInTrash: Boolean = false,

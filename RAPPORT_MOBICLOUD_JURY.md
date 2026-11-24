@@ -57,7 +57,7 @@ MobiCloud est une application Android de **stockage distribué pair-à-pair** (P
 
 ### 2.1 Identité Cryptographique des Nœuds
 
-Chaque appareil génère une **identité permanente** basée sur une paire de clés EC P-256 stockée dans l'Android Keystore matériel (TEE/StrongBox).
+Chaque appareil génère une **identité permanente** basée sur une paire de clés EC P-256 stockée de manière sécurisée dans des préférences chiffrées (`EncryptedSharedPreferences`), protégées par une clé maîtresse de l'Android Keystore elle-même sécurisée au niveau matériel (TEE).
 
 ```
 nodeId = SHA-256(publicKey)[0..15] → hex string 32 caractères
@@ -65,7 +65,7 @@ nodeId = SHA-256(publicKey)[0..15] → hex string 32 caractères
 
 **Propriétés :**
 - Clé générée une seule fois, persistante aux réinstallations
-- Stockée dans le Keystore matériel (protégée par le TEE si disponible)
+- Stockée de manière chiffrée par AES-256-GCM (sécurisée par la clé maîtresse du Keystore / TEE)
 - Pas de serveur d'identité central : l'identité est autosuffisante
 - Permet la vérification de signature cryptographique sur toutes les opérations critiques
 

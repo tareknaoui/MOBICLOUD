@@ -5,6 +5,7 @@ import com.mobicloud.domain.models.m11_join.NodeJoinState
 import com.mobicloud.domain.repository.PeerRepository
 import com.mobicloud.domain.repository.SecurityRepository
 import java.util.UUID
+import com.mobicloud.domain.usecase.m10_election.ElectionStateManager
 import javax.inject.Inject
 
 /**
@@ -19,7 +20,8 @@ class BullySoloElectionUseCase @Inject constructor(
     private val securityRepository: SecurityRepository,
     private val peerRepository: PeerRepository,
     private val markSelfAsSuperPairUseCase: MarkSelfAsSuperPairUseCase,
-    private val joinStateMachine: JoinStateMachine
+    private val joinStateMachine: JoinStateMachine,
+    private val electionStateManager: ElectionStateManager = ElectionStateManager()
 ) {
     suspend operator fun invoke() {
         val currentState = joinStateMachine.currentState.value
@@ -33,6 +35,10 @@ class BullySoloElectionUseCase @Inject constructor(
             timestampMs = System.currentTimeMillis(),
             isSuperPair = true
         )
+
+        // Nouveau cluster : premier mandat (term 1). Sans term, ce Super-Pair ne pourrait pas
+        // être départagé par term si un concurrent apparaît dans le même cluster.
+        electionStateManager.beginMandate(newClusterId, electionStateManager.nextCandidateTerm(newClusterId))
 
         markSelfAsSuperPairUseCase.invoke(newClusterId)
     }

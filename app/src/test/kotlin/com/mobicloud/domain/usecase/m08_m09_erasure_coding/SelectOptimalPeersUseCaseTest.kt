@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -150,43 +151,75 @@ class SelectOptimalPeersUseCaseTest {
     // ─── Happy paths ────────────────────────────────────────────────────────
 
     @Test
-    fun `happy path - 6 pairs fiables retourne K=4 N=1`() = runTest {
-        // Score >= 0.8 → dynamicN = 1 (réseau très stable) ; 6 pairs dispo >= 4+1 → finalN=1
-        val peers = (1..6).map { makePeer("peer_$it", score = 0.9f) }
+    fun `happy path - assez de pairs fiables atteint la cible avec le plus petit N`() = runTest {
+        // p = 0.9, K = 4 : A(N=3) = 0.99727 < 0.999 <= A(N=4) = 0.99957 → N = 4
+        val peers = (1..20).map { makePeer("peer_$it", score = 0.9f) }
         every { peerRepository.peers } returns MutableStateFlow(peers)
 
-        val result = useCase(FILE_10_MB, baseK = 4)
-        assertTrue(result.isSuccess)
-        val r = result.getOrThrow()
+        val r = useCase(FILE_10_MB, baseK = 4).getOrThrow()
         assertEquals("K doit être 4", 4, r.params.k)
-        assertEquals("N=1 pour réseau très stable (score >= 0.8)", 1, r.params.n)
-        assertEquals("5 pairs sélectionnés (K=4 + N=1)", 5, r.selectedPeers.size)
+        assertEquals("plus petit N tel que A >= 0.999", 4, r.params.n)
+        assertEquals("8 pairs sélectionnés (K=4 + N=4)", 8, r.selectedPeers.size)
+        assertTrue(r.availabilityTargetMet)
+        assertTrue(r.estimatedAvailability!! >= 0.999)
     }
 
     @Test
-    fun `happy path - réseau moyen score 0_6 retourne N=2`() = runTest {
-        // Score 0.6 → 0.5 ≤ s < 0.8 → dynamicN = 2
+    fun `l ancien seuil N=1 pour score 0_9 ne donnait que 92 pourcent`() = runTest {
+        // 5 pairs à 0.9 : seul N = 1 est possible → meilleur effort, cible non atteinte
+        val peers = (1..5).map { makePeer("peer_$it", score = 0.9f) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val r = useCase(FILE_10_MB, baseK = 4).getOrThrow()
+        assertEquals(1, r.params.n)
+        assertFalse(r.availabilityTargetMet)
+        assertEquals(0.91854, r.estimatedAvailability!!, 1e-5)
+    }
+
+    @Test
+    fun `réseau moyen - redondance au maximum des pairs présents`() = runTest {
+        // 7 pairs à 0.6 : la cible exigerait bien plus de 3 parités → N = 7 - 4 = 3
         val peers = (1..7).map { makePeer("peer_$it", score = 0.6f) }
         every { peerRepository.peers } returns MutableStateFlow(peers)
 
-        val result = useCase(FILE_10_MB, baseK = 4)
-        assertTrue(result.isSuccess)
-        val r = result.getOrThrow()
-        assertEquals("N=2 pour réseau moyen (0.5 <= score < 0.8)", 2, r.params.n)
-        assertEquals("6 pairs sélectionnés (K=4 + N=2)", 6, r.selectedPeers.size)
+        val r = useCase(FILE_10_MB, baseK = 4).getOrThrow()
+        assertEquals(3, r.params.n)
+        assertEquals(7, r.selectedPeers.size)
+        assertFalse(r.availabilityTargetMet)
     }
 
     @Test
-    fun `happy path - réseau instable score 0_3 retourne N=4`() = runTest {
-        // Score < 0.5 → dynamicN = 4 ; 9 peers dispo >= 4+4
-        val peers = (1..9).map { makePeer("peer_$it", score = 0.3f) }
+    fun `réseau instable - surcoût plafonné à une réplication x3`() = runTest {
+        // 30 pairs à 0.3 : la cible est hors d'atteinte → N plafonné à 2K = 8
+        val peers = (1..30).map { makePeer("peer_$it", score = 0.3f) }
         every { peerRepository.peers } returns MutableStateFlow(peers)
 
-        val result = useCase(FILE_10_MB, baseK = 4)
-        assertTrue(result.isSuccess)
-        val r = result.getOrThrow()
-        assertEquals("N=4 pour réseau instable (score < 0.5)", 4, r.params.n)
-        assertEquals("8 pairs sélectionnés (K=4 + N=4)", 8, r.selectedPeers.size)
+        val r = useCase(FILE_10_MB, baseK = 4).getOrThrow()
+        assertEquals(8, r.params.n)
+        assertEquals(12, r.selectedPeers.size)
+        assertFalse(r.availabilityTargetMet)
+    }
+
+    @Test
+    fun `profil démo 3 téléphones - RS(2,1)`() = runTest {
+        val peers = (1..3).map { makePeer("peer_$it", score = 0.9f) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val r = useCase(FILE_10_MB, baseK = 2).getOrThrow()
+        assertEquals(2, r.params.k)
+        assertEquals(1, r.params.n)
+        assertEquals(3, r.selectedPeers.size)
+    }
+
+    @Test
+    fun `mode duplication - parité calculée sur la répartition round-robin`() = runTest {
+        val peers = (1..2).map { makePeer("peer_$it", score = 0.9f) }
+        every { peerRepository.peers } returns MutableStateFlow(peers)
+
+        val r = useCase(FILE_10_MB, baseK = 2, allowDuplicatePeers = true).getOrThrow()
+        // p = 0.9, K = 2 : A(1) = 0.972, A(2) = 0.9963, A(3) = 0.99954 → N = 3
+        assertEquals(3, r.params.n)
+        assertEquals(5, r.selectedPeers.size)
     }
 
     @Test
@@ -245,9 +278,9 @@ class SelectOptimalPeersUseCaseTest {
     @Test
     fun `contrainte GF256 respectée - k + n doit être inférieur à 255`() = runTest {
         // Test sur tous les profils de redondance
-        val peersForStable = (1..20).map { makePeer("peer_$it", score = 0.9f) }   // dynamicN=1
-        val peersForNormal = (1..20).map { makePeer("peer_$it", score = 0.6f) }   // dynamicN=2
-        val peersForUnstable = (1..20).map { makePeer("peer_$it", score = 0.3f) } // dynamicN=4
+        val peersForStable = (1..20).map { makePeer("peer_$it", score = 0.9f) }
+        val peersForNormal = (1..20).map { makePeer("peer_$it", score = 0.6f) }
+        val peersForUnstable = (1..20).map { makePeer("peer_$it", score = 0.3f) }
 
         for (peerList in listOf(peersForStable, peersForNormal, peersForUnstable)) {
             every { peerRepository.peers } returns MutableStateFlow(peerList)

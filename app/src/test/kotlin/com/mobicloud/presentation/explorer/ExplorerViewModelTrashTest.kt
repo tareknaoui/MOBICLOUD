@@ -48,8 +48,7 @@ class ExplorerViewModelTrashTest {
         viewModel = ExplorerViewModel(
             catalogRepository = catalogRepository,
             gossipSyncUseCase = mockk(relaxed = true),
-            encodeErasureFragmentsUseCase = mockk(relaxed = true),
-            fragmentCipherUseCase = mockk(relaxed = true),
+            encryptThenEncodeUseCase = mockk(relaxed = true),
             distributeEncryptedBlocksUseCase = mockk(relaxed = true),
             securityRepository = mockk(relaxed = true),
             localizeFileBlocksUseCase = mockk(relaxed = true),

@@ -171,7 +171,7 @@ class MainActivity : AppCompatActivity() {
             // perdu plutôt que différé — acceptable pour ce scope (app déjà installée en groupe).
             LaunchedEffect(pendingInviteUri, hasCompletedOnboarding) {
                 val uri = pendingInviteUri ?: return@LaunchedEffect
-                if (!hasCompletedOnboarding) return@LaunchedEffect
+                if (hasCompletedOnboarding != true) return@LaunchedEffect
                 ClusterInvite.fromUri(uri)?.let { invite ->
                     appState.navController.navigate(JoinInviteRoute(invite.clusterId, invite.hintedSpNodeId))
                 }

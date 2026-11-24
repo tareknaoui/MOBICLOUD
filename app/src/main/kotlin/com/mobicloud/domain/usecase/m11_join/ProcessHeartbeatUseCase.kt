@@ -1,6 +1,7 @@
 package com.mobicloud.domain.usecase.m11_join
 
 import com.mobicloud.data.local.dao.MemberDao
+import com.mobicloud.data.local.m11_join.decodeEncryptionKeyBinding
 import com.mobicloud.domain.models.m11_join.Heartbeat
 import com.mobicloud.domain.models.m11_join.MEMBER_UPDATE_TIMESTAMP_WINDOW_MS
 import com.mobicloud.domain.models.m11_join.MAX_CLUSTER_SIZE
@@ -111,7 +112,9 @@ class ProcessHeartbeatUseCase @Inject constructor(
                     ipAddress = effectiveIp,
                     port = effectivePort,
                     freeBytes = hb.freeBytes,
-                    role = role
+                    role = role,
+                    // Conserver la clé de chiffrement publiée à l'admission (R2-10).
+                    encryptionKeyBinding = memberEntity.encryptionKeyBinding.decodeEncryptionKeyBinding()
                 )
                 val joinedUpdate = MemberUpdate(
                     event = MemberUpdateEvent.JOINED,

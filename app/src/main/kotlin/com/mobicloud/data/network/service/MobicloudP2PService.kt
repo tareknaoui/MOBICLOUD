@@ -54,6 +54,7 @@ import com.mobicloud.domain.usecase.m10_election.ProcessIncomingElectionEventUse
 import com.mobicloud.domain.usecase.m10_election.RegisterSuperPeerUseCase
 import com.mobicloud.domain.usecase.m10_election.RunBullyElectionUseCase
 import com.mobicloud.domain.usecase.m10_election.AbdicateSuperPeerUseCase
+import com.mobicloud.domain.usecase.m10_election.MandateRotationPolicy
 import com.mobicloud.domain.usecase.m11_join.JoinStateMachine
 import com.mobicloud.domain.usecase.m11_join.MemberHeartbeatUseCase
 import com.mobicloud.domain.usecase.m11_join.MemberSnapshotCacheUseCase
@@ -103,6 +104,7 @@ class MobicloudP2PService : Service() {
     @Inject lateinit var tcpConnectionManager: TcpConnectionManager
     @Inject lateinit var networkEventRepository: NetworkEventRepository
     @Inject lateinit var runBullyElectionUseCase: RunBullyElectionUseCase
+    @Inject lateinit var resolveRelaySuperPeerConflictUseCase: com.mobicloud.domain.usecase.m10_election.ResolveRelaySuperPeerConflictUseCase
     @Inject lateinit var registerSuperPeerUseCase: RegisterSuperPeerUseCase
     @Inject lateinit var abdicateSuperPeerUseCase: AbdicateSuperPeerUseCase
     @Inject lateinit var processIncomingElectionEventUseCase: ProcessIncomingElectionEventUseCase
@@ -155,8 +157,8 @@ class MobicloudP2PService : Service() {
         private const val EVICTION_CHECK_INTERVAL_MS = 15_000L
         private const val RELIABILITY_SCORE_INTERVAL_MS = 30_000L
         private const val LOGTAG = "MobicloudP2PService"
-        /** Durée du mandat Super-Pair avant abdication automatique (testable via overrideAbdicationDelayMs). */
-        const val ABDICATION_DELAY_MS = 30 * 60 * 1000L
+        /** Durée du mandat Super-Pair (voir MandateRotationPolicy, source de vérité). */
+        const val ABDICATION_DELAY_MS = MandateRotationPolicy.MANDATE_DURATION_MS
         /** Délai inter-cycle du monitoring d'élection — évite le hot-loop en période de cooldown. */
         private const val ELECTION_RETRY_DELAY_MS = 5_000L
         /** Story 7.3 — intervalle du scan auto-réparation (compromis détection vs thrash). */
@@ -319,6 +321,16 @@ class MobicloudP2PService : Service() {
                     runCatching {
                         processIncomingElectionEventUseCase().collect { result ->
                             result.onSuccess { event ->
+                                // Terms : un COORDINATOR concurrent du même cluster l'emporte sur notre
+                                // mandat (term plus récent, ou même term et priorité supérieure).
+                                // Même séquence de retrait que la résolution split-brain via le relais.
+                                if (event is com.mobicloud.domain.models.ElectionEvent.StepDownRequired
+                                    && joinStateMachine.currentState.value is NodeJoinState.SuperPair
+                                ) {
+                                    Log.i(LOGTAG, "[ELECTION-IN] Retrait au profit de ${event.winnerNodeId.take(8)} (term ${event.term})")
+                                    abdicate()
+                                    launch { abdicateSuperPeerUseCase() }
+                                }
                                 // D1 : AbdicationReceived était silencieusement ignoré ici —
                                 // les membres attendaient SP_TIMEOUT_MS (90s) pour détecter l'absence
                                 // de leur SP au lieu de réagir immédiatement. Fix : si le SP qui abdique
@@ -547,12 +559,14 @@ class MobicloudP2PService : Service() {
                                     val myClusterId = nodeSettingsRepository.getClusterIdOnce()
                                     val peers = signalingRepository.latestPeers.value
                                     val sameClusterRival = peers.firstOrNull { p ->
-                                        p.isSuperPair
-                                            && p.clusterId == myClusterId
-                                            && p.nodeId > identity.nodeId
+                                        p.isSuperPair && myClusterId.isNotBlank() && p.clusterId == myClusterId
                                     }
-                                    if (sameClusterRival != null) {
-                                        Log.i(LOGTAG, "[RECONNECT] Split-brain post-reconnexion: yield to ${sameClusterRival.nodeId.take(8)}")
+                                    // Le relais détecte, le term décide (ResolveRelaySuperPeerConflictUseCase).
+                                    if (sameClusterRival != null &&
+                                        resolveRelaySuperPeerConflictUseCase(myClusterId, sameClusterRival.nodeId, identity.nodeId) ==
+                                        com.mobicloud.domain.usecase.m10_election.ResolveRelaySuperPeerConflictUseCase.Decision.YIELD
+                                    ) {
+                                        Log.i(LOGTAG, "[RECONNECT] Split-brain post-reconnexion (sans mandat): yield to ${sameClusterRival.nodeId.take(8)}")
                                         abdicate()
                                         launch { abdicateSuperPeerUseCase() }
                                     }
@@ -627,10 +641,18 @@ class MobicloudP2PService : Service() {
                                 // Split-brain intra-cluster : même clusterId → abdication obligatoire
                                 // même si on a des membres. Deux SPs du même cluster avec chacun des
                                 // membres = deadlock permanent sans ce cas prioritaire.
-                                if (peer.clusterId.isNotBlank() && peer.clusterId == fsmState.clusterId && peer.nodeId > identity.nodeId) {
-                                    Log.i(LOGTAG, "[JOIN] SP split-brain (latestPeers, same cluster ${peer.clusterId.take(8)}): yield to ${peer.nodeId.take(8)}")
-                                    abdicate()
-                                    launch { abdicateSuperPeerUseCase() }
+                                // Le relais détecte, le term décide : le rival n'est pas ajouté à
+                                // seenSuperPairIds, donc le mandat est réaffirmé à chaque GET_PEERS
+                                // jusqu'au retrait de l'un des deux (ResolveRelaySuperPeerConflictUseCase).
+                                if (peer.clusterId.isNotBlank() && peer.clusterId == fsmState.clusterId) {
+                                    val decision = resolveRelaySuperPeerConflictUseCase(peer.clusterId, peer.nodeId, identity.nodeId)
+                                    if (decision == com.mobicloud.domain.usecase.m10_election.ResolveRelaySuperPeerConflictUseCase.Decision.YIELD) {
+                                        Log.i(LOGTAG, "[JOIN] SP split-brain (latestPeers, same cluster ${peer.clusterId.take(8)}, sans mandat): yield to ${peer.nodeId.take(8)}")
+                                        abdicate()
+                                        launch { abdicateSuperPeerUseCase() }
+                                    } else {
+                                        Log.i(LOGTAG, "[JOIN] SP split-brain (latestPeers, same cluster ${peer.clusterId.take(8)}) avec ${peer.nodeId.take(8)} : $decision")
+                                    }
                                 // Guards anti-ghost-cluster (incident 2026-05-17) :
                                 // 1. Si le SP local a des membres réels et rival dans un autre cluster,
                                 //    ne PAS abdiquer — on les abandonnerait à un cluster potentiellement fantôme.
@@ -708,24 +730,10 @@ class MobicloudP2PService : Service() {
                                         delay(30_000L)
                                     }
                                 }
-                                // S10 (stabilité) : auto-abdication 30 min DÉSACTIVÉE. Causait le bug
-                                // "SP affiche Searching après ~30 min" : forçait rotation du rôle SP
-                                // même quand le cluster était sain → churn inutile, perte temporaire
-                                // de cohérence (members → Rejoining → re-Bully → reconvergence).
-                                // Promotabilité préservée via : SP conflict resolution (cross-network),
-                                // Bully forcé si SP meurt, abdication manuelle utilisateur.
-                                // Pour ré-activer rotation équitable : décommenter le bloc ci-dessous.
-                                /*
-                                launch {
-                                    Log.i(LOGTAG, "Timer d'abdication BullySolo démarré (${ABDICATION_DELAY_MS / 60_000}min)")
-                                    delay(ABDICATION_DELAY_MS)
-                                    Log.i(LOGTAG, "Timer d'abdication BullySolo expiré — abdication")
-                                    abdicateSuperPeerUseCase()
-                                        .onFailure { Log.w(LOGTAG, "Broadcast ABDICATION échoué — abdication tout de même", it) }
-                                    networkEventRepository.pushEvent("[ELECTION] Abdication automatique après ${ABDICATION_DELAY_MS / 60_000}min")
-                                    abdicate()
-                                }
-                                */
+                                // Mandat tournant borné (réactivé, voir MandateRotationPolicy) :
+                                // rotation seulement s'il existe un successeur actif, retrait souple
+                                // au lieu du cooldown strict (corrige "SP affiche Searching après 30 min").
+                                launchMandateRotation("BullySolo")
                             }
                         }
                         // Polling 2s × 8 = 16s pour laisser le GET_PEERS (intervalle 10s) retourner
@@ -745,16 +753,21 @@ class MobicloudP2PService : Service() {
                                 // obligatoire même si on a des membres (règle Bully : nodeId le plus
                                 // bas cède, peu importe l'état). Sans ça, deux SPs gardent chacun
                                 // leurs membres et le deadlock est permanent.
+                                // Le relais détecte, le term décide (ResolveRelaySuperPeerConflictUseCase) :
+                                // mandat réaffirmé par COORDINATOR signé, le perdant se retire via
+                                // StepDownRequired. Repli par nodeId seulement sans mandat numéroté.
                                 val sameClusterRival = peers.firstOrNull { p ->
-                                    p.isSuperPair
-                                        && p.clusterId == myClusterId
-                                        && p.nodeId > identity.nodeId
+                                    p.isSuperPair && myClusterId.isNotBlank() && p.clusterId == myClusterId
                                 }
                                 if (sameClusterRival != null) {
-                                    Log.i(LOGTAG, "[JOIN] SP split-brain (same cluster): yield to ${sameClusterRival.nodeId.take(8)}")
-                                    abdicate()
-                                    launch { abdicateSuperPeerUseCase() }
-                                    return@launch
+                                    val decision = resolveRelaySuperPeerConflictUseCase(myClusterId, sameClusterRival.nodeId, identity.nodeId)
+                                    if (decision == com.mobicloud.domain.usecase.m10_election.ResolveRelaySuperPeerConflictUseCase.Decision.YIELD) {
+                                        Log.i(LOGTAG, "[JOIN] SP split-brain (same cluster, sans mandat): yield to ${sameClusterRival.nodeId.take(8)}")
+                                        abdicate()
+                                        launch { abdicateSuperPeerUseCase() }
+                                        return@launch
+                                    }
+                                    return@repeat
                                 }
                                 // Guard anti-ghost (incident 2026-05-17) : ne pas abdiquer si on a déjà
                                 // des membres réels et que le rival est dans un cluster différent.
@@ -901,20 +914,8 @@ class MobicloudP2PService : Service() {
                                             delay(30_000L)
                                         }
                                     }
-                                    // S10 (stabilité) : auto-abdication 30 min DÉSACTIVÉE — voir
-                                    // commentaire dans le bloc BullySolo path ci-dessus.
-                                    /*
-                                    launch {
-                                        Log.i(LOGTAG, "Timer d'abdication démarré (${ABDICATION_DELAY_MS / 60_000}min)")
-                                        delay(ABDICATION_DELAY_MS)
-                                        Log.i(LOGTAG, "Timer d'abdication expiré — exécution de l'abdication")
-                                        // F-05 : log l'échec broadcast mais procède toujours à l'abdication
-                                        abdicateSuperPeerUseCase()
-                                            .onFailure { Log.w(LOGTAG, "Broadcast ABDICATION échoué — abdication tout de même exécutée", it) }
-                                        networkEventRepository.pushEvent("[ELECTION] Abdication automatique après ${ABDICATION_DELAY_MS / 60_000}min")
-                                        abdicate() // Annule superPeerJob (keepalive Relais HA)
-                                    }
-                                    */
+                                    // Mandat tournant borné (réactivé, voir MandateRotationPolicy).
+                                    launchMandateRotation("Bully")
                                 }
                             }
                             .onFailure { Log.d(LOGTAG, "Cycle d'élection terminé : ${it.message}") }
@@ -923,6 +924,40 @@ class MobicloudP2PService : Service() {
                     delay(ELECTION_RETRY_DELAY_MS)
                 }
             }
+        }
+    }
+
+    /**
+     * Mandat tournant borné (R2-3). Lancé dans le superPeerJob : annulé avec lui si le nœud
+     * cesse d'être Super-Pair pour une autre raison.
+     *
+     * À chaque échéance : rotation s'il existe un membre actif pouvant succéder, sinon
+     * renouvellement du mandat. En rotation, l'abdication diffuse ABDICATION (les membres
+     * lancent Bully immédiatement) et place ce nœud en retrait souple.
+     */
+    private fun CoroutineScope.launchMandateRotation(path: String) = launch {
+        val mandateMinutes = MandateRotationPolicy.MANDATE_DURATION_MS / 60_000
+        Log.i(LOGTAG, "[$path] Mandat Super-Pair démarré (${mandateMinutes} min)")
+        while (isActive) {
+            delay(MandateRotationPolicy.MANDATE_DURATION_MS)
+            val activePeerIds = peerRepository.peers.value
+                .filter { it.isActive }
+                .mapTo(HashSet()) { it.identity.nodeId }
+            val hasSuccessor = MandateRotationPolicy.hasEligibleSuccessor(
+                memberSnapshotCacheUseCase.inMemory.value,
+                activePeerIds
+            )
+            if (!hasSuccessor) {
+                Log.i(LOGTAG, "[$path] Fin de mandat — aucun successeur actif, mandat renouvelé")
+                networkEventRepository.pushEvent("[ELECTION] Fin de mandat : aucun successeur actif — mandat renouvelé")
+                continue
+            }
+            Log.i(LOGTAG, "[$path] Fin de mandat — rotation")
+            networkEventRepository.pushEvent("[ELECTION] Fin de mandat (${mandateMinutes} min) — rotation du Super-Pair")
+            abdicateSuperPeerUseCase(rotation = true)
+                .onFailure { Log.w(LOGTAG, "Broadcast ABDICATION échoué — rotation tout de même", it) }
+            abdicate() // annule superPeerJob, donc cette boucle
+            break
         }
     }
 

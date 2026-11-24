@@ -4,6 +4,9 @@ import com.mobicloud.di.ApplicationScope
 import com.mobicloud.domain.models.Peer
 import com.mobicloud.domain.repository.NetworkEventRepository
 import com.mobicloud.domain.repository.PeerRepository
+import com.mobicloud.domain.usecase.experiments.NoOpProtocolEventRecorder
+import com.mobicloud.domain.usecase.experiments.ProtocolEventRecorder
+import com.mobicloud.domain.usecase.experiments.ProtocolEventType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -20,7 +23,8 @@ import javax.inject.Singleton
 class CircuitBreakerUseCase @Inject constructor(
     private val peerRepository: PeerRepository,
     private val networkEventRepository: NetworkEventRepository,
-    @ApplicationScope private val applicationScope: CoroutineScope
+    @ApplicationScope private val applicationScope: CoroutineScope,
+    private val eventRecorder: ProtocolEventRecorder = NoOpProtocolEventRecorder
 ) {
     // Visible for testing
     internal var currentTimeProvider: () -> Long = { System.currentTimeMillis() }
@@ -79,6 +83,11 @@ class CircuitBreakerUseCase @Inject constructor(
             val newlyInactiveCount = newlyInactive.size
             if (newlyInactiveCount > 0) {
                 android.util.Log.w("CircuitBreaker", "[CHURN] $newlyInactiveCount peer(s) → INACTIVE: ${newlyInactive.map { it.identity.nodeId.take(8) }}")
+                eventRecorder.record(
+                    ProtocolEventType.PEER_INACTIVE,
+                    newlyInactiveCount.toDouble(),
+                    newlyInactive.joinToString(" ") { it.identity.nodeId.take(8) }
+                )
             }
 
             repeat(newlyInactiveCount) { churnHistory.add(currentTime) }
@@ -97,6 +106,7 @@ class CircuitBreakerUseCase @Inject constructor(
 
             if (!_isCircuitOpen.value && churnRate > CHURN_OPEN_THRESHOLD) {
                 shouldActivate = true
+                eventRecorder.record(ProtocolEventType.CIRCUIT_OPEN, churnRate, "peers=$totalPeers")
             }
         }
 
@@ -141,6 +151,7 @@ class CircuitBreakerUseCase @Inject constructor(
             if (totalActivePeers < MIN_CLUSTER_SIZE) {
                 // Réseau trop petit ou vide : désactiver prudemment
                 shouldDeactivate = true
+                eventRecorder.record(ProtocolEventType.CIRCUIT_CLOSE, 0.0, "activePeers=$totalActivePeers (cluster trop petit)")
                 return@withLock
             }
 
@@ -148,6 +159,7 @@ class CircuitBreakerUseCase @Inject constructor(
 
             if (churnRate < CHURN_CLOSE_THRESHOLD) {
                 shouldDeactivate = true
+                eventRecorder.record(ProtocolEventType.CIRCUIT_CLOSE, churnRate, "activePeers=$totalActivePeers")
             } else {
                 // Churn encore élevé : réévaluer dans 2 minutes supplémentaires
                 shouldReschedule = true

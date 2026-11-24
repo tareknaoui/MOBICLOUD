@@ -213,6 +213,8 @@ dependencies {
     // ... Testing
     testImplementation(libs.junit)
     testImplementation("io.mockk:mockk:1.13.8")
+    // org.json réel en test JVM (le jar Android n'en fournit qu'un stub) : sérialisation relais.
+    testImplementation("org.json:json:20231013")
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.okhttp.mockwebserver)
     androidTestImplementation(libs.androidx.test.ext)
